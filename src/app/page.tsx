@@ -1,0 +1,1238 @@
+'use client';
+
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Search, ShoppingCart, Trash2, Plus, Minus, X, Printer, CreditCard,
+  Banknote, Wallet, Check, Package, Percent, User, Clock, Calendar,
+  ChevronRight, ScanLine, Pause, Play, RotateCcw, DollarSign, Receipt,
+  ShoppingCart as Cart, Settings, Bell, LogOut, Menu as MenuIcon,
+  TrendingUp, BarChart3, Tag, AlertCircle, CheckCircle2, ArrowLeft,
+  Zap, Store, Hash
+} from "lucide-react";
+import {
+  products as ALL_PRODUCTS, categories, paymentMethods, quickCashAmounts,
+  TAX_RATE, STORE_NAME, STORE_ADDRESS, STORE_PHONE,
+  type Product
+} from "@/lib/pos-data";
+import type { CartItem, PaymentResult } from "@/lib/pos-types";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
+
+export default function POSPage() {
+  // ===== State =====
+  const [activeCategory, setActiveCategory] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [selectedCartIndex, setSelectedCartIndex] = useState<number | null>(null);
+  const [keypadInput, setKeypadInput] = useState("");
+  const [customerName, setCustomerName] = useState("");
+  const [invoiceNumber, setInvoiceNumber] = useState(() => generateInvoice());
+  const [cashier] = useState("Sarah Johnson");
+  const [now, setNow] = useState(new Date());
+  const [heldOrders, setHeldOrders] = useState<{ items: CartItem[]; customer: string; invoice: string }[]>([]);
+  const [showPayment, setShowPayment] = useState(false);
+  const [showReceipt, setShowReceipt] = useState(false);
+  const [lastPayment, setLastPayment] = useState<PaymentResult | null>(null);
+  const [globalDiscount, setGlobalDiscount] = useState(0);
+  const [showCashDrawer, setShowCashDrawer] = useState(false);
+  const [lowStockNotified, setLowStockNotified] = useState<Set<string>>(new Set());
+  const [scannerMode, setScannerMode] = useState(false);
+  const [scannerText, setScannerText] = useState("");
+  const [dailyTotal, setDailyTotal] = useState(0);
+  const [transactionCount, setTransactionCount] = useState(0);
+  const [activeKeypadMode, setActiveKeypadMode] = useState<"qty" | "price" | "barcode">("qty");
+  const [showSidebar, setShowSidebar] = useState(true);
+
+  const { toast } = useToast();
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // ===== Effects =====
+  useEffect(() => {
+    const interval = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // ===== Computed =====
+  const filteredProducts = useMemo(() => {
+    let result = ALL_PRODUCTS;
+    if (activeCategory !== "all") {
+      result = result.filter(p => p.category === activeCategory);
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(p =>
+        p.name.toLowerCase().includes(q) ||
+        p.sku.toLowerCase().includes(q) ||
+        p.barcode.includes(q)
+      );
+    }
+    return result;
+  }, [activeCategory, searchQuery]);
+
+  const subtotal = useMemo(() =>
+    cart.reduce((sum, item) => {
+      const lineTotal = item.price * item.quantity;
+      const lineDiscount = lineTotal * (item.discount / 100);
+      return sum + (lineTotal - lineDiscount);
+    }, 0), [cart]);
+
+  const discountAmount = useMemo(() =>
+    cart.reduce((sum, item) => sum + (item.price * item.quantity * (item.discount / 100)), 0) +
+    (subtotal * (globalDiscount / 100)), [cart, subtotal, globalDiscount]);
+
+  const taxableAmount = useMemo(() =>
+    cart.reduce((sum, item) => {
+      if (!item.taxable) return sum;
+      const lineTotal = item.price * item.quantity;
+      const lineDiscount = lineTotal * (item.discount / 100);
+      return sum + (lineTotal - lineDiscount);
+    }, 0) - (subtotal * (globalDiscount / 100)), [cart, subtotal, globalDiscount]);
+
+  const taxAmount = taxableAmount * TAX_RATE;
+  const totalAfterDiscount = subtotal - (subtotal * (globalDiscount / 100));
+  const total = totalAfterDiscount + taxAmount;
+  const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+
+  // ===== Cart Actions =====
+  const addToCart = useCallback((product: Product) => {
+    setCart(prev => {
+      const existing = prev.find(item => item.productId === product.id);
+      if (existing) {
+        if (existing.quantity >= product.stock) {
+          toast({ title: "Stock limit reached", description: `Only ${product.stock} ${product.unit} of ${product.name} available`, variant: "destructive" });
+          return prev;
+        }
+        return prev.map(item =>
+          item.productId === product.id
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
+        );
+      }
+      if (product.stock <= 0) {
+        toast({ title: "Out of stock", description: `${product.name} is unavailable`, variant: "destructive" });
+        return prev;
+      }
+      // Low stock notification
+      if (product.stock <= 20 && !lowStockNotified.has(product.id)) {
+        toast({ title: "Low stock alert", description: `${product.name} has only ${product.stock} units left`, variant: "default" });
+        setLowStockNotified(prev => new Set(prev).add(product.id));
+      }
+      return [...prev, {
+        id: `${product.id}-${Date.now()}`,
+        productId: product.id,
+        sku: product.sku,
+        name: product.name,
+        price: product.price,
+        quantity: 1,
+        unit: product.unit,
+        emoji: product.emoji,
+        discount: 0,
+        taxable: product.taxable,
+        stock: product.stock,
+      }];
+    });
+    toast({ title: "Added to cart", description: `${product.emoji} ${product.name}`, duration: 1500 });
+  }, [lowStockNotified, toast]);
+
+  const updateQuantity = (index: number, delta: number) => {
+    setCart(prev => prev.map((item, i) => {
+      if (i !== index) return item;
+      const newQty = item.quantity + delta;
+      if (newQty <= 0) return item;
+      if (newQty > item.stock) {
+        toast({ title: "Stock limit reached", variant: "destructive" });
+        return item;
+      }
+      return { ...item, quantity: newQty };
+    }));
+  };
+
+  const setQuantity = (index: number, qty: number) => {
+    setCart(prev => prev.map((item, i) => {
+      if (i !== index) return item;
+      if (qty <= 0) return item;
+      if (qty > item.stock) {
+        toast({ title: "Stock limit reached", variant: "destructive" });
+        return item;
+      }
+      return { ...item, quantity: qty };
+    }));
+  };
+
+  const removeLine = (index: number) => {
+    setCart(prev => prev.filter((_, i) => i !== index));
+    setSelectedCartIndex(null);
+    toast({ title: "Line removed", variant: "default" });
+  };
+
+  const applyDiscount = (index: number, discount: number) => {
+    setCart(prev => prev.map((item, i) =>
+      i === index ? { ...item, discount: Math.min(100, Math.max(0, discount)) } : item
+    ));
+  };
+
+  const clearCart = () => {
+    setCart([]);
+    setSelectedCartIndex(null);
+    setGlobalDiscount(0);
+    setCustomerName("");
+    setInvoiceNumber(generateInvoice());
+  };
+
+  // ===== Keypad =====
+  const handleKeypadPress = (key: string) => {
+    if (key === "C") { setKeypadInput(""); return; }
+    if (key === "⌫") { setKeypadInput(prev => prev.slice(0, -1)); return; }
+    if (key === "Enter") {
+      handleKeypadEnter();
+      return;
+    }
+    if (key === "." && keypadInput.includes(".")) return;
+    setKeypadInput(prev => prev + key);
+  };
+
+  const handleKeypadEnter = () => {
+    const value = parseFloat(keypadInput);
+    if (isNaN(value) && activeKeypadMode !== "barcode") {
+      toast({ title: "Invalid input", variant: "destructive" });
+      return;
+    }
+    if (activeKeypadMode === "qty" && selectedCartIndex !== null) {
+      setQuantity(selectedCartIndex, value);
+      toast({ title: `Quantity updated to ${value}` });
+    } else if (activeKeypadMode === "price" && selectedCartIndex !== null) {
+      setCart(prev => prev.map((item, i) =>
+        i === selectedCartIndex ? { ...item, price: value } : item
+      ));
+      toast({ title: `Price updated to $${value.toFixed(2)}` });
+    } else if (activeKeypadMode === "barcode") {
+      const product = ALL_PRODUCTS.find(p => p.barcode === keypadInput || p.sku === keypadInput);
+      if (product) {
+        addToCart(product);
+      } else {
+        toast({ title: "Product not found", description: `No item with code ${keypadInput}`, variant: "destructive" });
+      }
+    }
+    setKeypadInput("");
+  };
+
+  // ===== Function Buttons =====
+  const handleSave = () => {
+    if (cart.length === 0) {
+      toast({ title: "Cart is empty", variant: "destructive" });
+      return;
+    }
+    setHeldOrders(prev => [...prev, { items: cart, customer: customerName, invoice: invoiceNumber }]);
+    clearCart();
+    toast({ title: "Order saved (F2)", description: `${heldOrders.length + 1} order(s) on hold` });
+  };
+
+  const handlePrint = () => {
+    if (cart.length === 0) {
+      toast({ title: "Nothing to print", variant: "destructive" });
+      return;
+    }
+    toast({ title: "Printing receipt (F3)", description: `Invoice ${invoiceNumber}` });
+  };
+
+  const handleVoid = () => {
+    if (cart.length === 0) {
+      toast({ title: "Cart already empty", variant: "destructive" });
+      return;
+    }
+    clearCart();
+    toast({ title: "Transaction voided (F4)", variant: "default" });
+  };
+
+  const handlePay = () => {
+    if (cart.length === 0) {
+      toast({ title: "Cart is empty", variant: "destructive" });
+      return;
+    }
+    setShowPayment(true);
+  };
+
+  const handleOpenCash = () => {
+    setShowCashDrawer(true);
+    setTimeout(() => setShowCashDrawer(false), 2000);
+    toast({ title: "Cash drawer opened", description: "Register #1 - Drawer 01" });
+  };
+
+  // Keyboard shortcuts (defined after handler functions to satisfy hoisting rules)
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.target as HTMLElement).tagName === 'INPUT') return;
+      if (e.key === 'F2') { e.preventDefault(); handleSave(); }
+      if (e.key === 'F3') { e.preventDefault(); handlePrint(); }
+      if (e.key === 'F4') { e.preventDefault(); handleVoid(); }
+      if (e.key === 'F5') { e.preventDefault(); handlePay(); }
+      if (e.key === 'Escape') {
+        if (showPayment) setShowPayment(false);
+        else if (showReceipt) setShowReceipt(false);
+        else setSelectedCartIndex(null);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  });
+
+  const completePayment = (method: string, amountPaid: number) => {
+    const change = amountPaid - total;
+    const result: PaymentResult = {
+      method,
+      amountPaid,
+      change: Math.max(0, change),
+      total,
+      subtotal,
+      tax: taxAmount,
+      discount: discountAmount,
+      timestamp: new Date(),
+      invoiceNumber,
+      items: [...cart],
+      cashier,
+      customer: customerName || undefined,
+    };
+    setLastPayment(result);
+    setDailyTotal(prev => prev + total);
+    setTransactionCount(prev => prev + 1);
+    setShowPayment(false);
+    setShowReceipt(true);
+  };
+
+  const finishReceipt = () => {
+    setShowReceipt(false);
+    clearCart();
+    setLastPayment(null);
+  };
+
+  const recallOrder = (index: number) => {
+    const order = heldOrders[index];
+    setCart(order.items);
+    setCustomerName(order.customer);
+    setInvoiceNumber(order.invoice);
+    setHeldOrders(prev => prev.filter((_, i) => i !== index));
+    toast({ title: "Order recalled", description: `${order.items.length} items restored` });
+  };
+
+  // ===== Render =====
+  return (
+    <div className="h-screen w-screen overflow-hidden bg-gradient-to-br from-slate-100 via-emerald-50 to-slate-100 flex flex-col font-sans">
+      {/* ===== Header Bar ===== */}
+      <header className="flex-shrink-0 bg-gradient-to-r from-emerald-700 via-emerald-600 to-teal-600 text-white shadow-lg z-30">
+        <div className="flex items-center justify-between px-4 py-2.5 gap-4">
+          {/* Left: Logo + Store info */}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="h-10 w-10 rounded-xl bg-white/15 backdrop-blur flex items-center justify-center ring-1 ring-white/20">
+                <Store className="h-5 w-5" />
+              </div>
+              <div>
+                <div className="font-bold text-base leading-tight tracking-tight">{STORE_NAME}</div>
+                <div className="text-[10px] text-emerald-100/90 leading-tight">Cash & Carry Supermarket</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Center: Search */}
+          <div className="flex-1 max-w-2xl relative">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <input
+                ref={searchInputRef}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search products, scan barcode, or enter SKU..."
+                className="w-full h-10 pl-10 pr-24 rounded-xl bg-white text-slate-800 text-sm shadow-md outline-none ring-2 ring-transparent focus:ring-emerald-300 transition"
+              />
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
+                <button
+                  onClick={() => setScannerMode(!scannerMode)}
+                  className={cn("h-7 px-2 rounded-lg flex items-center gap-1 text-[11px] font-medium transition",
+                    scannerMode ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500 hover:bg-slate-200")}
+                >
+                  <ScanLine className="h-3.5 w-3.5" />
+                  Scan
+                </button>
+                <kbd className="h-7 px-2 rounded-lg flex items-center text-[10px] bg-slate-100 text-slate-500 font-mono">/</kbd>
+              </div>
+            </div>
+          </div>
+
+          {/* Right: Date, Cashier, Stats */}
+          <div className="flex items-center gap-3">
+            <div className="hidden md:flex items-center gap-3 text-right">
+              <div className="px-3 py-1 rounded-lg bg-white/10 backdrop-blur ring-1 ring-white/15">
+                <div className="flex items-center gap-1.5 text-[10px] text-emerald-100/80 font-medium">
+                  <Calendar className="h-3 w-3" />
+                  {now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                </div>
+                <div className="flex items-center gap-1.5 text-sm font-mono font-bold">
+                  <Clock className="h-3.5 w-3.5" />
+                  {now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                </div>
+              </div>
+              <div className="px-3 py-1 rounded-lg bg-white/10 backdrop-blur ring-1 ring-white/15">
+                <div className="text-[10px] text-emerald-100/80 font-medium">Daily Sales</div>
+                <div className="text-sm font-mono font-bold">${dailyTotal.toFixed(2)}</div>
+              </div>
+              <div className="px-3 py-1 rounded-lg bg-white/10 backdrop-blur ring-1 ring-white/15">
+                <div className="text-[10px] text-emerald-100/80 font-medium">Transactions</div>
+                <div className="text-sm font-mono font-bold">{transactionCount}</div>
+              </div>
+            </div>
+            <Separator orientation="vertical" className="h-8 bg-white/20" />
+            <div className="flex items-center gap-2">
+              <div className="h-9 w-9 rounded-full bg-white/20 ring-2 ring-white/30 flex items-center justify-center text-sm font-bold">
+                SJ
+              </div>
+              <div className="hidden lg:block">
+                <div className="text-xs font-semibold leading-tight">{cashier}</div>
+                <div className="text-[10px] text-emerald-100/80 leading-tight">Register #1</div>
+              </div>
+            </div>
+            <button className="h-9 w-9 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center transition">
+              <LogOut className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* ===== Category Navigation ===== */}
+      <nav className="flex-shrink-0 bg-white border-b border-slate-200 shadow-sm z-20">
+        <div className="flex items-center gap-1.5 px-4 py-2 overflow-x-auto scrollbar-hide">
+          {categories.map(cat => (
+            <button
+              key={cat.id}
+              onClick={() => setActiveCategory(cat.id)}
+              className={cn(
+                "flex-shrink-0 flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200",
+                activeCategory === cat.id
+                  ? `bg-gradient-to-r ${cat.gradient} text-white shadow-md scale-105`
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200 hover:scale-105"
+              )}
+            >
+              <span className="text-base">{cat.icon}</span>
+              {cat.name}
+              {activeCategory === cat.id && cat.id !== "all" && (
+                <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px] bg-white/25 text-white">
+                  {ALL_PRODUCTS.filter(p => p.category === cat.id).length}
+                </Badge>
+              )}
+            </button>
+          ))}
+        </div>
+      </nav>
+
+      {/* ===== Main Content ===== */}
+      <main className="flex-1 flex overflow-hidden p-3 gap-3">
+        {/* ===== Left Panel: Product Grid (60%) ===== */}
+        <section className="flex-1 flex flex-col bg-white rounded-2xl shadow-lg ring-1 ring-slate-200/60 overflow-hidden min-w-0">
+          {/* Panel Header */}
+          <div className="flex-shrink-0 flex items-center justify-between px-5 py-3 bg-gradient-to-r from-slate-50 to-white border-b border-slate-200">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <Package className="h-5 w-5 text-emerald-600" />
+                <h2 className="text-base font-bold text-slate-800">
+                  {categories.find(c => c.id === activeCategory)?.name || "All Products"}
+                </h2>
+              </div>
+              <Badge variant="outline" className="font-mono text-[11px]">
+                {filteredProducts.length} items
+              </Badge>
+            </div>
+            <div className="flex items-center gap-2 text-[11px] text-slate-500">
+              <span className="flex items-center gap-1">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                Live Inventory
+              </span>
+            </div>
+          </div>
+
+          {/* Product Grid */}
+          <ScrollArea className="flex-1">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 p-4">
+              {filteredProducts.map((product, idx) => {
+                const inCart = cart.find(item => item.productId === product.id);
+                const lowStock = product.stock <= 20;
+                return (
+                  <motion.button
+                    key={product.id}
+                    layout
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.2, delay: Math.min(idx * 0.015, 0.3) }}
+                    whileHover={{ y: -3, scale: 1.02 }}
+                    whileTap={{ scale: 0.97 }}
+                    onClick={() => addToCart(product)}
+                    className="group relative flex flex-col items-center text-center bg-white rounded-xl p-3 ring-1 ring-slate-200 hover:ring-emerald-400 hover:shadow-lg transition-all duration-200"
+                  >
+                    {/* Badges */}
+                    {inCart && (
+                      <div className="absolute top-1.5 right-1.5 z-10 h-6 w-6 rounded-full bg-emerald-500 text-white text-[11px] font-bold flex items-center justify-center shadow-md">
+                        {inCart.quantity}
+                      </div>
+                    )}
+                    {product.taxable && (
+                      <div className="absolute top-1.5 left-1.5 z-10 px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700 text-[9px] font-bold">
+                        TAX
+                      </div>
+                    )}
+                    {lowStock && (
+                      <div className="absolute bottom-1.5 left-1.5 z-10 px-1.5 py-0.5 rounded-md bg-rose-100 text-rose-700 text-[9px] font-bold">
+                        LOW
+                      </div>
+                    )}
+
+                    {/* Product Emoji */}
+                    <div className="h-16 w-16 rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center text-4xl mb-2 group-hover:scale-110 transition-transform duration-200">
+                      {product.emoji}
+                    </div>
+
+                    {/* Name */}
+                    <div className="w-full">
+                      <div className="text-xs font-semibold text-slate-800 leading-tight line-clamp-2 min-h-[2rem]">
+                        {product.name}
+                      </div>
+                      <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                        {product.sku}
+                      </div>
+                      <div className="flex items-center justify-between mt-1.5">
+                        <div className="text-sm font-bold text-emerald-600">
+                          ${product.price.toFixed(2)}
+                        </div>
+                        <div className="text-[10px] text-slate-400">/{product.unit}</div>
+                      </div>
+                      <div className="text-[10px] text-slate-400 mt-0.5">
+                        Stock: {product.stock}
+                      </div>
+                    </div>
+                  </motion.button>
+                );
+              })}
+            </div>
+            {filteredProducts.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+                <Package className="h-12 w-12 mb-3 opacity-40" />
+                <div className="text-sm font-medium">No products found</div>
+                <div className="text-xs mt-1">Try a different category or search term</div>
+              </div>
+            )}
+          </ScrollArea>
+        </section>
+
+        {/* ===== Right Panel: Cart + Keypad + Functions (40%) ===== */}
+        <section className={cn(
+          "flex flex-col bg-white rounded-2xl shadow-lg ring-1 ring-slate-200/60 overflow-hidden transition-all duration-300",
+          showSidebar ? "w-[42%] min-w-[420px]" : "w-0 min-w-0"
+        )}>
+          <AnimatePresence>
+            {showSidebar && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="flex flex-col h-full w-full"
+              >
+                {/* Cart Header */}
+                <div className="flex-shrink-0 flex items-center justify-between px-4 py-2.5 bg-gradient-to-r from-slate-50 to-white border-b border-slate-200">
+                  <div className="flex items-center gap-2">
+                    <Cart className="h-5 w-5 text-emerald-600" />
+                    <h2 className="text-base font-bold text-slate-800">Current Order</h2>
+                    <Badge variant="secondary" className="font-mono text-[10px]">
+                      #{invoiceNumber}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setShowSidebar(false)}
+                      className="h-7 w-7 rounded-lg hover:bg-slate-100 flex items-center justify-center transition"
+                    >
+                      <X className="h-4 w-4 text-slate-500" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Customer Info + Held Orders */}
+                <div className="flex-shrink-0 px-3 py-2 bg-slate-50/50 border-b border-slate-200 flex items-center gap-2">
+                  <div className="flex-1 flex items-center gap-2 bg-white rounded-lg px-2 py-1 ring-1 ring-slate-200">
+                    <User className="h-3.5 w-3.5 text-slate-400" />
+                    <input
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      placeholder="Customer name (optional)"
+                      className="flex-1 bg-transparent outline-none text-xs text-slate-700 placeholder:text-slate-400"
+                    />
+                  </div>
+                  {heldOrders.length > 0 && (
+                    <button
+                      onClick={() => setShowPayment(false) || toast({ title: `${heldOrders.length} held order(s)`, description: "Click to recall from held orders panel" })}
+                      className="px-2 py-1 rounded-lg bg-amber-100 text-amber-700 text-[10px] font-semibold flex items-center gap-1 hover:bg-amber-200 transition"
+                    >
+                      <Pause className="h-3 w-3" />
+                      {heldOrders.length} Held
+                    </button>
+                  )}
+                </div>
+
+                {/* Cart Items Table */}
+                <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+                  {/* Table Header */}
+                  <div className="flex-shrink-0 grid grid-cols-[1fr_60px_70px_50px_70px] gap-1 px-3 py-1.5 bg-slate-800 text-white text-[10px] font-semibold uppercase tracking-wide">
+                    <div>Item</div>
+                    <div className="text-center">Qty</div>
+                    <div className="text-right">Price</div>
+                    <div className="text-center">Disc%</div>
+                    <div className="text-right">Total</div>
+                  </div>
+
+                  {/* Cart Items List */}
+                  <ScrollArea className="flex-1 min-h-0">
+                    <div className="divide-y divide-slate-100">
+                      <AnimatePresence mode="popLayout">
+                        {cart.map((item, index) => {
+                          const lineTotal = item.price * item.quantity;
+                          const lineDiscount = lineTotal * (item.discount / 100);
+                          const lineFinal = lineTotal - lineDiscount;
+                          const isSelected = selectedCartIndex === index;
+                          return (
+                            <motion.div
+                              key={item.id}
+                              layout
+                              initial={{ opacity: 0, x: 20 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              exit={{ opacity: 0, x: -20 }}
+                              transition={{ duration: 0.2 }}
+                              onClick={() => setSelectedCartIndex(index)}
+                              className={cn(
+                                "grid grid-cols-[1fr_60px_70px_50px_70px] gap-1 px-3 py-2 cursor-pointer transition-colors text-xs",
+                                isSelected ? "bg-emerald-50 ring-1 ring-emerald-300 ring-inset" : "hover:bg-slate-50"
+                              )}
+                            >
+                              {/* Item info */}
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="text-xl flex-shrink-0">{item.emoji}</span>
+                                <div className="min-w-0">
+                                  <div className="font-semibold text-slate-800 truncate">{item.name}</div>
+                                  <div className="text-[10px] text-slate-400 font-mono">{item.sku} · {item.unit}</div>
+                                </div>
+                              </div>
+                              {/* Qty controls */}
+                              <div className="flex items-center justify-center gap-0.5">
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); updateQuantity(index, -1); }}
+                                  className="h-5 w-5 rounded bg-slate-200 hover:bg-slate-300 flex items-center justify-center"
+                                >
+                                  <Minus className="h-3 w-3" />
+                                </button>
+                                <span className="w-6 text-center font-mono font-semibold text-slate-700">
+                                  {item.quantity.toFixed(item.unit === 'kg' ? 2 : 0)}
+                                </span>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); updateQuantity(index, 1); }}
+                                  className="h-5 w-5 rounded bg-slate-200 hover:bg-slate-300 flex items-center justify-center"
+                                >
+                                  <Plus className="h-3 w-3" />
+                                </button>
+                              </div>
+                              {/* Price */}
+                              <div className="text-right font-mono text-slate-700 self-center">
+                                ${item.price.toFixed(2)}
+                              </div>
+                              {/* Discount */}
+                              <div className="text-center self-center">
+                                <input
+                                  type="number"
+                                  value={item.discount || ''}
+                                  onClick={(e) => { e.stopPropagation(); setSelectedCartIndex(index); }}
+                                  onChange={(e) => applyDiscount(index, parseFloat(e.target.value) || 0)}
+                                  className="w-10 text-center text-[11px] bg-transparent border-b border-slate-200 focus:border-emerald-400 outline-none font-mono"
+                                  placeholder="0"
+                                />
+                              </div>
+                              {/* Line Total */}
+                              <div className="text-right font-mono font-semibold text-slate-900 self-center">
+                                ${lineFinal.toFixed(2)}
+                              </div>
+                            </motion.div>
+                          );
+                        })}
+                      </AnimatePresence>
+
+                      {cart.length === 0 && (
+                        <div className="flex flex-col items-center justify-center py-16 text-slate-400">
+                          <ShoppingCart className="h-10 w-10 mb-2 opacity-40" />
+                          <div className="text-sm font-medium">Cart is empty</div>
+                          <div className="text-xs mt-1">Click products to add them</div>
+                        </div>
+                      )}
+                    </div>
+                  </ScrollArea>
+                </div>
+
+                {/* Held Orders Recall (if any) */}
+                {heldOrders.length > 0 && (
+                  <div className="flex-shrink-0 px-3 py-2 bg-amber-50 border-t border-amber-200 max-h-24 overflow-y-auto">
+                    <div className="text-[10px] font-bold text-amber-800 mb-1">HELD ORDERS (click to recall)</div>
+                    <div className="flex flex-wrap gap-1">
+                      {heldOrders.map((order, i) => (
+                        <button
+                          key={i}
+                          onClick={() => recallOrder(i)}
+                          className="px-2 py-1 rounded-md bg-white ring-1 ring-amber-300 text-[10px] text-amber-700 hover:bg-amber-100 transition"
+                        >
+                          #{order.invoice} · {order.items.length} items
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Totals Section */}
+                <div className="flex-shrink-0 border-t border-slate-200 bg-gradient-to-b from-slate-50 to-white">
+                  <div className="px-4 py-2 space-y-1">
+                    <div className="flex justify-between text-xs text-slate-600">
+                      <span>Subtotal ({totalItems} items)</span>
+                      <span className="font-mono">${subtotal.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-xs text-slate-600">
+                      <span className="flex items-center gap-1">
+                        <Percent className="h-3 w-3" /> Discount
+                        <input
+                          type="number"
+                          value={globalDiscount || ''}
+                          onChange={(e) => setGlobalDiscount(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))}
+                          className="w-10 text-center bg-transparent border-b border-slate-200 focus:border-emerald-400 outline-none font-mono"
+                          placeholder="0"
+                        />%
+                      </span>
+                      <span className="font-mono text-rose-600">-${discountAmount.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-xs text-slate-600">
+                      <span>GST Tax ({(TAX_RATE * 100).toFixed(0)}%)</span>
+                      <span className="font-mono">${taxAmount.toFixed(2)}</span>
+                    </div>
+                  </div>
+                  <div className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white">
+                    <div className="flex justify-between items-baseline">
+                      <span className="text-xs font-semibold uppercase tracking-wider opacity-90">Total Due</span>
+                      <span className="text-2xl font-bold font-mono">${total.toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Function Buttons */}
+                <div className="flex-shrink-0 grid grid-cols-4 gap-1.5 p-2 bg-slate-100">
+                  <FuncBtn icon={<Pause className="h-3.5 w-3.5" />} label="Save" sub="F2" onClick={handleSave} variant="amber" />
+                  <FuncBtn icon={<Printer className="h-3.5 w-3.5" />} label="Print" sub="F3" onClick={handlePrint} variant="slate" />
+                  <FuncBtn icon={<RotateCcw className="h-3.5 w-3.5" />} label="Void" sub="F4" onClick={handleVoid} variant="rose" />
+                  <FuncBtn icon={<DollarSign className="h-3.5 w-3.5" />} label="Open Cash" sub="" onClick={handleOpenCash} variant="slate" />
+                  <FuncBtn icon={<Trash2 className="h-3.5 w-3.5" />} label="Delete Line" sub="Del" onClick={() => selectedCartIndex !== null ? removeLine(selectedCartIndex) : toast({ title: "Select a line first", variant: "destructive" })} variant="slate" />
+                  <FuncBtn icon={<Check className="h-3.5 w-3.5" />} label="Enter" sub="↵" onClick={handleKeypadEnter} variant="emerald" />
+                  <button
+                    onClick={handlePay}
+                    className="col-span-2 h-11 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold text-sm flex items-center justify-center gap-2 hover:from-emerald-700 hover:to-teal-700 transition shadow-md hover:shadow-lg"
+                  >
+                    <CreditCard className="h-4 w-4" />
+                    PAY NOW
+                    <kbd className="ml-1 px-1.5 py-0.5 rounded bg-white/20 text-[10px] font-mono">F5</kbd>
+                  </button>
+                </div>
+
+                {/* Numeric Keypad */}
+                <div className="flex-shrink-0 p-2 bg-slate-800">
+                  {/* Mode selector */}
+                  <div className="flex gap-1 mb-1.5">
+                    {(["qty", "price", "barcode"] as const).map(mode => (
+                      <button
+                        key={mode}
+                        onClick={() => setActiveKeypadMode(mode)}
+                        className={cn(
+                          "flex-1 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide transition",
+                          activeKeypadMode === mode
+                            ? "bg-emerald-500 text-white"
+                            : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+                        )}
+                      >
+                        {mode === "qty" ? "Qty" : mode === "price" ? "Price" : "Barcode/SKU"}
+                      </button>
+                    ))}
+                  </div>
+                  {/* Input display */}
+                  <div className="mb-1.5 px-3 py-1.5 bg-slate-900 rounded-lg flex items-center justify-between">
+                    <span className="text-[10px] text-slate-400 uppercase font-semibold">
+                      {activeKeypadMode === "qty" ? "Quantity" : activeKeypadMode === "price" ? "Price $" : "Scan Code"}
+                    </span>
+                    <span className="font-mono text-base font-bold text-emerald-400">
+                      {keypadInput || (activeKeypadMode === "price" ? "$0.00" : "—")}
+                    </span>
+                  </div>
+                  {/* Keypad grid */}
+                  <div className="grid grid-cols-4 gap-1">
+                    <KeypadBtn label="7" onClick={() => handleKeypadPress("7")} />
+                    <KeypadBtn label="8" onClick={() => handleKeypadPress("8")} />
+                    <KeypadBtn label="9" onClick={() => handleKeypadPress("9")} />
+                    <KeypadBtn label="C" onClick={() => handleKeypadPress("C")} variant="rose" />
+                    <KeypadBtn label="4" onClick={() => handleKeypadPress("4")} />
+                    <KeypadBtn label="5" onClick={() => handleKeypadPress("5")} />
+                    <KeypadBtn label="6" onClick={() => handleKeypadPress("6")} />
+                    <KeypadBtn label="⌫" onClick={() => handleKeypadPress("⌫")} variant="amber" />
+                    <KeypadBtn label="1" onClick={() => handleKeypadPress("1")} />
+                    <KeypadBtn label="2" onClick={() => handleKeypadPress("2")} />
+                    <KeypadBtn label="3" onClick={() => handleKeypadPress("3")} />
+                    <KeypadBtn label="Enter" onClick={() => handleKeypadPress("Enter")} variant="emerald" rowSpan />
+                    <KeypadBtn label="0" onClick={() => handleKeypadPress("0")} wide />
+                    <KeypadBtn label="." onClick={() => handleKeypadPress(".")} />
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </section>
+
+        {/* Toggle sidebar button when closed */}
+        {!showSidebar && (
+          <button
+            onClick={() => setShowSidebar(true)}
+            className="absolute right-3 top-32 z-20 h-12 w-12 rounded-full bg-emerald-600 text-white shadow-lg flex items-center justify-center hover:bg-emerald-700 transition"
+          >
+            <Cart className="h-5 w-5" />
+            {cart.length > 0 && (
+              <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center">
+                {totalItems}
+              </span>
+            )}
+          </button>
+        )}
+      </main>
+
+      {/* ===== Payment Modal ===== */}
+      <AnimatePresence>
+        {showPayment && (
+          <PaymentModal
+            total={total}
+            subtotal={subtotal}
+            tax={taxAmount}
+            discount={discountAmount}
+            itemCount={totalItems}
+            invoiceNumber={invoiceNumber}
+            customerName={customerName}
+            onClose={() => setShowPayment(false)}
+            onComplete={completePayment}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ===== Receipt Modal ===== */}
+      <AnimatePresence>
+        {showReceipt && lastPayment && (
+          <ReceiptModal payment={lastPayment} onClose={finishReceipt} />
+        )}
+      </AnimatePresence>
+
+      {/* ===== Cash Drawer Animation ===== */}
+      <AnimatePresence>
+        {showCashDrawer && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center"
+          >
+            <motion.div
+              initial={{ scale: 0.8, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.8, y: 20 }}
+              className="bg-white rounded-2xl p-8 shadow-2xl flex flex-col items-center"
+            >
+              <div className="h-16 w-16 rounded-full bg-emerald-100 flex items-center justify-center mb-3">
+                <DollarSign className="h-8 w-8 text-emerald-600" />
+              </div>
+              <div className="text-lg font-bold text-slate-800">Cash Drawer Opening</div>
+              <div className="text-sm text-slate-500 mt-1">Register #1 · Drawer 01</div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ===== Helper Components =====
+
+function FuncBtn({ icon, label, sub, onClick, variant }: {
+  icon: React.ReactNode;
+  label: string;
+  sub: string;
+  onClick: () => void;
+  variant: "emerald" | "amber" | "rose" | "slate";
+}) {
+  const variants = {
+    emerald: "bg-emerald-100 text-emerald-700 hover:bg-emerald-200 ring-emerald-200",
+    amber: "bg-amber-100 text-amber-700 hover:bg-amber-200 ring-amber-200",
+    rose: "bg-rose-100 text-rose-700 hover:bg-rose-200 ring-rose-200",
+    slate: "bg-white text-slate-700 hover:bg-slate-100 ring-slate-200",
+  };
+  return (
+    <button
+      onClick={onClick}
+      className={cn("h-11 rounded-lg flex flex-col items-center justify-center gap-0.5 ring-1 transition", variants[variant])}
+    >
+      {icon}
+      <span className="text-[10px] font-bold leading-none">{label}</span>
+      {sub && <span className="text-[8px] opacity-60 leading-none font-mono">{sub}</span>}
+    </button>
+  );
+}
+
+function KeypadBtn({ label, onClick, variant, wide, rowSpan }: {
+  label: string;
+  onClick: () => void;
+  variant?: "emerald" | "amber" | "rose";
+  wide?: boolean;
+  rowSpan?: boolean;
+}) {
+  const variants = {
+    emerald: "bg-emerald-600 text-white hover:bg-emerald-500",
+    amber: "bg-amber-600 text-white hover:bg-amber-500",
+    rose: "bg-rose-600 text-white hover:bg-rose-500",
+  };
+  const defaultClass = "bg-slate-700 text-white hover:bg-slate-600";
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "h-9 rounded-lg font-bold text-sm flex items-center justify-center transition active:scale-95",
+        variant ? variants[variant] : defaultClass,
+        wide && "col-span-2",
+        rowSpan && "row-span-2 h-[4.5rem]"
+      )}
+    >
+      {label}
+    </button>
+  );
+}
+
+// ===== Payment Modal =====
+function PaymentModal({ total, subtotal, tax, discount, itemCount, invoiceNumber, customerName, onClose, onComplete }: {
+  total: number;
+  subtotal: number;
+  tax: number;
+  discount: number;
+  itemCount: number;
+  invoiceNumber: string;
+  customerName: string;
+  onClose: () => void;
+  onComplete: (method: string, amountPaid: number) => void;
+}) {
+  const [method, setMethod] = useState("cash");
+  const [amountInput, setAmountInput] = useState("");
+  const { toast } = useToast();
+
+  const amountPaid = parseFloat(amountInput) || 0;
+  const change = amountPaid - total;
+  const canComplete = method === "cash" ? amountPaid >= total : true;
+
+  const handleComplete = () => {
+    const paid = method === "cash" ? amountPaid : total;
+    if (method === "cash" && amountPaid < total) {
+      toast({ title: "Insufficient cash", description: `Need $${(total - amountPaid).toFixed(2)} more`, variant: "destructive" });
+      return;
+    }
+    onComplete(method, paid);
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.9, y: 30 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.9, y: 30 }}
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+      >
+        {/* Header */}
+        <div className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-6 py-4 flex items-center justify-between">
+          <div>
+            <div className="text-xs opacity-80 font-semibold">PAYMENT · Invoice #{invoiceNumber}</div>
+            <div className="text-lg font-bold">{itemCount} items</div>
+          </div>
+          <button onClick={onClose} className="h-8 w-8 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Total Display */}
+        <div className="px-6 py-5 bg-slate-50 border-b border-slate-200 text-center">
+          <div className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Total Due</div>
+          <div className="text-5xl font-bold font-mono text-emerald-600 mt-1">${total.toFixed(2)}</div>
+          {customerName && <div className="text-xs text-slate-500 mt-1">Customer: {customerName}</div>}
+          <div className="flex justify-center gap-4 mt-2 text-[11px] text-slate-500">
+            <span>Sub: ${subtotal.toFixed(2)}</span>
+            <span>Tax: ${tax.toFixed(2)}</span>
+            {discount > 0 && <span className="text-rose-500">Disc: -${discount.toFixed(2)}</span>}
+          </div>
+        </div>
+
+        {/* Payment Method Selection */}
+        <div className="px-6 py-4">
+          <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Payment Method</div>
+          <div className="grid grid-cols-3 gap-2">
+            {paymentMethods.map(pm => (
+              <button
+                key={pm.id}
+                onClick={() => setMethod(pm.id)}
+                className={cn(
+                  "flex flex-col items-center gap-1 py-3 rounded-xl ring-2 transition",
+                  method === pm.id
+                    ? "ring-emerald-500 bg-emerald-50"
+                    : "ring-slate-200 hover:ring-slate-300 bg-white"
+                )}
+              >
+                <span className="text-2xl">{pm.icon}</span>
+                <span className="text-[11px] font-semibold text-slate-700">{pm.name}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Cash Input - only for cash method */}
+        {method === "cash" && (
+          <div className="px-6 pb-4">
+            <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Cash Received</div>
+            <input
+              type="number"
+              value={amountInput}
+              onChange={(e) => setAmountInput(e.target.value)}
+              autoFocus
+              placeholder="0.00"
+              className="w-full h-12 px-4 rounded-xl border-2 border-slate-200 focus:border-emerald-500 outline-none text-2xl font-mono font-bold text-right text-slate-800"
+            />
+            {/* Quick cash buttons */}
+            <div className="grid grid-cols-5 gap-1.5 mt-2">
+              {quickCashAmounts.map(amt => (
+                <button
+                  key={amt}
+                  onClick={() => setAmountInput(amt.toString())}
+                  className="py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-700 transition"
+                >
+                  ${amt}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setAmountInput(total.toFixed(2))}
+              className="w-full mt-1.5 py-1.5 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-xs font-bold text-emerald-700 transition"
+            >
+              Exact Amount ${total.toFixed(2)}
+            </button>
+
+            {/* Change display */}
+            {amountPaid > 0 && (
+              <div className="mt-3 p-3 rounded-xl bg-slate-800 text-white flex justify-between items-center">
+                <span className="text-xs font-semibold uppercase opacity-80">Change Due</span>
+                <span className={cn("text-2xl font-bold font-mono", change >= 0 ? "text-emerald-400" : "text-rose-400")}>
+                  ${Math.abs(change).toFixed(2)}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Card/Wallet info */}
+        {method !== "cash" && (
+          <div className="px-6 pb-4">
+            <div className="p-4 rounded-xl bg-blue-50 text-center">
+              <div className="text-3xl mb-2">{paymentMethods.find(p => p.id === method)?.icon}</div>
+              <div className="text-sm font-semibold text-slate-700">
+                Insert/tap {paymentMethods.find(p => p.id === method)?.name} on terminal
+              </div>
+              <div className="text-xs text-slate-500 mt-1">Awaiting confirmation...</div>
+            </div>
+          </div>
+        )}
+
+        {/* Complete button */}
+        <div className="px-6 pb-6">
+          <button
+            onClick={handleComplete}
+            disabled={!canComplete}
+            className={cn(
+              "w-full h-14 rounded-xl font-bold text-base flex items-center justify-center gap-2 transition shadow-md",
+              canComplete
+                ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white hover:shadow-lg"
+                : "bg-slate-200 text-slate-400 cursor-not-allowed"
+            )}
+          >
+            <Check className="h-5 w-5" />
+            COMPLETE PAYMENT · ${total.toFixed(2)}
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ===== Receipt Modal =====
+function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: () => void }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.9, y: 30 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.9, y: 30 }}
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden max-h-[90vh] flex flex-col"
+      >
+        {/* Success header */}
+        <div className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-6 py-5 text-center">
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.2, type: "spring" }}
+            className="h-16 w-16 rounded-full bg-white/20 mx-auto flex items-center justify-center mb-2"
+          >
+            <Check className="h-9 w-9" />
+          </motion.div>
+          <div className="text-lg font-bold">Payment Successful!</div>
+          <div className="text-xs opacity-90 mt-0.5">
+            {new Date(payment.timestamp).toLocaleString('en-GB')}
+          </div>
+        </div>
+
+        {/* Receipt body */}
+        <ScrollArea className="flex-1">
+          <div className="px-6 py-4 font-mono text-xs">
+            {/* Store info */}
+            <div className="text-center mb-3">
+              <div className="font-bold text-sm text-slate-800">{STORE_NAME}</div>
+              <div className="text-slate-500">{STORE_ADDRESS}</div>
+              <div className="text-slate-500">{STORE_PHONE}</div>
+            </div>
+            <Separator className="my-2" />
+            <div className="flex justify-between text-slate-600">
+              <span>Invoice:</span>
+              <span>#{payment.invoiceNumber}</span>
+            </div>
+            <div className="flex justify-between text-slate-600">
+              <span>Cashier:</span>
+              <span>{payment.cashier}</span>
+            </div>
+            {payment.customer && (
+              <div className="flex justify-between text-slate-600">
+                <span>Customer:</span>
+                <span>{payment.customer}</span>
+              </div>
+            )}
+            <div className="flex justify-between text-slate-600">
+              <span>Method:</span>
+              <span className="capitalize">{payment.method}</span>
+            </div>
+            <Separator className="my-2" />
+            {/* Items */}
+            <div className="space-y-1">
+              {payment.items.map(item => {
+                const lineTotal = item.price * item.quantity;
+                const lineDiscount = lineTotal * (item.discount / 100);
+                return (
+                  <div key={item.id}>
+                    <div className="flex justify-between text-slate-700">
+                      <span className="truncate flex-1">{item.emoji} {item.name}</span>
+                      <span>${(lineTotal - lineDiscount).toFixed(2)}</span>
+                    </div>
+                    <div className="text-slate-400 text-[10px] pl-5">
+                      {item.quantity} × ${item.price.toFixed(2)}
+                      {item.discount > 0 && ` (-${item.discount}%)`}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <Separator className="my-2" />
+            {/* Totals */}
+            <div className="space-y-0.5">
+              <div className="flex justify-between text-slate-600">
+                <span>Subtotal:</span>
+                <span>${payment.subtotal.toFixed(2)}</span>
+              </div>
+              {payment.discount > 0 && (
+                <div className="flex justify-between text-rose-600">
+                  <span>Discount:</span>
+                  <span>-${payment.discount.toFixed(2)}</span>
+                </div>
+              )}
+              <div className="flex justify-between text-slate-600">
+                <span>Tax (GST):</span>
+                <span>${payment.tax.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between font-bold text-slate-800 text-sm pt-1">
+                <span>TOTAL:</span>
+                <span>${payment.total.toFixed(2)}</span>
+              </div>
+              <Separator className="my-1.5" />
+              <div className="flex justify-between text-slate-600">
+                <span>Paid ({payment.method}):</span>
+                <span>${payment.amountPaid.toFixed(2)}</span>
+              </div>
+              {payment.change > 0 && (
+                <div className="flex justify-between font-bold text-emerald-600">
+                  <span>Change:</span>
+                  <span>${payment.change.toFixed(2)}</span>
+                </div>
+              )}
+            </div>
+            <Separator className="my-2" />
+            {/* Footer */}
+            <div className="text-center text-slate-500 text-[10px] mt-3">
+              <div className="font-bold">Thank you for shopping!</div>
+              <div>Have a fresh &amp; healthy day 🌿</div>
+              <div className="mt-1">Returns within 7 days with receipt</div>
+            </div>
+          </div>
+        </ScrollArea>
+
+        {/* Actions */}
+        <div className="px-6 py-3 border-t border-slate-200 bg-slate-50 flex gap-2">
+          <button
+            onClick={() => window.print()}
+            className="flex-1 h-11 rounded-xl bg-white ring-1 ring-slate-200 hover:bg-slate-100 text-slate-700 font-semibold text-sm flex items-center justify-center gap-2 transition"
+          >
+            <Printer className="h-4 w-4" />
+            Print
+          </button>
+          <button
+            onClick={onClose}
+            className="flex-1 h-11 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold text-sm flex items-center justify-center gap-2 hover:shadow-lg transition"
+          >
+            <Check className="h-4 w-4" />
+            New Sale
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ===== Utilities =====
+function generateInvoice(): string {
+  const num = Math.floor(100000 + Math.random() * 900000);
+  const check = Math.floor(Math.random() * 90 + 10);
+  return `${num} F${check}`;
+}
