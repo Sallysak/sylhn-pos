@@ -1,4 +1,4 @@
-// POS System Types
+// POS System Types - SYLHN COMPANY LTD
 
 export interface CartItem {
   id: string;
@@ -29,4 +29,32 @@ export interface PaymentResult {
   customer?: string;
 }
 
-export type ViewMode = "register" | "payment" | "receipt";
+export type ViewMode = "pos" | "stock" | "reports";
+
+export type StockView = "add-modify" | "group-maintenance" | "quantity-adjustment" | "history";
+
+export interface SavedReport {
+  id: string;
+  type: string;
+  title: string;
+  generatedAt: string;
+  generatedBy: string;
+  recordCount: number;
+  summary: string;
+}
+
+export interface ReportColumn {
+  key: string;
+  label: string;
+  align?: 'left' | 'right' | 'center';
+  format?: (value: any, row: any) => string;
+}
+
+export interface ReportData {
+  type: string;
+  title: string;
+  subtitle: string;
+  columns: ReportColumn[];
+  rows: Record<string, any>[];
+  summary: { label: string; value: string }[];
+}

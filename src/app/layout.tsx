@@ -14,10 +14,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "FreshMart POS - Grocery Store Point of Sale",
-  description: "Modern, professional point-of-sale system for grocery stores. Fast checkout, inventory tracking, and beautiful design.",
-  keywords: ["POS", "grocery", "point of sale", "supermarket", "cash register", "checkout"],
-  authors: [{ name: "FreshMart" }],
+  title: "SYLHN POS - Grocery Store Point of Sale",
+  description: "Modern point-of-sale system for SYLHN COMPANY LTD. Stock management, reports, and checkout in Ghana Cedis.",
+  keywords: ["POS", "SYLHN", "grocery", "point of sale", "Ghana", "stock management", "reports"],
+  authors: [{ name: "SYLHN COMPANY LTD" }],
   icons: {
     icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
   },

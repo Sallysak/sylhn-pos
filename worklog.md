@@ -43,3 +43,69 @@ Stage Summary:
 - Held orders (save/recall) functionality
 - Low stock alerts and taxable item indicators
 - Lint passes with 0 errors, dev server runs cleanly, all interactions verified via Agent Browser
+
+---
+Task ID: 2
+Agent: Main (Super Z)
+Task: Extend POS with detailed Stock Menu (Add/Modify Stock, Group Maintenance, Quantity Adjustment, Close) and Stock Report (12 report types with View/Delete/Print buttons). Add stock history, stock groups. Convert all currencies to Ghana Cedis. Add print and export (PDF, Excel, CSV) buttons. Each report bears SYLHN COMPANY LTD branding with contact +233592766044 and address East Legon, Accra.
+
+Work Log:
+- Installed jspdf, jspdf-autotable, xlsx packages for PDF/Excel export
+- Rewrote /src/lib/pos-data.ts:
+  * Updated COMPANY info to SYLHN COMPANY LTD, contact +233592766044, East Legon, Accra
+  * Added CURRENCY = "₵" (Ghana Cedi) and CURRENCY_CODE = "GHS"
+  * Converted all 90 product prices to realistic Ghana Cedis values (e.g., Apples ₵35/kg, Milk ₵18, Eggs ₵45/dozen, Rice 5kg ₵95)
+  * Added new Product fields: costPrice, reorderLevel, batchNumber, receivedDate, expiryDate, supplier, groupId
+  * Created 10 Stock Groups (Fresh Produce, Chilled & Dairy, Butchery, Bakery Items, Beverages, Confectionery, Frozen Foods, Dry Goods, Household, Health & Beauty)
+  * Added StockHistoryEntry type and 8 seed history entries
+  * Added formatGHS() helper function
+  * Renamed TAX to VAT (Ghana standard)
+- Updated /src/lib/pos-types.ts with ViewMode, StockView, SavedReport, ReportColumn, ReportData types
+- Created /src/lib/report-utils.ts:
+  * exportReportToPDF() - jsPDF with autoTable, company header, summary box
+  * exportReportToExcel() - XLSX with company header rows
+  * exportReportToCSV() - CSV export
+  * printReport() - opens print window with styled HTML
+  * generateReport() - generates ReportData for all 12 report types
+  * reportTypes array with all 12 report definitions
+- Created /src/components/stock-management.tsx with:
+  * Add/Modify Stock view: searchable product table with edit/delete, full product form modal (all fields including costPrice, batch, expiry, supplier, reorderLevel, taxable)
+  * Group Maintenance: card-based group management with add/edit/delete, product count and value per group
+  * Quantity Adjustment: product selector + Add/Remove/Set quantity modes with reason and preview
+  * Stock History: filterable timeline of all stock movements with action badges
+- Created /src/components/reports.tsx with:
+  * 12 report type cards (Quantities, Selling Price, Stock Batch, Cost Price, Performance, Reorder, Stock Take, Stock Value, Out of Stock, Items History, Expiry Date, Stock Aging)
+  * Generated reports list with View/Print/Delete buttons for each
+  * Report Viewer modal with SYLHN COMPANY LTD header, export toolbar (Print/PDF/Excel/CSV), data table, summary section
+- Rewrote /src/app/page.tsx:
+  * Added menu bar with File, Stock Menu, Stock Report, Help dropdowns
+  * Stock Menu dropdown: Add/Modify Stock, Group Maintenance, Quantity Adjustment, Stock History, Close
+  * Stock Report dropdown: View All Reports + all 12 report types
+  * Added quick nav buttons (POS, Stock, Reports) in header
+  * Integrated StockManagement and Reports components via view state
+  * Updated all currency displays to use formatGHS() (Ghana Cedis ₵)
+  * Receipt shows SYLHN COMPANY LTD branding
+  * Sales now reduce stock levels and add to stock history
+- Updated /src/app/layout.tsx metadata to SYLHN POS
+- Verified with Agent Browser:
+  * POS loads with SYLHN COMPANY LTD header, contact, address
+  * Menu bar shows File, Stock Menu, Stock Report, Help
+  * All prices in Ghana Cedis (₵35.00, ₵18.00, etc.)
+  * Stock Menu dropdown opens with all 5 items
+  * Stock Management view loads with 4 sub-tabs
+  * Add Product form works with all fields
+  * Quantity Adjustment works with Add/Remove/Set modes
+  * Stock History shows filterable timeline
+  * Reports view shows all 12 report types
+  * Report generation creates modal with SYLHN header, export buttons
+  * Excel export creates .xlsx file (verified file downloaded)
+  * PDF export creates .pdf file (verified file downloaded)
+- Lint: 0 errors
+
+Stage Summary:
+- Successfully extended POS with comprehensive Stock Menu and Stock Report system
+- All 12 report types implemented with View/Delete/Print/Export (PDF/Excel/CSV) functionality
+- Stock Management with Add/Modify Stock, Group Maintenance, Quantity Adjustment, and Stock History
+- All currencies in Ghana Cedis (₵)
+- Every report bears SYLHN COMPANY LTD, contact: +233592766044, Address: East Legon, Accra
+- Modern design with emerald/teal theme, animations, and professional layout
