@@ -45,9 +45,9 @@ export default function POSPage() {
   const [selectedCartIndex, setSelectedCartIndex] = useState<number | null>(null);
   const [keypadInput, setKeypadInput] = useState("");
   const [customerName, setCustomerName] = useState("");
-  const [invoiceNumber, setInvoiceNumber] = useState(() => generateInvoice());
+  const [invoiceNumber, setInvoiceNumber] = useState<string | null>(null);
   const [cashier] = useState("Sarah Johnson");
-  const [now, setNow] = useState(new Date());
+  const [now, setNow] = useState<Date | null>(null);
   const [heldOrders, setHeldOrders] = useState<{ items: CartItem[]; customer: string; invoice: string }[]>([]);
   const [showPayment, setShowPayment] = useState(false);
   const [showReceipt, setShowReceipt] = useState(false);
@@ -66,10 +66,21 @@ export default function POSPage() {
   const menuRef = useRef<HTMLDivElement>(null);
 
   // ===== Effects =====
+  // Initialize client-only values to avoid hydration mismatch.
+  // Math.random() and new Date() produce different values on server vs client,
+  // so we must defer their initialization to the client side.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
+    setInvoiceNumber(generateInvoice());
+    setNow(new Date());
+  }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  useEffect(() => {
+    if (!now) return;
     const interval = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [now]);
 
   // Close menu on outside click
   useEffect(() => {
@@ -531,8 +542,8 @@ export default function POSPage() {
           <div className="flex items-center gap-2 flex-shrink-0">
             <div className="hidden lg:flex items-center gap-2 text-right">
               <div className="px-2.5 py-1 rounded-lg bg-white/10 backdrop-blur ring-1 ring-white/15">
-                <div className="text-[9px] text-emerald-100/80 font-medium">{now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</div>
-                <div className="text-xs font-mono font-bold">{now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</div>
+                <div className="text-[9px] text-emerald-100/80 font-medium">{now ? now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : '--'}</div>
+                <div className="text-xs font-mono font-bold">{now ? now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '--:--:--'}</div>
               </div>
               <div className="px-2.5 py-1 rounded-lg bg-white/10 backdrop-blur ring-1 ring-white/15">
                 <div className="text-[9px] text-emerald-100/80 font-medium">Daily Sales</div>
@@ -690,7 +701,7 @@ export default function POSPage() {
                     <Cart className="h-5 w-5 text-emerald-600" />
                     <h2 className="text-base font-bold text-slate-800">Current Order</h2>
                     <Badge variant="secondary" className="font-mono text-[10px]">
-                      #{invoiceNumber}
+                      #{invoiceNumber || '------'}
                     </Badge>
                   </div>
                   <button onClick={() => setShowSidebar(false)} className="h-7 w-7 rounded-lg hover:bg-slate-100 flex items-center justify-center transition">
@@ -934,7 +945,7 @@ export default function POSPage() {
             tax={taxAmount}
             discount={discountAmount}
             itemCount={totalItems}
-            invoiceNumber={invoiceNumber}
+            invoiceNumber={invoiceNumber || '------'}
             customerName={customerName}
             onClose={() => setShowPayment(false)}
             onComplete={completePayment}
@@ -1078,7 +1089,7 @@ function PaymentModal({ total, subtotal, tax, discount, itemCount, invoiceNumber
       >
         <div className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-6 py-4 flex items-center justify-between">
           <div>
-            <div className="text-xs opacity-80 font-semibold">PAYMENT · Invoice #{invoiceNumber}</div>
+            <div className="text-xs opacity-80 font-semibold">PAYMENT · Invoice #{invoiceNumber || '------'}</div>
             <div className="text-lg font-bold">{itemCount} items</div>
           </div>
           <button onClick={onClose} className="h-8 w-8 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center">
