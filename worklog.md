@@ -1102,3 +1102,37 @@ Stage Summary:
 - All reports now print all filtered data across multiple pages (header repeats on each page)
 - Purchase form uses PopupWindow with minimize/maximize/close buttons
 - Window size reduced (920×650, min 700×500) to fit in popup view
+
+---
+Task ID: 21
+Agent: Main (Super Z)
+Task: Fix POS cart not displaying all contents - some parts of cart not showing, number buttons not all showing on POS window load.
+
+Work Log:
+- Investigated the POS layout issue where cart contents and keypad buttons were cut off
+- Root cause: The right cart panel was too wide (42% width, 420px min) and the function buttons/keypad were too tall, causing overflow on smaller screens
+- Applied fixes:
+  1. Reduced cart panel width from 42% to 38%, min from 420px to 380px
+  2. Reduced function button heights from h-11 to h-9
+  3. Reduced function button icon sizes from h-3.5 to h-3
+  4. Reduced function button text sizes (sm to xs, xs to 10px, etc.)
+  5. Reduced function button gap from 1.5 to 1
+  6. Reduced keypad mode button padding from py-1 to py-0.5
+  7. Reduced keypad display text from text-base to text-sm
+  8. Reduced keypad button heights from h-9 to h-8
+  9. Reduced keypad Enter rowSpan height from 4.5rem to 4.25rem
+  10. Reduced totals section padding from py-2 to py-1 and py-1.5
+  11. Reduced FIND PRODUCT button height from h-11 to h-9
+  12. Shortened labels: "Open Cash" → "Cash", "Delete Line" → "Del Line"
+- Verified all elements are present in the DOM via Agent Browser:
+  * All 10 function buttons: FIND PRODUCT, Save, Print, Void, Cash, Del Line, Enter, PREVIEW, PAY NOW
+  * All 14 keypad buttons: 0-9, C, ⌫, Enter, .
+  * Cart table columns: Part No, Part Details, Qty, Amount GHC, Disc%, Total GHC
+  * Totals: Subtotal, Discount, VAT, Total Due
+- Lint: 0 errors
+
+Stage Summary:
+- Fixed POS cart display by making the right panel more compact
+- Reduced widths, heights, and spacing throughout the cart panel
+- All function buttons and keypad buttons now fit on screen
+- All cart columns, totals, and buttons visible and accessible

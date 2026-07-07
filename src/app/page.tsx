@@ -756,7 +756,7 @@ export default function POSPage() {
         {/* ===== Right Panel: Cart + Keypad + Functions (40%) ===== */}
         <section className={cn(
           "flex flex-col bg-white rounded-2xl shadow-lg ring-1 ring-slate-200/60 overflow-hidden transition-all duration-300",
-          showSidebar ? "w-[42%] min-w-[420px]" : "w-0 min-w-0"
+          showSidebar ? "w-[38%] min-w-[380px]" : "w-0 min-w-0"
         )}>
           <AnimatePresence>
             {showSidebar && (
@@ -924,7 +924,7 @@ export default function POSPage() {
 
                 {/* Totals */}
                 <div className="flex-shrink-0 border-t border-slate-200 bg-gradient-to-b from-slate-50 to-white">
-                  <div className="px-4 py-2 space-y-1">
+                  <div className="px-4 py-1 space-y-0.5">
                     <div className="flex justify-between text-xs text-slate-600">
                       <span>Subtotal ({totalItems} items)</span>
                       <span className="font-mono">{formatGHS(subtotal)}</span>
@@ -947,7 +947,7 @@ export default function POSPage() {
                       <span className="font-mono">{formatGHS(taxAmount)}</span>
                     </div>
                   </div>
-                  <div className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white">
+                  <div className="px-4 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white">
                     <div className="flex justify-between items-baseline">
                       <span className="text-xs font-semibold uppercase tracking-wider opacity-90">Total Due</span>
                       <span className="text-2xl font-bold font-mono">{formatGHS(total)}</span>
@@ -956,60 +956,60 @@ export default function POSPage() {
                 </div>
 
                 {/* Function Buttons */}
-                <div className="flex-shrink-0 grid grid-cols-4 gap-1.5 p-2 bg-slate-100">
+                <div className="flex-shrink-0 grid grid-cols-4 gap-1 p-1.5 bg-slate-100">
                   <button
                     onClick={() => setShowFindProduct(true)}
-                    className="col-span-4 h-11 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold text-sm flex items-center justify-center gap-2 hover:from-blue-700 hover:to-indigo-700 transition shadow-md hover:shadow-lg"
+                    className="col-span-4 h-9 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold text-xs flex items-center justify-center gap-1.5 hover:from-blue-700 hover:to-indigo-700 transition shadow-sm"
                   >
-                    <Search className="h-4 w-4" />
+                    <Search className="h-3.5 w-3.5" />
                     FIND PRODUCT
-                    <kbd className="ml-1 px-1.5 py-0.5 rounded bg-white/20 text-[10px] font-mono">F1</kbd>
+                    <kbd className="ml-1 px-1 py-0.5 rounded bg-white/20 text-[9px] font-mono">F1</kbd>
                   </button>
-                  <FuncBtn icon={<Pause className="h-3.5 w-3.5" />} label="Save" sub="F2" onClick={handleSave} variant="amber" />
-                  <FuncBtn icon={<Printer className="h-3.5 w-3.5" />} label="Print" sub="F3" onClick={handlePrint} variant="slate" />
-                  <FuncBtn icon={<RotateCcw className="h-3.5 w-3.5" />} label="Void" sub="F4" onClick={handleVoid} variant="rose" />
-                  <FuncBtn icon={<DollarSign className="h-3.5 w-3.5" />} label="Open Cash" sub="" onClick={handleOpenCash} variant="slate" />
-                  <FuncBtn icon={<Trash2 className="h-3.5 w-3.5" />} label="Delete Line" sub="Del" onClick={() => selectedCartIndex !== null ? removeLine(selectedCartIndex) : toast({ title: "Select a line first", variant: "destructive" })} variant="slate" />
-                  <FuncBtn icon={<Check className="h-3.5 w-3.5" />} label="Enter" sub="↵" onClick={handleKeypadEnter} variant="emerald" />
+                  <FuncBtn icon={<Pause className="h-3 w-3" />} label="Save" sub="F2" onClick={handleSave} variant="amber" />
+                  <FuncBtn icon={<Printer className="h-3 w-3" />} label="Print" sub="F3" onClick={handlePrint} variant="slate" />
+                  <FuncBtn icon={<RotateCcw className="h-3 w-3" />} label="Void" sub="F4" onClick={handleVoid} variant="rose" />
+                  <FuncBtn icon={<DollarSign className="h-3 w-3" />} label="Cash" sub="" onClick={handleOpenCash} variant="slate" />
+                  <FuncBtn icon={<Trash2 className="h-3 w-3" />} label="Del Line" sub="Del" onClick={() => selectedCartIndex !== null ? removeLine(selectedCartIndex) : toast({ title: "Select a line first", variant: "destructive" })} variant="slate" />
+                  <FuncBtn icon={<Check className="h-3 w-3" />} label="Enter" sub="↵" onClick={handleKeypadEnter} variant="emerald" />
                   <button
                     onClick={() => setShowCartPreview(true)}
-                    className="col-span-1 h-11 rounded-lg bg-gradient-to-r from-violet-600 to-purple-600 text-white font-bold text-xs flex items-center justify-center gap-1 hover:from-violet-700 hover:to-purple-700 transition shadow-md hover:shadow-lg"
+                    className="col-span-1 h-9 rounded-lg bg-gradient-to-r from-violet-600 to-purple-600 text-white font-bold text-[10px] flex items-center justify-center gap-0.5 hover:from-violet-700 hover:to-purple-700 transition shadow-sm"
                   >
-                    <Eye className="h-3.5 w-3.5" />
+                    <Eye className="h-3 w-3" />
                     PREVIEW
-                    <kbd className="ml-0.5 px-1 py-0.5 rounded bg-white/20 text-[9px] font-mono">F6</kbd>
+                    <kbd className="ml-0.5 px-0.5 py-0.5 rounded bg-white/20 text-[8px] font-mono">F6</kbd>
                   </button>
                   <button
                     onClick={handlePay}
-                    className="col-span-3 h-11 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold text-sm flex items-center justify-center gap-2 hover:from-emerald-700 hover:to-teal-700 transition shadow-md hover:shadow-lg"
+                    className="col-span-3 h-9 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold text-xs flex items-center justify-center gap-1.5 hover:from-emerald-700 hover:to-teal-700 transition shadow-sm"
                   >
-                    <CreditCard className="h-4 w-4" />
+                    <CreditCard className="h-3.5 w-3.5" />
                     PAY NOW
-                    <kbd className="ml-1 px-1.5 py-0.5 rounded bg-white/20 text-[10px] font-mono">F5</kbd>
+                    <kbd className="ml-1 px-1 py-0.5 rounded bg-white/20 text-[9px] font-mono">F5</kbd>
                   </button>
                 </div>
 
                 {/* Numeric Keypad */}
-                <div className="flex-shrink-0 p-2 bg-slate-800">
-                  <div className="flex gap-1 mb-1.5">
+                <div className="flex-shrink-0 p-1.5 bg-slate-800">
+                  <div className="flex gap-1 mb-1">
                     {(["qty", "price", "barcode"] as const).map(mode => (
                       <button
                         key={mode}
                         onClick={() => setActiveKeypadMode(mode)}
                         className={cn(
-                          "flex-1 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide transition",
+                          "flex-1 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wide transition",
                           activeKeypadMode === mode ? "bg-emerald-500 text-white" : "bg-slate-700 text-slate-300 hover:bg-slate-600"
                         )}
                       >
-                        {mode === "qty" ? "Qty" : mode === "price" ? "Price" : "Barcode/SKU"}
+                        {mode === "qty" ? "Qty" : mode === "price" ? "Price" : "Barcode"}
                       </button>
                     ))}
                   </div>
-                  <div className="mb-1.5 px-3 py-1.5 bg-slate-900 rounded-lg flex items-center justify-between">
-                    <span className="text-[10px] text-slate-400 uppercase font-semibold">
+                  <div className="mb-1 px-2 py-1 bg-slate-900 rounded-lg flex items-center justify-between">
+                    <span className="text-[9px] text-slate-400 uppercase font-semibold">
                       {activeKeypadMode === "qty" ? "Quantity" : activeKeypadMode === "price" ? `Price (${CURRENCY_CODE})` : "Scan Code"}
                     </span>
-                    <span className="font-mono text-base font-bold text-emerald-400">
+                    <span className="font-mono text-sm font-bold text-emerald-400">
                       {keypadInput || (activeKeypadMode === "price" ? `${CURRENCY}0.00` : "—")}
                     </span>
                   </div>
@@ -1181,7 +1181,7 @@ function FuncBtn({ icon, label, sub, onClick, variant }: {
   return (
     <button
       onClick={onClick}
-      className={cn("h-11 rounded-lg flex flex-col items-center justify-center gap-0.5 ring-1 transition", variants[variant])}
+      className={cn("h-9 rounded-lg flex flex-col items-center justify-center gap-0.5 ring-1 transition", variants[variant])}
     >
       {icon}
       <span className="text-[10px] font-bold leading-none">{label}</span>
@@ -1207,10 +1207,10 @@ function KeypadBtn({ label, onClick, variant, wide, rowSpan }: {
     <button
       onClick={onClick}
       className={cn(
-        "h-9 rounded-lg font-bold text-sm flex items-center justify-center transition active:scale-95",
+        "h-8 rounded-lg font-bold text-sm flex items-center justify-center transition active:scale-95",
         variant ? variants[variant] : defaultClass,
         wide && "col-span-2",
-        rowSpan && "row-span-2 h-[4.5rem]"
+        rowSpan && "row-span-2 h-[4.25rem]"
       )}
     >
       {label}
