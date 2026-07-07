@@ -198,9 +198,9 @@ export function PurchaseModule({ onBack, products }: PurchaseProps) {
             transition={{ duration: 0.2 }}
             className="h-full"
           >
-            {tab === "orders" && <PurchaseOrders orders={orders} onView={setViewOrder} onNew={() => setShowNewOrder(true)} />}
+            {tab === "orders" && <PurchaseOrders orders={orders} setOrders={setOrders} suppliers={suppliers} />}
             {tab === "receive" && <ReceiveStock orders={orders} setOrders={setOrders} products={products} />}
-            {tab === "suppliers" && <Suppliers suppliers={suppliers} onNew={() => setShowNewSupplier(true)} onDelete={(id) => setSuppliers(prev => prev.filter(s => s.id !== id))} />}
+            {tab === "suppliers" && <Suppliers suppliers={suppliers} setSuppliers={setSuppliers} products={products} />}
             {tab === "history" && <PurchaseHistory orders={orders} onView={setViewOrder} />}
             {tab === "payments" && <SupplierPayments suppliers={suppliers} onPay={(id, amount) => {
               setSuppliers(prev => prev.map(s => s.id === id ? { ...s, balance: Math.max(0, s.balance - amount) } : s));
@@ -216,11 +216,15 @@ export function PurchaseModule({ onBack, products }: PurchaseProps) {
 }
 
 // ===== Purchase Orders Tab =====
-function PurchaseOrders({ orders, onView, onNew }: {
+function PurchaseOrders({ orders, setOrders, suppliers }: {
   orders: PurchaseOrder[];
-  onView: (order: PurchaseOrder) => void;
-  onNew: () => void;
+  setOrders: React.Dispatch<React.SetStateAction<PurchaseOrder[]>>;
+  suppliers: Supplier[];
 }) {
+  const [searchSupplier, setSearchSupplier] = useState("");
+  const [viewOrder, setViewOrder] = useState<PurchaseOrder | null>(null);
+  const [editOrder, setEditOrder] = useState<PurchaseOrder | null>(null);
+  const [showNewPOForm, setShowNewPOForm] = useState(false);
   const { toast } = useToast();
   const statusColors: Record<string, string> = {
     draft: "bg-slate-100 text-slate-700",
@@ -230,17 +234,33 @@ function PurchaseOrders({ orders, onView, onNew }: {
     cancelled: "bg-rose-100 text-rose-700",
   };
 
+  const filtered = orders.filter(o =>
+    o.supplier.toLowerCase().includes(searchSupplier.toLowerCase()) ||
+    o.poNumber.toLowerCase().includes(searchSupplier.toLowerCase())
+  );
+
   return (
     <div className="h-full bg-white rounded-2xl shadow-lg ring-1 ring-slate-200/60 overflow-hidden flex flex-col">
       <div className="flex-shrink-0 flex items-center justify-between px-5 py-3 bg-gradient-to-r from-slate-50 to-white border-b border-slate-200">
         <div className="flex items-center gap-3">
           <Archive className="h-5 w-5 text-amber-600" />
           <h2 className="text-base font-bold text-slate-800">Purchase Orders</h2>
-          <Badge variant="outline" className="font-mono text-xs">{orders.length} orders</Badge>
+          <Badge variant="outline" className="font-mono text-xs">{filtered.length} of {orders.length} orders</Badge>
         </div>
-        <Button onClick={onNew} className="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700">
-          <Plus className="h-4 w-4" /> New PO
-        </Button>
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <input
+              value={searchSupplier}
+              onChange={(e) => setSearchSupplier(e.target.value)}
+              placeholder="Search supplier or PO..."
+              className="h-9 pl-8 pr-3 rounded-lg bg-slate-100 text-sm outline-none focus:ring-2 focus:ring-amber-400 w-56"
+            />
+          </div>
+          <Button onClick={() => setShowNewPOForm(true)} className="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700">
+            <Plus className="h-4 w-4" /> New PO
+          </Button>
+        </div>
       </div>
 
       <ScrollArea className="flex-1">
@@ -258,33 +278,316 @@ function PurchaseOrders({ orders, onView, onNew }: {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {orders.map(o => (
-              <tr key={o.id} className="hover:bg-amber-50/50 transition">
-                <td className="px-4 py-2.5 font-mono font-semibold text-slate-800">{o.poNumber}</td>
-                <td className="px-3 py-2.5 text-slate-700">{o.supplier}</td>
-                <td className="px-3 py-2.5 text-slate-500 text-xs">{o.date}</td>
-                <td className="px-3 py-2.5 text-slate-500 text-xs">{o.expectedDate}</td>
-                <td className="px-3 py-2.5 text-center font-mono text-slate-700">{o.items.length}</td>
-                <td className="px-3 py-2.5 text-right font-mono font-semibold text-slate-800">{formatGHS(o.total)}</td>
-                <td className="px-3 py-2.5 text-center">
-                  <span className={cn("px-2 py-1 rounded-md text-[10px] font-bold uppercase", statusColors[o.status])}>{o.status}</span>
-                </td>
-                <td className="px-3 py-2.5">
-                  <div className="flex items-center justify-center gap-1">
-                    <button onClick={() => onView(o)} className="h-7 w-7 rounded-md bg-blue-100 text-blue-600 hover:bg-blue-200 flex items-center justify-center transition">
-                      <Eye className="h-3.5 w-3.5" />
-                    </button>
-                    <button onClick={() => toast({ title: "Edit PO", description: o.poNumber })} className="h-7 w-7 rounded-md bg-amber-100 text-amber-600 hover:bg-amber-200 flex items-center justify-center transition">
-                      <Edit2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
+            {filtered.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="px-4 py-8 text-center text-slate-400">
+                  {searchSupplier ? `No orders found matching "${searchSupplier}"` : "No purchase orders"}
                 </td>
               </tr>
-            ))}
+            ) : (
+              filtered.map(o => (
+                <tr key={o.id} className="hover:bg-amber-50/50 transition">
+                  <td className="px-4 py-2.5 font-mono font-semibold text-slate-800">{o.poNumber}</td>
+                  <td className="px-3 py-2.5 text-slate-700">{o.supplier}</td>
+                  <td className="px-3 py-2.5 text-slate-500 text-xs">{o.date}</td>
+                  <td className="px-3 py-2.5 text-slate-500 text-xs">{o.expectedDate}</td>
+                  <td className="px-3 py-2.5 text-center font-mono text-slate-700">{o.items.length}</td>
+                  <td className="px-3 py-2.5 text-right font-mono font-semibold text-slate-800">{formatGHS(o.total)}</td>
+                  <td className="px-3 py-2.5 text-center">
+                    <span className={cn("px-2 py-1 rounded-md text-[10px] font-bold uppercase", statusColors[o.status])}>{o.status}</span>
+                  </td>
+                  <td className="px-3 py-2.5">
+                    <div className="flex items-center justify-center gap-1">
+                      <button onClick={() => setViewOrder(o)} className="h-7 w-7 rounded-md bg-blue-100 text-blue-600 hover:bg-blue-200 flex items-center justify-center transition" title="View">
+                        <Eye className="h-3.5 w-3.5" />
+                      </button>
+                      <button onClick={() => setEditOrder(o)} className="h-7 w-7 rounded-md bg-amber-100 text-amber-600 hover:bg-amber-200 flex items-center justify-center transition" title="Edit">
+                        <Edit2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </ScrollArea>
+
+      {/* View PO Modal */}
+      <AnimatePresence>
+        {viewOrder && (
+          <POViewModal order={viewOrder} onClose={() => setViewOrder(null)} />
+        )}
+      </AnimatePresence>
+
+      {/* Edit PO Modal */}
+      <AnimatePresence>
+        {editOrder && (
+          <POEditModal order={editOrder} suppliers={suppliers} onClose={() => setEditOrder(null)} onSave={(updated) => {
+            setOrders(prev => prev.map(o => o.id === updated.id ? updated : o));
+            toast({ title: "PO updated", description: updated.poNumber });
+            setEditOrder(null);
+          }} />
+        )}
+      </AnimatePresence>
+
+      {/* New PO Form Modal */}
+      <AnimatePresence>
+        {showNewPOForm && (
+          <POEditModal order={null} suppliers={suppliers} onClose={() => setShowNewPOForm(false)} onSave={(newOrder) => {
+            setOrders(prev => [...prev, newOrder]);
+            toast({ title: "Purchase Order created", description: newOrder.poNumber });
+            setShowNewPOForm(false);
+          }} />
+        )}
+      </AnimatePresence>
     </div>
+  );
+}
+
+// ===== PO View Modal =====
+function POViewModal({ order, onClose }: { order: PurchaseOrder; onClose: () => void }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.95, y: 20 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.95, y: 20 }}
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col"
+      >
+        <div className="flex-shrink-0 px-5 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Eye className="h-5 w-5" />
+            <h3 className="font-bold">Purchase Order Details</h3>
+          </div>
+          <button onClick={onClose} className="h-8 w-8 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center"><X className="h-4 w-4" /></button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-slate-50 rounded-lg p-3">
+              <div className="text-[10px] text-slate-500 uppercase font-semibold">PO Number</div>
+              <div className="text-sm font-bold text-slate-800 font-mono">{order.poNumber}</div>
+            </div>
+            <div className="bg-slate-50 rounded-lg p-3">
+              <div className="text-[10px] text-slate-500 uppercase font-semibold">Supplier</div>
+              <div className="text-sm font-bold text-slate-800">{order.supplier}</div>
+            </div>
+            <div className="bg-slate-50 rounded-lg p-3">
+              <div className="text-[10px] text-slate-500 uppercase font-semibold">Order Date</div>
+              <div className="text-sm font-bold text-slate-800">{order.date}</div>
+            </div>
+            <div className="bg-slate-50 rounded-lg p-3">
+              <div className="text-[10px] text-slate-500 uppercase font-semibold">Expected Date</div>
+              <div className="text-sm font-bold text-slate-800">{order.expectedDate}</div>
+            </div>
+            <div className="bg-slate-50 rounded-lg p-3">
+              <div className="text-[10px] text-slate-500 uppercase font-semibold">Status</div>
+              <div className="text-sm font-bold text-slate-800 capitalize">{order.status}</div>
+            </div>
+            <div className="bg-slate-50 rounded-lg p-3">
+              <div className="text-[10px] text-slate-500 uppercase font-semibold">Total Amount</div>
+              <div className="text-sm font-bold text-blue-600 font-mono">{formatGHS(order.total)}</div>
+            </div>
+          </div>
+          <div>
+            <div className="text-xs font-bold text-slate-600 uppercase mb-2">Order Items ({order.items.length})</div>
+            <table className="w-full text-xs">
+              <thead className="bg-slate-100">
+                <tr>
+                  <th className="text-left px-3 py-2 font-semibold text-slate-700">Product</th>
+                  <th className="text-right px-3 py-2 font-semibold text-slate-700">Qty Ordered</th>
+                  <th className="text-right px-3 py-2 font-semibold text-slate-700">Cost</th>
+                  <th className="text-right px-3 py-2 font-semibold text-slate-700">Received</th>
+                  <th className="text-right px-3 py-2 font-semibold text-slate-700">Line Total</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {order.items.map((it, i) => (
+                  <tr key={i} className="hover:bg-slate-50">
+                    <td className="px-3 py-2 text-slate-800">{it.name}</td>
+                    <td className="px-3 py-2 text-right font-mono text-slate-700">{it.qty}</td>
+                    <td className="px-3 py-2 text-right font-mono text-slate-700">{formatGHS(it.cost)}</td>
+                    <td className="px-3 py-2 text-right font-mono text-slate-700">{it.received}</td>
+                    <td className="px-3 py-2 text-right font-mono font-semibold text-slate-800">{formatGHS(it.qty * it.cost)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div className="flex-shrink-0 px-5 py-3 border-t border-slate-200 bg-slate-50 flex justify-end">
+          <Button variant="outline" onClick={onClose}>Close</Button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ===== PO Edit/New Modal =====
+function POEditModal({ order, suppliers, onClose, onSave }: {
+  order: PurchaseOrder | null;
+  suppliers: Supplier[];
+  onClose: () => void;
+  onSave: (order: PurchaseOrder) => void;
+}) {
+  const isNew = !order;
+  const [form, setForm] = useState<PurchaseOrder>(order || {
+    id: `po-${Date.now()}`,
+    poNumber: `PO-2026-${String(Math.floor(Math.random() * 9000) + 1000)}`,
+    supplier: "",
+    date: new Date().toISOString().split('T')[0],
+    expectedDate: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
+    status: "draft",
+    items: [],
+    total: 0,
+  });
+  const [newItemName, setNewItemName] = useState("");
+  const [newItemQty, setNewItemQty] = useState(1);
+  const [newItemCost, setNewItemCost] = useState(0);
+
+  const addItem = () => {
+    if (!newItemName || newItemQty <= 0) return;
+    setForm({
+      ...form,
+      items: [...form.items, { productId: `p-${Date.now()}`, name: newItemName, qty: newItemQty, cost: newItemCost, received: 0 }],
+      total: form.total + newItemQty * newItemCost,
+    });
+    setNewItemName(""); setNewItemQty(1); setNewItemCost(0);
+  };
+
+  const removeItem = (i: number) => {
+    const item = form.items[i];
+    setForm({
+      ...form,
+      items: form.items.filter((_, idx) => idx !== i),
+      total: form.total - item.qty * item.cost,
+    });
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.95, y: 20 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.95, y: 20 }}
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col"
+      >
+        <div className="flex-shrink-0 px-5 py-3 bg-gradient-to-r from-amber-600 to-orange-600 text-white flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {isNew ? <Plus className="h-5 w-5" /> : <Edit2 className="h-5 w-5" />}
+            <h3 className="font-bold">{isNew ? "New Purchase Order" : "Edit Purchase Order"}</h3>
+          </div>
+          <button onClick={onClose} className="h-8 w-8 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center"><X className="h-4 w-4" /></button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-semibold text-slate-600 mb-1 block">PO Number</label>
+              <input value={form.poNumber} onChange={(e) => setForm({ ...form, poNumber: e.target.value })} className="w-full h-10 px-3 rounded-lg border border-slate-200 focus:border-amber-500 outline-none text-sm font-mono" />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-600 mb-1 block">Supplier</label>
+              <select value={form.supplier} onChange={(e) => setForm({ ...form, supplier: e.target.value })} className="w-full h-10 px-3 rounded-lg border border-slate-200 focus:border-amber-500 outline-none text-sm">
+                <option value="">Select supplier...</option>
+                {suppliers.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-600 mb-1 block">Order Date</label>
+              <input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} className="w-full h-10 px-3 rounded-lg border border-slate-200 focus:border-amber-500 outline-none text-sm" />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-600 mb-1 block">Expected Date</label>
+              <input type="date" value={form.expectedDate} onChange={(e) => setForm({ ...form, expectedDate: e.target.value })} className="w-full h-10 px-3 rounded-lg border border-slate-200 focus:border-amber-500 outline-none text-sm" />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-600 mb-1 block">Status</label>
+              <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as PurchaseOrder["status"] })} className="w-full h-10 px-3 rounded-lg border border-slate-200 focus:border-amber-500 outline-none text-sm">
+                <option value="draft">Draft</option>
+                <option value="sent">Sent</option>
+                <option value="partial">Partial</option>
+                <option value="received">Received</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-600 mb-1 block">Total Amount (GHC)</label>
+              <input value={form.total.toFixed(2)} readOnly className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-slate-50 outline-none text-sm font-mono font-bold text-amber-700" />
+            </div>
+          </div>
+
+          {/* Items section */}
+          <div>
+            <label className="text-xs font-bold text-slate-600 uppercase mb-2 block">Order Items</label>
+            <div className="flex items-center gap-2 mb-2 p-2 bg-slate-50 rounded-lg">
+              <input value={newItemName} onChange={(e) => setNewItemName(e.target.value)} placeholder="Product name" className="flex-1 h-9 px-3 rounded-lg border border-slate-200 outline-none text-sm" />
+              <input type="number" value={newItemQty || ""} onChange={(e) => setNewItemQty(parseInt(e.target.value) || 0)} placeholder="Qty" className="w-16 h-9 px-2 rounded-lg border border-slate-200 outline-none text-sm text-center" />
+              <input type="number" value={newItemCost || ""} onChange={(e) => setNewItemCost(parseFloat(e.target.value) || 0)} placeholder="Cost" className="w-24 h-9 px-2 rounded-lg border border-slate-200 outline-none text-sm text-right" />
+              <button onClick={addItem} className="h-9 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1">
+                <Plus className="h-3.5 w-3.5" /> Add
+              </button>
+            </div>
+            <table className="w-full text-xs">
+              <thead className="bg-slate-100">
+                <tr>
+                  <th className="text-left px-3 py-2 font-semibold text-slate-700">Product</th>
+                  <th className="text-right px-3 py-2 font-semibold text-slate-700">Qty</th>
+                  <th className="text-right px-3 py-2 font-semibold text-slate-700">Cost</th>
+                  <th className="text-right px-3 py-2 font-semibold text-slate-700">Total</th>
+                  <th className="px-3 py-2"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {form.items.length === 0 ? (
+                  <tr><td colSpan={5} className="px-3 py-4 text-center text-slate-400">No items added yet</td></tr>
+                ) : (
+                  form.items.map((it, i) => (
+                    <tr key={i}>
+                      <td className="px-3 py-2 text-slate-800">{it.name}</td>
+                      <td className="px-3 py-2 text-right font-mono text-slate-700">{it.qty}</td>
+                      <td className="px-3 py-2 text-right font-mono text-slate-700">{formatGHS(it.cost)}</td>
+                      <td className="px-3 py-2 text-right font-mono font-semibold text-slate-800">{formatGHS(it.qty * it.cost)}</td>
+                      <td className="px-3 py-2 text-center">
+                        <button onClick={() => removeItem(i)} className="h-6 w-6 rounded bg-rose-100 text-rose-600 hover:bg-rose-200 flex items-center justify-center mx-auto">
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="flex-shrink-0 px-5 py-3 border-t border-slate-200 bg-slate-50 flex justify-end gap-2">
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <button
+            onClick={() => onSave(form)}
+            disabled={!form.supplier}
+            className="h-10 px-5 rounded-lg bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white font-semibold text-sm transition disabled:opacity-50"
+          >
+            <Save className="h-4 w-4 inline mr-1" />
+            {isNew ? "Create PO" : "Save Changes"}
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -372,63 +675,291 @@ function ReceiveStock({ orders, setOrders, products }: {
 }
 
 // ===== Suppliers Tab =====
-function Suppliers({ suppliers, onNew, onDelete }: {
+function Suppliers({ suppliers, setSuppliers, products }: {
   suppliers: Supplier[];
-  onNew: () => void;
-  onDelete: (id: string) => void;
+  setSuppliers: React.Dispatch<React.SetStateAction<Supplier[]>>;
+  products: Product[];
 }) {
   const { toast } = useToast();
+  const [search, setSearch] = useState("");
+  const [editSupplier, setEditSupplier] = useState<Supplier | null>(null);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [viewSupplier, setViewSupplier] = useState<Supplier | null>(null);
+
+  const handleDelete = (id: string) => {
+    setSuppliers(prev => prev.filter(s => s.id !== id));
+    toast({ title: "Supplier deleted" });
+  };
+
+  const filtered = suppliers.filter(s =>
+    s.name.toLowerCase().includes(search.toLowerCase()) ||
+    s.contact.includes(search) ||
+    s.email.toLowerCase().includes(search.toLowerCase()) ||
+    s.address.toLowerCase().includes(search.toLowerCase())
+  );
+
   return (
     <div className="h-full bg-white rounded-2xl shadow-lg ring-1 ring-slate-200/60 overflow-hidden flex flex-col">
       <div className="flex-shrink-0 flex items-center justify-between px-5 py-3 bg-gradient-to-r from-slate-50 to-white border-b border-slate-200">
         <div className="flex items-center gap-3">
           <Users className="h-5 w-5 text-amber-600" />
           <h2 className="text-base font-bold text-slate-800">Suppliers</h2>
-          <Badge variant="outline" className="font-mono text-xs">{suppliers.length} suppliers</Badge>
+          <Badge variant="outline" className="font-mono text-xs">{filtered.length} of {suppliers.length} suppliers</Badge>
         </div>
-        <Button onClick={onNew} className="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700">
-          <Plus className="h-4 w-4" /> Add Supplier
-        </Button>
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search suppliers..."
+              className="h-9 pl-8 pr-3 rounded-lg bg-slate-100 text-sm outline-none focus:ring-2 focus:ring-amber-400 w-56"
+            />
+          </div>
+          <Button onClick={() => setShowAddForm(true)} className="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700">
+            <Plus className="h-4 w-4" /> Add Supplier
+          </Button>
+        </div>
       </div>
 
       <ScrollArea className="flex-1">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-5">
-          {suppliers.map(s => (
-            <motion.div
-              key={s.id}
-              whileHover={{ y: -3 }}
-              className="bg-white rounded-xl ring-1 ring-slate-200 p-4 shadow-sm hover:shadow-md transition"
-            >
-              <div className="flex items-start justify-between mb-2">
-                <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-amber-100 to-orange-100 flex items-center justify-center">
-                  <Truck className="h-6 w-6 text-amber-600" />
+          {filtered.length === 0 ? (
+            <div className="col-span-full flex flex-col items-center justify-center py-16 text-slate-400">
+              <Users className="h-10 w-10 mb-2 opacity-40" />
+              <div className="text-sm font-medium">No suppliers found</div>
+              <div className="text-xs mt-1">{search ? `No match for "${search}"` : "Add a supplier to get started"}</div>
+            </div>
+          ) : (
+            filtered.map(s => (
+              <motion.div
+                key={s.id}
+                whileHover={{ y: -3 }}
+                className="bg-white rounded-xl ring-1 ring-slate-200 p-4 shadow-sm hover:shadow-md transition"
+              >
+                <div className="flex items-start justify-between mb-2">
+                  <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-amber-100 to-orange-100 flex items-center justify-center">
+                    <Truck className="h-6 w-6 text-amber-600" />
+                  </div>
+                  <div className="flex gap-1">
+                    <button onClick={() => setViewSupplier(s)} className="h-7 w-7 rounded-md bg-emerald-100 text-emerald-600 hover:bg-emerald-200 flex items-center justify-center" title="View Products">
+                      <Eye className="h-3.5 w-3.5" />
+                    </button>
+                    <button onClick={() => setEditSupplier(s)} className="h-7 w-7 rounded-md bg-blue-100 text-blue-600 hover:bg-blue-200 flex items-center justify-center" title="Edit">
+                      <Edit2 className="h-3.5 w-3.5" />
+                    </button>
+                    <button onClick={() => handleDelete(s.id)} className="h-7 w-7 rounded-md bg-rose-100 text-rose-600 hover:bg-rose-200 flex items-center justify-center" title="Delete">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 </div>
-                <div className="flex gap-1">
-                  <button onClick={() => toast({ title: "Edit Supplier", description: s.name })} className="h-7 w-7 rounded-md bg-blue-100 text-blue-600 hover:bg-blue-200 flex items-center justify-center">
-                    <Edit2 className="h-3.5 w-3.5" />
-                  </button>
-                  <button onClick={() => onDelete(s.id)} className="h-7 w-7 rounded-md bg-rose-100 text-rose-600 hover:bg-rose-200 flex items-center justify-center">
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
+                <div className="font-bold text-slate-800">{s.name}</div>
+                <div className="text-xs text-slate-500 space-y-1 mt-2">
+                  <div className="flex items-center gap-1.5"><Phone className="h-3 w-3" /> {s.contact}</div>
+                  <div className="flex items-center gap-1.5"><MapPin className="h-3 w-3" /> {s.address}</div>
                 </div>
-              </div>
-              <div className="font-bold text-slate-800">{s.name}</div>
-              <div className="text-xs text-slate-500 space-y-1 mt-2">
-                <div className="flex items-center gap-1.5"><Phone className="h-3 w-3" /> {s.contact}</div>
-                <div className="flex items-center gap-1.5"><MapPin className="h-3 w-3" /> {s.address}</div>
-              </div>
-              <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
-                <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-700">{s.productsSupplied} products</Badge>
-                <div className="text-right">
-                  <div className="text-[10px] text-slate-500">Balance</div>
-                  <div className={cn("text-sm font-bold font-mono", s.balance > 0 ? "text-rose-600" : "text-emerald-600")}>{formatGHS(s.balance)}</div>
+                <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
+                  <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-700">{s.productsSupplied} products</Badge>
+                  <div className="text-right">
+                    <div className="text-[10px] text-slate-500">Balance</div>
+                    <div className={cn("text-sm font-bold font-mono", s.balance > 0 ? "text-rose-600" : "text-emerald-600")}>{formatGHS(s.balance)}</div>
+                  </div>
                 </div>
-              </div>
-            </motion.div>
-          ))}
+              </motion.div>
+            ))
+          )}
         </div>
       </ScrollArea>
+
+      {/* View Supplier Products Modal */}
+      <AnimatePresence>
+        {viewSupplier && (
+          <SupplierViewModal supplier={viewSupplier} products={products} onClose={() => setViewSupplier(null)} />
+        )}
+      </AnimatePresence>
+
+      {/* Edit Supplier Modal */}
+      <AnimatePresence>
+        {editSupplier && (
+          <SupplierFormModal supplier={editSupplier} onClose={() => setEditSupplier(null)} onSave={(updated) => {
+            setSuppliers(prev => prev.map(s => s.id === updated.id ? updated : s));
+            toast({ title: "Supplier updated", description: updated.name });
+            setEditSupplier(null);
+          }} />
+        )}
+      </AnimatePresence>
+
+      {/* Add Supplier Modal */}
+      <AnimatePresence>
+        {showAddForm && (
+          <SupplierFormModal supplier={null} onClose={() => setShowAddForm(false)} onSave={(newSupplier) => {
+            setSuppliers(prev => [...prev, newSupplier]);
+            toast({ title: "Supplier added", description: newSupplier.name });
+            setShowAddForm(false);
+          }} />
+        )}
+      </AnimatePresence>
     </div>
+  );
+}
+
+// ===== Supplier View Modal (shows actual products supplied) =====
+function SupplierViewModal({ supplier, products, onClose }: { supplier: Supplier; products: Product[]; onClose: () => void }) {
+  // Filter actual products from this supplier
+  const supplierProducts = products.filter(p => p.supplier === supplier.name);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.95, y: 20 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.95, y: 20 }}
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col"
+      >
+        <div className="flex-shrink-0 px-5 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Eye className="h-5 w-5" />
+            <h3 className="font-bold">Products Supplied</h3>
+          </div>
+          <button onClick={onClose} className="h-8 w-8 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center"><X className="h-4 w-4" /></button>
+        </div>
+        <div className="flex-shrink-0 p-4 bg-slate-50 border-b border-slate-200 flex items-center gap-3">
+          <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-amber-100 to-orange-100 flex items-center justify-center">
+            <Truck className="h-6 w-6 text-amber-600" />
+          </div>
+          <div>
+            <div className="font-bold text-slate-800">{supplier.name}</div>
+            <div className="text-xs text-slate-500">{supplier.contact} · {supplier.address}</div>
+          </div>
+          <Badge variant="secondary" className="ml-auto bg-emerald-100 text-emerald-700">{supplierProducts.length} products</Badge>
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          {supplierProducts.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-slate-400">
+              <Package className="h-10 w-10 mb-2 opacity-40" />
+              <div className="text-sm font-medium">No products found</div>
+              <div className="text-xs mt-1">No products in inventory are supplied by {supplier.name}</div>
+            </div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 bg-slate-800 text-white text-[11px] uppercase tracking-wide z-10">
+                <tr>
+                  <th className="text-left px-4 py-2.5 font-semibold">Product Name</th>
+                  <th className="text-left px-3 py-2.5 font-semibold">SKU</th>
+                  <th className="text-center px-3 py-2.5 font-semibold">Stock</th>
+                  <th className="text-right px-3 py-2.5 font-semibold">Price (GHC)</th>
+                  <th className="text-right px-3 py-2.5 font-semibold">Cost (GHC)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {supplierProducts.map((p) => (
+                  <tr key={p.id} className="hover:bg-emerald-50/50">
+                    <td className="px-4 py-2.5 text-slate-800">{p.emoji} {p.name}</td>
+                    <td className="px-3 py-2.5 font-mono text-xs text-slate-600">{p.sku}</td>
+                    <td className="px-3 py-2.5 text-center font-mono text-slate-700">{p.stock}</td>
+                    <td className="px-3 py-2.5 text-right font-mono font-semibold text-emerald-600">{formatGHS(p.price)}</td>
+                    <td className="px-3 py-2.5 text-right font-mono text-slate-600">{formatGHS(p.costPrice)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+        <div className="flex-shrink-0 px-5 py-3 border-t border-slate-200 bg-slate-50 flex justify-end">
+          <Button variant="outline" onClick={onClose}>Close</Button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ===== Supplier Form Modal (Edit/Add) =====
+function SupplierFormModal({ supplier, onClose, onSave }: {
+  supplier: Supplier | null;
+  onClose: () => void;
+  onSave: (supplier: Supplier) => void;
+}) {
+  const isNew = !supplier;
+  const [form, setForm] = useState<Supplier>(supplier || {
+    id: `s-${Date.now()}`,
+    name: "",
+    contact: "",
+    email: "",
+    address: "",
+    balance: 0,
+    productsSupplied: 0,
+  });
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.95, y: 20 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.95, y: 20 }}
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+      >
+        <div className="flex-shrink-0 px-5 py-3 bg-gradient-to-r from-amber-600 to-orange-600 text-white flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {isNew ? <Plus className="h-5 w-5" /> : <Edit2 className="h-5 w-5" />}
+            <h3 className="font-bold">{isNew ? "Add Supplier" : "Edit Supplier"}</h3>
+          </div>
+          <button onClick={onClose} className="h-8 w-8 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center"><X className="h-4 w-4" /></button>
+        </div>
+        <div className="p-5 space-y-3">
+          <div>
+            <label className="text-xs font-semibold text-slate-600 mb-1 block">Supplier Name</label>
+            <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. AgriCorp Ghana" className="w-full h-10 px-3 rounded-lg border border-slate-200 focus:border-amber-500 outline-none text-sm" />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-slate-600 mb-1 block">Contact Phone</label>
+            <input value={form.contact} onChange={(e) => setForm({ ...form, contact: e.target.value })} placeholder="+233 24 111 2222" className="w-full h-10 px-3 rounded-lg border border-slate-200 focus:border-amber-500 outline-none text-sm" />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-slate-600 mb-1 block">Email</label>
+            <input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="supplier@email.com" className="w-full h-10 px-3 rounded-lg border border-slate-200 focus:border-amber-500 outline-none text-sm" />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-slate-600 mb-1 block">Address</label>
+            <input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Location, City" className="w-full h-10 px-3 rounded-lg border border-slate-200 focus:border-amber-500 outline-none text-sm" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-semibold text-slate-600 mb-1 block">Balance (GHC)</label>
+              <input type="number" step="0.01" value={form.balance || ""} onChange={(e) => setForm({ ...form, balance: parseFloat(e.target.value) || 0 })} className="w-full h-10 px-3 rounded-lg border border-slate-200 focus:border-amber-500 outline-none text-sm font-mono" />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-600 mb-1 block">Products Supplied</label>
+              <input type="number" value={form.productsSupplied || ""} onChange={(e) => setForm({ ...form, productsSupplied: parseInt(e.target.value) || 0 })} className="w-full h-10 px-3 rounded-lg border border-slate-200 focus:border-amber-500 outline-none text-sm" />
+            </div>
+          </div>
+        </div>
+        <div className="flex-shrink-0 px-5 py-3 border-t border-slate-200 bg-slate-50 flex justify-end gap-2">
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <button
+            onClick={() => form.name && onSave(form)}
+            disabled={!form.name}
+            className="h-10 px-5 rounded-lg bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white font-semibold text-sm transition disabled:opacity-50"
+          >
+            <Save className="h-4 w-4 inline mr-1" />
+            {isNew ? "Add Supplier" : "Save Changes"}
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -561,197 +1092,169 @@ function PurchaseReport({ transactions }: { transactions: PurchaseTransaction[] 
   const { toast } = useToast();
 
   // Filter transactions by date range
-  const filtered = transactions.filter(t => {
-    return t.date >= fromDate && t.date <= toDate;
-  });
+  const filtered = transactions.filter(t => t.date >= fromDate && t.date <= toDate);
 
   // Calculate totals
   const totals = filtered.reduce((acc, t) => ({
-    qty: acc.qty + t.qty,
-    tax: acc.tax + t.tax,
-    amount: acc.amount + t.amount,
-    paid: acc.paid + t.paid,
-    due: acc.due + t.due,
+    qty: acc.qty + t.qty, tax: acc.tax + t.tax, amount: acc.amount + t.amount,
+    paid: acc.paid + t.paid, due: acc.due + t.due,
   }), { qty: 0, tax: 0, amount: 0, paid: 0, due: 0 });
 
-  // Format date for display (M/D/YYYY)
   const formatDate = (iso: string) => {
     const [y, m, d] = iso.split('-');
     return `${parseInt(m)}/${parseInt(d)}/${y}`;
   };
-
-  // Format number with commas
   const formatNum = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   const now = new Date();
   const dateStr = `${now.getMonth() + 1}/${now.getDate()}/${now.getFullYear()}`;
   const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
 
-  const handlePrint = () => {
-    window.print();
-    toast({ title: "Printing report..." });
-  };
-
+  // PDF Export
   const handleExportPDF = () => {
-    toast({ title: "Exporting to PDF..." });
+    if (filtered.length === 0) { toast({ title: "No data to export", variant: "destructive" }); return; }
+    import("jspdf").then(({ default: jsPDF }) => {
+      import("jspdf-autotable").then(({ default: autoTable }) => {
+        const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+        const pw = doc.internal.pageSize.getWidth();
+        doc.setFontSize(16); doc.setFont("helvetica", "bold"); doc.setTextColor(30, 41, 59);
+        doc.text(COMPANY.name, 14, 18);
+        doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.setTextColor(100, 100, 100);
+        doc.text("Accra Warehouse", 14, 24); doc.text(COMPANY.address, 14, 29);
+        doc.setFontSize(9); doc.text(`${dateStr}`, pw - 14, 18, { align: "right" });
+        doc.text(`${timeStr}`, pw - 14, 23, { align: "right" }); doc.text("Page 1", pw - 14, 28, { align: "right" });
+        doc.setFontSize(14); doc.setFont("helvetica", "bold"); doc.setTextColor(0, 0, 0);
+        doc.text("Totals Purchase Report", pw / 2, 42, { align: "center" });
+        doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.setTextColor(80, 80, 80);
+        doc.text(`For The Period ${formatDate(fromDate)} - ${formatDate(toDate)}`, pw / 2, 48, { align: "center" });
+        const head = [["Date", "Qty", "TAX GHC", "Amount", "Paid GHC", "Due GHC"]];
+        const body = filtered.map(t => [formatDate(t.date), String(t.qty), formatNum(t.tax), formatNum(t.amount), formatNum(t.paid), formatNum(t.due)]);
+        body.push(["TOTAL", String(totals.qty), formatNum(totals.tax), formatNum(totals.amount), formatNum(totals.paid), formatNum(totals.due)]);
+        autoTable(doc, { head, body, startY: 54, styles: { fontSize: 9, cellPadding: 2, lineColor: [0, 0, 0], lineWidth: 0.3 },
+          headStyles: { fillColor: [240, 240, 240], textColor: 0, fontStyle: "bold" },
+          alternateRowStyles: { fillColor: [250, 250, 250] },
+          columnStyles: { 0: { cellWidth: 30 }, 1: { cellWidth: 20, halign: "right" }, 2: { cellWidth: 30, halign: "right" }, 3: { cellWidth: 35, halign: "right" }, 4: { cellWidth: 35, halign: "right" }, 5: { cellWidth: 35, halign: "right" } },
+          margin: { left: 14, right: 14 } });
+        const ph = doc.internal.pageSize.getHeight();
+        doc.setFontSize(8); doc.setTextColor(150, 150, 150);
+        doc.text(`${COMPANY.name} · ${COMPANY.address} · ${COMPANY.contact}`, pw / 2, ph - 8, { align: "center" });
+        doc.save(`purchase-report-${new Date().toISOString().split('T')[0]}.pdf`);
+        toast({ title: "PDF exported successfully" });
+      });
+    });
   };
 
+  // Excel Export
   const handleExportExcel = () => {
-    toast({ title: "Exporting to Excel..." });
+    if (filtered.length === 0) { toast({ title: "No data to export", variant: "destructive" }); return; }
+    import("xlsx").then((XLSX) => {
+      const data: (string | number)[][] = [];
+      data.push([COMPANY.name]); data.push(["Accra Warehouse"]); data.push([COMPANY.address]); data.push([]);
+      data.push(["Totals Purchase Report"]); data.push([`For The Period ${formatDate(fromDate)} - ${formatDate(toDate)}`]);
+      data.push([`Generated: ${dateStr} ${timeStr}`]); data.push([]);
+      data.push(["Date", "Qty", "TAX GHC", "Amount", "Paid GHC", "Due GHC"]);
+      filtered.forEach(t => data.push([formatDate(t.date), t.qty, formatNum(t.tax), formatNum(t.amount), formatNum(t.paid), formatNum(t.due)]));
+      data.push(["TOTAL", totals.qty, formatNum(totals.tax), formatNum(totals.amount), formatNum(totals.paid), formatNum(totals.due)]);
+      const ws = XLSX.utils.aoa_to_sheet(data);
+      ws['!cols'] = [{ wch: 14 }, { wch: 8 }, { wch: 14 }, { wch: 16 }, { wch: 14 }, { wch: 14 }];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Purchase Report");
+      XLSX.writeFile(wb, `purchase-report-${new Date().toISOString().split('T')[0]}.xlsx`);
+      toast({ title: "Excel exported successfully" });
+    });
   };
 
   return (
-    <div className="h-full flex flex-col gap-3">
-      {/* Date Filter Bar */}
-      <div className="flex-shrink-0 bg-white rounded-xl shadow-md ring-1 ring-slate-200 px-5 py-3 flex items-center gap-4 flex-wrap">
+    <div className="h-full overflow-y-auto bg-slate-200/50 p-4">
+      {/* Minimal Date Filter + Export Bar */}
+      <div className="max-w-3xl mx-auto mb-3 flex items-center justify-between gap-2 flex-wrap print:hidden">
         <div className="flex items-center gap-2">
-          <Calendar className="h-5 w-5 text-amber-600" />
-          <span className="text-sm font-bold text-slate-700">Filter by Date Range:</span>
+          <Calendar className="h-4 w-4 text-amber-600" />
+          <span className="text-xs font-semibold text-slate-600">From:</span>
+          <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="h-9 px-2 rounded-lg border border-slate-300 text-xs outline-none focus:ring-2 focus:ring-amber-400" />
+          <span className="text-xs font-semibold text-slate-600">To:</span>
+          <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="h-9 px-2 rounded-lg border border-slate-300 text-xs outline-none focus:ring-2 focus:ring-amber-400" />
         </div>
         <div className="flex items-center gap-2">
-          <label className="text-xs font-semibold text-slate-600">From:</label>
-          <input
-            type="date"
-            value={fromDate}
-            onChange={(e) => setFromDate(e.target.value)}
-            className="h-9 px-3 rounded-lg border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-amber-400"
-          />
+          <button onClick={() => window.print()} className="h-9 px-3 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition">
+            <Printer className="h-3.5 w-3.5" /> Print
+          </button>
+          <button onClick={handleExportPDF} className="h-9 px-3 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-700 text-xs font-semibold flex items-center gap-1.5 transition">
+            <FileText className="h-3.5 w-3.5" /> PDF
+          </button>
+          <button onClick={handleExportExcel} className="h-9 px-3 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-700 text-xs font-semibold flex items-center gap-1.5 transition">
+            <Download className="h-3.5 w-3.5" /> Excel
+          </button>
         </div>
-        <div className="flex items-center gap-2">
-          <label className="text-xs font-semibold text-slate-600">To:</label>
-          <input
-            type="date"
-            value={toDate}
-            onChange={(e) => setToDate(e.target.value)}
-            className="h-9 px-3 rounded-lg border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-amber-400"
-          />
-        </div>
-        <div className="flex-1" />
-        <button onClick={handlePrint} className="h-9 px-3 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition">
-          <Printer className="h-3.5 w-3.5" /> Print
-        </button>
-        <button onClick={handleExportPDF} className="h-9 px-3 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-700 text-xs font-semibold flex items-center gap-1.5 transition">
-          <FileText className="h-3.5 w-3.5" /> PDF
-        </button>
-        <button onClick={handleExportExcel} className="h-9 px-3 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-700 text-xs font-semibold flex items-center gap-1.5 transition">
-          <Download className="h-3.5 w-3.5" /> Excel
-        </button>
       </div>
 
-      {/* Report Preview - Styled like a printed document */}
-      <div className="flex-1 overflow-y-auto bg-slate-200/50 rounded-xl p-4">
-        <div className="max-w-3xl mx-auto bg-white shadow-xl rounded-lg overflow-hidden" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
-          {/* Report Header */}
-          <div className="px-8 pt-6 pb-2 border-b-2 border-slate-800">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-3">
-                <div className="h-12 w-12 rounded-lg bg-gradient-to-br from-amber-600 to-orange-700 flex items-center justify-center text-white font-bold text-xl shadow-md">
-                  S
-                </div>
-                <div>
-                  <div className="text-lg font-bold text-slate-900 leading-tight">{COMPANY.name}</div>
-                  <div className="text-xs text-slate-600">Accra Warehouse</div>
-                  <div className="text-xs text-slate-600">{COMPANY.address}</div>
-                </div>
-              </div>
-              <div className="text-right text-xs text-slate-600">
-                <div>{dateStr}</div>
-                <div>{timeStr}</div>
-                <div className="mt-1 font-semibold text-slate-700">Page 1</div>
-              </div>
+      {/* The Report — ONLY company header + title + table */}
+      <div className="max-w-3xl mx-auto bg-white shadow-xl" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
+        {/* Company Header */}
+        <div className="px-8 pt-6 pb-3 flex items-start justify-between border-b-2 border-slate-800">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-full bg-slate-100 ring-1 ring-slate-300 flex items-center justify-center text-slate-700 font-bold text-lg">S</div>
+            <div>
+              <div className="text-base font-bold text-slate-900 uppercase leading-tight">{COMPANY.name}</div>
+              <div className="text-xs text-slate-600">Accra Warehouse</div>
+              <div className="text-xs text-slate-600">{COMPANY.address}</div>
             </div>
           </div>
-
-          {/* Report Title */}
-          <div className="px-8 py-4 text-center border-b border-slate-300 bg-slate-50">
-            <h1 className="text-xl font-bold text-slate-900 tracking-wide">Totals Purchase Report</h1>
-            <p className="text-sm text-slate-600 mt-1">
-              For The Period {formatDate(fromDate)} - {formatDate(toDate)}
-            </p>
+          <div className="text-right text-xs text-slate-600">
+            <div>{dateStr}</div>
+            <div>{timeStr}</div>
+            <div className="mt-1 font-semibold text-slate-700">Page 1</div>
           </div>
+        </div>
 
-          {/* Report Table */}
-          <div className="px-8 py-4">
-            <table className="w-full text-xs" style={{ borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ backgroundColor: '#E6F0FA' }}>
-                  <th className="px-3 py-2 text-left font-bold text-slate-800 border border-slate-400">Date</th>
-                  <th className="px-3 py-2 text-right font-bold text-slate-800 border border-slate-400">Qty</th>
-                  <th className="px-3 py-2 text-right font-bold text-slate-800 border border-slate-400">TAX GHC</th>
-                  <th className="px-3 py-2 text-right font-bold text-slate-800 border border-slate-400">Amount</th>
-                  <th className="px-3 py-2 text-right font-bold text-slate-800 border border-slate-400">Paid GHC</th>
-                  <th className="px-3 py-2 text-right font-bold text-slate-800 border border-slate-400">Due GHC</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="px-3 py-8 text-center text-slate-400 border border-slate-400">
-                      No transactions found in the selected date range
-                    </td>
+        {/* Report Title */}
+        <div className="px-8 py-4 text-center">
+          <h1 className="text-lg font-bold text-slate-900">Totals Purchase Report</h1>
+          <p className="text-sm text-slate-600 mt-1">For The Period {formatDate(fromDate)} - {formatDate(toDate)}</p>
+        </div>
+
+        {/* Report Table */}
+        <div className="px-8 pb-6">
+          <table className="w-full text-xs" style={{ borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ backgroundColor: '#F0F0F0' }}>
+                <th className="px-3 py-2 text-left font-bold text-slate-800 border border-slate-700">Date</th>
+                <th className="px-3 py-2 text-right font-bold text-slate-800 border border-slate-700">Qty</th>
+                <th className="px-3 py-2 text-right font-bold text-slate-800 border border-slate-700">TAX GHC</th>
+                <th className="px-3 py-2 text-right font-bold text-slate-800 border border-slate-700">Amount</th>
+                <th className="px-3 py-2 text-right font-bold text-slate-800 border border-slate-700">Paid GHC</th>
+                <th className="px-3 py-2 text-right font-bold text-slate-800 border border-slate-700">Due GHC</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.length === 0 ? (
+                <tr><td colSpan={6} className="px-3 py-8 text-center text-slate-400 border border-slate-700">No transactions found in the selected date range</td></tr>
+              ) : (
+                filtered.map((t, i) => (
+                  <tr key={t.id} style={{ backgroundColor: i % 2 === 0 ? '#FFFFFF' : '#FAFAFA' }}>
+                    <td className="px-3 py-1.5 text-slate-800 border border-slate-700">{formatDate(t.date)}</td>
+                    <td className="px-3 py-1.5 text-right text-slate-800 border border-slate-700">{t.qty}</td>
+                    <td className="px-3 py-1.5 text-right text-slate-800 border border-slate-700">{formatNum(t.tax)}</td>
+                    <td className="px-3 py-1.5 text-right text-slate-800 border border-slate-700">{formatNum(t.amount)}</td>
+                    <td className="px-3 py-1.5 text-right text-slate-800 border border-slate-700">{formatNum(t.paid)}</td>
+                    <td className="px-3 py-1.5 text-right font-semibold border border-slate-700" style={{ color: t.due > 0 ? '#DC2626' : '#16A34A' }}>{formatNum(t.due)}</td>
                   </tr>
-                ) : (
-                  filtered.map((t, i) => (
-                    <tr key={t.id} style={{ backgroundColor: i % 2 === 0 ? '#FFFFFF' : '#F8F8F8' }}>
-                      <td className="px-3 py-1.5 text-slate-800 border border-slate-400">{formatDate(t.date)}</td>
-                      <td className="px-3 py-1.5 text-right text-slate-800 border border-slate-400">{t.qty}</td>
-                      <td className="px-3 py-1.5 text-right text-slate-800 border border-slate-400">{formatNum(t.tax)}</td>
-                      <td className="px-3 py-1.5 text-right text-slate-800 border border-slate-400">{formatNum(t.amount)}</td>
-                      <td className="px-3 py-1.5 text-right text-slate-800 border border-slate-400">{formatNum(t.paid)}</td>
-                      <td className="px-3 py-1.5 text-right font-semibold border border-slate-400" style={{ color: t.due > 0 ? '#DC2626' : '#10B981' }}>
-                        {formatNum(t.due)}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-              {/* Totals Row */}
-              {filtered.length > 0 && (
-                <tfoot>
-                  <tr style={{ backgroundColor: '#FEF3C7' }}>
-                    <td className="px-3 py-2 font-bold text-slate-900 border border-slate-400 border-t-2 border-t-slate-700">TOTAL</td>
-                    <td className="px-3 py-2 text-right font-bold text-slate-900 border border-slate-400 border-t-2 border-t-slate-700">{totals.qty}</td>
-                    <td className="px-3 py-2 text-right font-bold text-slate-900 border border-slate-400 border-t-2 border-t-slate-700">{formatNum(totals.tax)}</td>
-                    <td className="px-3 py-2 text-right font-bold text-slate-900 border border-slate-400 border-t-2 border-t-slate-700">{formatNum(totals.amount)}</td>
-                    <td className="px-3 py-2 text-right font-bold text-slate-900 border border-slate-400 border-t-2 border-t-slate-700">{formatNum(totals.paid)}</td>
-                    <td className="px-3 py-2 text-right font-bold border border-slate-400 border-t-2 border-t-slate-700" style={{ color: totals.due > 0 ? '#DC2626' : '#10B981' }}>
-                      {formatNum(totals.due)}
-                    </td>
-                  </tr>
-                </tfoot>
+                ))
               )}
-            </table>
-          </div>
-
-          {/* Summary Cards */}
-          {filtered.length > 0 && (
-            <div className="px-8 pb-4">
-              <div className="grid grid-cols-4 gap-3">
-                <div className="bg-amber-50 rounded-lg p-3 ring-1 ring-amber-200 text-center">
-                  <div className="text-[10px] text-slate-500 uppercase font-semibold">Transactions</div>
-                  <div className="text-lg font-bold text-amber-700">{filtered.length}</div>
-                </div>
-                <div className="bg-blue-50 rounded-lg p-3 ring-1 ring-blue-200 text-center">
-                  <div className="text-[10px] text-slate-500 uppercase font-semibold">Total Amount</div>
-                  <div className="text-lg font-bold text-blue-700 font-mono">{formatNum(totals.amount)}</div>
-                </div>
-                <div className="bg-emerald-50 rounded-lg p-3 ring-1 ring-emerald-200 text-center">
-                  <div className="text-[10px] text-slate-500 uppercase font-semibold">Total Paid</div>
-                  <div className="text-lg font-bold text-emerald-700 font-mono">{formatNum(totals.paid)}</div>
-                </div>
-                <div className="bg-rose-50 rounded-lg p-3 ring-1 ring-rose-200 text-center">
-                  <div className="text-[10px] text-slate-500 uppercase font-semibold">Total Due</div>
-                  <div className="text-lg font-bold text-rose-700 font-mono">{formatNum(totals.due)}</div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Report Footer */}
-          <div className="px-8 py-3 border-t border-slate-300 bg-slate-50 flex items-center justify-between text-[10px] text-slate-500">
-            <div>{COMPANY.name} · {COMPANY.address} · {COMPANY.contact}</div>
-            <div>Generated: {dateStr} {timeStr}</div>
-          </div>
+            </tbody>
+            {filtered.length > 0 && (
+              <tfoot>
+                <tr style={{ backgroundColor: '#F0F0F0' }}>
+                  <td className="px-3 py-2 font-bold text-slate-900 border border-slate-700">TOTAL</td>
+                  <td className="px-3 py-2 text-right font-bold text-slate-900 border border-slate-700">{totals.qty}</td>
+                  <td className="px-3 py-2 text-right font-bold text-slate-900 border border-slate-700">{formatNum(totals.tax)}</td>
+                  <td className="px-3 py-2 text-right font-bold text-slate-900 border border-slate-700">{formatNum(totals.amount)}</td>
+                  <td className="px-3 py-2 text-right font-bold text-slate-900 border border-slate-700">{formatNum(totals.paid)}</td>
+                  <td className="px-3 py-2 text-right font-bold border border-slate-700" style={{ color: totals.due > 0 ? '#DC2626' : '#16A34A' }}>{formatNum(totals.due)}</td>
+                </tr>
+              </tfoot>
+            )}
+          </table>
         </div>
       </div>
     </div>
