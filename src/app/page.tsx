@@ -71,6 +71,8 @@ export default function POSPage() {
   const [showCartPreview, setShowCartPreview] = useState(false);
   const [initialStockView, setInitialStockView] = useState<"stock-file" | "stock-search" | "add-modify" | "group-maintenance" | "quantity-adjustment" | "history">("stock-file");
   const [openStockQtyReport, setOpenStockQtyReport] = useState(false);
+  const [showStockList, setShowStockList] = useState(false);
+  const [partNoInput, setPartNoInput] = useState("");
 
   const { toast } = useToast();
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -758,46 +760,89 @@ export default function POSPage() {
                 className="flex flex-col h-full w-full"
               >
                 {/* Cart Header */}
-                <div className="flex-shrink-0 flex items-center justify-between px-4 py-2.5 bg-gradient-to-r from-slate-50 to-white border-b border-slate-200">
+                <div className="flex-shrink-0 flex items-center justify-between px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-500 text-white">
                   <div className="flex items-center gap-2">
-                    <Cart className="h-5 w-5 text-emerald-600" />
-                    <h2 className="text-base font-bold text-slate-800">Current Order</h2>
-                    <Badge variant="secondary" className="font-mono text-[10px]">
-                      #{invoiceNumber || '------'}
-                    </Badge>
+                    <Cart className="h-4 w-4" />
+                    <span className="text-xs font-bold">Invoice #{invoiceNumber || '------'}</span>
                   </div>
-                  <button onClick={() => setShowSidebar(false)} className="h-7 w-7 rounded-lg hover:bg-slate-100 flex items-center justify-center transition">
-                    <X className="h-4 w-4 text-slate-500" />
+                  <button onClick={() => setShowSidebar(false)} className="h-6 w-6 rounded hover:bg-white/20 flex items-center justify-center transition">
+                    <X className="h-3.5 w-3.5" />
                   </button>
                 </div>
 
-                {/* Customer Info */}
-                <div className="flex-shrink-0 px-3 py-2 bg-slate-50/50 border-b border-slate-200 flex items-center gap-2">
-                  <div className="flex-1 flex items-center gap-2 bg-white rounded-lg px-2 py-1 ring-1 ring-slate-200">
-                    <User className="h-3.5 w-3.5 text-slate-400" />
+                {/* Invoice Info Bar */}
+                <div className="flex-shrink-0 px-3 py-1.5 bg-slate-100 border-b border-slate-300 flex items-center gap-3 text-[10px]">
+                  <div className="flex items-center gap-1">
+                    <span className="font-semibold text-slate-600">Client:</span>
                     <input
                       value={customerName}
                       onChange={(e) => setCustomerName(e.target.value)}
-                      placeholder="Customer name (optional)"
-                      className="flex-1 bg-transparent outline-none text-xs text-slate-700 placeholder:text-slate-400"
+                      placeholder="Walk-in customer"
+                      className="w-32 h-6 px-1.5 border border-slate-300 rounded text-[10px] bg-white outline-none focus:ring-1 focus:ring-blue-400"
                     />
                   </div>
+                  <div className="flex items-center gap-1">
+                    <span className="font-semibold text-slate-600">Balance:</span>
+                    <span className="font-mono font-bold text-slate-800">{formatGHS(0)}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="font-semibold text-slate-600">Points:</span>
+                    <span className="font-mono text-slate-700">0</span>
+                  </div>
                   {heldOrders.length > 0 && (
-                    <button className="px-2 py-1 rounded-lg bg-amber-100 text-amber-700 text-[10px] font-semibold flex items-center gap-1 hover:bg-amber-200 transition">
-                      <Pause className="h-3 w-3" />
+                    <button className="ml-auto px-2 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-semibold flex items-center gap-1 hover:bg-amber-200 transition">
+                      <Pause className="h-2.5 w-2.5" />
                       {heldOrders.length} Held
                     </button>
                   )}
                 </div>
 
+                {/* Part No. Input — typing here opens Stock List popup */}
+                <div className="flex-shrink-0 px-3 py-1.5 bg-white border-b border-slate-200 flex items-center gap-2">
+                  <label className="text-[10px] font-bold text-slate-600 whitespace-nowrap">Part No.:</label>
+                  <input
+                    value={partNoInput}
+                    onChange={(e) => {
+                      setPartNoInput(e.target.value);
+                      if (e.target.value.length > 0) {
+                        setShowStockList(true);
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const product = products.find(p => p.barcode === partNoInput || p.sku.toLowerCase() === partNoInput.toLowerCase());
+                        if (product) {
+                          addToCart(product);
+                          setPartNoInput("");
+                          setShowStockList(false);
+                        } else {
+                          setShowStockList(true);
+                        }
+                      }
+                      if (e.key === 'Escape') setShowStockList(false);
+                    }}
+                    onFocus={() => { if (partNoInput) setShowStockList(true); }}
+                    placeholder="Type part number or scan barcode..."
+                    className="flex-1 h-7 px-2 text-xs font-mono border border-slate-400 rounded outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                  />
+                  <button
+                    onClick={() => setShowStockList(true)}
+                    className="h-7 px-2 rounded bg-blue-100 hover:bg-blue-200 text-blue-700 text-[10px] font-semibold flex items-center gap-1"
+                  >
+                    <Search className="h-3 w-3" /> F10
+                  </button>
+                </div>
+
                 {/* Cart Items Table */}
                 <div className="flex-1 overflow-hidden flex flex-col min-h-0">
-                  <div className="flex-shrink-0 grid grid-cols-[1fr_60px_70px_50px_70px] gap-1 px-3 py-1.5 bg-slate-800 text-white text-[10px] font-semibold uppercase tracking-wide">
-                    <div>Item</div>
-                    <div className="text-center">Qty</div>
-                    <div className="text-right">Price</div>
+                  {/* Table Header — light blue matching reference */}
+                  <div className="flex-shrink-0 grid grid-cols-[120px_1fr_50px_80px_45px_80px] gap-1 px-2 py-1 text-[10px] font-bold text-slate-700 border-b border-slate-400" style={{ backgroundColor: '#ADD8E6' }}>
+                    <div>Part No.</div>
+                    <div>Part Details</div>
+                    <div className="text-right">Qty</div>
+                    <div className="text-right">Amount GHC</div>
                     <div className="text-center">Disc%</div>
-                    <div className="text-right">Total</div>
+                    <div className="text-right">Total GHC</div>
                   </div>
 
                   <ScrollArea className="flex-1 min-h-0">
@@ -818,44 +863,28 @@ export default function POSPage() {
                               transition={{ duration: 0.2 }}
                               onClick={() => setSelectedCartIndex(index)}
                               className={cn(
-                                "grid grid-cols-[1fr_60px_70px_50px_70px] gap-1 px-3 py-2 cursor-pointer transition-colors text-xs",
-                                isSelected ? "bg-emerald-50 ring-1 ring-emerald-300 ring-inset" : "hover:bg-slate-50"
+                                "grid grid-cols-[120px_1fr_50px_80px_45px_80px] gap-1 px-2 py-1.5 cursor-pointer transition-colors text-[11px]",
                               )}
+                              style={{
+                                backgroundColor: isSelected ? '#E3F2FD' : (index % 2 === 1 ? '#FAFAFA' : '#FFFFFF'),
+                                color: isSelected ? '#1565C0' : '#424242',
+                              }}
                             >
-                              <div className="flex items-center gap-2 min-w-0">
-                                <span className="text-xl flex-shrink-0">{item.emoji}</span>
-                                <div className="min-w-0">
-                                  <div className="font-semibold text-slate-800 truncate">{item.name}</div>
-                                  <div className="text-[10px] text-slate-400 font-mono">{item.sku} · {item.unit}</div>
-                                </div>
-                              </div>
-                              <div className="flex items-center justify-center gap-0.5">
-                                <button onClick={(e) => { e.stopPropagation(); updateQuantity(index, -1); }} className="h-5 w-5 rounded bg-slate-200 hover:bg-slate-300 flex items-center justify-center">
-                                  <Minus className="h-3 w-3" />
-                                </button>
-                                <span className="w-6 text-center font-mono font-semibold text-slate-700">
-                                  {item.quantity.toFixed(item.unit === 'kg' ? 2 : 0)}
-                                </span>
-                                <button onClick={(e) => { e.stopPropagation(); updateQuantity(index, 1); }} className="h-5 w-5 rounded bg-slate-200 hover:bg-slate-300 flex items-center justify-center">
-                                  <Plus className="h-3 w-3" />
-                                </button>
-                              </div>
-                              <div className="text-right font-mono text-slate-700 self-center">
-                                {formatGHS(item.price)}
-                              </div>
-                              <div className="text-center self-center">
+                              <div className="font-mono truncate">{item.sku}</div>
+                              <div className="truncate">{item.emoji} {item.name}</div>
+                              <div className="text-right font-mono">{item.quantity.toFixed(item.unit === 'kg' ? 2 : 0)}</div>
+                              <div className="text-right font-mono">{formatGHS(item.price)}</div>
+                              <div className="text-center">
                                 <input
                                   type="number"
                                   value={item.discount || ''}
                                   onClick={(e) => { e.stopPropagation(); setSelectedCartIndex(index); }}
                                   onChange={(e) => applyDiscount(index, parseFloat(e.target.value) || 0)}
-                                  className="w-10 text-center text-[11px] bg-transparent border-b border-slate-200 focus:border-emerald-400 outline-none font-mono"
+                                  className="w-9 text-center text-[10px] bg-transparent border-b border-slate-200 focus:border-blue-400 outline-none font-mono"
                                   placeholder="0"
                                 />
                               </div>
-                              <div className="text-right font-mono font-semibold text-slate-900 self-center">
-                                {formatGHS(lineFinal)}
-                              </div>
+                              <div className="text-right font-mono font-semibold">{formatGHS(lineFinal)}</div>
                             </motion.div>
                           );
                         })}
@@ -865,7 +894,7 @@ export default function POSPage() {
                         <div className="flex flex-col items-center justify-center py-16 text-slate-400">
                           <ShoppingCart className="h-10 w-10 mb-2 opacity-40" />
                           <div className="text-sm font-medium">Cart is empty</div>
-                          <div className="text-xs mt-1">Click products to add them</div>
+                          <div className="text-xs mt-1">Type a Part No. above or click products</div>
                         </div>
                       )}
                     </div>
@@ -1038,6 +1067,22 @@ export default function POSPage() {
             products={products}
             onAdd={(product) => { addToCart(product); }}
             onClose={() => setShowFindProduct(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ===== Stock List Popup (triggered by Part No. input) ===== */}
+      <AnimatePresence>
+        {showStockList && (
+          <StockListPopup
+            products={products}
+            searchText={partNoInput}
+            onSelect={(product) => {
+              addToCart(product);
+              setPartNoInput("");
+              setShowStockList(false);
+            }}
+            onClose={() => setShowStockList(false)}
           />
         )}
       </AnimatePresence>
