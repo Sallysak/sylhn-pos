@@ -31,7 +31,7 @@ export interface PaymentResult {
 
 export type ViewMode = "pos" | "stock" | "reports";
 
-export type StockView = "add-modify" | "group-maintenance" | "quantity-adjustment" | "history";
+export type StockView = "add-modify" | "group-maintenance" | "quantity-adjustment" | "history" | "stock-file" | "stock-search";
 
 export interface SavedReport {
   id: string;

@@ -12,6 +12,7 @@ import {
   Layers, ArrowUpDown, History, FileSpreadsheet, Home, Power,
   Phone, Truck, Users, Database, Wrench, Shield,
   FileBarChart2, BookOpen, PhoneCall, Archive, Settings2, Lock,
+  FileSearch, Copy, Image as ImageIcon, Tags,
 } from "lucide-react";
 import {
   products as INITIAL_PRODUCTS, categories, paymentMethods, quickCashAmounts,
@@ -64,6 +65,7 @@ export default function POSPage() {
   const [showSidebar, setShowSidebar] = useState(true);
   const [showFindProduct, setShowFindProduct] = useState(false);
   const [showCartPreview, setShowCartPreview] = useState(false);
+  const [initialStockView, setInitialStockView] = useState<"stock-file" | "stock-search" | "add-modify" | "group-maintenance" | "quantity-adjustment" | "history">("stock-file");
 
   const { toast } = useToast();
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -411,10 +413,12 @@ export default function POSPage() {
       id: "stock",
       label: "Stock",
       items: [
-        { label: "Add / Modify Stock", icon: Package, action: () => setView("stock") },
-        { label: "Group Maintenance", icon: Layers, action: () => setView("stock") },
-        { label: "Quantity Adjustment", icon: ArrowUpDown, action: () => setView("stock") },
-        { label: "Stock History", icon: History, action: () => setView("stock") },
+        { label: "Stock File", icon: FileText, action: () => { setInitialStockView("stock-file"); setView("stock"); } },
+        { label: "Stock Search", icon: FileSearch, action: () => { setInitialStockView("stock-search"); setView("stock"); } },
+        { label: "Add / Modify Stock", icon: Package, action: () => { setInitialStockView("add-modify"); setView("stock"); } },
+        { label: "Group Maintenance", icon: Layers, action: () => { setInitialStockView("group-maintenance"); setView("stock"); } },
+        { label: "Quantity Adjustment", icon: ArrowUpDown, action: () => { setInitialStockView("quantity-adjustment"); setView("stock"); } },
+        { label: "Stock History", icon: History, action: () => { setInitialStockView("history"); setView("stock"); } },
         { separator: true },
         { label: "Stock Reports", icon: FileBarChart, action: () => setView("reports") },
         { label: "Quantities Report", icon: FileText, action: () => setView("reports") },
@@ -483,7 +487,7 @@ export default function POSPage() {
 
   // ===== Render Other Views =====
   if (view === "stock") {
-    return <StockManagement onBack={() => setView("pos")} products={products} setProducts={setProducts} groups={groups} setGroups={setGroups} history={history} setHistory={setHistory} />;
+    return <StockManagement onBack={() => setView("pos")} products={products} setProducts={setProducts} groups={groups} setGroups={setGroups} history={history} setHistory={setHistory} initialView={initialStockView} />;
   }
   if (view === "reports") {
     return <Reports onBack={() => setView("pos")} products={products} groups={groups} history={history} />;

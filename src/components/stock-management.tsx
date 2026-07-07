@@ -6,7 +6,8 @@ import {
   Package, Plus, Edit2, Trash2, Search, Layers, Settings2, History,
   ArrowLeft, Save, X, TrendingUp, AlertTriangle, CheckCircle2, Boxes,
   Filter, ChevronRight, Calendar, User, Tag, DollarSign, Barcode,
-  ArrowUpDown, ArrowUp, ArrowDown, RotateCcw
+  ArrowUpDown, ArrowUp, ArrowDown, RotateCcw,
+  FileText, Copy, Image as ImageIcon, Tags, FileSearch, FolderTree, SlidersHorizontal,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,10 +29,11 @@ interface StockManagementProps {
   setGroups: React.Dispatch<React.SetStateAction<StockGroup[]>>;
   history: StockHistoryEntry[];
   setHistory: React.Dispatch<React.SetStateAction<StockHistoryEntry[]>>;
+  initialView?: StockView;
 }
 
-export function StockManagement({ onBack, products, setProducts, groups, setGroups, history, setHistory }: StockManagementProps) {
-  const [view, setView] = useState<StockView>("add-modify");
+export function StockManagement({ onBack, products, setProducts, groups, setGroups, history, setHistory, initialView }: StockManagementProps) {
+  const [view, setView] = useState<StockView>(initialView || "stock-file");
   const { toast } = useToast();
 
   return (
@@ -64,6 +66,8 @@ export function StockManagement({ onBack, products, setProducts, groups, setGrou
       <nav className="flex-shrink-0 bg-white border-b border-slate-200 shadow-sm">
         <div className="flex items-center gap-1 px-6 py-2">
           {[
+            { id: "stock-file" as const, label: "Stock File", icon: FileText },
+            { id: "stock-search" as const, label: "Stock Search", icon: FileSearch },
             { id: "add-modify" as const, label: "Add / Modify Stock", icon: Plus },
             { id: "group-maintenance" as const, label: "Group Maintenance", icon: Layers },
             { id: "quantity-adjustment" as const, label: "Quantity Adjustment", icon: ArrowUpDown },
@@ -97,6 +101,8 @@ export function StockManagement({ onBack, products, setProducts, groups, setGrou
             transition={{ duration: 0.2 }}
             className="h-full"
           >
+            {view === "stock-file" && <StockFileView products={products} setProducts={setProducts} groups={groups} setHistory={setHistory} />}
+            {view === "stock-search" && <StockSearchView products={products} groups={groups} />}
             {view === "add-modify" && <AddModifyStock products={products} setProducts={setProducts} groups={groups} setHistory={setHistory} />}
             {view === "group-maintenance" && <GroupMaintenance groups={groups} setGroups={setGroups} products={products} />}
             {view === "quantity-adjustment" && <QuantityAdjustment products={products} setProducts={setProducts} setHistory={setHistory} />}
@@ -862,6 +868,736 @@ function StockHistoryView({ history, products }: { history: StockHistoryEntry[];
           )}
         </div>
       </ScrollArea>
+    </div>
+  );
+}
+
+// ===== Stock File View =====
+function StockFileView({ products, setProducts, groups, setHistory }: {
+  products: Product[];
+  setProducts: React.Dispatch<React.SetStateAction<Product[]>>;
+  groups: StockGroup[];
+  setHistory: React.Dispatch<React.SetStateAction<StockHistoryEntry[]>>;
+}) {
+  const [searchText, setSearchText] = useState("");
+  const [filterType, setFilterType] = useState("all");
+  const [filterGroup, setFilterGroup] = useState("all");
+  const [filterGroup1, setFilterGroup1] = useState("all");
+  const [filterGroup2, setFilterGroup2] = useState("all");
+  const [filterGroup3, setFilterGroup3] = useState("all");
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [showForm, setShowForm] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [showCloneConfirm, setShowCloneConfirm] = useState<Product | null>(null);
+  const [showQtyAdjust, setShowQtyAdjust] = useState<Product | null>(null);
+  const { toast } = useToast();
+
+  const filtered = products.filter(p => {
+    if (searchText.trim()) {
+      const q = searchText.toLowerCase();
+      if (!p.name.toLowerCase().includes(q) && !p.sku.toLowerCase().includes(q) && !p.barcode.includes(q)) return false;
+    }
+    if (filterType !== "all") {
+      if (filterType === "taxable" && !p.taxable) return false;
+      if (filterType === "non-taxable" && p.taxable) return false;
+      if (filterType === "low-stock" && p.stock > p.reorderLevel) return false;
+      if (filterType === "out-of-stock" && p.stock > 0) return false;
+      if (filterType === "expiring" && Math.ceil((new Date(p.expiryDate).getTime() - Date.now()) / 86400000) > 7) return false;
+    }
+    if (filterGroup !== "all" && p.groupId !== filterGroup) return false;
+    return true;
+  });
+
+  const selected = filtered[selectedIndex];
+
+  const handleModify = () => {
+    if (!selected) { toast({ title: "No product selected", variant: "destructive" }); return; }
+    setEditingProduct(selected);
+    setShowForm(true);
+  };
+
+  const handleNew = () => {
+    setEditingProduct(null);
+    setShowForm(true);
+  };
+
+  const handleClone = () => {
+    if (!selected) { toast({ title: "No product selected", variant: "destructive" }); return; }
+    setShowCloneConfirm(selected);
+  };
+
+  const handleSave = (product: Product) => {
+    const isNew = !products.find(p => p.id === product.id);
+    if (isNew) {
+      setProducts(prev => [...prev, product]);
+      setHistory(prev => [...prev, {
+        id: `h-${Date.now()}`,
+        productId: product.id,
+        productName: product.name,
+        sku: product.sku,
+        action: 'added',
+        quantityChange: product.stock,
+        newQuantity: product.stock,
+        timestamp: new Date().toISOString(),
+        user: "Sarah Johnson",
+        reason: "New product added via Stock File",
+        reference: `ADD-${Date.now().toString().slice(-6)}`,
+      }]);
+      toast({ title: "Product added", description: `${product.emoji} ${product.name}` });
+    } else {
+      setProducts(prev => prev.map(p => p.id === product.id ? product : p));
+      setHistory(prev => [...prev, {
+        id: `h-${Date.now()}`,
+        productId: product.id,
+        productName: product.name,
+        sku: product.sku,
+        action: 'modified',
+        quantityChange: 0,
+        newQuantity: product.stock,
+        timestamp: new Date().toISOString(),
+        user: "Sarah Johnson",
+        reason: "Product modified via Stock File",
+        reference: `MOD-${Date.now().toString().slice(-6)}`,
+      }]);
+      toast({ title: "Product updated", description: `${product.emoji} ${product.name}` });
+    }
+    setShowForm(false);
+    setEditingProduct(null);
+  };
+
+  const confirmClone = () => {
+    if (!showCloneConfirm) return;
+    const cloned: Product = {
+      ...showCloneConfirm,
+      id: `p-${Date.now()}`,
+      sku: `CLN-${Math.floor(1000 + Math.random() * 9000)}`,
+      name: `${showCloneConfirm.name} (Copy)`,
+      barcode: `${showCloneConfirm.barcode}${Math.floor(Math.random() * 10)}`,
+      batchNumber: `B-CLN-${Date.now().toString().slice(-4)}`,
+      stock: 0,
+    };
+    setProducts(prev => [...prev, cloned]);
+    setHistory(prev => [...prev, {
+      id: `h-${Date.now()}`,
+      productId: cloned.id,
+      productName: cloned.name,
+      sku: cloned.sku,
+      action: 'added',
+      quantityChange: 0,
+      newQuantity: 0,
+      timestamp: new Date().toISOString(),
+      user: "Sarah Johnson",
+      reason: `Cloned from ${showCloneConfirm.name}`,
+      reference: `CLN-${Date.now().toString().slice(-6)}`,
+    }]);
+    toast({ title: "Product cloned", description: `${cloned.name} created` });
+    setShowCloneConfirm(null);
+  };
+
+  return (
+    <div className="h-full bg-white rounded-2xl shadow-lg ring-1 ring-slate-200/60 overflow-hidden flex flex-col">
+      {/* Header */}
+      <div className="flex-shrink-0 flex items-center justify-between px-5 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white">
+        <div className="flex items-center gap-2">
+          <FileText className="h-5 w-5" />
+          <h2 className="text-base font-bold">Stock File</h2>
+          <Badge variant="secondary" className="font-mono text-xs bg-white/20 text-white">{filtered.length} records</Badge>
+        </div>
+        <div className="text-xs text-emerald-100/90">Manage your complete stock inventory</div>
+      </div>
+
+      {/* Search & Filter Section */}
+      <div className="flex-shrink-0 px-5 py-3 bg-emerald-50/50 border-b border-emerald-100 space-y-2.5">
+        {/* Search Row */}
+        <div className="flex items-center gap-3">
+          <label className="text-xs font-bold text-slate-600 uppercase tracking-wide whitespace-nowrap w-20">Search Text</label>
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <input
+              value={searchText}
+              onChange={(e) => { setSearchText(e.target.value); setSelectedIndex(0); }}
+              placeholder="Part Number"
+              className="w-full h-9 pl-9 pr-3 rounded-lg bg-white border border-slate-200 text-sm outline-none ring-2 ring-transparent focus:ring-emerald-400 transition"
+            />
+          </div>
+          <button
+            onClick={() => setSelectedIndex(0)}
+            className="h-9 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold flex items-center gap-1.5 transition shadow-sm"
+          >
+            <Search className="h-3.5 w-3.5" />
+            Search
+          </button>
+        </div>
+        {/* Filter Row */}
+        <div className="flex items-center gap-3 flex-wrap">
+          <label className="text-xs font-bold text-slate-600 uppercase tracking-wide whitespace-nowrap w-20">Filter By</label>
+          <FilterDropdown label="Type" value={filterType} onChange={(v) => { setFilterType(v); setSelectedIndex(0); }} options={[
+            { value: "all", label: "All Types" },
+            { value: "taxable", label: "Taxable (VAT)" },
+            { value: "non-taxable", label: "Non-Taxable" },
+            { value: "low-stock", label: "Low Stock" },
+            { value: "out-of-stock", label: "Out of Stock" },
+            { value: "expiring", label: "Expiring (≤7 days)" },
+          ]} />
+          <FilterDropdown label="Stock Group" value={filterGroup} onChange={(v) => { setFilterGroup(v); setSelectedIndex(0); }} options={[
+            { value: "all", label: "All Groups" },
+            ...groups.map(g => ({ value: g.id, label: `${g.icon} ${g.name}` })),
+          ]} />
+          <FilterDropdown label="Group1" value={filterGroup1} onChange={setFilterGroup1} options={[
+            { value: "all", label: "All" },
+            { value: "fresh", label: "Fresh Items" },
+            { value: "packaged", label: "Packaged" },
+            { value: "frozen", label: "Frozen" },
+          ]} />
+          <FilterDropdown label="Group2" value={filterGroup2} onChange={setFilterGroup2} options={[
+            { value: "all", label: "All" },
+            { value: "fast-moving", label: "Fast Moving" },
+            { value: "slow-moving", label: "Slow Moving" },
+          ]} />
+          <FilterDropdown label="Group3" value={filterGroup3} onChange={setFilterGroup3} options={[
+            { value: "all", label: "All" },
+            { value: "high-value", label: "High Value" },
+            { value: "low-value", label: "Low Value" },
+          ]} />
+        </div>
+      </div>
+
+      {/* Data Table */}
+      <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+        {/* Table Header */}
+        <div className="flex-shrink-0 grid grid-cols-[180px_1fr_70px_100px_100px_110px] gap-2 px-4 py-2 bg-slate-800 text-white text-[11px] font-semibold uppercase tracking-wide">
+          <div>Part No.</div>
+          <div>Details</div>
+          <div className="text-right">Qty</div>
+          <div className="text-right">Retail GHC</div>
+          <div className="text-right">Cost GHC</div>
+          <div className="text-center">Expiry</div>
+        </div>
+
+        {/* Table Body */}
+        <ScrollArea className="flex-1 min-h-0">
+          <div className="divide-y divide-slate-100">
+            {filtered.map((p, idx) => {
+              const isSelected = idx === selectedIndex;
+              const expDays = Math.ceil((new Date(p.expiryDate).getTime() - Date.now()) / 86400000);
+              return (
+                <div
+                  key={p.id}
+                  onClick={() => setSelectedIndex(idx)}
+                  className={cn(
+                    "grid grid-cols-[180px_1fr_70px_100px_100px_110px] gap-2 px-4 py-2 text-xs cursor-pointer transition",
+                    isSelected ? "bg-blue-500 text-white" : idx % 2 === 1 ? "bg-slate-50 hover:bg-slate-100" : "bg-white hover:bg-slate-50"
+                  )}
+                >
+                  <div className="font-mono truncate">{p.barcode}</div>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-base flex-shrink-0">{p.emoji}</span>
+                    <span className={cn("font-medium truncate", isSelected ? "text-white" : "text-slate-800")}>{p.name}</span>
+                  </div>
+                  <div className={cn("text-right font-mono font-semibold", isSelected ? "text-white" : p.stock === 0 ? "text-rose-600" : p.stock <= p.reorderLevel ? "text-amber-600" : "text-slate-700")}>
+                    {p.stock}
+                  </div>
+                  <div className="text-right font-mono">{p.price.toFixed(2)}</div>
+                  <div className="text-right font-mono">{p.costPrice.toFixed(2)}</div>
+                  <div className={cn("text-center text-[11px]", isSelected ? "text-white" : expDays < 0 ? "text-rose-600" : expDays <= 7 ? "text-amber-600" : "text-slate-500")}>
+                    {p.expiryDate}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {filtered.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-16 text-slate-400">
+              <Package className="h-10 w-10 mb-2 opacity-40" />
+              <div className="text-sm font-medium">No products found</div>
+              <div className="text-xs mt-1">Try adjusting your search or filters</div>
+            </div>
+          )}
+        </ScrollArea>
+      </div>
+
+      {/* Action Buttons */}
+      <div className="flex-shrink-0 px-4 py-2.5 bg-slate-100 border-t border-slate-200 flex items-center gap-1.5 flex-wrap">
+        <StockActionButton icon={<Edit2 className="h-4 w-4" />} label="Modify" color="emerald" onClick={handleModify} />
+        <StockActionButton icon={<Plus className="h-4 w-4" />} label="New" color="blue" onClick={handleNew} />
+        <StockActionButton icon={<Copy className="h-4 w-4" />} label="Clone" color="cyan" onClick={handleClone} />
+        <StockActionButton icon={<ImageIcon className="h-4 w-4" />} label="Picture" color="slate" onClick={() => toast({ title: "Product Picture", description: selected ? `View picture for ${selected.name}` : "Select a product first" })} />
+        <StockActionButton icon={<History className="h-4 w-4" />} label="History" color="purple" onClick={() => toast({ title: "Product History", description: selected ? `View history for ${selected.name}` : "Select a product first" })} />
+        <StockActionButton icon={<Tags className="h-4 w-4" />} label="Labels" color="amber" onClick={() => toast({ title: "Print Labels", description: selected ? `Print labels for ${selected.name}` : "Select a product first", })} />
+        <StockActionButton icon={<ArrowUpDown className="h-4 w-4" />} label="Qty" color="indigo" onClick={() => { if (!selected) { toast({ title: "Select a product first", variant: "destructive" }); return; } setShowQtyAdjust(selected); }} />
+        <div className="flex-1" />
+        <StockActionButton icon={<X className="h-4 w-4" />} label="Close (Esc)" color="rose" onClick={() => {}} />
+      </div>
+
+      {/* Status Bar */}
+      <div className="flex-shrink-0 px-4 py-1.5 bg-slate-800 text-white text-[10px] font-mono flex items-center gap-4">
+        <span><kbd className="px-1.5 py-0.5 rounded bg-white/15 mr-1">F9</kbd>Part No.</span>
+        <span><kbd className="px-1.5 py-0.5 rounded bg-white/15 mr-1">F10</kbd>Details</span>
+        <span><kbd className="px-1.5 py-0.5 rounded bg-white/15 mr-1">Shift+F12</kbd>Print Labels</span>
+        <div className="flex-1" />
+        <span className="text-emerald-400">{filtered.length} of {products.length} products</span>
+      </div>
+
+      {/* Product Form Modal */}
+      <AnimatePresence>
+        {showForm && (
+          <ProductForm
+            product={editingProduct}
+            groups={groups}
+            onSave={handleSave}
+            onClose={() => { setShowForm(false); setEditingProduct(null); }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Clone Confirmation */}
+      <AnimatePresence>
+        {showCloneConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => setShowCloneConfirm(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.95 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.95 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full"
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="h-12 w-12 rounded-full bg-cyan-100 flex items-center justify-center">
+                  <Copy className="h-6 w-6 text-cyan-600" />
+                </div>
+                <div>
+                  <div className="font-bold text-slate-800">Clone Product?</div>
+                  <div className="text-xs text-slate-500">A copy of "{showCloneConfirm.name}" will be created with 0 stock.</div>
+                </div>
+              </div>
+              <div className="flex gap-2 mt-4">
+                <Button variant="outline" className="flex-1" onClick={() => setShowCloneConfirm(null)}>Cancel</Button>
+                <button onClick={confirmClone} className="flex-1 h-10 rounded-lg bg-cyan-600 hover:bg-cyan-700 text-white font-semibold text-sm transition">Clone Product</button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Qty Quick Adjust */}
+      <AnimatePresence>
+        {showQtyAdjust && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => setShowQtyAdjust(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.95 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.95 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+            >
+              <div className="px-5 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <ArrowUpDown className="h-5 w-5" />
+                  <h3 className="font-bold">Adjust Quantity</h3>
+                </div>
+                <button onClick={() => setShowQtyAdjust(null)} className="h-8 w-8 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center"><X className="h-4 w-4" /></button>
+              </div>
+              <div className="p-5">
+                <div className="flex items-center gap-3 mb-4 p-3 rounded-lg bg-slate-50">
+                  <span className="text-3xl">{showQtyAdjust.emoji}</span>
+                  <div>
+                    <div className="font-bold text-slate-800">{showQtyAdjust.name}</div>
+                    <div className="text-xs text-slate-500 font-mono">{showQtyAdjust.sku} · Current: {showQtyAdjust.stock}</div>
+                  </div>
+                </div>
+                <QuickQtyAdjust
+                  product={showQtyAdjust}
+                  onConfirm={(newQty, reason) => {
+                    const change = newQty - showQtyAdjust.stock;
+                    setProducts(prev => prev.map(p => p.id === showQtyAdjust.id ? { ...p, stock: newQty } : p));
+                    setHistory(prev => [...prev, {
+                      id: `h-${Date.now()}`,
+                      productId: showQtyAdjust.id,
+                      productName: showQtyAdjust.name,
+                      sku: showQtyAdjust.sku,
+                      action: 'adjusted',
+                      quantityChange: change,
+                      newQuantity: newQty,
+                      timestamp: new Date().toISOString(),
+                      user: "Sarah Johnson",
+                      reason: reason || `Qty adjusted to ${newQty}`,
+                      reference: `ADJ-${Date.now().toString().slice(-6)}`,
+                    }]);
+                    toast({ title: "Quantity adjusted", description: `${showQtyAdjust.name}: ${showQtyAdjust.stock} → ${newQty}` });
+                    setShowQtyAdjust(null);
+                  }}
+                  onCancel={() => setShowQtyAdjust(null)}
+                />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ===== Stock Search View =====
+function StockSearchView({ products, groups }: {
+  products: Product[];
+  groups: StockGroup[];
+}) {
+  const [searchText, setSearchText] = useState("");
+  const [filterType, setFilterType] = useState("all");
+  const [filterGroup, setFilterGroup] = useState("all");
+  const [filterGroup1, setFilterGroup1] = useState("all");
+  const [filterGroup2, setFilterGroup2] = useState("all");
+  const [filterGroup3, setFilterGroup3] = useState("all");
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const { toast } = useToast();
+
+  const filtered = products.filter(p => {
+    if (searchText.trim()) {
+      const q = searchText.toLowerCase();
+      if (!p.name.toLowerCase().includes(q) && !p.sku.toLowerCase().includes(q) && !p.barcode.includes(q) && !p.supplier.toLowerCase().includes(q)) return false;
+    }
+    if (filterType !== "all") {
+      if (filterType === "taxable" && !p.taxable) return false;
+      if (filterType === "non-taxable" && p.taxable) return false;
+      if (filterType === "low-stock" && p.stock > p.reorderLevel) return false;
+      if (filterType === "out-of-stock" && p.stock > 0) return false;
+    }
+    if (filterGroup !== "all" && p.groupId !== filterGroup) return false;
+    return true;
+  });
+
+  const handleSelect = () => {
+    if (!filtered[selectedIndex]) { toast({ title: "No product selected", variant: "destructive" }); return; }
+    setSelectedProduct(filtered[selectedIndex]);
+  };
+
+  return (
+    <div className="h-full bg-white rounded-2xl shadow-lg ring-1 ring-slate-200/60 overflow-hidden flex flex-col">
+      {/* Header */}
+      <div className="flex-shrink-0 flex items-center justify-between px-5 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
+        <div className="flex items-center gap-2">
+          <FileSearch className="h-5 w-5" />
+          <h2 className="text-base font-bold">Stock Search</h2>
+          <Badge variant="secondary" className="font-mono text-xs bg-white/20 text-white">{filtered.length} results</Badge>
+        </div>
+        <div className="text-xs text-blue-100/90">Search and view product information</div>
+      </div>
+
+      {/* Search & Filter Section */}
+      <div className="flex-shrink-0 px-5 py-3 bg-blue-50/50 border-b border-blue-100 space-y-2.5">
+        {/* Search Row */}
+        <div className="flex items-center gap-3">
+          <label className="text-xs font-bold text-slate-600 uppercase tracking-wide whitespace-nowrap w-20">Search Text</label>
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <input
+              value={searchText}
+              onChange={(e) => { setSearchText(e.target.value); setSelectedIndex(0); }}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSelect(); }}
+              placeholder="Details"
+              className="w-full h-9 pl-9 pr-3 rounded-lg bg-white border border-slate-200 text-sm outline-none ring-2 ring-transparent focus:ring-blue-400 transition"
+            />
+          </div>
+          <button
+            onClick={() => setSelectedIndex(0)}
+            className="h-9 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold flex items-center gap-1.5 transition shadow-sm"
+          >
+            <Search className="h-3.5 w-3.5" />
+            Search
+          </button>
+        </div>
+        {/* Filter Row */}
+        <div className="flex items-center gap-3 flex-wrap">
+          <label className="text-xs font-bold text-slate-600 uppercase tracking-wide whitespace-nowrap w-20">Filter By</label>
+          <FilterDropdown label="Type" value={filterType} onChange={(v) => { setFilterType(v); setSelectedIndex(0); }} options={[
+            { value: "all", label: "All Types" },
+            { value: "taxable", label: "Taxable (VAT)" },
+            { value: "non-taxable", label: "Non-Taxable" },
+            { value: "low-stock", label: "Low Stock" },
+            { value: "out-of-stock", label: "Out of Stock" },
+          ]} />
+          <FilterDropdown label="Stock Group" value={filterGroup} onChange={(v) => { setFilterGroup(v); setSelectedIndex(0); }} options={[
+            { value: "all", label: "All Groups" },
+            ...groups.map(g => ({ value: g.id, label: `${g.icon} ${g.name}` })),
+          ]} />
+          <FilterDropdown label="Group1" value={filterGroup1} onChange={setFilterGroup1} options={[
+            { value: "all", label: "All" },
+            { value: "fresh", label: "Fresh Items" },
+            { value: "packaged", label: "Packaged" },
+            { value: "frozen", label: "Frozen" },
+          ]} />
+          <FilterDropdown label="Group2" value={filterGroup2} onChange={setFilterGroup2} options={[
+            { value: "all", label: "All" },
+            { value: "fast-moving", label: "Fast Moving" },
+            { value: "slow-moving", label: "Slow Moving" },
+          ]} />
+          <FilterDropdown label="Group3" value={filterGroup3} onChange={setFilterGroup3} options={[
+            { value: "all", label: "All" },
+            { value: "high-value", label: "High Value" },
+            { value: "low-value", label: "Low Value" },
+          ]} />
+        </div>
+      </div>
+
+      {/* Results Table */}
+      <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+        <div className="flex-shrink-0 grid grid-cols-[180px_1fr_70px_100px_100px] gap-2 px-4 py-2 bg-slate-800 text-white text-[11px] font-semibold uppercase tracking-wide">
+          <div>Part No.</div>
+          <div>Details</div>
+          <div className="text-right">Qty</div>
+          <div className="text-right">Retail GHC</div>
+          <div className="text-right">Cost GHC</div>
+        </div>
+        <ScrollArea className="flex-1 min-h-0">
+          <div className="divide-y divide-slate-100">
+            {filtered.map((p, idx) => {
+              const isSelected = idx === selectedIndex;
+              return (
+                <div
+                  key={p.id}
+                  onClick={() => setSelectedIndex(idx)}
+                  onDoubleClick={handleSelect}
+                  className={cn(
+                    "grid grid-cols-[180px_1fr_70px_100px_100px] gap-2 px-4 py-2 text-xs cursor-pointer transition",
+                    isSelected ? "bg-blue-500 text-white" : idx % 2 === 1 ? "bg-slate-50 hover:bg-slate-100" : "bg-white hover:bg-slate-50"
+                  )}
+                >
+                  <div className="font-mono truncate">{p.barcode}</div>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-base flex-shrink-0">{p.emoji}</span>
+                    <span className={cn("font-medium truncate", isSelected ? "text-white" : "text-slate-800")}>{p.name}</span>
+                    {p.taxable && <span className={cn("px-1 py-0.5 rounded text-[9px] font-bold", isSelected ? "bg-white/20 text-white" : "bg-amber-100 text-amber-700")}>VAT</span>}
+                  </div>
+                  <div className={cn("text-right font-mono font-semibold", isSelected ? "text-white" : p.stock === 0 ? "text-rose-600" : p.stock <= p.reorderLevel ? "text-amber-600" : "text-slate-700")}>
+                    {p.stock}
+                  </div>
+                  <div className="text-right font-mono">{p.price.toFixed(2)}</div>
+                  <div className="text-right font-mono">{p.costPrice.toFixed(2)}</div>
+                </div>
+              );
+            })}
+          </div>
+          {filtered.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-16 text-slate-400">
+              <Search className="h-10 w-10 mb-2 opacity-40" />
+              <div className="text-sm font-medium">No products found</div>
+              <div className="text-xs mt-1">Try a different search term or filter</div>
+            </div>
+          )}
+        </ScrollArea>
+      </div>
+
+      {/* Action Buttons */}
+      <div className="flex-shrink-0 px-4 py-2.5 bg-slate-100 border-t border-slate-200 flex items-center gap-1.5 flex-wrap">
+        <StockActionButton icon={<CheckCircle2 className="h-4 w-4" />} label="Select (Enter)" color="emerald" onClick={handleSelect} />
+        <StockActionButton icon={<Plus className="h-4 w-4" />} label="New" color="blue" onClick={() => toast({ title: "New Product", description: "Use Stock File to add new products" })} />
+        <StockActionButton icon={<ImageIcon className="h-4 w-4" />} label="Picture" color="slate" onClick={() => toast({ title: "Product Picture", description: filtered[selectedIndex] ? `View picture for ${filtered[selectedIndex].name}` : "Select a product first" })} />
+        <StockActionButton icon={<History className="h-4 w-4" />} label="History" color="purple" onClick={() => toast({ title: "Product History", description: filtered[selectedIndex] ? `View history for ${filtered[selectedIndex].name}` : "Select a product first" })} />
+        <StockActionButton icon={<Tags className="h-4 w-4" />} label="Labels" color="amber" onClick={() => toast({ title: "Print Labels", description: filtered[selectedIndex] ? `Print labels for ${filtered[selectedIndex].name}` : "Select a product first" })} />
+        <StockActionButton icon={<ArrowUpDown className="h-4 w-4" />} label="Qty" color="indigo" onClick={() => toast({ title: "Quantity Info", description: filtered[selectedIndex] ? `${filtered[selectedIndex].name}: ${filtered[selectedIndex].stock} in stock` : "Select a product first" })} />
+        <div className="flex-1" />
+        <StockActionButton icon={<X className="h-4 w-4" />} label="Close (Esc)" color="rose" onClick={() => {}} />
+      </div>
+
+      {/* Status Bar */}
+      <div className="flex-shrink-0 px-4 py-1.5 bg-slate-800 text-white text-[10px] font-mono flex items-center gap-4">
+        <span><kbd className="px-1.5 py-0.5 rounded bg-white/15 mr-1">F9</kbd>Part No.</span>
+        <span><kbd className="px-1.5 py-0.5 rounded bg-white/15 mr-1">F10</kbd>Details</span>
+        <span><kbd className="px-1.5 py-0.5 rounded bg-white/15 mr-1">Shift+F12</kbd>Print Labels</span>
+        <div className="flex-1" />
+        <span className="text-blue-400">{filtered.length} of {products.length} products</span>
+      </div>
+
+      {/* Product Detail Modal (on Select) */}
+      <AnimatePresence>
+        {selectedProduct && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => setSelectedProduct(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 20 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+            >
+              <div className="px-5 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <FileSearch className="h-5 w-5" />
+                  <h3 className="font-bold">Product Details</h3>
+                </div>
+                <button onClick={() => setSelectedProduct(null)} className="h-8 w-8 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center"><X className="h-4 w-4" /></button>
+              </div>
+              <div className="p-5">
+                <div className="text-center mb-4">
+                  <div className="h-24 w-24 mx-auto rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center text-6xl mb-3">
+                    {selectedProduct.emoji}
+                  </div>
+                  <div className="font-bold text-slate-800 text-lg">{selectedProduct.name}</div>
+                  <div className="text-xs text-slate-400 font-mono">{selectedProduct.sku}</div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <DetailRow label="Part No." value={selectedProduct.barcode} />
+                  <DetailRow label="Group" value={groups.find(g => g.id === selectedProduct.groupId)?.name || '-'} />
+                  <DetailRow label="Retail GHC" value={selectedProduct.price.toFixed(2)} highlight />
+                  <DetailRow label="Cost GHC" value={selectedProduct.costPrice.toFixed(2)} />
+                  <DetailRow label="Quantity" value={`${selectedProduct.stock} ${selectedProduct.unit}`} />
+                  <DetailRow label="Reorder Level" value={String(selectedProduct.reorderLevel)} />
+                  <DetailRow label="Supplier" value={selectedProduct.supplier} />
+                  <DetailRow label="Batch" value={selectedProduct.batchNumber} />
+                  <DetailRow label="Expiry" value={selectedProduct.expiryDate} />
+                  <DetailRow label="Taxable" value={selectedProduct.taxable ? "Yes (VAT)" : "No"} />
+                </div>
+                <button
+                  onClick={() => setSelectedProduct(null)}
+                  className="w-full mt-4 h-10 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition"
+                >
+                  Close
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ===== Helper: Filter Dropdown =====
+function FilterDropdown({ label, value, onChange, options }: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: { value: string; label: string }[];
+}) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className="text-[10px] font-semibold text-slate-500 uppercase">{label}:</span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-8 px-2 rounded-md bg-white border border-slate-200 text-xs font-medium text-slate-700 outline-none focus:ring-2 focus:ring-emerald-400 cursor-pointer hover:border-slate-300 transition"
+      >
+        {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+    </div>
+  );
+}
+
+// ===== Helper: Stock Action Button =====
+function StockActionButton({ icon, label, color, onClick }: {
+  icon: React.ReactNode;
+  label: string;
+  color: "emerald" | "blue" | "cyan" | "slate" | "purple" | "amber" | "indigo" | "rose";
+  onClick: () => void;
+}) {
+  const colors = {
+    emerald: "bg-emerald-100 text-emerald-700 hover:bg-emerald-200 ring-emerald-200",
+    blue: "bg-blue-100 text-blue-700 hover:bg-blue-200 ring-blue-200",
+    cyan: "bg-cyan-100 text-cyan-700 hover:bg-cyan-200 ring-cyan-200",
+    slate: "bg-slate-100 text-slate-700 hover:bg-slate-200 ring-slate-200",
+    purple: "bg-purple-100 text-purple-700 hover:bg-purple-200 ring-purple-200",
+    amber: "bg-amber-100 text-amber-700 hover:bg-amber-200 ring-amber-200",
+    indigo: "bg-indigo-100 text-indigo-700 hover:bg-indigo-200 ring-indigo-200",
+    rose: "bg-rose-100 text-rose-700 hover:bg-rose-200 ring-rose-200",
+  };
+  return (
+    <button
+      onClick={onClick}
+      className={cn("h-9 px-3 rounded-lg flex items-center gap-1.5 text-xs font-semibold ring-1 transition", colors[color])}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
+
+// ===== Helper: Detail Row =====
+function DetailRow({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+  return (
+    <div className="flex justify-between items-center py-1 px-2 rounded bg-slate-50">
+      <span className="text-slate-500">{label}</span>
+      <span className={cn("font-mono font-semibold", highlight ? "text-blue-600" : "text-slate-800")}>{value}</span>
+    </div>
+  );
+}
+
+// ===== Helper: Quick Quantity Adjust =====
+function QuickQtyAdjust({ product, onConfirm, onCancel }: {
+  product: Product;
+  onConfirm: (newQty: number, reason: string) => void;
+  onCancel: () => void;
+}) {
+  const [mode, setMode] = useState<"add" | "remove" | "set">("add");
+  const [amount, setAmount] = useState(0);
+  const [reason, setReason] = useState("");
+
+  const newQty = mode === "add" ? product.stock + amount : mode === "remove" ? Math.max(0, product.stock - amount) : amount;
+
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-3 gap-2">
+        {[{ id: "add", label: "Add" }, { id: "remove", label: "Remove" }, { id: "set", label: "Set" }].map(m => (
+          <button
+            key={m.id}
+            onClick={() => setMode(m.id as any)}
+            className={cn("py-2 rounded-lg text-xs font-bold ring-2 transition",
+              mode === m.id ? "ring-indigo-500 bg-indigo-50 text-indigo-700" : "ring-slate-200 text-slate-600 hover:bg-slate-50")}
+          >
+            {m.label}
+          </button>
+        ))}
+      </div>
+      <div>
+        <label className="text-xs font-semibold text-slate-600 mb-1 block">Amount</label>
+        <input
+          type="number"
+          value={amount || ""}
+          onChange={(e) => setAmount(parseInt(e.target.value) || 0)}
+          className="w-full h-10 px-3 rounded-lg border-2 border-slate-200 focus:border-indigo-500 outline-none text-lg font-mono font-bold text-center"
+          placeholder="0"
+        />
+      </div>
+      <div>
+        <label className="text-xs font-semibold text-slate-600 mb-1 block">Reason (optional)</label>
+        <input
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          className="w-full h-10 px-3 rounded-lg border border-slate-200 focus:border-indigo-500 outline-none text-sm"
+          placeholder="e.g. Damaged, received, recount"
+        />
+      </div>
+      <div className="p-3 rounded-lg bg-slate-800 text-white flex justify-between items-center">
+        <span className="text-xs font-semibold uppercase opacity-80">New Quantity</span>
+        <span className="text-2xl font-bold font-mono text-indigo-400">{newQty}</span>
+      </div>
+      <div className="flex gap-2">
+        <Button variant="outline" className="flex-1" onClick={onCancel}>Cancel</Button>
+        <button
+          onClick={() => amount > 0 && onConfirm(newQty, reason)}
+          disabled={amount <= 0 && mode !== "set"}
+          className="flex-1 h-10 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm transition disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Confirm
+        </button>
+      </div>
     </div>
   );
 }
