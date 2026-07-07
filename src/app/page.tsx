@@ -30,6 +30,9 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { StockManagement } from "@/components/stock-management";
 import { Reports } from "@/components/reports";
+import { PurchaseModule } from "@/components/purchase-module";
+import { TelephoneModule } from "@/components/telephone-module";
+import { MaintenanceModule } from "@/components/maintenance-module";
 
 export default function POSPage() {
   // ===== Top-level View State =====
@@ -431,12 +434,12 @@ export default function POSPage() {
       id: "purchase",
       label: "Purchase",
       items: [
-        { label: "Purchase Orders", icon: Archive, action: () => toast({ title: "Purchase Orders", description: "Create and manage purchase orders" }) },
-        { label: "Receive Stock", icon: Package, action: () => toast({ title: "Receive Stock", description: "Record incoming stock deliveries" }) },
-        { label: "Suppliers", icon: Users, action: () => toast({ title: "Suppliers", description: "Manage supplier database" }) },
+        { label: "Purchase Orders", icon: Archive, action: () => setView("purchase") },
+        { label: "Receive Stock", icon: Package, action: () => setView("purchase") },
+        { label: "Suppliers", icon: Users, action: () => setView("purchase") },
         { separator: true },
-        { label: "Purchase History", icon: History, action: () => toast({ title: "Purchase History", description: "View past purchase orders" }) },
-        { label: "Supplier Payments", icon: DollarSign, action: () => toast({ title: "Supplier Payments", description: "Track payments to suppliers" }) },
+        { label: "Purchase History", icon: History, action: () => setView("purchase") },
+        { label: "Supplier Payments", icon: DollarSign, action: () => setView("purchase") },
       ],
     },
     {
@@ -459,27 +462,25 @@ export default function POSPage() {
       id: "telephone",
       label: "Telephone",
       items: [
-        { label: "Phone Orders", icon: PhoneCall, action: () => toast({ title: "Phone Orders", description: "Take orders over the phone" }) },
-        { label: "Delivery Orders", icon: Truck, action: () => toast({ title: "Delivery Orders", description: "Manage delivery requests" }) },
-        { label: "Customer Database", icon: Users, action: () => toast({ title: "Customer Database", description: "Manage customer contacts" }) },
+        { label: "Phone Orders", icon: PhoneCall, action: () => setView("telephone") },
+        { label: "Delivery Tracking", icon: Truck, action: () => setView("telephone") },
+        { label: "Customer Database", icon: Users, action: () => setView("telephone") },
         { separator: true },
-        { label: "Call Log", icon: Phone, action: () => toast({ title: "Call Log", description: "View call history" }) },
-        { label: "Delivery Tracking", icon: Truck, action: () => toast({ title: "Delivery Tracking", description: "Track active deliveries" }) },
+        { label: "Call Log", icon: Phone, action: () => setView("telephone") },
       ],
     },
     {
       id: "maintenance",
       label: "Maintenance",
       items: [
-        { label: "System Settings", icon: Settings2, action: () => toast({ title: "System Settings", description: "Configure POS settings" }) },
-        { label: "User Management", icon: Users, action: () => toast({ title: "User Management", description: "Manage cashier accounts" }) },
-        { label: "Backup Database", icon: Database, action: () => toast({ title: "Backup", description: "Backup system database" }) },
+        { label: "System Settings", icon: Settings2, action: () => setView("maintenance") },
+        { label: "User Management", icon: Users, action: () => setView("maintenance") },
+        { label: "Backup Database", icon: Database, action: () => setView("maintenance") },
         { separator: true },
-        { label: "Cashier Shift", icon: Clock, action: () => toast({ title: "Cashier Shift", description: "Start/end cashier shift" }) },
-        { label: "Security & Permissions", icon: Lock, action: () => toast({ title: "Security", description: "Manage user permissions" }) },
+        { label: "Cashier Shift", icon: Clock, action: () => setView("maintenance") },
+        { label: "Security & Permissions", icon: Lock, action: () => setView("maintenance") },
         { separator: true },
-        { label: "Keyboard Shortcuts", icon: Zap, action: () => toast({ title: "Shortcuts", description: "F2=Save · F3=Print · F4=Void · F5=Pay · Esc=Cancel" }) },
-        { label: "About SYLHN POS", icon: Store, action: () => toast({ title: COMPANY.name, description: `${COMPANY.address} · ${COMPANY.contact}` }) },
+        { label: "About SYLHN POS", icon: Store, action: () => setView("maintenance") },
         { label: "Exit", icon: Power, action: () => toast({ title: "Goodbye!", description: "Shift ended" }) },
       ],
     },
@@ -491,6 +492,15 @@ export default function POSPage() {
   }
   if (view === "reports") {
     return <Reports onBack={() => setView("pos")} products={products} groups={groups} history={history} />;
+  }
+  if (view === "purchase") {
+    return <PurchaseModule onBack={() => setView("pos")} products={products} />;
+  }
+  if (view === "telephone") {
+    return <TelephoneModule onBack={() => setView("pos")} products={products} />;
+  }
+  if (view === "maintenance") {
+    return <MaintenanceModule onBack={() => setView("pos")} cashier={cashier} dailyTotal={dailyTotal} transactionCount={transactionCount} />;
   }
 
   // ===== Render POS =====
@@ -567,8 +577,17 @@ export default function POSPage() {
             <button onClick={() => setView("stock")} className={cn("h-8 px-2.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition", view === "stock" ? "bg-white/20" : "hover:bg-white/10")}>
               <Boxes className="h-3.5 w-3.5" /> Stock
             </button>
+            <button onClick={() => setView("purchase")} className={cn("h-8 px-2.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition", view === "purchase" ? "bg-white/20" : "hover:bg-white/10")}>
+              <Truck className="h-3.5 w-3.5" /> Purchase
+            </button>
+            <button onClick={() => setView("telephone")} className={cn("h-8 px-2.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition", view === "telephone" ? "bg-white/20" : "hover:bg-white/10")}>
+              <Phone className="h-3.5 w-3.5" /> Telephone
+            </button>
             <button onClick={() => setView("reports")} className={cn("h-8 px-2.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition", view === "reports" ? "bg-white/20" : "hover:bg-white/10")}>
               <FileBarChart className="h-3.5 w-3.5" /> Reports
+            </button>
+            <button onClick={() => setView("maintenance")} className={cn("h-8 px-2.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition", view === "maintenance" ? "bg-white/20" : "hover:bg-white/10")}>
+              <Settings2 className="h-3.5 w-3.5" /> Maintain
             </button>
           </div>
 

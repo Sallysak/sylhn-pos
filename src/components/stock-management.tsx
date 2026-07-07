@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Package, Plus, Edit2, Trash2, Search, Layers, Settings2, History,
@@ -101,8 +101,8 @@ export function StockManagement({ onBack, products, setProducts, groups, setGrou
             transition={{ duration: 0.2 }}
             className="h-full"
           >
-            {view === "stock-file" && <StockFileView products={products} setProducts={setProducts} groups={groups} setHistory={setHistory} />}
-            {view === "stock-search" && <StockSearchView products={products} groups={groups} />}
+            {view === "stock-file" && <StockFileView products={products} setProducts={setProducts} groups={groups} history={history} setHistory={setHistory} />}
+            {view === "stock-search" && <StockSearchView products={products} groups={groups} history={history} />}
             {view === "add-modify" && <AddModifyStock products={products} setProducts={setProducts} groups={groups} setHistory={setHistory} />}
             {view === "group-maintenance" && <GroupMaintenance groups={groups} setGroups={setGroups} products={products} />}
             {view === "quantity-adjustment" && <QuantityAdjustment products={products} setProducts={setProducts} setHistory={setHistory} />}
@@ -873,10 +873,11 @@ function StockHistoryView({ history, products }: { history: StockHistoryEntry[];
 }
 
 // ===== Stock File View =====
-function StockFileView({ products, setProducts, groups, setHistory }: {
+function StockFileView({ products, setProducts, groups, history, setHistory }: {
   products: Product[];
   setProducts: React.Dispatch<React.SetStateAction<Product[]>>;
   groups: StockGroup[];
+  history: StockHistoryEntry[];
   setHistory: React.Dispatch<React.SetStateAction<StockHistoryEntry[]>>;
 }) {
   const [searchText, setSearchText] = useState("");
@@ -890,6 +891,8 @@ function StockFileView({ products, setProducts, groups, setHistory }: {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [showCloneConfirm, setShowCloneConfirm] = useState<Product | null>(null);
   const [showQtyAdjust, setShowQtyAdjust] = useState<Product | null>(null);
+  const [showPicture, setShowPicture] = useState<Product | null>(null);
+  const [showHistory, setShowHistory] = useState<Product | null>(null);
   const { toast } = useToast();
 
   const filtered = products.filter(p => {
@@ -1121,8 +1124,8 @@ function StockFileView({ products, setProducts, groups, setHistory }: {
         <StockActionButton icon={<Edit2 className="h-4 w-4" />} label="Modify" color="emerald" onClick={handleModify} />
         <StockActionButton icon={<Plus className="h-4 w-4" />} label="New" color="blue" onClick={handleNew} />
         <StockActionButton icon={<Copy className="h-4 w-4" />} label="Clone" color="cyan" onClick={handleClone} />
-        <StockActionButton icon={<ImageIcon className="h-4 w-4" />} label="Picture" color="slate" onClick={() => toast({ title: "Product Picture", description: selected ? `View picture for ${selected.name}` : "Select a product first" })} />
-        <StockActionButton icon={<History className="h-4 w-4" />} label="History" color="purple" onClick={() => toast({ title: "Product History", description: selected ? `View history for ${selected.name}` : "Select a product first" })} />
+        <StockActionButton icon={<ImageIcon className="h-4 w-4" />} label="Picture" color="slate" onClick={() => { if (!selected) { toast({ title: "Select a product first", variant: "destructive" }); return; } setShowPicture(selected); }} />
+        <StockActionButton icon={<History className="h-4 w-4" />} label="History" color="purple" onClick={() => { if (!selected) { toast({ title: "Select a product first", variant: "destructive" }); return; } setShowHistory(selected); }} />
         <StockActionButton icon={<Tags className="h-4 w-4" />} label="Labels" color="amber" onClick={() => toast({ title: "Print Labels", description: selected ? `Print labels for ${selected.name}` : "Select a product first", })} />
         <StockActionButton icon={<ArrowUpDown className="h-4 w-4" />} label="Qty" color="indigo" onClick={() => { if (!selected) { toast({ title: "Select a product first", variant: "destructive" }); return; } setShowQtyAdjust(selected); }} />
         <div className="flex-1" />
@@ -1245,14 +1248,54 @@ function StockFileView({ products, setProducts, groups, setHistory }: {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Picture Modal */}
+      <AnimatePresence>
+        {showPicture && (
+          <PictureModal
+            product={showPicture}
+            onSave={(imageData) => {
+              setProducts(prev => prev.map(p => p.id === showPicture.id ? { ...p, image: imageData } : p));
+              setHistory(prev => [...prev, {
+                id: `h-${Date.now()}`,
+                productId: showPicture.id,
+                productName: showPicture.name,
+                sku: showPicture.sku,
+                action: 'modified',
+                quantityChange: 0,
+                newQuantity: showPicture.stock,
+                timestamp: new Date().toISOString(),
+                user: "Sarah Johnson",
+                reason: imageData ? "Product picture updated" : "Product picture removed",
+                reference: `PIC-${Date.now().toString().slice(-6)}`,
+              }]);
+              toast({ title: imageData ? "Picture saved" : "Picture removed", description: showPicture.name });
+              setShowPicture(null);
+            }}
+            onClose={() => setShowPicture(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Product History Modal */}
+      <AnimatePresence>
+        {showHistory && (
+          <ProductHistoryModal
+            product={showHistory}
+            history={history.filter(h => h.productId === showHistory.id)}
+            onClose={() => setShowHistory(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
 
 // ===== Stock Search View =====
-function StockSearchView({ products, groups }: {
+function StockSearchView({ products, groups, history }: {
   products: Product[];
   groups: StockGroup[];
+  history: StockHistoryEntry[];
 }) {
   const [searchText, setSearchText] = useState("");
   const [filterType, setFilterType] = useState("all");
@@ -1262,6 +1305,8 @@ function StockSearchView({ products, groups }: {
   const [filterGroup3, setFilterGroup3] = useState("all");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [showPicture, setShowPicture] = useState<Product | null>(null);
+  const [showHistory, setShowHistory] = useState<Product | null>(null);
   const { toast } = useToast();
 
   const filtered = products.filter(p => {
@@ -1404,8 +1449,8 @@ function StockSearchView({ products, groups }: {
       <div className="flex-shrink-0 px-4 py-2.5 bg-slate-100 border-t border-slate-200 flex items-center gap-1.5 flex-wrap">
         <StockActionButton icon={<CheckCircle2 className="h-4 w-4" />} label="Select (Enter)" color="emerald" onClick={handleSelect} />
         <StockActionButton icon={<Plus className="h-4 w-4" />} label="New" color="blue" onClick={() => toast({ title: "New Product", description: "Use Stock File to add new products" })} />
-        <StockActionButton icon={<ImageIcon className="h-4 w-4" />} label="Picture" color="slate" onClick={() => toast({ title: "Product Picture", description: filtered[selectedIndex] ? `View picture for ${filtered[selectedIndex].name}` : "Select a product first" })} />
-        <StockActionButton icon={<History className="h-4 w-4" />} label="History" color="purple" onClick={() => toast({ title: "Product History", description: filtered[selectedIndex] ? `View history for ${filtered[selectedIndex].name}` : "Select a product first" })} />
+        <StockActionButton icon={<ImageIcon className="h-4 w-4" />} label="Picture" color="slate" onClick={() => { if (!filtered[selectedIndex]) { toast({ title: "Select a product first", variant: "destructive" }); return; } setShowPicture(filtered[selectedIndex]); }} />
+        <StockActionButton icon={<History className="h-4 w-4" />} label="History" color="purple" onClick={() => { if (!filtered[selectedIndex]) { toast({ title: "Select a product first", variant: "destructive" }); return; } setShowHistory(filtered[selectedIndex]); }} />
         <StockActionButton icon={<Tags className="h-4 w-4" />} label="Labels" color="amber" onClick={() => toast({ title: "Print Labels", description: filtered[selectedIndex] ? `Print labels for ${filtered[selectedIndex].name}` : "Select a product first" })} />
         <StockActionButton icon={<ArrowUpDown className="h-4 w-4" />} label="Qty" color="indigo" onClick={() => toast({ title: "Quantity Info", description: filtered[selectedIndex] ? `${filtered[selectedIndex].name}: ${filtered[selectedIndex].stock} in stock` : "Select a product first" })} />
         <div className="flex-1" />
@@ -1474,6 +1519,28 @@ function StockSearchView({ products, groups }: {
               </div>
             </motion.div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Picture Modal (read-only in Search) */}
+      <AnimatePresence>
+        {showPicture && (
+          <PictureModal
+            product={showPicture}
+            onSave={() => { setShowPicture(null); }}
+            onClose={() => setShowPicture(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Product History Modal */}
+      <AnimatePresence>
+        {showHistory && (
+          <ProductHistoryModal
+            product={showHistory}
+            history={history.filter(h => h.productId === showHistory.id)}
+            onClose={() => setShowHistory(null)}
+          />
         )}
       </AnimatePresence>
     </div>
@@ -1599,5 +1666,246 @@ function QuickQtyAdjust({ product, onConfirm, onCancel }: {
         </button>
       </div>
     </div>
+  );
+}
+
+// ===== Picture Modal =====
+function PictureModal({ product, onSave, onClose }: {
+  product: Product;
+  onSave: (imageData: string | undefined) => void;
+  onClose: () => void;
+}) {
+  const [imageData, setImageData] = useState<string | undefined>(product.image);
+  const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFile = (file: File) => {
+    if (!file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setImageData(e.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (file) handleFile(file);
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.95, y: 20 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.95, y: 20 }}
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+      >
+        <div className="px-5 py-3 bg-gradient-to-r from-slate-600 to-slate-700 text-white flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <ImageIcon className="h-5 w-5" />
+            <h3 className="font-bold">Product Picture</h3>
+          </div>
+          <button onClick={onClose} className="h-8 w-8 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center"><X className="h-4 w-4" /></button>
+        </div>
+        <div className="p-5">
+          <div className="flex items-center gap-3 mb-4 p-3 rounded-lg bg-slate-50">
+            <span className="text-3xl">{product.emoji}</span>
+            <div>
+              <div className="font-bold text-slate-800">{product.name}</div>
+              <div className="text-xs text-slate-500 font-mono">{product.sku}</div>
+            </div>
+          </div>
+
+          {/* Image Preview / Upload Area */}
+          {imageData ? (
+            <div className="relative mb-4 group">
+              <img src={imageData} alt={product.name} className="w-full h-48 object-contain rounded-xl bg-slate-50 ring-1 ring-slate-200" />
+              <button
+                onClick={() => setImageData(undefined)}
+                className="absolute top-2 right-2 h-8 w-8 rounded-full bg-rose-500 text-white hover:bg-rose-600 flex items-center justify-center transition opacity-0 group-hover:opacity-100"
+                title="Remove picture"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="absolute bottom-2 right-2 h-8 px-3 rounded-lg bg-white/90 text-slate-700 hover:bg-white text-xs font-semibold flex items-center gap-1 transition opacity-0 group-hover:opacity-100"
+              >
+                <ImageIcon className="h-3.5 w-3.5" />
+                Change
+              </button>
+            </div>
+          ) : (
+            <div
+              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={handleDrop}
+              onClick={() => fileInputRef.current?.click()}
+              className={cn(
+                "h-48 rounded-xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition mb-4",
+                dragOver ? "border-emerald-500 bg-emerald-50" : "border-slate-300 bg-slate-50 hover:border-slate-400 hover:bg-slate-100"
+              )}
+            >
+              <ImageIcon className={cn("h-10 w-10 mb-2 transition", dragOver ? "text-emerald-500" : "text-slate-400")} />
+              <div className="text-sm font-semibold text-slate-600">
+                {dragOver ? "Drop image here" : "Click to upload or drag & drop"}
+              </div>
+              <div className="text-xs text-slate-400 mt-1">PNG, JPG, GIF up to 2MB</div>
+            </div>
+          )}
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleFile(file);
+            }}
+          />
+
+          <div className="flex gap-2">
+            <Button variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
+            <button
+              onClick={() => onSave(imageData)}
+              className="flex-1 h-10 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm transition"
+            >
+              {imageData ? "Save Picture" : "Remove Picture"}
+            </button>
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ===== Product History Modal =====
+function ProductHistoryModal({ product, history, onClose }: {
+  product: Product;
+  history: StockHistoryEntry[];
+  onClose: () => void;
+}) {
+  const sortedHistory = [...history].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+  const actionColors: Record<string, string> = {
+    added: "bg-emerald-100 text-emerald-700",
+    modified: "bg-blue-100 text-blue-700",
+    adjusted: "bg-amber-100 text-amber-700",
+    sold: "bg-purple-100 text-purple-700",
+    received: "bg-cyan-100 text-cyan-700",
+    removed: "bg-rose-100 text-rose-700",
+    reordered: "bg-orange-100 text-orange-700",
+  };
+
+  const totalIn = history.filter(h => h.quantityChange > 0).reduce((s, h) => s + h.quantityChange, 0);
+  const totalOut = history.filter(h => h.quantityChange < 0).reduce((s, h) => s + Math.abs(h.quantityChange), 0);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.95, y: 20 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.95, y: 20 }}
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col"
+      >
+        <div className="px-5 py-3 bg-gradient-to-r from-purple-600 to-violet-600 text-white flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <History className="h-5 w-5" />
+            <h3 className="font-bold">Product History</h3>
+          </div>
+          <button onClick={onClose} className="h-8 w-8 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center"><X className="h-4 w-4" /></button>
+        </div>
+
+        {/* Product Info */}
+        <div className="px-5 py-3 bg-slate-50 border-b border-slate-200 flex items-center gap-3">
+          <span className="text-3xl">{product.emoji}</span>
+          <div className="flex-1">
+            <div className="font-bold text-slate-800">{product.name}</div>
+            <div className="text-xs text-slate-500 font-mono">{product.sku} · {product.barcode}</div>
+          </div>
+          <div className="text-right">
+            <div className="text-[10px] text-slate-500 uppercase">Current Stock</div>
+            <div className="text-lg font-bold text-slate-800">{product.stock} {product.unit}</div>
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div className="px-5 py-2.5 bg-white border-b border-slate-200 grid grid-cols-3 gap-2">
+          <div className="text-center p-2 rounded-lg bg-emerald-50">
+            <div className="text-[10px] text-slate-500 uppercase">Total In</div>
+            <div className="text-base font-bold text-emerald-600">+{totalIn}</div>
+          </div>
+          <div className="text-center p-2 rounded-lg bg-rose-50">
+            <div className="text-[10px] text-slate-500 uppercase">Total Out</div>
+            <div className="text-base font-bold text-rose-600">-{totalOut}</div>
+          </div>
+          <div className="text-center p-2 rounded-lg bg-blue-50">
+            <div className="text-[10px] text-slate-500 uppercase">Transactions</div>
+            <div className="text-base font-bold text-blue-600">{history.length}</div>
+          </div>
+        </div>
+
+        {/* Timeline */}
+        <ScrollArea className="flex-1 min-h-0">
+          <div className="p-4 space-y-2">
+            {sortedHistory.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+                <History className="h-10 w-10 mb-2 opacity-40" />
+                <div className="text-sm font-medium">No history yet</div>
+                <div className="text-xs mt-1">This product has no recorded movements</div>
+              </div>
+            ) : (
+              sortedHistory.map((h, i) => (
+                <motion.div
+                  key={h.id}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: Math.min(i * 0.03, 0.3) }}
+                  className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 hover:bg-slate-100 transition"
+                >
+                  <div className={cn("h-10 w-10 rounded-lg flex items-center justify-center text-[10px] font-bold uppercase flex-shrink-0", actionColors[h.action] || "bg-slate-100 text-slate-700")}>
+                    {h.action.slice(0, 3)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold text-slate-800">{h.reason}</div>
+                    <div className="text-[11px] text-slate-500">
+                      {new Date(h.timestamp).toLocaleString('en-GB')} · {h.user} · Ref: {h.reference}
+                    </div>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <div className={cn("font-mono font-bold text-sm", h.quantityChange > 0 ? "text-emerald-600" : h.quantityChange < 0 ? "text-rose-600" : "text-slate-600")}>
+                      {h.quantityChange > 0 ? "+" : ""}{h.quantityChange}
+                    </div>
+                    <div className="text-[10px] text-slate-400">→ {h.newQuantity}</div>
+                  </div>
+                </motion.div>
+              ))
+            )}
+          </div>
+        </ScrollArea>
+
+        <div className="px-5 py-3 border-t border-slate-200 bg-slate-50 flex justify-end">
+          <Button variant="outline" onClick={onClose}>Close</Button>
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }

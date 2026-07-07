@@ -334,3 +334,69 @@ Stage Summary:
 - Stock File: full CRUD with Modify/New/Clone/Qty actions
 - Stock Search: search and select with Select(Enter) opening a detail modal
 - Both accessible via Stock menu dropdown and as the first two tabs in Stock Management
+
+---
+Task ID: 8
+Agent: Main (Super Z)
+Task: Wire up Picture button to product image upload, History button to per-product movement history, and build out Purchase, Telephone, and Maintenance menus as functional modules.
+
+Work Log:
+- Added `image` field (base64 data URL) to Product interface in pos-data.ts
+- Added "purchase", "telephone", "maintenance" to ViewMode type in pos-types.ts
+- Built PictureModal component in stock-management.tsx:
+  * Shows current product image or upload dropzone
+  * Supports click-to-upload and drag-and-drop
+  * File reader converts to base64 data URL
+  * Preview with remove/change buttons
+  * Save/Cancel buttons
+  * Logs picture update to stock history
+- Built ProductHistoryModal component:
+  * Shows product info header with current stock
+  * Stats: Total In, Total Out, Transactions count
+  * Filtered timeline of all movements for that product
+  * Color-coded action badges (received, added, modified, adjusted, sold, removed)
+  * Each entry shows reason, timestamp, user, reference, quantity change
+- Wired up Picture and History buttons in both StockFileView and StockSearchView
+- Created /src/components/purchase-module.tsx with 5 tabs:
+  * Purchase Orders: table of POs with status badges, view/edit actions
+  * Receive Stock: pending deliveries with progress bars and "Receive All" buttons
+  * Suppliers: card grid with contact info, balance, products supplied
+  * Purchase History: stats cards + chronological list of all POs
+  * Supplier Payments: outstanding balances with "Pay Full" buttons
+- Created /src/components/telephone-module.tsx with 4 tabs:
+  * Phone Orders: card grid of orders with status, customer info, items, advance button
+  * Delivery Tracking: two-panel (active vs completed) with dispatch/delivered buttons
+  * Customers: searchable card grid with order history and total spent
+  * Call Log: timeline of incoming/outgoing/missed calls with notes
+- Created /src/components/maintenance-module.tsx with 6 tabs:
+  * System Settings: company info, financial settings, receipt settings, notifications
+  * User Management: table with name, username, email, role, PIN, status, actions
+  * Backup & Restore: create backup, restore from file, backup history
+  * Cashier Shift: active shift info, stats, opening float, pause/end buttons
+  * Security: authentication settings, auto-lock, role permissions matrix
+  * About: company info, system info, quick stats
+- Updated page.tsx:
+  * Imported PurchaseModule, TelephoneModule, MaintenanceModule
+  * Added render blocks for purchase, telephone, maintenance views
+  * Updated Purchase menu items to navigate to purchase view
+  * Updated Telephone menu items to navigate to telephone view
+  * Updated Maintenance menu items to navigate to maintenance view
+  * Added Purchase, Telephone, Maintain quick nav buttons in header
+- Verified with Agent Browser:
+  * Purchase module: all 5 tabs work, 3 POs visible, 5 suppliers visible
+  * Telephone module: all 4 tabs work, 3 phone orders with customer names
+  * Maintenance module: all 6 tabs work, 4 users with roles visible
+  * Stock File Picture button opens upload modal with drag-drop area
+  * Stock File History button opens modal with stats and timeline
+  * No console errors
+- Lint: 0 errors
+
+Stage Summary:
+- Successfully implemented all requested features:
+  1. Picture button → product image upload modal (drag-drop, preview, save)
+  2. History button → per-product movement history modal (stats + timeline)
+  3. Purchase module → 5 tabs (Orders, Receive Stock, Suppliers, History, Payments)
+  4. Telephone module → 4 tabs (Phone Orders, Delivery, Customers, Call Log)
+  5. Maintenance module → 6 tabs (Settings, Users, Backup, Shift, Security, About)
+- All menu items now navigate to functional modules instead of showing toasts
+- Quick nav bar includes all 6 modules for one-click access

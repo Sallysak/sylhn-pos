@@ -20,6 +20,7 @@ export interface Product {
   expiryDate: string;     // ISO date
   supplier: string;
   discount?: number;
+  image?: string; // Base64 data URL for product picture
 }
 
 export interface Category {
