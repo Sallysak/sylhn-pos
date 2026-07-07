@@ -109,3 +109,44 @@ Stage Summary:
 - All currencies in Ghana Cedis (₵)
 - Every report bears SYLHN COMPANY LTD, contact: +233592766044, Address: East Legon, Accra
 - Modern design with emerald/teal theme, animations, and professional layout
+
+---
+Task ID: 3
+Agent: Main (Super Z)
+Task: 1) Change stock groups to only 5: Households, Groceries, Confectionery, Soft Drinks, Hard Liquor. 2) Rearrange menu bar to: POS, Sale, Stock, Purchase, Accounts, Telephone, Maintenance (in this order).
+
+Work Log:
+- Replaced 10 stock groups with 5 new groups in /src/lib/pos-data.ts:
+  * Groceries (🛒) - 66 products (fruits, veg, dairy, meat, bakery, frozen, pantry)
+  * Confectionery (🍫) - 8 products (snacks)
+  * Soft Drinks (🥤) - 7 products (non-alcoholic beverages)
+  * Hard Liquor (🍷) - 1 product (wine)
+  * Households (🧴) - 8 products (household items)
+- Created and ran a remap script to update all 90 products' groupId fields from old g1-g10 to new group IDs
+- Specifically handled Wine (p56) → hard-liquor, all other beverages → soft-drinks
+- Rewrote the menus array in /src/app/page.tsx with 7 menus in the specified order:
+  1. POS - Go to POS Screen, New Sale, Open Cash Drawer, Switch Register
+  2. Sale - New Sale, Save/Hold Order (F2), Print Receipt (F3), Void Transaction (F4), Pay Now (F5), Sales History, Daily Sales Report
+  3. Stock - Add/Modify Stock, Group Maintenance, Quantity Adjustment, Stock History, Stock Reports, Quantities Report, Stock Value Report, Reorder Report, Expiry Date Report
+  4. Purchase - Purchase Orders, Receive Stock, Suppliers, Purchase History, Supplier Payments
+  5. Accounts - Daily Sales, Profit & Loss, VAT Tax Report, Stock Value Report, Cost Price Report, Stock Performance, General Ledger, Trial Balance
+  6. Telephone - Phone Orders, Delivery Orders, Customer Database, Call Log, Delivery Tracking
+  7. Maintenance - System Settings, User Management, Backup Database, Cashier Shift, Security & Permissions, Keyboard Shortcuts, About SYLHN POS, Exit
+- Added new icon imports: Phone, Truck, Users, Database, Wrench, Shield, FileBarChart2, BookOpen, PhoneCall, Archive, Settings2, Lock
+- Functional menus navigate to existing views (POS, Stock, Reports); placeholder menus show informative toasts
+- Kept quick nav buttons (POS, Stock, Reports) in header for one-click access
+- Deleted temporary remap script (scripts/remap-groups.js) to pass lint
+- Verified with Agent Browser:
+  * Menu bar shows all 7 menus in correct order: POS, Sale, Stock, Purchase, Accounts, Telephone, Maintenance
+  * Stock dropdown opens with all items (Add/Modify, Group Maintenance, Quantity Adjustment, Stock History, Reports)
+  * Group Maintenance shows exactly 5 groups: Groceries, Confectionery, Soft Drinks, Hard Liquor, Households
+  * Product counts per group verified: Groceries=66, Confectionery=8, Soft Drinks=7, Hard Liquor=1, Households=8 (total=90)
+  * Add Product form shows new group dropdown with 5 groups
+  * No console errors or hydration warnings
+- Lint: 0 errors
+
+Stage Summary:
+- Successfully reduced stock groups from 10 to 5 (Households, Groceries, Confectionery, Soft Drinks, Hard Liquor)
+- All 90 products remapped to new groups
+- Menu bar rearranged to 7 menus in specified order: POS, Sale, Stock, Purchase, Accounts, Telephone, Maintenance
+- Each menu has relevant dropdown items; working actions navigate to views or show toasts
