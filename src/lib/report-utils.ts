@@ -208,6 +208,9 @@ export function printReport(report: ReportData) {
           body { padding: 15px; }
           th { background: #107a57 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           tr:nth-child(even) { background: #f0fdf4 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          thead { display: table-header-group; }
+          tr { page-break-inside: avoid; }
+          table { page-break-after: auto; }
         }
       </style>
     </head>

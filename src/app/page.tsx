@@ -443,7 +443,7 @@ export default function POSPage() {
       id: "purchase",
       label: "Purchase",
       items: [
-        { label: "Purchase Form", icon: FileText, action: () => setView("purchase-form") },
+        { label: "Purchase", icon: FileText, action: () => setView("purchase-form") },
         { label: "Purchase Orders", icon: Archive, action: () => setView("purchase") },
         { label: "Receive Stock", icon: Package, action: () => setView("purchase") },
         { label: "Suppliers", icon: Users, action: () => setView("purchase") },
