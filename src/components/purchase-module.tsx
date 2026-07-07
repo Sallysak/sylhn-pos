@@ -6,6 +6,7 @@ import {
   ArrowLeft, Package, Truck, Users, History, DollarSign, Plus, X, Save,
   Archive, ShoppingCart, CheckCircle2, Clock, Phone, MapPin, Search,
   TrendingUp, Filter, ChevronRight, Edit2, Trash2, Eye,
+  FileBarChart2, Calendar, Printer, Download, FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,7 +15,54 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { COMPANY, CURRENCY, formatGHS, type Product } from "@/lib/pos-data";
 
-type PurchaseTab = "orders" | "receive" | "suppliers" | "history" | "payments";
+type PurchaseTab = "orders" | "receive" | "suppliers" | "history" | "payments" | "report";
+
+interface PurchaseTransaction {
+  id: string;
+  date: string; // ISO date (YYYY-MM-DD)
+  qty: number;
+  tax: number;
+  amount: number;
+  paid: number;
+  due: number;
+  supplier: string;
+  invoiceNo: string;
+}
+
+// Sample purchase transactions spanning Jan-Mar 2026
+const initialTransactions: PurchaseTransaction[] = [
+  { id: "t1", date: "2026-01-02", qty: 1, tax: 0, amount: 540.00, paid: 540.00, due: 0, supplier: "AgriCorp Ghana", invoiceNo: "INV-001" },
+  { id: "t2", date: "2026-01-06", qty: 1, tax: 0, amount: 2436.00, paid: 2436.00, due: 0, supplier: "Global Foods GH", invoiceNo: "INV-002" },
+  { id: "t3", date: "2026-01-08", qty: 3, tax: 0, amount: 17415.00, paid: 16965.00, due: 450.00, supplier: "Fan Milk Ghana", invoiceNo: "INV-003" },
+  { id: "t4", date: "2026-01-09", qty: 1, tax: 0, amount: 210.00, paid: 0, due: 210.00, supplier: "Darko Farms", invoiceNo: "INV-004" },
+  { id: "t5", date: "2026-01-12", qty: 2, tax: 0, amount: 1988.60, paid: 420.00, due: 1568.60, supplier: "Global Foods GH", invoiceNo: "INV-005" },
+  { id: "t6", date: "2026-01-13", qty: 1, tax: 0, amount: 100.00, paid: 0, due: 100.00, supplier: "AgriCorp Ghana", invoiceNo: "INV-006" },
+  { id: "t7", date: "2026-01-14", qty: 1, tax: 0, amount: 24500.00, paid: 24500.00, due: 0, supplier: "Unilever Ghana", invoiceNo: "INV-007" },
+  { id: "t8", date: "2026-01-19", qty: 1, tax: 0, amount: 2300.00, paid: 0, due: 2300.00, supplier: "Global Foods GH", invoiceNo: "INV-008" },
+  { id: "t9", date: "2026-01-20", qty: 3, tax: 0, amount: 642.40, paid: 0, due: 642.40, supplier: "Darko Farms", invoiceNo: "INV-009" },
+  { id: "t10", date: "2026-01-22", qty: 2, tax: 0, amount: 3295.80, paid: 0, due: 3295.80, supplier: "AgriCorp Ghana", invoiceNo: "INV-010" },
+  { id: "t11", date: "2026-01-27", qty: 5, tax: 0, amount: 12519.10, paid: 11723.10, due: 796.00, supplier: "Fan Milk Ghana", invoiceNo: "INV-011" },
+  { id: "t12", date: "2026-01-28", qty: 2, tax: 275.68, amount: 1654.08, paid: 1555.20, due: 98.88, supplier: "Global Foods GH", invoiceNo: "INV-012" },
+  { id: "t13", date: "2026-01-29", qty: 1, tax: 340.32, amount: 2041.92, paid: 0, due: 2041.92, supplier: "Unilever Ghana", invoiceNo: "INV-013" },
+  { id: "t14", date: "2026-01-30", qty: 2, tax: 0, amount: 2598.00, paid: 1128.00, due: 1470.00, supplier: "AgriCorp Ghana", invoiceNo: "INV-014" },
+  { id: "t15", date: "2026-02-02", qty: 1, tax: 0, amount: 100.00, paid: 0, due: 100.00, supplier: "Darko Farms", invoiceNo: "INV-015" },
+  { id: "t16", date: "2026-02-03", qty: 2, tax: 0, amount: 1710.00, paid: 0, due: 1710.00, supplier: "Global Foods GH", invoiceNo: "INV-016" },
+  { id: "t17", date: "2026-02-09", qty: 2, tax: 773.15, amount: 4638.90, paid: 240.00, due: 4398.90, supplier: "Fan Milk Ghana", invoiceNo: "INV-017" },
+  { id: "t18", date: "2026-02-10", qty: 1, tax: 0, amount: 2268.00, paid: 0, due: 2268.00, supplier: "Unilever Ghana", invoiceNo: "INV-018" },
+  { id: "t19", date: "2026-02-11", qty: 1, tax: 0, amount: 3470.00, paid: 3470.00, due: 0, supplier: "Global Foods GH", invoiceNo: "INV-019" },
+  { id: "t20", date: "2026-02-16", qty: 3, tax: 29.00, amount: 531.00, paid: 0, due: 531.00, supplier: "AgriCorp Ghana", invoiceNo: "INV-020" },
+  { id: "t21", date: "2026-02-23", qty: 2, tax: 654.81, amount: 4028.86, paid: 3928.86, due: 100.00, supplier: "Darko Farms", invoiceNo: "INV-021" },
+  { id: "t22", date: "2026-02-24", qty: 1, tax: 0, amount: 11520.00, paid: 0, due: 11520.00, supplier: "Unilever Ghana", invoiceNo: "INV-022" },
+  { id: "t23", date: "2026-02-25", qty: 3, tax: 555.83, amount: 4015.00, paid: 0, due: 4015.00, supplier: "Global Foods GH", invoiceNo: "INV-023" },
+  { id: "t24", date: "2026-02-26", qty: 1, tax: 32.00, amount: 192.00, paid: 0, due: 192.00, supplier: "Fan Milk Ghana", invoiceNo: "INV-024" },
+  { id: "t25", date: "2026-02-27", qty: 3, tax: 139.17, amount: 1075.00, paid: 0, due: 1075.00, supplier: "AgriCorp Ghana", invoiceNo: "INV-025" },
+  { id: "t26", date: "2026-02-28", qty: 2, tax: 92.43, amount: 654.58, paid: 0, due: 654.58, supplier: "Darko Farms", invoiceNo: "INV-026" },
+  { id: "t27", date: "2026-03-02", qty: 1, tax: 382.10, amount: 2292.60, paid: 0, due: 2292.60, supplier: "Global Foods GH", invoiceNo: "INV-027" },
+  { id: "t28", date: "2026-03-04", qty: 3, tax: 0, amount: 17956.84, paid: 15736.84, due: 2220.00, supplier: "Unilever Ghana", invoiceNo: "INV-028" },
+  { id: "t29", date: "2026-03-05", qty: 1, tax: 86.80, amount: 520.80, paid: 0, due: 520.80, supplier: "Fan Milk Ghana", invoiceNo: "INV-029" },
+  { id: "t30", date: "2026-03-07", qty: 1, tax: 0, amount: 240.00, paid: 0, due: 240.00, supplier: "AgriCorp Ghana", invoiceNo: "INV-030" },
+  { id: "t31", date: "2026-03-10", qty: 1, tax: 0, amount: 100.00, paid: 0, due: 100.00, supplier: "Global Foods GH", invoiceNo: "INV-031" },
+];
 
 interface PurchaseOrder {
   id: string;
@@ -80,6 +128,7 @@ export function PurchaseModule({ onBack, products }: PurchaseProps) {
   const [tab, setTab] = useState<PurchaseTab>("orders");
   const [suppliers, setSuppliers] = useState<Supplier[]>(initialSuppliers);
   const [orders, setOrders] = useState<PurchaseOrder[]>(initialOrders);
+  const [transactions] = useState<PurchaseTransaction[]>(initialTransactions);
   const [showNewOrder, setShowNewOrder] = useState(false);
   const [showNewSupplier, setShowNewSupplier] = useState(false);
   const [viewOrder, setViewOrder] = useState<PurchaseOrder | null>(null);
@@ -90,6 +139,7 @@ export function PurchaseModule({ onBack, products }: PurchaseProps) {
     { id: "suppliers" as const, label: "Suppliers", icon: Users },
     { id: "history" as const, label: "Purchase History", icon: History },
     { id: "payments" as const, label: "Supplier Payments", icon: DollarSign },
+    { id: "report" as const, label: "Purchase Report", icon: FileBarChart2 },
   ];
 
   return (
@@ -155,6 +205,7 @@ export function PurchaseModule({ onBack, products }: PurchaseProps) {
             {tab === "payments" && <SupplierPayments suppliers={suppliers} onPay={(id, amount) => {
               setSuppliers(prev => prev.map(s => s.id === id ? { ...s, balance: Math.max(0, s.balance - amount) } : s));
             }} />}
+            {tab === "report" && <PurchaseReport transactions={transactions} />}
           </motion.div>
         </AnimatePresence>
       </main>
@@ -499,6 +550,210 @@ function SupplierPayments({ suppliers, onPay }: {
           )}
         </div>
       </ScrollArea>
+    </div>
+  );
+}
+
+// ===== Purchase Report Tab =====
+function PurchaseReport({ transactions }: { transactions: PurchaseTransaction[] }) {
+  const [fromDate, setFromDate] = useState("2026-01-01");
+  const [toDate, setToDate] = useState("2026-12-31");
+  const { toast } = useToast();
+
+  // Filter transactions by date range
+  const filtered = transactions.filter(t => {
+    return t.date >= fromDate && t.date <= toDate;
+  });
+
+  // Calculate totals
+  const totals = filtered.reduce((acc, t) => ({
+    qty: acc.qty + t.qty,
+    tax: acc.tax + t.tax,
+    amount: acc.amount + t.amount,
+    paid: acc.paid + t.paid,
+    due: acc.due + t.due,
+  }), { qty: 0, tax: 0, amount: 0, paid: 0, due: 0 });
+
+  // Format date for display (M/D/YYYY)
+  const formatDate = (iso: string) => {
+    const [y, m, d] = iso.split('-');
+    return `${parseInt(m)}/${parseInt(d)}/${y}`;
+  };
+
+  // Format number with commas
+  const formatNum = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const now = new Date();
+  const dateStr = `${now.getMonth() + 1}/${now.getDate()}/${now.getFullYear()}`;
+  const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+
+  const handlePrint = () => {
+    window.print();
+    toast({ title: "Printing report..." });
+  };
+
+  const handleExportPDF = () => {
+    toast({ title: "Exporting to PDF..." });
+  };
+
+  const handleExportExcel = () => {
+    toast({ title: "Exporting to Excel..." });
+  };
+
+  return (
+    <div className="h-full flex flex-col gap-3">
+      {/* Date Filter Bar */}
+      <div className="flex-shrink-0 bg-white rounded-xl shadow-md ring-1 ring-slate-200 px-5 py-3 flex items-center gap-4 flex-wrap">
+        <div className="flex items-center gap-2">
+          <Calendar className="h-5 w-5 text-amber-600" />
+          <span className="text-sm font-bold text-slate-700">Filter by Date Range:</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-xs font-semibold text-slate-600">From:</label>
+          <input
+            type="date"
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+            className="h-9 px-3 rounded-lg border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-amber-400"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-xs font-semibold text-slate-600">To:</label>
+          <input
+            type="date"
+            value={toDate}
+            onChange={(e) => setToDate(e.target.value)}
+            className="h-9 px-3 rounded-lg border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-amber-400"
+          />
+        </div>
+        <div className="flex-1" />
+        <button onClick={handlePrint} className="h-9 px-3 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition">
+          <Printer className="h-3.5 w-3.5" /> Print
+        </button>
+        <button onClick={handleExportPDF} className="h-9 px-3 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-700 text-xs font-semibold flex items-center gap-1.5 transition">
+          <FileText className="h-3.5 w-3.5" /> PDF
+        </button>
+        <button onClick={handleExportExcel} className="h-9 px-3 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-700 text-xs font-semibold flex items-center gap-1.5 transition">
+          <Download className="h-3.5 w-3.5" /> Excel
+        </button>
+      </div>
+
+      {/* Report Preview - Styled like a printed document */}
+      <div className="flex-1 overflow-y-auto bg-slate-200/50 rounded-xl p-4">
+        <div className="max-w-3xl mx-auto bg-white shadow-xl rounded-lg overflow-hidden" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
+          {/* Report Header */}
+          <div className="px-8 pt-6 pb-2 border-b-2 border-slate-800">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-12 w-12 rounded-lg bg-gradient-to-br from-amber-600 to-orange-700 flex items-center justify-center text-white font-bold text-xl shadow-md">
+                  S
+                </div>
+                <div>
+                  <div className="text-lg font-bold text-slate-900 leading-tight">{COMPANY.name}</div>
+                  <div className="text-xs text-slate-600">Accra Warehouse</div>
+                  <div className="text-xs text-slate-600">{COMPANY.address}</div>
+                </div>
+              </div>
+              <div className="text-right text-xs text-slate-600">
+                <div>{dateStr}</div>
+                <div>{timeStr}</div>
+                <div className="mt-1 font-semibold text-slate-700">Page 1</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Report Title */}
+          <div className="px-8 py-4 text-center border-b border-slate-300 bg-slate-50">
+            <h1 className="text-xl font-bold text-slate-900 tracking-wide">Totals Purchase Report</h1>
+            <p className="text-sm text-slate-600 mt-1">
+              For The Period {formatDate(fromDate)} - {formatDate(toDate)}
+            </p>
+          </div>
+
+          {/* Report Table */}
+          <div className="px-8 py-4">
+            <table className="w-full text-xs" style={{ borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ backgroundColor: '#E6F0FA' }}>
+                  <th className="px-3 py-2 text-left font-bold text-slate-800 border border-slate-400">Date</th>
+                  <th className="px-3 py-2 text-right font-bold text-slate-800 border border-slate-400">Qty</th>
+                  <th className="px-3 py-2 text-right font-bold text-slate-800 border border-slate-400">TAX GHC</th>
+                  <th className="px-3 py-2 text-right font-bold text-slate-800 border border-slate-400">Amount</th>
+                  <th className="px-3 py-2 text-right font-bold text-slate-800 border border-slate-400">Paid GHC</th>
+                  <th className="px-3 py-2 text-right font-bold text-slate-800 border border-slate-400">Due GHC</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-3 py-8 text-center text-slate-400 border border-slate-400">
+                      No transactions found in the selected date range
+                    </td>
+                  </tr>
+                ) : (
+                  filtered.map((t, i) => (
+                    <tr key={t.id} style={{ backgroundColor: i % 2 === 0 ? '#FFFFFF' : '#F8F8F8' }}>
+                      <td className="px-3 py-1.5 text-slate-800 border border-slate-400">{formatDate(t.date)}</td>
+                      <td className="px-3 py-1.5 text-right text-slate-800 border border-slate-400">{t.qty}</td>
+                      <td className="px-3 py-1.5 text-right text-slate-800 border border-slate-400">{formatNum(t.tax)}</td>
+                      <td className="px-3 py-1.5 text-right text-slate-800 border border-slate-400">{formatNum(t.amount)}</td>
+                      <td className="px-3 py-1.5 text-right text-slate-800 border border-slate-400">{formatNum(t.paid)}</td>
+                      <td className="px-3 py-1.5 text-right font-semibold border border-slate-400" style={{ color: t.due > 0 ? '#DC2626' : '#10B981' }}>
+                        {formatNum(t.due)}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+              {/* Totals Row */}
+              {filtered.length > 0 && (
+                <tfoot>
+                  <tr style={{ backgroundColor: '#FEF3C7' }}>
+                    <td className="px-3 py-2 font-bold text-slate-900 border border-slate-400 border-t-2 border-t-slate-700">TOTAL</td>
+                    <td className="px-3 py-2 text-right font-bold text-slate-900 border border-slate-400 border-t-2 border-t-slate-700">{totals.qty}</td>
+                    <td className="px-3 py-2 text-right font-bold text-slate-900 border border-slate-400 border-t-2 border-t-slate-700">{formatNum(totals.tax)}</td>
+                    <td className="px-3 py-2 text-right font-bold text-slate-900 border border-slate-400 border-t-2 border-t-slate-700">{formatNum(totals.amount)}</td>
+                    <td className="px-3 py-2 text-right font-bold text-slate-900 border border-slate-400 border-t-2 border-t-slate-700">{formatNum(totals.paid)}</td>
+                    <td className="px-3 py-2 text-right font-bold border border-slate-400 border-t-2 border-t-slate-700" style={{ color: totals.due > 0 ? '#DC2626' : '#10B981' }}>
+                      {formatNum(totals.due)}
+                    </td>
+                  </tr>
+                </tfoot>
+              )}
+            </table>
+          </div>
+
+          {/* Summary Cards */}
+          {filtered.length > 0 && (
+            <div className="px-8 pb-4">
+              <div className="grid grid-cols-4 gap-3">
+                <div className="bg-amber-50 rounded-lg p-3 ring-1 ring-amber-200 text-center">
+                  <div className="text-[10px] text-slate-500 uppercase font-semibold">Transactions</div>
+                  <div className="text-lg font-bold text-amber-700">{filtered.length}</div>
+                </div>
+                <div className="bg-blue-50 rounded-lg p-3 ring-1 ring-blue-200 text-center">
+                  <div className="text-[10px] text-slate-500 uppercase font-semibold">Total Amount</div>
+                  <div className="text-lg font-bold text-blue-700 font-mono">{formatNum(totals.amount)}</div>
+                </div>
+                <div className="bg-emerald-50 rounded-lg p-3 ring-1 ring-emerald-200 text-center">
+                  <div className="text-[10px] text-slate-500 uppercase font-semibold">Total Paid</div>
+                  <div className="text-lg font-bold text-emerald-700 font-mono">{formatNum(totals.paid)}</div>
+                </div>
+                <div className="bg-rose-50 rounded-lg p-3 ring-1 ring-rose-200 text-center">
+                  <div className="text-[10px] text-slate-500 uppercase font-semibold">Total Due</div>
+                  <div className="text-lg font-bold text-rose-700 font-mono">{formatNum(totals.due)}</div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Report Footer */}
+          <div className="px-8 py-3 border-t border-slate-300 bg-slate-50 flex items-center justify-between text-[10px] text-slate-500">
+            <div>{COMPANY.name} · {COMPANY.address} · {COMPANY.contact}</div>
+            <div>Generated: {dateStr} {timeStr}</div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

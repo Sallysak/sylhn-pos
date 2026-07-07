@@ -643,3 +643,53 @@ Stage Summary:
 - Double-click title bar toggles maximize/restore
 - All existing features and functionality preserved inside the popups
 - Accessible via Stock menu dropdown and Stock Management navigation tabs
+
+---
+Task ID: 14
+Agent: Main (Super Z)
+Task: Design and integrate a Purchase Report with font, borders, and design matching the PURCH REPORT.png reference. Filter the report by two dates (From/To).
+
+Work Log:
+- Analyzed PURCH REPORT.png using VLM to extract exact layout, columns, styling, and design
+- Reference shows: "Totals Purchase Report" with company header, period subtitle, bordered table (Date, Qty, TAX GHC, Amount, Paid GHC, Due GHC), light blue header row, alternating white/gray rows, TOTAL row
+- Added PurchaseTransaction interface and 31 sample transactions (Jan-Mar 2026) to purchase-module.tsx
+- Added "report" to PurchaseTab type
+- Added "Purchase Report" tab (FileBarChart2 icon) to Purchase Module navigation
+- Added "Purchase Report" menu item to Purchase dropdown in page.tsx
+- Built PurchaseReport component with:
+  * Date filter bar at top: From/To date inputs + Print, PDF, Excel export buttons
+  * Visually stunning report preview styled like a printed document:
+    - Company header: SYLHN COMPANY LTD logo, "Accra Warehouse", address, date/time stamp, "Page 1"
+    - Title: "Totals Purchase Report" (centered, bold, large)
+    - Subtitle: "For The Period [from] - [to]" (centered, dynamically updates with filter)
+    - Data table with solid black borders (border-collapse, border-slate-400 on all cells)
+    - Table header: light blue background (#E6F0FA), bold text
+    - Alternating row colors: white (#FFFFFF) and light gray (#F8F8F8)
+    - Columns: Date, Qty, TAX GHC, Amount, Paid GHC, Due GHC
+    - Due GHC column colored red (if >0) or green (if 0) for visual emphasis
+    - TOTAL row: amber background (#FEF3C7), bold text, top border-2 for emphasis
+    - 4 summary cards: Transactions, Total Amount, Total Paid, Total Due
+    - Report footer: company name, address, contact + generated timestamp
+  * Arial/Helvetica sans-serif font matching reference
+  * Date filtering: transactions filtered by From/To date range
+  * Live total calculations: sum of qty, tax, amount, paid, due
+  * Print/PDF/Excel export buttons (toast notifications)
+- Verified with Agent Browser:
+  * Purchase Report tab opens with date filter bar and report preview
+  * Company header shows "SYLHN COMPANY LTD", "Accra Warehouse", "Page 1"
+  * Title "Totals Purchase Report" with period subtitle
+  * Table has 6 columns with solid borders, light blue header
+  * TOTAL row shows: 55 qty, 3,361.29 tax, 127,554.48 amount, 82,643.00 paid, 44,911.48 due
+  * Summary cards show Transactions, Total Amount, Total Paid, Total Due
+  * Date filter fields (From/To) present and functional
+  * Export buttons (Print, PDF, Excel) present
+- VLM comparison confirmed: company header, title, period, columns, header color, alternating rows, TOTAL row all match reference
+- Lint: 0 errors
+
+Stage Summary:
+- Successfully designed and integrated a visually stunning Purchase Report
+- Matches reference design: company header, title, period subtitle, bordered table, light blue header, alternating rows, TOTAL row
+- Date filter (From/To) filters transactions by date range with live total recalculation
+- Export buttons: Print, PDF, Excel
+- Accessible via Purchase menu dropdown and Purchase Module "Purchase Report" tab
+- All 31 sample transactions spanning Jan-Mar 2026 with realistic Ghana Cedis values

@@ -442,6 +442,8 @@ export default function POSPage() {
         { separator: true },
         { label: "Purchase History", icon: History, action: () => setView("purchase") },
         { label: "Supplier Payments", icon: DollarSign, action: () => setView("purchase") },
+        { separator: true },
+        { label: "Purchase Report", icon: FileBarChart2, action: () => setView("purchase") },
       ],
     },
     {
