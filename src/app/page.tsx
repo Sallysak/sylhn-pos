@@ -62,6 +62,7 @@ export default function POSPage() {
   const [transactionCount, setTransactionCount] = useState(0);
   const [activeKeypadMode, setActiveKeypadMode] = useState<"qty" | "price" | "barcode">("qty");
   const [showSidebar, setShowSidebar] = useState(true);
+  const [showFindProduct, setShowFindProduct] = useState(false);
 
   const { toast } = useToast();
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -301,6 +302,7 @@ export default function POSPage() {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement).tagName === 'INPUT') return;
+      if (e.key === 'F1') { e.preventDefault(); setShowFindProduct(true); }
       if (e.key === 'F2') { e.preventDefault(); handleSave(); }
       if (e.key === 'F3') { e.preventDefault(); handlePrint(); }
       if (e.key === 'F4') { e.preventDefault(); handleVoid(); }
@@ -308,6 +310,7 @@ export default function POSPage() {
       if (e.key === 'Escape') {
         if (showPayment) setShowPayment(false);
         else if (showReceipt) setShowReceipt(false);
+        else if (showFindProduct) setShowFindProduct(false);
         else setSelectedCartIndex(null);
       }
     };
@@ -905,6 +908,14 @@ export default function POSPage() {
 
                 {/* Function Buttons */}
                 <div className="flex-shrink-0 grid grid-cols-4 gap-1.5 p-2 bg-slate-100">
+                  <button
+                    onClick={() => setShowFindProduct(true)}
+                    className="col-span-4 h-11 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold text-sm flex items-center justify-center gap-2 hover:from-blue-700 hover:to-indigo-700 transition shadow-md hover:shadow-lg"
+                  >
+                    <Search className="h-4 w-4" />
+                    FIND PRODUCT
+                    <kbd className="ml-1 px-1.5 py-0.5 rounded bg-white/20 text-[10px] font-mono">F1</kbd>
+                  </button>
                   <FuncBtn icon={<Pause className="h-3.5 w-3.5" />} label="Save" sub="F2" onClick={handleSave} variant="amber" />
                   <FuncBtn icon={<Printer className="h-3.5 w-3.5" />} label="Print" sub="F3" onClick={handlePrint} variant="slate" />
                   <FuncBtn icon={<RotateCcw className="h-3.5 w-3.5" />} label="Void" sub="F4" onClick={handleVoid} variant="rose" />
@@ -995,6 +1006,17 @@ export default function POSPage() {
             customerName={customerName}
             onClose={() => setShowPayment(false)}
             onComplete={completePayment}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ===== Find Product Modal ===== */}
+      <AnimatePresence>
+        {showFindProduct && (
+          <FindProductModal
+            products={products}
+            onAdd={(product) => { addToCart(product); }}
+            onClose={() => setShowFindProduct(false)}
           />
         )}
       </AnimatePresence>
@@ -1237,6 +1259,391 @@ function PaymentModal({ total, subtotal, tax, discount, itemCount, invoiceNumber
             <Check className="h-5 w-5" />
             COMPLETE PAYMENT · {formatGHS(total)}
           </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ===== Find Product Modal =====
+function FindProductModal({ products, onAdd, onClose }: {
+  products: Product[];
+  onAdd: (product: Product) => void;
+  onClose: () => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [groupFilter, setGroupFilter] = useState<string>("all");
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  const [quantity, setQuantity] = useState(1);
+  const [recentlyAdded, setRecentlyAdded] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Autofocus on input when modal opens
+  useEffect(() => {
+    const t = setTimeout(() => inputRef.current?.focus(), 100);
+    return () => clearTimeout(t);
+  }, []);
+
+  const selectProduct = (id: string | null) => {
+    setSelectedProductId(id);
+    setQuantity(1);
+  };
+
+  const stockGroups = [
+    { id: "all", name: "All Groups", icon: "🛒" },
+    { id: "groceries", name: "Groceries", icon: "🛒" },
+    { id: "confectionery", name: "Confectionery", icon: "🍫" },
+    { id: "soft-drinks", name: "Soft Drinks", icon: "🥤" },
+    { id: "hard-liquor", name: "Hard Liquor", icon: "🍷" },
+    { id: "households", name: "Households", icon: "🧴" },
+  ];
+
+  const filtered = useMemo(() => {
+    let result = products;
+    if (groupFilter !== "all") {
+      result = result.filter(p => p.groupId === groupFilter);
+    }
+    if (query.trim()) {
+      const q = query.toLowerCase();
+      result = result.filter(p =>
+        p.name.toLowerCase().includes(q) ||
+        p.sku.toLowerCase().includes(q) ||
+        p.barcode.includes(q) ||
+        p.supplier.toLowerCase().includes(q)
+      );
+    }
+    return result;
+  }, [products, query, groupFilter]);
+
+  const selectedProduct = selectedProductId
+    ? products.find(p => p.id === selectedProductId) || null
+    : null;
+
+  const handleAddToCart = () => {
+    if (!selectedProduct) return;
+    for (let i = 0; i < quantity; i++) {
+      onAdd(selectedProduct);
+    }
+    setRecentlyAdded(selectedProduct.id);
+    setTimeout(() => setRecentlyAdded(null), 1200);
+    // Keep modal open for adding more products, but clear selection
+    selectProduct(null);
+    inputRef.current?.focus();
+  };
+
+  const handleQuickAdd = (product: Product) => {
+    onAdd(product);
+    setRecentlyAdded(product.id);
+    setTimeout(() => setRecentlyAdded(null), 1200);
+    inputRef.current?.focus();
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.95, y: 30 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.95, y: 30 }}
+        transition={{ type: "spring", damping: 25, stiffness: 300 }}
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[92vh] overflow-hidden flex flex-col"
+      >
+        {/* Header */}
+        <div className="flex-shrink-0 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="h-11 w-11 rounded-xl bg-white/15 backdrop-blur flex items-center justify-center ring-1 ring-white/20">
+              <Search className="h-6 w-6" />
+            </div>
+            <div>
+              <div className="text-lg font-bold">Find Product</div>
+              <div className="text-xs text-blue-100/90">Search by name, SKU, barcode, or supplier</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <kbd className="px-2 py-1 rounded-md bg-white/15 text-[10px] font-mono">F1 to open</kbd>
+            <button onClick={onClose} className="h-9 w-9 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center transition">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Search Bar + Group Filters */}
+        <div className="flex-shrink-0 px-6 py-3 bg-slate-50 border-b border-slate-200 space-y-2.5">
+          <div className="relative">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+            <input
+              ref={inputRef}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && filtered.length > 0) {
+                  selectProduct(filtered[0].id);
+                }
+              }}
+              placeholder="Type to search products... (Enter to select first result)"
+              className="w-full h-12 pl-11 pr-4 rounded-xl bg-white text-slate-800 text-base shadow-sm outline-none ring-2 ring-transparent focus:ring-blue-400 border border-slate-200 transition"
+            />
+            {query && (
+              <button
+                onClick={() => { setQuery(""); inputRef.current?.focus(); }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 h-6 w-6 rounded-full bg-slate-200 hover:bg-slate-300 flex items-center justify-center"
+              >
+                <X className="h-3.5 w-3.5 text-slate-600" />
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {stockGroups.map(g => (
+              <button
+                key={g.id}
+                onClick={() => setGroupFilter(g.id)}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition",
+                  groupFilter === g.id
+                    ? "bg-blue-600 text-white shadow-sm"
+                    : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-100"
+                )}
+              >
+                <span>{g.icon}</span>
+                {g.name}
+              </button>
+            ))}
+            <div className="ml-auto text-xs text-slate-500 font-medium">
+              {filtered.length} of {products.length} products
+            </div>
+          </div>
+        </div>
+
+        {/* Body: Product List + Detail Panel */}
+        <div className="flex-1 overflow-hidden grid grid-cols-3 gap-0">
+          {/* Left: Product List (2 cols) */}
+          <div className="col-span-2 overflow-y-auto border-r border-slate-200">
+            {filtered.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+                <Search className="h-12 w-12 mb-3 opacity-40" />
+                <div className="text-sm font-medium">No products found</div>
+                <div className="text-xs mt-1">Try a different search term or group filter</div>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {filtered.map((product, idx) => {
+                  const isSelected = selectedProductId === product.id;
+                  const justAdded = recentlyAdded === product.id;
+                  const lowStock = product.stock <= product.reorderLevel;
+                  return (
+                    <motion.button
+                      key={product.id}
+                      layout
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1, backgroundColor: justAdded ? "#ecfdf5" : isSelected ? "#eff6ff" : "#ffffff" }}
+                      transition={{ duration: 0.15, delay: Math.min(idx * 0.01, 0.2) }}
+                      onClick={() => selectProduct(product.id)}
+                      onDoubleClick={() => handleQuickAdd(product)}
+                      className={cn(
+                        "w-full flex items-center gap-3 px-4 py-2.5 text-left transition",
+                        isSelected ? "ring-2 ring-blue-400 ring-inset" : "hover:bg-slate-50"
+                      )}
+                    >
+                      {/* Emoji */}
+                      <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center text-2xl flex-shrink-0">
+                        {product.emoji}
+                      </div>
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-slate-800 text-sm truncate">{product.name}</span>
+                          {product.taxable && (
+                            <span className="px-1 py-0.5 rounded bg-amber-100 text-amber-700 text-[9px] font-bold">VAT</span>
+                          )}
+                          {lowStock && (
+                            <span className="px-1 py-0.5 rounded bg-rose-100 text-rose-700 text-[9px] font-bold">LOW</span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-slate-400 font-mono flex items-center gap-2">
+                          <span>{product.sku}</span>
+                          <span>·</span>
+                          <span>{product.barcode}</span>
+                        </div>
+                      </div>
+                      {/* Price + Stock */}
+                      <div className="text-right flex-shrink-0">
+                        <div className="font-bold text-blue-600 text-sm">{formatGHS(product.price)}</div>
+                        <div className="text-[10px] text-slate-400">/{product.unit} · Stock: {product.stock}</div>
+                      </div>
+                      {/* Quick Add Button */}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleQuickAdd(product); }}
+                        className="h-8 w-8 rounded-lg bg-emerald-100 text-emerald-600 hover:bg-emerald-200 flex items-center justify-center transition flex-shrink-0"
+                        title="Quick add (1 unit)"
+                      >
+                        {justAdded ? <Check className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+                      </button>
+                    </motion.button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Right: Product Detail Panel (1 col) */}
+          <div className="overflow-y-auto bg-slate-50">
+            {selectedProduct ? (
+              <motion.div
+                key={selectedProduct.id}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="p-5 space-y-4"
+              >
+                {/* Product Card */}
+                <div className="bg-white rounded-xl p-4 shadow-sm ring-1 ring-slate-200 text-center">
+                  <div className="h-24 w-24 mx-auto rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center text-6xl mb-3">
+                    {selectedProduct.emoji}
+                  </div>
+                  <div className="font-bold text-slate-800 text-base">{selectedProduct.name}</div>
+                  <div className="text-xs text-slate-400 font-mono mt-0.5">{selectedProduct.sku}</div>
+                  <div className="text-2xl font-bold text-blue-600 mt-2">{formatGHS(selectedProduct.price)}</div>
+                  <div className="text-xs text-slate-500">per {selectedProduct.unit}</div>
+                </div>
+
+                {/* Product Details */}
+                <div className="bg-white rounded-xl p-4 shadow-sm ring-1 ring-slate-200 space-y-2 text-xs">
+                  <div className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Product Details</div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Group</span>
+                    <span className="font-semibold text-slate-800">{stockGroups.find(g => g.id === selectedProduct.groupId)?.name}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Barcode</span>
+                    <span className="font-mono text-slate-700">{selectedProduct.barcode}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Supplier</span>
+                    <span className="font-semibold text-slate-800">{selectedProduct.supplier}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Batch</span>
+                    <span className="font-mono text-slate-700">{selectedProduct.batchNumber}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Cost Price</span>
+                    <span className="font-mono text-slate-700">{formatGHS(selectedProduct.costPrice)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">In Stock</span>
+                    <span className={cn("font-bold", selectedProduct.stock === 0 ? "text-rose-600" : selectedProduct.stock <= selectedProduct.reorderLevel ? "text-amber-600" : "text-emerald-600")}>
+                      {selectedProduct.stock} {selectedProduct.unit}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Reorder Level</span>
+                    <span className="font-mono text-slate-700">{selectedProduct.reorderLevel}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Expiry Date</span>
+                    <span className="font-mono text-slate-700">{selectedProduct.expiryDate}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Taxable (VAT)</span>
+                    <span className="font-semibold text-slate-800">{selectedProduct.taxable ? "Yes" : "No"}</span>
+                  </div>
+                </div>
+
+                {/* Quantity Selector */}
+                <div className="bg-white rounded-xl p-4 shadow-sm ring-1 ring-slate-200">
+                  <div className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Quantity to Add</div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setQuantity(q => Math.max(1, q - 1))}
+                      className="h-10 w-10 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition"
+                    >
+                      <Minus className="h-4 w-4" />
+                    </button>
+                    <input
+                      type="number"
+                      value={quantity}
+                      onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                      min={1}
+                      max={selectedProduct.stock}
+                      className="flex-1 h-10 text-center text-lg font-bold font-mono border-2 border-slate-200 focus:border-blue-400 rounded-lg outline-none"
+                    />
+                    <button
+                      onClick={() => setQuantity(q => Math.min(selectedProduct.stock, q + 1))}
+                      className="h-10 w-10 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-4 gap-1 mt-2">
+                    {[1, 5, 10, 20].map(n => (
+                      <button
+                        key={n}
+                        onClick={() => setQuantity(n)}
+                        className="py-1 rounded-md bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-700 transition"
+                      >
+                        {n}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="mt-2 p-2 rounded-lg bg-blue-50 flex justify-between items-center">
+                    <span className="text-xs font-semibold text-slate-600">Subtotal</span>
+                    <span className="text-lg font-bold font-mono text-blue-600">{formatGHS(selectedProduct.price * quantity)}</span>
+                  </div>
+                </div>
+
+                {/* Add to Cart Button */}
+                <button
+                  onClick={handleAddToCart}
+                  disabled={selectedProduct.stock === 0}
+                  className={cn(
+                    "w-full h-12 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition shadow-md",
+                    selectedProduct.stock === 0
+                      ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                      : "bg-gradient-to-r from-emerald-600 to-teal-600 text-white hover:shadow-lg"
+                  )}
+                >
+                  <ShoppingCart className="h-5 w-5" />
+                  ADD {quantity} TO CART
+                  <span className="ml-1 px-2 py-0.5 rounded bg-white/20 text-xs font-mono">{formatGHS(selectedProduct.price * quantity)}</span>
+                </button>
+                <div className="text-center text-[10px] text-slate-400">
+                  Tip: Double-click any product for quick add (1 unit)
+                </div>
+              </motion.div>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full text-slate-400 p-6 text-center">
+                <Search className="h-12 w-12 mb-3 opacity-30" />
+                <div className="text-sm font-medium">Select a product</div>
+                <div className="text-xs mt-1">Click any product from the list to view details and add a custom quantity to the cart</div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex-shrink-0 px-6 py-2.5 bg-white border-t border-slate-200 flex items-center justify-between">
+          <div className="flex items-center gap-3 text-xs text-slate-500">
+            <span className="flex items-center gap-1">
+              <kbd className="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 font-mono text-[10px]">↑↓</kbd>
+              Navigate
+            </span>
+            <span className="flex items-center gap-1">
+              <kbd className="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 font-mono text-[10px]">Enter</kbd>
+              Select first
+            </span>
+            <span className="flex items-center gap-1">
+              <kbd className="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 font-mono text-[10px]">Esc</kbd>
+              Close
+            </span>
+          </div>
+          <Button variant="outline" size="sm" onClick={onClose}>
+            Close (Esc)
+          </Button>
         </div>
       </motion.div>
     </motion.div>

@@ -191,3 +191,48 @@ Stage Summary:
 - Products now have a single `category` field that matches their `groupId` (both use the 5 group IDs)
 - Add Product form simplified to one "Stock Group" dropdown
 - Entire system is now consistent: POS filter bar, Stock Management, Reports all use the same 5 groups
+
+---
+Task ID: 5
+Agent: Main (Super Z)
+Task: Add a "Find Product" feature to the POS such that a new modern form appears to select products to add to the cart.
+
+Work Log:
+- Added `showFindProduct` state to POSPage component
+- Added keyboard shortcut F1 to open the Find Product modal (alongside existing F2-F5 shortcuts)
+- Added Escape handling to close the Find Product modal
+- Added a prominent "FIND PRODUCT" button (blue→indigo gradient, col-span-4) as the first item in the function buttons row, with F1 keyboard shortcut badge
+- Rendered FindProductModal component via AnimatePresence (between PaymentModal and ReceiptModal)
+- Built FindProductModal component with:
+  * Modern blue→indigo→purple gradient header with Search icon, title, and "F1 to open" hint
+  * Large search input with autofocus, clear button, and Enter-to-select-first-result
+  * Group filter pills (All Groups, Groceries, Confectionery, Soft Drinks, Hard Liquor, Households) matching the unified 5-group system
+  * Live result count display
+  * Two-column layout: product list (2 cols) + detail panel (1 col)
+  * Product list: each row shows emoji, name, SKU, barcode, price, stock, VAT/LOW badges, and a green quick-add (+) button
+  * Double-click any product for instant quick-add of 1 unit
+  * Detail panel: large emoji, name, SKU, price, then full product details card (Group, Barcode, Supplier, Batch, Cost Price, In Stock, Reorder Level, Expiry Date, Taxable)
+  * Quantity selector with +/- buttons, manual input, and quick-select (1, 5, 10, 20)
+  * Live subtotal calculation in blue box
+  * "ADD X TO CART" button (emerald gradient) showing quantity and total price
+  * Footer with keyboard shortcut hints (↑↓ Navigate, Enter Select first, Esc Close) and Close button
+  * "Recently added" green flash animation on the product row when quick-added
+  * Modal stays open after adding products (for multi-product entry), refocuses search input
+- Refactored to use a `selectProduct()` helper that resets quantity (avoids lint error for setState in effect)
+- Verified with Agent Browser:
+  * FIND PRODUCT button visible in function buttons area with F1 badge
+  * Clicking button opens modal with search input, group filters, and product list
+  * Typing "milk" filters to Whole Milk and Skim Milk
+  * Clicking a product shows full detail panel with all product info
+  * "ADD 1 TO CART ₵18.00" button adds product to cart (Whole Milk appeared in Current Order)
+  * F1 keyboard shortcut opens modal
+  * Hard Liquor group filter shows only Wine Bottle
+  * No console errors
+- Lint: 0 errors
+
+Stage Summary:
+- Successfully added a modern "Find Product" feature to the POS
+- Triggered by a prominent blue FIND PRODUCT button (F1 shortcut) in the function buttons area
+- Modern modal with search, group filters, product list, detail panel, quantity selector, and add-to-cart
+- Supports both quick-add (double-click or + button) and detailed add with custom quantity
+- Modal stays open for adding multiple products, then closes with Esc or Close button
