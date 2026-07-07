@@ -569,30 +569,8 @@ export default function POSPage() {
             ))}
           </div>
 
-          {/* Quick Nav */}
-          <div className="flex items-center gap-1 flex-shrink-0">
-            <button onClick={() => setView("pos")} className={cn("h-8 px-2.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition", view === "pos" ? "bg-white/20" : "hover:bg-white/10")}>
-              <Home className="h-3.5 w-3.5" /> POS
-            </button>
-            <button onClick={() => setView("stock")} className={cn("h-8 px-2.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition", view === "stock" ? "bg-white/20" : "hover:bg-white/10")}>
-              <Boxes className="h-3.5 w-3.5" /> Stock
-            </button>
-            <button onClick={() => setView("purchase")} className={cn("h-8 px-2.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition", view === "purchase" ? "bg-white/20" : "hover:bg-white/10")}>
-              <Truck className="h-3.5 w-3.5" /> Purchase
-            </button>
-            <button onClick={() => setView("telephone")} className={cn("h-8 px-2.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition", view === "telephone" ? "bg-white/20" : "hover:bg-white/10")}>
-              <Phone className="h-3.5 w-3.5" /> Telephone
-            </button>
-            <button onClick={() => setView("reports")} className={cn("h-8 px-2.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition", view === "reports" ? "bg-white/20" : "hover:bg-white/10")}>
-              <FileBarChart className="h-3.5 w-3.5" /> Reports
-            </button>
-            <button onClick={() => setView("maintenance")} className={cn("h-8 px-2.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition", view === "maintenance" ? "bg-white/20" : "hover:bg-white/10")}>
-              <Settings2 className="h-3.5 w-3.5" /> Maintain
-            </button>
-          </div>
-
           {/* Search */}
-          <div className="flex-1 max-w-md relative">
+          <div className="flex-1 max-w-xl relative">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
               <input
