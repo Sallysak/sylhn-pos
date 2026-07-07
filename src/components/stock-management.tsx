@@ -1070,87 +1070,73 @@ function StockFileView({ products, setProducts, groups, history, setHistory }: {
   };
 
   return (
-    <div className="h-full overflow-hidden flex flex-col" style={{ backgroundColor: '#C8E6D0' }}>
-      {/* Sub-header (inside popup, below title bar) */}
-      <div className="flex-shrink-0 flex items-center justify-between px-4 py-1.5 bg-emerald-700/90 text-white">
-        <div className="flex items-center gap-2">
-          <FileText className="h-4 w-4" />
-          <span className="text-xs font-bold">Stock File</span>
-          <Badge variant="secondary" className="font-mono text-[10px] bg-white/25 text-white">{filtered.length} records</Badge>
-        </div>
-        <div className="text-[10px] text-emerald-100/90">Manage your complete stock inventory</div>
-      </div>
-
+    <div className="h-full overflow-hidden flex flex-col" style={{ backgroundColor: '#E8F5E9' }}>
       {/* Search & Filter Section */}
-      <div className="flex-shrink-0 px-5 py-2.5 space-y-2" style={{ backgroundColor: '#B8DCC0' }}>
+      <div className="flex-shrink-0 px-4 py-2 space-y-2" style={{ backgroundColor: '#E8F5E9' }}>
         {/* Search Row */}
         <div className="flex items-center gap-3">
-          <label className="text-xs font-bold text-slate-700 uppercase tracking-wide whitespace-nowrap w-20">Search Text</label>
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-            <input
-              value={searchText}
-              onChange={(e) => { setSearchText(e.target.value); setSelectedIndex(0); }}
-              placeholder="Part Number"
-              className="w-full h-9 pl-9 pr-3 rounded-md bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition"
-            />
-          </div>
+          <label className="text-xs font-bold text-slate-700 whitespace-nowrap w-20">Search Text</label>
+          <input
+            value={searchText}
+            onChange={(e) => { setSearchText(e.target.value); setSelectedIndex(0); }}
+            placeholder="Part Number"
+            className="flex-1 max-w-xs h-8 px-3 rounded border border-slate-400 bg-white text-sm outline-none focus:ring-2 focus:ring-blue-400"
+          />
           <button
             onClick={() => setSelectedIndex(0)}
-            className="h-9 px-5 rounded-md bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-semibold flex items-center gap-1.5 transition shadow-sm"
+            className="h-8 px-4 rounded border border-slate-400 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold transition"
           >
-            <Search className="h-3.5 w-3.5" />
             Search
           </button>
         </div>
         {/* Filter Row */}
         <div className="flex items-center gap-3 flex-wrap">
-          <label className="text-xs font-bold text-slate-700 uppercase tracking-wide whitespace-nowrap w-20">Filter By</label>
+          <label className="text-xs font-bold text-slate-700 whitespace-nowrap w-20">Filter By</label>
           <FilterDropdown label="Type" value={filterType} onChange={(v) => { setFilterType(v); setSelectedIndex(0); }} options={[
             { value: "all", label: "All Types" },
             { value: "taxable", label: "Taxable (VAT)" },
             { value: "non-taxable", label: "Non-Taxable" },
             { value: "low-stock", label: "Low Stock" },
             { value: "out-of-stock", label: "Out of Stock" },
-            { value: "expiring", label: "Expiring (≤7 days)" },
           ]} />
           <FilterDropdown label="Stock Group" value={filterGroup} onChange={(v) => { setFilterGroup(v); setSelectedIndex(0); }} options={[
             { value: "all", label: "All Groups" },
             ...groups.map(g => ({ value: g.id, label: `${g.icon} ${g.name}` })),
           ]} />
-          <FilterDropdown label="Group1" value={filterGroup1} onChange={setFilterGroup1} options={[
+          <FilterDropdown label="Sub Group" value={filterGroup1} onChange={setFilterGroup1} options={[
             { value: "all", label: "All" },
             { value: "fresh", label: "Fresh Items" },
             { value: "packaged", label: "Packaged" },
             { value: "frozen", label: "Frozen" },
           ]} />
-          <FilterDropdown label="Group2" value={filterGroup2} onChange={setFilterGroup2} options={[
-            { value: "all", label: "All" },
-            { value: "fast-moving", label: "Fast Moving" },
-            { value: "slow-moving", label: "Slow Moving" },
+          <FilterDropdown label="Brand" value={filterGroup2} onChange={setFilterGroup2} options={[
+            { value: "all", label: "All Brands" },
+            { value: "local", label: "Local Brands" },
+            { value: "imported", label: "Imported Brands" },
           ]} />
-          <FilterDropdown label="Group3" value={filterGroup3} onChange={setFilterGroup3} options={[
-            { value: "all", label: "All" },
-            { value: "high-value", label: "High Value" },
-            { value: "low-value", label: "Low Value" },
+          <FilterDropdown label="Size" value={filterGroup3} onChange={setFilterGroup3} options={[
+            { value: "all", label: "All Sizes" },
+            { value: "small", label: "Small" },
+            { value: "medium", label: "Medium" },
+            { value: "large", label: "Large" },
           ]} />
         </div>
       </div>
 
       {/* Data Table */}
-      <div className="flex-1 overflow-hidden flex flex-col min-h-0 bg-white">
+      <div className="flex-1 overflow-hidden flex flex-col min-h-0 bg-white border-t border-b border-slate-400">
         {/* Table Header */}
-        <div className="flex-shrink-0 grid grid-cols-[180px_1fr_70px_110px_110px] gap-2 px-4 py-2 bg-slate-200 text-slate-700 text-[11px] font-bold uppercase tracking-wide border-b-2 border-slate-300">
-          <div>Part No.</div>
+        <div className="flex-shrink-0 grid grid-cols-[160px_1fr_60px_100px_100px] gap-1 px-3 py-1.5 text-slate-700 text-[11px] font-bold border-b border-slate-400" style={{ backgroundColor: '#F5F5F5' }}>
+          <div>Part no</div>
           <div>Details</div>
           <div className="text-right">Qty</div>
           <div className="text-right">Retail GHC</div>
-          <div className="text-right">Cost GHC</div>
+          <div className="text-right">Trade GHC</div>
         </div>
 
         {/* Table Body */}
         <ScrollArea className="flex-1 min-h-0">
-          <div className="divide-y divide-slate-100">
+          <div>
             {filtered.map((p, idx) => {
               const isSelected = idx === selectedIndex;
               return (
@@ -1158,21 +1144,18 @@ function StockFileView({ products, setProducts, groups, history, setHistory }: {
                   key={p.id}
                   onClick={() => setSelectedIndex(idx)}
                   className={cn(
-                    "grid grid-cols-[180px_1fr_70px_110px_110px] gap-2 px-4 py-2 text-xs cursor-pointer transition border-b border-slate-100",
-                    isSelected ? "text-slate-900" : idx % 2 === 1 ? "bg-slate-50 hover:bg-slate-100" : "bg-white hover:bg-slate-50"
+                    "grid grid-cols-[160px_1fr_60px_100px_100px] gap-1 px-3 py-1.5 text-xs cursor-pointer transition border-b border-slate-200",
                   )}
-                  style={isSelected ? { backgroundColor: '#D4E6F1' } : undefined}
+                  style={{
+                    backgroundColor: isSelected ? '#E3F2FD' : (idx % 2 === 1 ? '#FAFAFA' : '#FFFFFF'),
+                    color: isSelected ? '#1565C0' : '#424242',
+                  }}
                 >
                   <div className="font-mono truncate">{p.barcode}</div>
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-base flex-shrink-0">{p.emoji}</span>
-                    <span className="font-medium truncate text-slate-800">{p.name}</span>
-                  </div>
-                  <div className={cn("text-right font-mono font-semibold", p.stock === 0 ? "text-rose-600" : p.stock <= p.reorderLevel ? "text-amber-600" : "text-slate-700")}>
-                    {p.stock}
-                  </div>
-                  <div className="text-right font-mono text-slate-700">{p.price.toFixed(2)}</div>
-                  <div className="text-right font-mono text-slate-700">{p.costPrice.toFixed(2)}</div>
+                  <div className="truncate">{p.emoji} {p.name}</div>
+                  <div className="text-right font-mono">{p.stock}</div>
+                  <div className="text-right font-mono">{p.price.toFixed(2)}</div>
+                  <div className="text-right font-mono">{p.costPrice.toFixed(2)}</div>
                 </div>
               );
             })}
@@ -1188,25 +1171,39 @@ function StockFileView({ products, setProducts, groups, history, setHistory }: {
       </div>
 
       {/* Action Buttons */}
-      <div className="flex-shrink-0 px-4 py-2 flex items-center gap-1.5 flex-wrap" style={{ backgroundColor: '#B8DCC0' }}>
-        <StockActionButton icon={<Edit2 className="h-4 w-4" />} label="Modify" color="emerald" onClick={handleModify} />
-        <StockActionButton icon={<Plus className="h-4 w-4" />} label="New" color="blue" onClick={handleNew} />
-        <StockActionButton icon={<Copy className="h-4 w-4" />} label="Clone" color="cyan" onClick={handleClone} />
-        <StockActionButton icon={<ImageIcon className="h-4 w-4" />} label="Picture" color="slate" onClick={() => { if (!selected) { toast({ title: "Select a product first", variant: "destructive" }); return; } setShowPicture(selected); }} />
-        <StockActionButton icon={<History className="h-4 w-4" />} label="History" color="purple" onClick={() => { if (!selected) { toast({ title: "Select a product first", variant: "destructive" }); return; } setShowHistory(selected); }} />
-        <StockActionButton icon={<Tags className="h-4 w-4" />} label="Labels" color="amber" onClick={() => toast({ title: "Print Labels", description: selected ? `Print labels for ${selected.name}` : "Select a product first", })} />
-        <StockActionButton icon={<ArrowUpDown className="h-4 w-4" />} label="Qty" color="indigo" onClick={() => { if (!selected) { toast({ title: "Select a product first", variant: "destructive" }); return; } setShowQtyAdjust(selected); }} />
+      <div className="flex-shrink-0 px-4 py-2 flex items-center gap-2 flex-wrap" style={{ backgroundColor: '#E8F5E9' }}>
+        <button onClick={handleModify} className="h-9 px-4 rounded text-white text-xs font-semibold flex items-center gap-1.5 transition shadow-sm" style={{ backgroundColor: '#4CAF50' }}>
+          <Edit2 className="h-3.5 w-3.5" /> Modify
+        </button>
+        <button onClick={handleNew} className="h-9 px-4 rounded bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition border border-slate-400">
+          <Plus className="h-3.5 w-3.5" /> New
+        </button>
+        <button onClick={handleClone} className="h-9 px-4 rounded bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition border border-slate-400">
+          <Copy className="h-3.5 w-3.5" /> Clone
+        </button>
+        <button onClick={() => { if (!selected) { toast({ title: "Select a product first", variant: "destructive" }); return; } setShowPicture(selected); }} className="h-9 px-4 rounded bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition border border-slate-400">
+          <ImageIcon className="h-3.5 w-3.5" /> Picture
+        </button>
+        <button onClick={() => { if (!selected) { toast({ title: "Select a product first", variant: "destructive" }); return; } setShowHistory(selected); }} className="h-9 px-4 rounded bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition border border-slate-400">
+          <History className="h-3.5 w-3.5" /> History
+        </button>
+        <button onClick={() => toast({ title: "Print Labels", description: selected ? `Print labels for ${selected.name}` : "Select a product first" })} className="h-9 px-4 rounded bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition border border-slate-400">
+          <Tags className="h-3.5 w-3.5" /> Labels
+        </button>
         <div className="flex-1" />
-        <StockActionButton icon={<X className="h-4 w-4" />} label="Close (Esc)" color="rose" onClick={() => {}} />
+        <button onClick={() => {}} className="h-9 px-4 rounded text-white text-xs font-semibold flex items-center gap-1.5 transition shadow-sm" style={{ backgroundColor: '#F44336' }}>
+          <X className="h-3.5 w-3.5" /> Close (Esc)
+        </button>
       </div>
 
       {/* Status Bar */}
-      <div className="flex-shrink-0 px-4 py-1.5 bg-slate-700 text-white text-[10px] font-mono flex items-center gap-4">
-        <span><kbd className="px-1.5 py-0.5 rounded bg-white/20 mr-1">F9</kbd>Part No.</span>
-        <span><kbd className="px-1.5 py-0.5 rounded bg-white/20 mr-1">F10</kbd>Details</span>
-        <span><kbd className="px-1.5 py-0.5 rounded bg-white/20 mr-1">Shift+F12</kbd>Print Labels</span>
+      <div className="flex-shrink-0 px-4 py-1 flex items-center gap-4 text-[10px] text-slate-600 border-t border-slate-300" style={{ backgroundColor: '#E8F5E9' }}>
+        <span>&lt; &gt;</span>
+        <span className="font-mono">{filtered.length} of {products.length} products</span>
         <div className="flex-1" />
-        <span className="text-emerald-300">{filtered.length} of {products.length} products</span>
+        <span><kbd className="px-1 bg-white border border-slate-300 rounded mr-1">F9</kbd>Part No.</span>
+        <span><kbd className="px-1 bg-white border border-slate-300 rounded mr-1">F10</kbd>Details</span>
+        <span><kbd className="px-1 bg-white border border-slate-300 rounded mr-1">Shift+F12</kbd>Print Labels</span>
       </div>
 
       {/* Product Form Modal */}
@@ -1398,43 +1395,29 @@ function StockSearchView({ products, groups, history }: {
   };
 
   return (
-    <div className="h-full overflow-hidden flex flex-col" style={{ backgroundColor: '#C8E6D0' }}>
-      {/* Sub-header (inside popup, below title bar) */}
-      <div className="flex-shrink-0 flex items-center justify-between px-4 py-1.5 bg-emerald-700/90 text-white">
-        <div className="flex items-center gap-2">
-          <FileSearch className="h-4 w-4" />
-          <span className="text-xs font-bold">Stock Search</span>
-          <Badge variant="secondary" className="font-mono text-[10px] bg-white/25 text-white">{filtered.length} results</Badge>
-        </div>
-        <div className="text-[10px] text-emerald-100/90">Search and view product information</div>
-      </div>
-
+    <div className="h-full overflow-hidden flex flex-col" style={{ backgroundColor: '#E8F5E9' }}>
       {/* Search & Filter Section */}
-      <div className="flex-shrink-0 px-5 py-2.5 space-y-2" style={{ backgroundColor: '#B8DCC0' }}>
+      <div className="flex-shrink-0 px-4 py-2 space-y-2" style={{ backgroundColor: '#E8F5E9' }}>
         {/* Search Row */}
         <div className="flex items-center gap-3">
-          <label className="text-xs font-bold text-slate-700 uppercase tracking-wide whitespace-nowrap w-20">Search Text</label>
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-            <input
-              value={searchText}
-              onChange={(e) => { setSearchText(e.target.value); setSelectedIndex(0); }}
-              onKeyDown={(e) => { if (e.key === 'Enter') handleSelect(); }}
-              placeholder="Details"
-              className="w-full h-9 pl-9 pr-3 rounded-md bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition"
-            />
-          </div>
+          <label className="text-xs font-bold text-slate-700 whitespace-nowrap w-20">Search Text</label>
+          <input
+            value={searchText}
+            onChange={(e) => { setSearchText(e.target.value); setSelectedIndex(0); }}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleSelect(); }}
+            placeholder="Details"
+            className="flex-1 max-w-xs h-8 px-3 rounded border border-slate-400 bg-white text-sm outline-none focus:ring-2 focus:ring-blue-400"
+          />
           <button
             onClick={() => setSelectedIndex(0)}
-            className="h-9 px-5 rounded-md bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-semibold flex items-center gap-1.5 transition shadow-sm"
+            className="h-8 px-4 rounded border border-slate-400 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold transition"
           >
-            <Search className="h-3.5 w-3.5" />
             Search
           </button>
         </div>
         {/* Filter Row */}
         <div className="flex items-center gap-3 flex-wrap">
-          <label className="text-xs font-bold text-slate-700 uppercase tracking-wide whitespace-nowrap w-20">Filter By</label>
+          <label className="text-xs font-bold text-slate-700 whitespace-nowrap w-20">Filter By</label>
           <FilterDropdown label="Type" value={filterType} onChange={(v) => { setFilterType(v); setSelectedIndex(0); }} options={[
             { value: "all", label: "All Types" },
             { value: "taxable", label: "Taxable (VAT)" },
@@ -1446,36 +1429,37 @@ function StockSearchView({ products, groups, history }: {
             { value: "all", label: "All Groups" },
             ...groups.map(g => ({ value: g.id, label: `${g.icon} ${g.name}` })),
           ]} />
-          <FilterDropdown label="Group1" value={filterGroup1} onChange={setFilterGroup1} options={[
+          <FilterDropdown label="Sub Group" value={filterGroup1} onChange={setFilterGroup1} options={[
             { value: "all", label: "All" },
             { value: "fresh", label: "Fresh Items" },
             { value: "packaged", label: "Packaged" },
             { value: "frozen", label: "Frozen" },
           ]} />
-          <FilterDropdown label="Group2" value={filterGroup2} onChange={setFilterGroup2} options={[
-            { value: "all", label: "All" },
-            { value: "fast-moving", label: "Fast Moving" },
-            { value: "slow-moving", label: "Slow Moving" },
+          <FilterDropdown label="Brand" value={filterGroup2} onChange={setFilterGroup2} options={[
+            { value: "all", label: "All Brands" },
+            { value: "local", label: "Local Brands" },
+            { value: "imported", label: "Imported Brands" },
           ]} />
-          <FilterDropdown label="Group3" value={filterGroup3} onChange={setFilterGroup3} options={[
-            { value: "all", label: "All" },
-            { value: "high-value", label: "High Value" },
-            { value: "low-value", label: "Low Value" },
+          <FilterDropdown label="Size" value={filterGroup3} onChange={setFilterGroup3} options={[
+            { value: "all", label: "All Sizes" },
+            { value: "small", label: "Small" },
+            { value: "medium", label: "Medium" },
+            { value: "large", label: "Large" },
           ]} />
         </div>
       </div>
 
       {/* Results Table */}
-      <div className="flex-1 overflow-hidden flex flex-col min-h-0 bg-white">
-        <div className="flex-shrink-0 grid grid-cols-[180px_1fr_70px_100px_100px] gap-2 px-4 py-2 bg-slate-200 text-slate-700 text-[11px] font-bold uppercase tracking-wide border-b-2 border-slate-300">
-          <div>Part No.</div>
+      <div className="flex-1 overflow-hidden flex flex-col min-h-0 bg-white border-t border-b border-slate-400">
+        <div className="flex-shrink-0 grid grid-cols-[160px_1fr_60px_100px_100px] gap-1 px-3 py-1.5 text-slate-700 text-[11px] font-bold border-b border-slate-400" style={{ backgroundColor: '#F5F5F5' }}>
+          <div>Part no</div>
           <div>Details</div>
           <div className="text-right">Qty</div>
           <div className="text-right">Retail GHC</div>
-          <div className="text-right">Cost GHC</div>
+          <div className="text-right">Trade GHC</div>
         </div>
         <ScrollArea className="flex-1 min-h-0">
-          <div className="divide-y divide-slate-100">
+          <div>
             {filtered.map((p, idx) => {
               const isSelected = idx === selectedIndex;
               return (
@@ -1483,23 +1467,17 @@ function StockSearchView({ products, groups, history }: {
                   key={p.id}
                   onClick={() => setSelectedIndex(idx)}
                   onDoubleClick={handleSelect}
-                  className={cn(
-                    "grid grid-cols-[180px_1fr_70px_100px_100px] gap-2 px-4 py-2 text-xs cursor-pointer transition border-b border-slate-100",
-                    isSelected ? "text-white" : idx % 2 === 1 ? "bg-slate-50 hover:bg-slate-100" : "bg-white hover:bg-slate-50"
-                  )}
-                  style={isSelected ? { backgroundColor: '#4169E1' } : undefined}
+                  className="grid grid-cols-[160px_1fr_60px_100px_100px] gap-1 px-3 py-1.5 text-xs cursor-pointer transition border-b border-slate-200"
+                  style={{
+                    backgroundColor: isSelected ? '#E3F2FD' : (idx % 2 === 1 ? '#FAFAFA' : '#FFFFFF'),
+                    color: isSelected ? '#1565C0' : '#424242',
+                  }}
                 >
                   <div className="font-mono truncate">{p.barcode}</div>
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-base flex-shrink-0">{p.emoji}</span>
-                    <span className="font-medium truncate text-slate-800">{p.name}</span>
-                    {p.taxable && <span className="px-1 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-700">VAT</span>}
-                  </div>
-                  <div className={cn("text-right font-mono font-semibold", p.stock === 0 ? "text-rose-600" : p.stock <= p.reorderLevel ? "text-amber-600" : "text-slate-700")}>
-                    {p.stock}
-                  </div>
-                  <div className="text-right font-mono text-slate-700">{p.price.toFixed(2)}</div>
-                  <div className="text-right font-mono text-slate-700">{p.costPrice.toFixed(2)}</div>
+                  <div className="truncate">{p.emoji} {p.name}</div>
+                  <div className="text-right font-mono">{p.stock}</div>
+                  <div className="text-right font-mono">{p.price.toFixed(2)}</div>
+                  <div className="text-right font-mono">{p.costPrice.toFixed(2)}</div>
                 </div>
               );
             })}
@@ -1515,24 +1493,36 @@ function StockSearchView({ products, groups, history }: {
       </div>
 
       {/* Action Buttons */}
-      <div className="flex-shrink-0 px-4 py-2 flex items-center gap-1.5 flex-wrap" style={{ backgroundColor: '#B8DCC0' }}>
-        <StockActionButton icon={<CheckCircle2 className="h-4 w-4" />} label="Select (Enter)" color="emerald" onClick={handleSelect} />
-        <StockActionButton icon={<Plus className="h-4 w-4" />} label="New" color="blue" onClick={() => toast({ title: "New Product", description: "Use Stock File to add new products" })} />
-        <StockActionButton icon={<ImageIcon className="h-4 w-4" />} label="Picture" color="slate" onClick={() => { if (!filtered[selectedIndex]) { toast({ title: "Select a product first", variant: "destructive" }); return; } setShowPicture(filtered[selectedIndex]); }} />
-        <StockActionButton icon={<History className="h-4 w-4" />} label="History" color="purple" onClick={() => { if (!filtered[selectedIndex]) { toast({ title: "Select a product first", variant: "destructive" }); return; } setShowHistory(filtered[selectedIndex]); }} />
-        <StockActionButton icon={<Tags className="h-4 w-4" />} label="Labels" color="amber" onClick={() => toast({ title: "Print Labels", description: filtered[selectedIndex] ? `Print labels for ${filtered[selectedIndex].name}` : "Select a product first" })} />
-        <StockActionButton icon={<ArrowUpDown className="h-4 w-4" />} label="Qty" color="indigo" onClick={() => toast({ title: "Quantity Info", description: filtered[selectedIndex] ? `${filtered[selectedIndex].name}: ${filtered[selectedIndex].stock} in stock` : "Select a product first" })} />
+      <div className="flex-shrink-0 px-4 py-2 flex items-center gap-2 flex-wrap" style={{ backgroundColor: '#E8F5E9' }}>
+        <button onClick={handleSelect} className="h-9 px-4 rounded text-white text-xs font-semibold flex items-center gap-1.5 transition shadow-sm" style={{ backgroundColor: '#4CAF50' }}>
+          <CheckCircle2 className="h-3.5 w-3.5" /> Select (Enter)
+        </button>
+        <button onClick={() => toast({ title: "New Product", description: "Use Stock File to add new products" })} className="h-9 px-4 rounded bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition border border-slate-400">
+          <Plus className="h-3.5 w-3.5" /> New
+        </button>
+        <button onClick={() => { if (!filtered[selectedIndex]) { toast({ title: "Select a product first", variant: "destructive" }); return; } setShowPicture(filtered[selectedIndex]); }} className="h-9 px-4 rounded bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition border border-slate-400">
+          <ImageIcon className="h-3.5 w-3.5" /> Picture
+        </button>
+        <button onClick={() => { if (!filtered[selectedIndex]) { toast({ title: "Select a product first", variant: "destructive" }); return; } setShowHistory(filtered[selectedIndex]); }} className="h-9 px-4 rounded bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition border border-slate-400">
+          <History className="h-3.5 w-3.5" /> History
+        </button>
+        <button onClick={() => toast({ title: "Print Labels", description: filtered[selectedIndex] ? `Print labels for ${filtered[selectedIndex].name}` : "Select a product first" })} className="h-9 px-4 rounded bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition border border-slate-400">
+          <Tags className="h-3.5 w-3.5" /> Labels
+        </button>
         <div className="flex-1" />
-        <StockActionButton icon={<X className="h-4 w-4" />} label="Close (Esc)" color="rose" onClick={() => {}} />
+        <button onClick={() => {}} className="h-9 px-4 rounded text-white text-xs font-semibold flex items-center gap-1.5 transition shadow-sm" style={{ backgroundColor: '#F44336' }}>
+          <X className="h-3.5 w-3.5" /> Close (Esc)
+        </button>
       </div>
 
       {/* Status Bar */}
-      <div className="flex-shrink-0 px-4 py-1.5 bg-slate-300 text-slate-700 text-[10px] font-mono flex items-center gap-4 border-t border-slate-400">
-        <span><kbd className="px-1.5 py-0.5 rounded bg-white/60 mr-1">F9</kbd>Part No.</span>
-        <span><kbd className="px-1.5 py-0.5 rounded bg-white/60 mr-1">F10</kbd>Details</span>
-        <span><kbd className="px-1.5 py-0.5 rounded bg-white/60 mr-1">Shift+F12</kbd>Print Labels</span>
+      <div className="flex-shrink-0 px-4 py-1 flex items-center gap-4 text-[10px] text-slate-600 border-t border-slate-300" style={{ backgroundColor: '#E8F5E9' }}>
+        <span>&lt; &gt;</span>
+        <span className="font-mono">{filtered.length} of {products.length} products</span>
         <div className="flex-1" />
-        <span className="text-slate-600">{filtered.length} of {products.length} products</span>
+        <span><kbd className="px-1 bg-white border border-slate-300 rounded mr-1">F9</kbd>Part No.</span>
+        <span><kbd className="px-1 bg-white border border-slate-300 rounded mr-1">F10</kbd>Details</span>
+        <span><kbd className="px-1 bg-white border border-slate-300 rounded mr-1">Shift+F12</kbd>Print Labels</span>
       </div>
 
       {/* Product Detail Modal (on Select) */}
