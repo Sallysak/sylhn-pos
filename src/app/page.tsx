@@ -1437,7 +1437,7 @@ function FindProductModal({ products, onAdd, onClose }: {
                   const justAdded = recentlyAdded === product.id;
                   const lowStock = product.stock <= product.reorderLevel;
                   return (
-                    <motion.button
+                    <motion.div
                       key={product.id}
                       layout
                       initial={{ opacity: 0 }}
@@ -1445,8 +1445,16 @@ function FindProductModal({ products, onAdd, onClose }: {
                       transition={{ duration: 0.15, delay: Math.min(idx * 0.01, 0.2) }}
                       onClick={() => selectProduct(product.id)}
                       onDoubleClick={() => handleQuickAdd(product)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          selectProduct(product.id);
+                        }
+                      }}
                       className={cn(
-                        "w-full flex items-center gap-3 px-4 py-2.5 text-left transition",
+                        "w-full flex items-center gap-3 px-4 py-2.5 text-left transition cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-blue-400",
                         isSelected ? "ring-2 ring-blue-400 ring-inset" : "hover:bg-slate-50"
                       )}
                     >
@@ -1484,7 +1492,7 @@ function FindProductModal({ products, onAdd, onClose }: {
                       >
                         {justAdded ? <Check className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
                       </button>
-                    </motion.button>
+                    </motion.div>
                   );
                 })}
               </div>
