@@ -34,6 +34,7 @@ import { PurchaseModule } from "@/components/purchase-module";
 import { TelephoneModule } from "@/components/telephone-module";
 import { MaintenanceModule } from "@/components/maintenance-module";
 import { SoldItemsReport } from "@/components/sold-items-report";
+import { PurchaseForm } from "@/components/purchase-form";
 
 export default function POSPage() {
   // ===== Top-level View State =====
@@ -442,6 +443,7 @@ export default function POSPage() {
       id: "purchase",
       label: "Purchase",
       items: [
+        { label: "Purchase Form", icon: FileText, action: () => setView("purchase-form") },
         { label: "Purchase Orders", icon: Archive, action: () => setView("purchase") },
         { label: "Receive Stock", icon: Package, action: () => setView("purchase") },
         { label: "Suppliers", icon: Users, action: () => setView("purchase") },
@@ -505,6 +507,9 @@ export default function POSPage() {
   }
   if (view === "purchase") {
     return <PurchaseModule onBack={() => setView("pos")} products={products} />;
+  }
+  if (view === "purchase-form") {
+    return <PurchaseForm onBack={() => setView("pos")} products={products} groups={groups} suppliers={groups.map(g => ({ id: g.id, name: g.name }))} />;
   }
   if (view === "telephone") {
     return <TelephoneModule onBack={() => setView("pos")} products={products} />;

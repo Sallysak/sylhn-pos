@@ -29,7 +29,7 @@ export interface PaymentResult {
   customer?: string;
 }
 
-export type ViewMode = "pos" | "stock" | "reports" | "purchase" | "telephone" | "maintenance" | "sold-items";
+export type ViewMode = "pos" | "stock" | "reports" | "purchase" | "purchase-form" | "telephone" | "maintenance" | "sold-items";
 
 export type StockView = "add-modify" | "group-maintenance" | "quantity-adjustment" | "history" | "stock-file" | "stock-search";
 
