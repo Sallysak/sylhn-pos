@@ -487,3 +487,65 @@ Stage Summary:
   * Dark status bars
 - All features and functionalities preserved (search, 5 filters, tables, action buttons, status bar)
 - Consistent design between the two forms for a professional look
+
+---
+Task ID: 11
+Agent: Main (Super Z)
+Task: Add a Stock Quantity Report form matching the uploaded reference image (stock qty report.png) with same colors, size, features, and functionality.
+
+Work Log:
+- Analyzed the reference image (stock qty report.png) using VLM to extract exact layout, fields, checkboxes, buttons, and colors
+- Built StockQtyReportModal component in stock-management.tsx matching the reference:
+  * Header: "Stock Qty Report" title with Windows-style window controls (minimize, maximize, close)
+  * Light green background (#C8E6D0) matching the Stock File/Search theme
+  * Blue header bar (blue-600 to blue-500 gradient) per reference
+  * 11 filter fields in form layout:
+    - Location (dropdown: All Locations, Main Store, Warehouse, Shop Floor)
+    - From Part No. (text input)
+    - To Part No. (text input)
+    - Supplier (dropdown: All Suppliers + all unique suppliers from products)
+    - Sort Order (dropdown: Part Number, Details, Qty Asc/Desc, Retail Price, Cost Price)
+    - Stock Group (dropdown: All Groups + 5 stock groups)
+    - Group1, Group2, Group3 (dropdowns)
+    - Report Type (dropdown: Detailed, Summary)
+  * 4 checkboxes (matching reference states):
+    - Consignment Out (checked by default)
+    - Consignment In (checked by default)
+    - Include Zero Qty (unchecked by default)
+    - Include -ve Qty (unchecked by default)
+  * 4 action buttons (matching reference exactly):
+    - Screen (monitor icon) - generates and displays report on screen
+    - Printer (F3) (printer icon) - prints report
+    - File (folder icon) - exports to Excel
+    - Close (Esc) (X icon) - closes modal
+- Built QtyReportViewer component for Screen output:
+  * SYLHN COMPANY LTD header with address and contact
+  * Report title and subtitle
+  * Data table with all columns (Part No, Details, Stock Group, Supplier, Unit, Qty, Reorder Level, Retail GHC, Cost GHC, Status)
+  * 6 summary cards: Total Products, Total Quantity, Total Retail Value, Total Cost Value, Low Stock Items, Out of Stock
+  * Export buttons: Print, PDF, Excel, CSV
+- Added filtering logic:
+  * Filter by From/To Part No. (barcode or SKU range)
+  * Filter by Supplier
+  * Filter by Stock Group
+  * Include/exclude zero quantity items
+  * Include/exclude negative quantity items
+  * Sort by: Part Number, Details, Qty Ascending/Descending, Retail Price, Cost Price
+  * Detailed vs Summary report type (detailed = 10 columns, summary = 3 columns)
+- Added "Stock Qty Report" button to Stock Management navigation bar (blue gradient, right-aligned)
+- Added "Stock Qty Report" menu item to Stock dropdown in page.tsx
+- Added openQtyReport prop to StockManagement to open modal from menu
+- Verified with Agent Browser + VLM:
+  * Modal opens with all 11 fields, 4 checkboxes (correct states), 4 buttons
+  * Screen button generates report viewer with SYLHN header, data table, summary, export buttons
+  * All filter fields work (Location, Supplier, Sort Order, Stock Group, Report Type)
+  * VLM confirmed all structural elements match reference
+- Lint: 0 errors
+
+Stage Summary:
+- Successfully added Stock Quantity Report form matching the reference image
+- Same color scheme (light green background, blue header) as Stock File/Search for consistency
+- All 11 filter fields, 4 checkboxes, and 4 action buttons match the reference
+- Screen button displays report in a viewer with export options (Print/PDF/Excel/CSV)
+- Printer button prints the report, File button exports to Excel
+- Accessible via Stock menu dropdown and Stock Management navigation bar

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Package, Plus, Edit2, Trash2, Search, Layers, Settings2, History,
@@ -8,6 +8,7 @@ import {
   Filter, ChevronRight, Calendar, User, Tag, DollarSign, Barcode,
   ArrowUpDown, ArrowUp, ArrowDown, RotateCcw,
   FileText, Copy, Image as ImageIcon, Tags, FileSearch, FolderTree, SlidersHorizontal,
+  Monitor, Printer, Folder, FileBarChart,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,7 +20,8 @@ import {
   COMPANY, CURRENCY, formatGHS, stockGroups, products as ALL_PRODUCTS,
   initialStockHistory, type Product, type StockGroup, type StockHistoryEntry,
 } from "@/lib/pos-data";
-import type { StockView } from "@/lib/pos-types";
+import { generateReport, exportReportToPDF, exportReportToExcel, exportReportToCSV, printReport } from "@/lib/report-utils";
+import type { StockView, ReportData } from "@/lib/pos-types";
 
 interface StockManagementProps {
   onBack: () => void;
@@ -30,11 +32,21 @@ interface StockManagementProps {
   history: StockHistoryEntry[];
   setHistory: React.Dispatch<React.SetStateAction<StockHistoryEntry[]>>;
   initialView?: StockView;
+  openQtyReport?: boolean;
 }
 
-export function StockManagement({ onBack, products, setProducts, groups, setGroups, history, setHistory, initialView }: StockManagementProps) {
+export function StockManagement({ onBack, products, setProducts, groups, setGroups, history, setHistory, initialView, openQtyReport }: StockManagementProps) {
   const [view, setView] = useState<StockView>(initialView || "stock-file");
+  const [showQtyReport, setShowQtyReport] = useState(false);
   const { toast } = useToast();
+
+  // Open Qty Report modal on mount if requested via menu.
+  // This is a legitimate use: the parent passes a prop to request the modal open.
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (openQtyReport) setShowQtyReport(true);
+  }, [openQtyReport]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   return (
     <div className="h-screen flex flex-col bg-gradient-to-br from-slate-50 to-emerald-50/30">
@@ -87,6 +99,14 @@ export function StockManagement({ onBack, products, setProducts, groups, setGrou
               {tab.label}
             </button>
           ))}
+          <div className="flex-1" />
+          <button
+            onClick={() => setShowQtyReport(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md hover:from-blue-700 hover:to-indigo-700"
+          >
+            <FileBarChart className="h-4 w-4" />
+            Stock Qty Report
+          </button>
         </div>
       </nav>
 
@@ -110,6 +130,13 @@ export function StockManagement({ onBack, products, setProducts, groups, setGrou
           </motion.div>
         </AnimatePresence>
       </main>
+
+      {/* Stock Qty Report Modal */}
+      <AnimatePresence>
+        {showQtyReport && (
+          <StockQtyReportModal products={products} groups={groups} onClose={() => setShowQtyReport(false)} />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -1906,6 +1933,462 @@ function ProductHistoryModal({ product, history, onClose }: {
 
         <div className="px-5 py-3 border-t border-slate-200 bg-slate-50 flex justify-end">
           <Button variant="outline" onClick={onClose}>Close</Button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ===== Stock Quantity Report Modal =====
+export function StockQtyReportModal({ products, groups, onClose }: {
+  products: Product[];
+  groups: StockGroup[];
+  onClose: () => void;
+}) {
+  const { toast } = useToast();
+  const [location, setLocation] = useState("all");
+  const [fromPartNo, setFromPartNo] = useState("");
+  const [toPartNo, setToPartNo] = useState("");
+  const [supplier, setSupplier] = useState("all");
+  const [sortOrder, setSortOrder] = useState("part-number");
+  const [stockGroup, setStockGroup] = useState("all");
+  const [group1, setGroup1] = useState("all");
+  const [group2, setGroup2] = useState("all");
+  const [group3, setGroup3] = useState("all");
+  const [reportType, setReportType] = useState("detailed");
+  const [consignmentOut, setConsignmentOut] = useState(true);
+  const [consignmentIn, setConsignmentIn] = useState(true);
+  const [includeZeroQty, setIncludeZeroQty] = useState(false);
+  const [includeNegativeQty, setIncludeNegativeQty] = useState(false);
+  const [generatedReport, setGeneratedReport] = useState<ReportData | null>(null);
+
+  // Get unique suppliers from products
+  const suppliers = Array.from(new Set(products.map(p => p.supplier)));
+
+  // Filter products based on form criteria
+  const getFilteredProducts = (): Product[] => {
+    let result = products;
+    if (fromPartNo.trim()) {
+      result = result.filter(p => p.barcode >= fromPartNo || p.sku.toLowerCase() >= fromPartNo.toLowerCase());
+    }
+    if (toPartNo.trim()) {
+      result = result.filter(p => p.barcode <= toPartNo || p.sku.toLowerCase() <= toPartNo.toLowerCase());
+    }
+    if (supplier !== "all") {
+      result = result.filter(p => p.supplier === supplier);
+    }
+    if (stockGroup !== "all") {
+      result = result.filter(p => p.groupId === stockGroup);
+    }
+    if (!includeZeroQty) {
+      result = result.filter(p => p.stock !== 0);
+    }
+    if (!includeNegativeQty) {
+      result = result.filter(p => p.stock >= 0);
+    }
+    // Sort
+    if (sortOrder === "part-number") {
+      result = [...result].sort((a, b) => a.barcode.localeCompare(b.barcode));
+    } else if (sortOrder === "details") {
+      result = [...result].sort((a, b) => a.name.localeCompare(b.name));
+    } else if (sortOrder === "qty-ascending") {
+      result = [...result].sort((a, b) => a.stock - b.stock);
+    } else if (sortOrder === "qty-descending") {
+      result = [...result].sort((a, b) => b.stock - a.stock);
+    } else if (sortOrder === "retail-price") {
+      result = [...result].sort((a, b) => a.price - b.price);
+    } else if (sortOrder === "cost-price") {
+      result = [...result].sort((a, b) => a.costPrice - b.costPrice);
+    }
+    return result;
+  };
+
+  // Generate the report data based on filters
+  const buildReport = (): ReportData => {
+    const filtered = getFilteredProducts();
+    const isSummary = reportType === "summary";
+    return {
+      type: "stock-qty-report",
+      title: "Stock Quantity Report",
+      subtitle: `${reportType === "detailed" ? "Detailed" : "Summary"} report · ${filtered.length} products · ${new Date().toLocaleDateString('en-GB')}`,
+      columns: isSummary ? [
+        { key: "sku", label: "Part No." },
+        { key: "name", label: "Details" },
+        { key: "qty", label: "Qty", align: "right" as const },
+      ] : [
+        { key: "sku", label: "Part No." },
+        { key: "name", label: "Details" },
+        { key: "group", label: "Stock Group" },
+        { key: "supplier", label: "Supplier" },
+        { key: "unit", label: "Unit", align: "center" as const },
+        { key: "qty", label: "Qty", align: "right" as const },
+        { key: "reorderLevel", label: "Reorder Level", align: "right" as const },
+        { key: "retail", label: "Retail GHC", align: "right" as const },
+        { key: "cost", label: "Cost GHC", align: "right" as const },
+        { key: "status", label: "Status", align: "center" as const },
+      ],
+      rows: filtered.map(p => isSummary ? {
+        sku: p.barcode, name: `${p.emoji} ${p.name}`, qty: p.stock,
+      } : {
+        sku: p.barcode,
+        name: `${p.emoji} ${p.name}`,
+        group: groups.find(g => g.id === p.groupId)?.name || "-",
+        supplier: p.supplier,
+        unit: p.unit,
+        qty: p.stock,
+        reorderLevel: p.reorderLevel,
+        retail: p.price.toFixed(2),
+        cost: p.costPrice.toFixed(2),
+        status: p.stock === 0 ? "OUT OF STOCK" : p.stock <= p.reorderLevel ? "LOW STOCK" : "OK",
+      }),
+      summary: [
+        { label: "Total Products", value: String(filtered.length) },
+        { label: "Total Quantity", value: String(filtered.reduce((s, p) => s + p.stock, 0)) },
+        { label: "Total Retail Value", value: formatGHS(filtered.reduce((s, p) => s + p.price * p.stock, 0)) },
+        { label: "Total Cost Value", value: formatGHS(filtered.reduce((s, p) => s + p.costPrice * p.stock, 0)) },
+        { label: "Low Stock Items", value: String(filtered.filter(p => p.stock > 0 && p.stock <= p.reorderLevel).length) },
+        { label: "Out of Stock", value: String(filtered.filter(p => p.stock === 0).length) },
+      ],
+    };
+  };
+
+  const handleScreen = () => {
+    const report = buildReport();
+    setGeneratedReport(report);
+    toast({ title: "Report generated", description: `${report.rows.length} records on screen` });
+  };
+
+  const handlePrinter = () => {
+    const report = buildReport();
+    printReport(report);
+    toast({ title: "Printing report (F3)", description: `${report.rows.length} records` });
+  };
+
+  const handleFile = () => {
+    const report = buildReport();
+    // Export to Excel by default
+    exportReportToExcel(report);
+    toast({ title: "Report exported", description: "Saved as Excel file" });
+  };
+
+  return (
+    <>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        onClick={onClose}
+      >
+        <motion.div
+          initial={{ scale: 0.95, y: 20 }}
+          animate={{ scale: 1, y: 0 }}
+          exit={{ scale: 0.95, y: 20 }}
+          transition={{ type: "spring", damping: 25, stiffness: 300 }}
+          onClick={(e) => e.stopPropagation()}
+          className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[92vh] overflow-hidden flex flex-col"
+          style={{ backgroundColor: '#C8E6D0' }}
+        >
+          {/* Header - Windows-style title bar */}
+          <div className="flex-shrink-0 flex items-center justify-between px-4 py-2.5 bg-gradient-to-r from-blue-600 to-blue-500 text-white">
+            <div className="flex items-center gap-2">
+              <FileBarChart className="h-5 w-5" />
+              <h3 className="font-bold text-base">Stock Qty Report</h3>
+            </div>
+            <div className="flex items-center gap-1">
+              <button className="h-6 w-6 rounded bg-white/15 hover:bg-white/25 flex items-center justify-center text-xs">─</button>
+              <button className="h-6 w-6 rounded bg-white/15 hover:bg-white/25 flex items-center justify-center text-xs">□</button>
+              <button onClick={onClose} className="h-6 w-6 rounded bg-white/15 hover:bg-rose-500 flex items-center justify-center transition">
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Form Content */}
+          <div className="flex-1 overflow-y-auto p-6" style={{ backgroundColor: '#C8E6D0' }}>
+            <div className="bg-white/40 rounded-lg p-5 ring-1 ring-emerald-200/50 space-y-3">
+              {/* Location */}
+              <FormRow label="Location">
+                <select value={location} onChange={(e) => setLocation(e.target.value)} className="qty-form-input">
+                  <option value="all">All Locations</option>
+                  <option value="main-store">Main Store</option>
+                  <option value="warehouse">Warehouse</option>
+                  <option value="shop-floor">Shop Floor</option>
+                </select>
+              </FormRow>
+
+              {/* From / To Part No. */}
+              <div className="grid grid-cols-2 gap-4">
+                <FormRow label="From Part No.">
+                  <input value={fromPartNo} onChange={(e) => setFromPartNo(e.target.value)} placeholder="e.g. 941563812092" className="qty-form-input" />
+                </FormRow>
+                <FormRow label="To Part No.">
+                  <input value={toPartNo} onChange={(e) => setToPartNo(e.target.value)} placeholder="e.g. 941563812181" className="qty-form-input" />
+                </FormRow>
+              </div>
+
+              {/* Supplier */}
+              <FormRow label="Supplier">
+                <select value={supplier} onChange={(e) => setSupplier(e.target.value)} className="qty-form-input">
+                  <option value="all">All Suppliers</option>
+                  {suppliers.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </FormRow>
+
+              {/* Sort Order */}
+              <FormRow label="Sort Order">
+                <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} className="qty-form-input">
+                  <option value="part-number">Part Number</option>
+                  <option value="details">Details (Name)</option>
+                  <option value="qty-ascending">Quantity (Ascending)</option>
+                  <option value="qty-descending">Quantity (Descending)</option>
+                  <option value="retail-price">Retail Price</option>
+                  <option value="cost-price">Cost Price</option>
+                </select>
+              </FormRow>
+
+              {/* Stock Group */}
+              <FormRow label="Stock Group">
+                <select value={stockGroup} onChange={(e) => setStockGroup(e.target.value)} className="qty-form-input">
+                  <option value="all">All Groups</option>
+                  {groups.map(g => <option key={g.id} value={g.id}>{g.icon} {g.name}</option>)}
+                </select>
+              </FormRow>
+
+              {/* Group 1 / 2 / 3 */}
+              <div className="grid grid-cols-3 gap-3">
+                <FormRow label="Group1">
+                  <select value={group1} onChange={(e) => setGroup1(e.target.value)} className="qty-form-input">
+                    <option value="all">All</option>
+                    <option value="fresh">Fresh Items</option>
+                    <option value="packaged">Packaged</option>
+                    <option value="frozen">Frozen</option>
+                  </select>
+                </FormRow>
+                <FormRow label="Group2">
+                  <select value={group2} onChange={(e) => setGroup2(e.target.value)} className="qty-form-input">
+                    <option value="all">All</option>
+                    <option value="fast-moving">Fast Moving</option>
+                    <option value="slow-moving">Slow Moving</option>
+                  </select>
+                </FormRow>
+                <FormRow label="Group3">
+                  <select value={group3} onChange={(e) => setGroup3(e.target.value)} className="qty-form-input">
+                    <option value="all">All</option>
+                    <option value="high-value">High Value</option>
+                    <option value="low-value">Low Value</option>
+                  </select>
+                </FormRow>
+              </div>
+
+              {/* Report Type */}
+              <FormRow label="Report Type">
+                <select value={reportType} onChange={(e) => setReportType(e.target.value)} className="qty-form-input">
+                  <option value="detailed">Detailed</option>
+                  <option value="summary">Summary</option>
+                </select>
+              </FormRow>
+
+              {/* Checkboxes */}
+              <div className="grid grid-cols-2 gap-3 pt-2 border-t border-emerald-200/50 mt-3">
+                <CheckboxRow label="Consignment Out" checked={consignmentOut} onChange={setConsignmentOut} />
+                <CheckboxRow label="Consignment In" checked={consignmentIn} onChange={setConsignmentIn} />
+                <CheckboxRow label="Include Zero Qty" checked={includeZeroQty} onChange={setIncludeZeroQty} />
+                <CheckboxRow label="Include -ve Qty" checked={includeNegativeQty} onChange={setIncludeNegativeQty} />
+              </div>
+            </div>
+          </div>
+
+          {/* Button Bar */}
+          <div className="flex-shrink-0 px-6 py-3 flex items-center justify-center gap-3 border-t border-emerald-300/50" style={{ backgroundColor: '#B8DCC0' }}>
+            <QtyActionButton icon={<Monitor className="h-5 w-5" />} label="Screen" color="blue" onClick={handleScreen} />
+            <QtyActionButton icon={<Printer className="h-5 w-5" />} label="Printer" sub="F3" color="blue" onClick={handlePrinter} />
+            <QtyActionButton icon={<Folder className="h-5 w-5" />} label="File" color="blue" onClick={handleFile} />
+            <QtyActionButton icon={<X className="h-5 w-5" />} label="Close" sub="Esc" color="rose" onClick={onClose} />
+          </div>
+        </motion.div>
+      </motion.div>
+
+      {/* Generated Report Viewer */}
+      <AnimatePresence>
+        {generatedReport && (
+          <QtyReportViewer report={generatedReport} onClose={() => setGeneratedReport(null)} />
+        )}
+      </AnimatePresence>
+
+      <style jsx>{`
+        :global(.qty-form-input) {
+          width: 100%;
+          height: 2.25rem;
+          padding: 0 0.625rem;
+          border-radius: 0.375rem;
+          border: 1px solid rgb(148 163 184);
+          background: white;
+          font-size: 0.8125rem;
+          color: rgb(30 41 59);
+          outline: none;
+          transition: all 0.15s;
+        }
+        :global(.qty-form-input:focus) {
+          border-color: rgb(37 99 235);
+          box-shadow: 0 0 0 2px rgb(37 99 235 / 0.2);
+        }
+      `}</style>
+    </>
+  );
+}
+
+// ===== Helper: Form Row =====
+function FormRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-3">
+      <label className="text-xs font-semibold text-slate-700 w-28 flex-shrink-0 text-right">{label}:</label>
+      <div className="flex-1">{children}</div>
+    </div>
+  );
+}
+
+// ===== Helper: Checkbox Row =====
+function CheckboxRow({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-slate-700">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="h-4 w-4 rounded border-slate-400 accent-blue-600"
+      />
+      {label}
+    </label>
+  );
+}
+
+// ===== Helper: Qty Action Button =====
+function QtyActionButton({ icon, label, sub, color, onClick }: {
+  icon: React.ReactNode;
+  label: string;
+  sub?: string;
+  color: "blue" | "rose";
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "flex flex-col items-center gap-1 px-6 py-2.5 rounded-lg bg-white border-2 transition shadow-sm hover:shadow-md",
+        color === "blue" ? "border-blue-300 text-blue-700 hover:bg-blue-50 hover:border-blue-500" : "border-rose-300 text-rose-700 hover:bg-rose-50 hover:border-rose-500"
+      )}
+    >
+      {icon}
+      <span className="text-xs font-bold flex items-center gap-1">
+        {label}
+        {sub && <kbd className="text-[9px] font-mono bg-slate-100 px-1 rounded">{sub}</kbd>}
+      </span>
+    </button>
+  );
+}
+
+// ===== Qty Report Viewer (Screen output) =====
+function QtyReportViewer({ report, onClose }: { report: ReportData; onClose: () => void }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[60] flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.95, y: 20 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.95, y: 20 }}
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[92vh] overflow-hidden flex flex-col"
+      >
+        {/* Company Header */}
+        <div className="flex-shrink-0 px-6 py-3 bg-gradient-to-r from-emerald-700 to-emerald-600 text-white flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-lg bg-white/15 flex items-center justify-center font-bold text-lg">S</div>
+            <div>
+              <div className="font-bold text-base">{COMPANY.name}</div>
+              <div className="text-xs text-emerald-100/90">{COMPANY.address} · {COMPANY.contact}</div>
+            </div>
+          </div>
+          <button onClick={onClose} className="h-8 w-8 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Report Title */}
+        <div className="flex-shrink-0 px-6 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+          <div>
+            <div className="font-bold text-slate-800">{report.title}</div>
+            <div className="text-xs text-slate-500">{report.subtitle}</div>
+          </div>
+          <Badge variant="secondary" className="bg-emerald-100 text-emerald-700">{report.rows.length} records</Badge>
+        </div>
+
+        {/* Table */}
+        <ScrollArea className="flex-1 min-h-0">
+          <table className="w-full text-xs">
+            <thead className="sticky top-0 bg-slate-700 text-white text-[10px] uppercase tracking-wide z-10">
+              <tr>
+                {report.columns.map(col => (
+                  <th key={col.key} className={cn("px-3 py-2 font-bold", col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left")}>
+                    {col.label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {report.rows.map((row, i) => (
+                <tr key={i} className={cn("hover:bg-emerald-50/50", i % 2 === 1 && "bg-slate-50")}>
+                  {report.columns.map(col => {
+                    const val = row[col.key];
+                    const display = col.format ? col.format(val, row) : (val ?? "");
+                    return (
+                      <td key={col.key} className={cn("px-3 py-1.5", col.align === "right" ? "text-right font-mono" : col.align === "center" ? "text-center" : "text-left")}>
+                        {display}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </ScrollArea>
+
+        {/* Summary */}
+        <div className="flex-shrink-0 px-6 py-3 bg-gradient-to-r from-emerald-50 to-teal-50 border-t border-emerald-200">
+          <div className="grid grid-cols-6 gap-2">
+            {report.summary.map((s, i) => (
+              <div key={i} className="bg-white rounded-lg px-2.5 py-1.5 ring-1 ring-emerald-100 text-center">
+                <div className="text-[9px] text-slate-500 uppercase">{s.label}</div>
+                <div className="text-xs font-bold text-emerald-700 font-mono">{s.value}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Export Buttons */}
+        <div className="flex-shrink-0 px-6 py-2.5 bg-white border-t border-slate-200 flex items-center gap-2">
+          <span className="text-xs font-semibold text-slate-500 uppercase mr-2">Export:</span>
+          <button onClick={() => printReport(report)} className="h-8 px-3 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1.5">
+            <Printer className="h-3.5 w-3.5" /> Print
+          </button>
+          <button onClick={() => exportReportToPDF(report)} className="h-8 px-3 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-700 text-xs font-semibold flex items-center gap-1.5">
+            <FileText className="h-3.5 w-3.5" /> PDF
+          </button>
+          <button onClick={() => exportReportToExcel(report)} className="h-8 px-3 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-700 text-xs font-semibold flex items-center gap-1.5">
+            <Folder className="h-3.5 w-3.5" /> Excel
+          </button>
+          <button onClick={() => exportReportToCSV(report)} className="h-8 px-3 rounded-lg bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs font-semibold flex items-center gap-1.5">
+            <FileText className="h-3.5 w-3.5" /> CSV
+          </button>
+          <div className="flex-1" />
+          <button onClick={onClose} className="h-8 px-4 rounded-lg bg-slate-700 hover:bg-slate-800 text-white text-xs font-semibold">
+            Close
+          </button>
         </div>
       </motion.div>
     </motion.div>
