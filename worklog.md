@@ -584,3 +584,62 @@ Stage Summary:
 - Stock Search status bar is now light gray (matching reference)
 - Both forms maintain same window size, resolution, features, and functionality as the reference images
 - All action buttons, search fields, filters, and status bar text preserved
+
+---
+Task ID: 13
+Agent: Main (Super Z)
+Task: Change Stock File and Stock Search forms to be resizable popup windows with Windows-style title bars (minimize/maximize/close buttons), running in popup view.
+
+Work Log:
+- Created reusable PopupWindow component (/src/components/popup-window.tsx):
+  * Windows-style title bar with title text and 3 control buttons: Minimize (─), Maximize (□), Close (X)
+  * Drag-to-move: click and drag title bar to reposition window
+  * Resize: drag bottom-right corner handle to resize window (min 500x350)
+  * Maximize: fills entire viewport, button changes to "Restore Down"
+  * Minimize: collapses to a small bar at bottom-right with Restore and Close buttons
+  * Double-click title bar to toggle maximize/restore
+  * Configurable: title, titleBarColor, initialWidth/Height, initialX/Y, minWidth/Height
+  * Centers on screen by default
+  * Blue title bar (#5B9BD5) matching Windows application style
+- Updated StockManagement component:
+  * Added showStockFilePopup and showStockSearchPopup states
+  * Changed Stock File and Stock Search tabs to open popup windows instead of switching views
+  * Default view changed to "add-modify" when stock-file/stock-search requested (popup opens on top)
+  * Initial view prop triggers popup open on mount (from menu navigation)
+  * Both popups render via AnimatePresence with the PopupWindow wrapper
+- Updated StockFileView container:
+  * Removed outer rounded card styling (now fills popup window)
+  * Replaced large header with compact sub-header bar inside popup
+  * Light green background (#C8E6D0) preserved
+- Updated StockSearchView container:
+  * Same treatment as StockFileView
+  * Compact sub-header bar
+  * Light green background preserved
+- All features preserved inside popups:
+  * Stock File: search, 5 filters, 5-column table, 8 action buttons, status bar
+  * Stock Search: search, 5 filters, 5-column table, 7 action buttons, status bar
+  * All modals (Picture, History, Qty Adjust, Clone, Product Detail) still work
+- Verified with Agent Browser:
+  * Stock File popup opens with title bar, minimize/maximize/close buttons
+  * Maximize button works (fills screen, shows "Restore Down")
+  * Minimize button works (collapses to bottom bar with Restore/Close)
+  * Close button closes the popup
+  * Stock Search popup also works with same controls
+  * Table shows 5 columns, all action buttons present
+- VLM comparison confirmed all 6 criteria PASS:
+  ✅ Appears as popup/dialog (not fullscreen)
+  ✅ Title bar with minimize, maximize, close buttons
+  ✅ Title "Stock File"
+  ✅ Light green background
+  ✅ All sections present (search, filter, table, buttons, status bar)
+  ✅ Resizable (resize handle at bottom-right)
+- Lint: 0 errors
+
+Stage Summary:
+- Stock File and Stock Search now run as resizable popup windows
+- Windows-style title bar with minimize (─), maximize (□), close (X) buttons
+- Draggable by title bar, resizable via bottom-right corner handle
+- Maximize fills screen, minimize collapses to bottom bar
+- Double-click title bar toggles maximize/restore
+- All existing features and functionality preserved inside the popups
+- Accessible via Stock menu dropdown and Stock Management navigation tabs

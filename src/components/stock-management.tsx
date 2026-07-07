@@ -22,6 +22,7 @@ import {
 } from "@/lib/pos-data";
 import { generateReport, exportReportToPDF, exportReportToExcel, exportReportToCSV, printReport } from "@/lib/report-utils";
 import type { StockView, ReportData } from "@/lib/pos-types";
+import { PopupWindow } from "@/components/popup-window";
 
 interface StockManagementProps {
   onBack: () => void;
@@ -36,8 +37,10 @@ interface StockManagementProps {
 }
 
 export function StockManagement({ onBack, products, setProducts, groups, setGroups, history, setHistory, initialView, openQtyReport }: StockManagementProps) {
-  const [view, setView] = useState<StockView>(initialView || "stock-file");
+  const [view, setView] = useState<StockView>(initialView === "stock-file" || initialView === "stock-search" ? "add-modify" : (initialView || "add-modify"));
   const [showQtyReport, setShowQtyReport] = useState(false);
+  const [showStockFilePopup, setShowStockFilePopup] = useState(initialView === "stock-file");
+  const [showStockSearchPopup, setShowStockSearchPopup] = useState(initialView === "stock-search");
   const { toast } = useToast();
 
   // Open Qty Report modal on mount if requested via menu.
@@ -78,27 +81,35 @@ export function StockManagement({ onBack, products, setProducts, groups, setGrou
       <nav className="flex-shrink-0 bg-white border-b border-slate-200 shadow-sm">
         <div className="flex items-center gap-1 px-6 py-2">
           {[
-            { id: "stock-file" as const, label: "Stock File", icon: FileText },
-            { id: "stock-search" as const, label: "Stock Search", icon: FileSearch },
+            { id: "stock-file-popup" as const, label: "Stock File", icon: FileText },
+            { id: "stock-search-popup" as const, label: "Stock Search", icon: FileSearch },
             { id: "add-modify" as const, label: "Add / Modify Stock", icon: Plus },
             { id: "group-maintenance" as const, label: "Group Maintenance", icon: Layers },
             { id: "quantity-adjustment" as const, label: "Quantity Adjustment", icon: ArrowUpDown },
             { id: "history" as const, label: "Stock History", icon: History },
-          ].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setView(tab.id)}
-              className={cn(
-                "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all",
-                view === tab.id
-                  ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md"
-                  : "text-slate-600 hover:bg-slate-100"
-              )}
-            >
-              <tab.icon className="h-4 w-4" />
-              {tab.label}
-            </button>
-          ))}
+          ].map(tab => {
+            const isPopupTab = tab.id === "stock-file-popup" || tab.id === "stock-search-popup";
+            const isActivePopup = (tab.id === "stock-file-popup" && showStockFilePopup) || (tab.id === "stock-search-popup" && showStockSearchPopup);
+            return (
+              <button
+                key={tab.id}
+                onClick={() => {
+                  if (tab.id === "stock-file-popup") setShowStockFilePopup(true);
+                  else if (tab.id === "stock-search-popup") setShowStockSearchPopup(true);
+                  else setView(tab.id);
+                }}
+                className={cn(
+                  "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all",
+                  (!isPopupTab && view === tab.id) || isActivePopup
+                    ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md"
+                    : "text-slate-600 hover:bg-slate-100"
+                )}
+              >
+                <tab.icon className="h-4 w-4" />
+                {tab.label}
+              </button>
+            );
+          })}
           <div className="flex-1" />
           <button
             onClick={() => setShowQtyReport(true)}
@@ -121,8 +132,6 @@ export function StockManagement({ onBack, products, setProducts, groups, setGrou
             transition={{ duration: 0.2 }}
             className="h-full"
           >
-            {view === "stock-file" && <StockFileView products={products} setProducts={setProducts} groups={groups} history={history} setHistory={setHistory} />}
-            {view === "stock-search" && <StockSearchView products={products} groups={groups} history={history} />}
             {view === "add-modify" && <AddModifyStock products={products} setProducts={setProducts} groups={groups} setHistory={setHistory} />}
             {view === "group-maintenance" && <GroupMaintenance groups={groups} setGroups={setGroups} products={products} />}
             {view === "quantity-adjustment" && <QuantityAdjustment products={products} setProducts={setProducts} setHistory={setHistory} />}
@@ -135,6 +144,42 @@ export function StockManagement({ onBack, products, setProducts, groups, setGrou
       <AnimatePresence>
         {showQtyReport && (
           <StockQtyReportModal products={products} groups={groups} onClose={() => setShowQtyReport(false)} />
+        )}
+      </AnimatePresence>
+
+      {/* Stock File Popup Window */}
+      <AnimatePresence>
+        {showStockFilePopup && (
+          <PopupWindow
+            title="Stock File"
+            titleBarColor="#5B9BD5"
+            initialWidth={900}
+            initialHeight={620}
+            minWidth={600}
+            minHeight={400}
+            onClose={() => setShowStockFilePopup(false)}
+          >
+            <StockFileView products={products} setProducts={setProducts} groups={groups} history={history} setHistory={setHistory} />
+          </PopupWindow>
+        )}
+      </AnimatePresence>
+
+      {/* Stock Search Popup Window */}
+      <AnimatePresence>
+        {showStockSearchPopup && (
+          <PopupWindow
+            title="Stock Search"
+            titleBarColor="#5B9BD5"
+            initialWidth={900}
+            initialHeight={620}
+            minWidth={600}
+            minHeight={400}
+            initialX={80}
+            initialY={80}
+            onClose={() => setShowStockSearchPopup(false)}
+          >
+            <StockSearchView products={products} groups={groups} history={history} />
+          </PopupWindow>
         )}
       </AnimatePresence>
     </div>
@@ -1025,15 +1070,15 @@ function StockFileView({ products, setProducts, groups, history, setHistory }: {
   };
 
   return (
-    <div className="h-full rounded-2xl shadow-lg ring-1 ring-emerald-300/50 overflow-hidden flex flex-col" style={{ backgroundColor: '#C8E6D0' }}>
-      {/* Header */}
-      <div className="flex-shrink-0 flex items-center justify-between px-5 py-2.5 bg-gradient-to-r from-emerald-700 to-emerald-600 text-white">
+    <div className="h-full overflow-hidden flex flex-col" style={{ backgroundColor: '#C8E6D0' }}>
+      {/* Sub-header (inside popup, below title bar) */}
+      <div className="flex-shrink-0 flex items-center justify-between px-4 py-1.5 bg-emerald-700/90 text-white">
         <div className="flex items-center gap-2">
-          <FileText className="h-5 w-5" />
-          <h2 className="text-base font-bold">Stock File</h2>
-          <Badge variant="secondary" className="font-mono text-xs bg-white/25 text-white">{filtered.length} records</Badge>
+          <FileText className="h-4 w-4" />
+          <span className="text-xs font-bold">Stock File</span>
+          <Badge variant="secondary" className="font-mono text-[10px] bg-white/25 text-white">{filtered.length} records</Badge>
         </div>
-        <div className="text-xs text-emerald-100/90">Manage your complete stock inventory</div>
+        <div className="text-[10px] text-emerald-100/90">Manage your complete stock inventory</div>
       </div>
 
       {/* Search & Filter Section */}
@@ -1353,15 +1398,15 @@ function StockSearchView({ products, groups, history }: {
   };
 
   return (
-    <div className="h-full rounded-2xl shadow-lg ring-1 ring-emerald-300/50 overflow-hidden flex flex-col" style={{ backgroundColor: '#C8E6D0' }}>
-      {/* Header */}
-      <div className="flex-shrink-0 flex items-center justify-between px-5 py-2.5 bg-gradient-to-r from-emerald-700 to-emerald-600 text-white">
+    <div className="h-full overflow-hidden flex flex-col" style={{ backgroundColor: '#C8E6D0' }}>
+      {/* Sub-header (inside popup, below title bar) */}
+      <div className="flex-shrink-0 flex items-center justify-between px-4 py-1.5 bg-emerald-700/90 text-white">
         <div className="flex items-center gap-2">
-          <FileSearch className="h-5 w-5" />
-          <h2 className="text-base font-bold">Stock Search</h2>
-          <Badge variant="secondary" className="font-mono text-xs bg-white/25 text-white">{filtered.length} results</Badge>
+          <FileSearch className="h-4 w-4" />
+          <span className="text-xs font-bold">Stock Search</span>
+          <Badge variant="secondary" className="font-mono text-[10px] bg-white/25 text-white">{filtered.length} results</Badge>
         </div>
-        <div className="text-xs text-emerald-100/90">Search and view product information</div>
+        <div className="text-[10px] text-emerald-100/90">Search and view product information</div>
       </div>
 
       {/* Search & Filter Section */}
