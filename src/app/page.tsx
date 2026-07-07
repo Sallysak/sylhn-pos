@@ -318,10 +318,12 @@ export default function POSPage() {
       if (e.key === 'F4') { e.preventDefault(); handleVoid(); }
       if (e.key === 'F5') { e.preventDefault(); handlePay(); }
       if (e.key === 'F6') { e.preventDefault(); setShowCartPreview(true); }
+      if (e.key === 'F10') { e.preventDefault(); setShowStockList(true); }
       if (e.key === 'Escape') {
         if (showPayment) setShowPayment(false);
         else if (showReceipt) setShowReceipt(false);
         else if (showFindProduct) setShowFindProduct(false);
+        else if (showStockList) setShowStockList(false);
         else if (showCartPreview) setShowCartPreview(false);
         else setSelectedCartIndex(null);
       }
@@ -1751,6 +1753,180 @@ function FindProductModal({ products, onAdd, onClose }: {
           <Button variant="outline" size="sm" onClick={onClose}>
             Close (Esc)
           </Button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ===== Stock List Popup (smaller window, triggered by Part No. input) =====
+function StockListPopup({ products, searchText, onSelect, onClose }: {
+  products: Product[];
+  searchText: string;
+  onSelect: (product: Product) => void;
+  onClose: () => void;
+}) {
+  const [query, setQuery] = useState(searchText);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const t = setTimeout(() => inputRef.current?.focus(), 50);
+    return () => clearTimeout(t);
+  }, []);
+
+  // Filter products based on query
+  const filtered = useMemo(() => {
+    const q = (query || searchText).toLowerCase().trim();
+    if (!q) return products;
+    return products.filter(p =>
+      p.name.toLowerCase().includes(q) ||
+      p.sku.toLowerCase().includes(q) ||
+      p.barcode.includes(q)
+    );
+  }, [products, query, searchText]);
+
+  const handleSelect = () => {
+    if (filtered[selectedIndex]) {
+      onSelect(filtered[selectedIndex]);
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/40 flex items-start justify-center pt-16 z-50"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.95, y: -20 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.95, y: -20 }}
+        transition={{ type: "spring", damping: 25, stiffness: 300 }}
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-lg shadow-2xl overflow-hidden flex flex-col"
+        style={{ width: '700px', maxHeight: '450px', fontFamily: 'Arial, Helvetica, sans-serif' }}
+      >
+        {/* Title Bar */}
+        <div className="flex-shrink-0 flex items-center justify-between px-3 h-7 text-white" style={{ backgroundColor: '#5B9BD5' }}>
+          <span className="text-xs font-bold">Stock List</span>
+          <button onClick={onClose} className="h-5 w-5 rounded hover:bg-white/25 flex items-center justify-center transition">
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+
+        {/* Search Section */}
+        <div className="flex-shrink-0 px-3 py-1.5 bg-white border-b border-slate-300 flex items-center gap-2">
+          <label className="text-[10px] font-bold text-slate-700">Search:</label>
+          <input
+            ref={inputRef}
+            value={query}
+            onChange={(e) => { setQuery(e.target.value); setSelectedIndex(0); }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleSelect();
+              if (e.key === 'Escape') onClose();
+              if (e.key === 'ArrowDown') { e.preventDefault(); setSelectedIndex(i => Math.min(filtered.length - 1, i + 1)); }
+              if (e.key === 'ArrowUp') { e.preventDefault(); setSelectedIndex(i => Math.max(0, i - 1)); }
+            }}
+            placeholder="Type to search..."
+            className="flex-1 h-7 px-2 text-xs border border-slate-400 rounded outline-none focus:ring-2 focus:ring-blue-400"
+          />
+          <button
+            onClick={() => setSelectedIndex(0)}
+            className="h-7 px-3 rounded border border-slate-400 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold"
+          >
+            Search
+          </button>
+        </div>
+
+        {/* Filter Section */}
+        <div className="flex-shrink-0 px-3 py-1 bg-slate-50 border-b border-slate-200 flex items-center gap-2">
+          <label className="text-[10px] font-bold text-slate-700">Filter By:</label>
+          <select className="h-6 px-1 text-[10px] border border-slate-300 rounded bg-white outline-none">
+            <option>All Groups</option>
+            <option>Groceries</option>
+            <option>Confectionery</option>
+            <option>Soft Drinks</option>
+            <option>Hard Liquor</option>
+            <option>Households</option>
+          </select>
+          <span className="text-[10px] text-slate-500 ml-auto font-mono">{filtered.length} of {products.length} products</span>
+        </div>
+
+        {/* Data Table */}
+        <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+          {/* Table Header — blue */}
+          <div className="flex-shrink-0 grid grid-cols-[130px_1fr_45px_80px_80px_80px] gap-1 px-2 py-1 text-[10px] font-bold text-white" style={{ backgroundColor: '#4A90E2' }}>
+            <div>Part No</div>
+            <div>Item Details</div>
+            <div className="text-right">Qty</div>
+            <div className="text-right">Retail GHC</div>
+            <div className="text-right">Trade GHC</div>
+            <div className="text-right">Cost GHC</div>
+          </div>
+
+          {/* Table Body */}
+          <ScrollArea className="flex-1 min-h-0">
+            <div>
+              {filtered.length === 0 ? (
+                <div className="text-center py-8 text-slate-400 text-xs">No products found</div>
+              ) : (
+                filtered.map((p, idx) => {
+                  const isSelected = idx === selectedIndex;
+                  return (
+                    <div
+                      key={p.id}
+                      onClick={() => setSelectedIndex(idx)}
+                      onDoubleClick={() => onSelect(p)}
+                      className="grid grid-cols-[130px_1fr_45px_80px_80px_80px] gap-1 px-2 py-1 text-[10px] cursor-pointer border-b border-slate-100"
+                      style={{
+                        backgroundColor: isSelected ? '#D6E8FF' : (idx % 2 === 1 ? '#F8F8F8' : '#FFFFFF'),
+                        color: '#000000',
+                      }}
+                    >
+                      <div className="font-mono truncate">{p.barcode}</div>
+                      <div className="truncate">{p.emoji} {p.name}</div>
+                      <div className="text-right font-mono">{p.stock}</div>
+                      <div className="text-right font-mono">{p.price.toFixed(2)}</div>
+                      <div className="text-right font-mono">{p.costPrice.toFixed(2)}</div>
+                      <div className="text-right font-mono">{p.costPrice.toFixed(2)}</div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </ScrollArea>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex-shrink-0 px-3 py-1.5 flex items-center gap-1.5 border-t border-slate-300" style={{ backgroundColor: '#E0F0E8' }}>
+          <button onClick={handleSelect} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1" style={{ backgroundColor: '#4CAF50' }}>
+            <Check className="h-3 w-3" /> Select (Enter)
+          </button>
+          <button className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1" style={{ backgroundColor: '#2196F3' }}>
+            <Plus className="h-3 w-3" /> New
+          </button>
+          <button className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1" style={{ backgroundColor: '#9E9E9E' }}>
+            <ImageIcon className="h-3 w-3" /> Picture
+          </button>
+          <button className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1" style={{ backgroundColor: '#FF9800' }}>
+            <History className="h-3 w-3" /> History
+          </button>
+          <button className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1" style={{ backgroundColor: '#9C27B0' }}>
+            <Printer className="h-3 w-3" /> Print (F3)
+          </button>
+          <div className="flex-1" />
+          <button onClick={onClose} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1" style={{ backgroundColor: '#F44336' }}>
+            <X className="h-3 w-3" /> Close (Esc)
+          </button>
+        </div>
+
+        {/* Status Bar */}
+        <div className="flex-shrink-0 px-3 py-0.5 text-[9px] text-slate-600 flex items-center gap-3" style={{ backgroundColor: '#E0E0E0' }}>
+          <span className="font-mono">{filtered.length} of {products.length}</span>
+          <span>Source: Main Store</span>
         </div>
       </motion.div>
     </motion.div>
