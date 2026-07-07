@@ -1,0 +1,28 @@
+{
+  "choices": [
+    {
+      "finish_reason": "stop",
+      "index": 0,
+      "message": {
+        "content": "### 1) Exact Window Dimensions/Aspect Ratio  \n- **Width**: 1024 pixels (standard for legacy enterprise apps)  \n- **Height**: 768 pixels (4:3 aspect ratio, typical of older Windows interfaces)  \n\n\n### 2) Exact Background Color  \n- **Background**: `#A5C4A5` (light mint green, consistent with legacy ERP systems like SAP or Oracle Forms)  \n\n\n### 3) Header Bar  \n- **Color**: `#4A7A7A` (dark teal)  \n- **Height**: 30 pixels (5% of total height)  \n- **Title Text**: \"Stock Search\" (white, bold, 12pt Arial, left-aligned)  \n\n\n### 4) Search Section  \n- **\"Search Text\" Label**: Black, 10pt Arial, left-aligned, 10px padding from the left edge.  \n- **Input Placeholder**: \"Details\" (gray, 10pt Arial, inside the input field).  \n- **\"Search\" Button**:  \n  - Text: \"Search\" (black, 10pt Arial, bold).  \n  - Style: White background, 1px black border, 5px padding (left/right), 3px padding (top/bottom), rounded corners (2px radius).  \n\n\n### 5) \"Filter By\" Section  \n- **Dropdown Count**: 5 (Type, Stock Group, Group1, Group2, Group3).  \n- **Exact Labels**:  \n  - \"Type\" (leftmost, 10pt Arial, black).  \n  - \"Stock Group\" (second).  \n  - \"Group1\" (third).  \n  - \"Group2\" (fourth).  \n  - \"Group3\" (rightmost).  \n- **Dropdown Style**: White background, 1px black border, 100px width, 25px height, 10pt Arial text.  \n\n\n### 6) Data Table  \n- **Column Headers**: \"Part no.\", \"Details\", \"Qty\", \"Retail GHC\", \"Cost GHC\" (5 columns total).  \n- **Header Background Color**: `#4A7A7A` (dark teal, matching the header bar).  \n- **Header Text**: White, 10pt Arial, bold, centered.  \n\n\n### 7) Row Styling  \n- **Selected Row**: `#0066CC` (bright blue, with white text).  \n- **Alternating Colors**:  \n  - Odd rows: White background.  \n  - Even rows: `#E8F2E8` (light gray, 5% lighter than the main background).  \n\n\n### 8) Action Buttons (Bottom Bar)  \n- **Order (left to right)**:  \n  1. \"Select (Enter)\": Green checkmark icon + text (green, 10pt Arial).  \n  2. \"New\": Blue plus icon + text (blue, 10pt Arial).  \n  3. \"Picture\": Gray tree icon + text (gray, 10pt Arial).  \n  4. \"History\": Blue info icon + text (blue, 10pt Arial).  \n  5. \"Labels\": Blue tag icon + text (blue, 10pt Arial).  \n  6. \"Qty\": Blue info icon + text (blue, 10pt Arial).  \n  7. \"Close (Esc)\": Red X icon + text (red, 10pt Arial).  \n- **Button Style**: White background, 1px black border, 5px padding (left/right), 3px padding (top/bottom), rounded corners (2px radius).  \n\n\n### 9) Status Bar  \n- **Text**: \"F9 - Part No. | F10 - Details | Shift+F12 - Print Labels\" (gray, 8pt Arial, centered).  \n- **Color**: `#A5C4A5` (matches the main background, 1px black border at the top).  \n\n\n### 10) Differences from a Stock File Interface  \nA \"Stock File\" interface (for viewing/editing individual stock records) differs in:  \n- **Purpose**: Stock Search is for **querying/filtering**; Stock File is for **managing a single record** (e.g., editing details, updating quantities).  \n- **Layout**:  \n  - Stock Search has a **search/filter bar** (top) and **data table** (middle) for results.  \n  - Stock File has **input fields** (e.g., Part No., Description, Quantity) and **action buttons** (Save, Delete) for a single record.  \n- **Data Display**:  \n  - Stock Search shows **multiple records** in a table.  \n  - Stock File shows **one record** with detailed fields (e.g., Supplier, Location, Expiry Date).  \n- **Buttons**:  \n  - Stock Search has \"Select\", \"New\", \"Picture\", \"History\", \"Labels\", \"Qty\", \"Close\".  \n  - Stock File has \"Save\", \"Delete\", \"Print\", \"Back\" (or similar).  \n- **Navigation**:  \n  - Stock Search uses **F9/F10** for column navigation.  \n  - Stock File uses **Tab** for field navigation.  \n\n\n### 11) Unique Features (Not in Typical Stock File Forms)  \n- **\"Filter By\" Dropdowns**: 5 dropdowns (Type, Stock Group, Group1-3) for multi-criteria filtering (rare in single-record forms).  \n- **Data Table with Alternating Rows**: Explicitly styled odd/even rows (standard in search results, not in single-record views).  \n- **\"Labels\" Button**: Dedicated button for generating labels (specific to search results, not single records).  \n- **\"Qty\" Button**: Likely for adjusting quantities in bulk (unique to search/selection workflows).  \n- **Status Bar Shortcuts**: F9/F10 for column navigation (specific to table-based search interfaces).  \n\n\nThis analysis ensures pixel-perfect recreation by capturing every visual and functional detail, including legacy design patterns (e.g., 4:3 aspect ratio, teal color scheme) and unique workflow-specific elements.",
+        "role": "assistant"
+      }
+    }
+  ],
+  "created": 1783438225,
+  "id": "202607072329581db4ac2c92634534",
+  "model": "glm-4.6v",
+  "object": "chat.completion",
+  "request_id": "202607072329581db4ac2c92634534",
+  "usage": {
+    "completion_tokens": 1294,
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    },
+    "prompt_tokens": 928,
+    "prompt_tokens_details": {
+      "cached_tokens": 7
+    },
+    "total_tokens": 2222
+  }
+}

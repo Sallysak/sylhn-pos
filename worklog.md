@@ -549,3 +549,38 @@ Stage Summary:
 - Screen button displays report in a viewer with export options (Print/PDF/Excel/CSV)
 - Printer button prints the report, File button exports to Excel
 - Accessible via Stock menu dropdown and Stock Management navigation bar
+
+---
+Task ID: 12
+Agent: Main (Super Z)
+Task: Update Stock File and Stock Search forms to maintain same windows, resolution, features, and functionality as the attached reference images.
+
+Work Log:
+- Re-analyzed both reference images (stock file.png and stock search.png) using VLM for exact specifications
+- Identified key differences from current implementation:
+  * Stock File had 6 columns (included Expiry) but reference shows only 5 (Part No, Details, Qty, Retail GHC, Cost GHC)
+  * Stock Search selected row was light blue (#ADD8E6) but reference shows solid bright blue (#4169E1) with white text
+  * Stock Search status bar was dark (slate-700) but reference shows light gray (#D3D3D3)
+- Updated StockFileView:
+  * Removed Expiry column — now 5 columns: Part No, Details, Qty, Retail GHC, Cost GHC
+  * Updated grid layout from 6-col to 5-col: grid-cols-[180px_1fr_70px_110px_110px]
+  * Removed expiry date rendering from table rows
+  * Changed selected row color from #ADD8E6 to #D4E6F1 (light blue per reference)
+  * Widened Retail GHC and Cost GHC columns from 100px to 110px for better proportions
+- Updated StockSearchView:
+  * Changed selected row from light blue (#ADD8E6) to solid bright blue (#4169E1) per reference
+  * Added white text color for selected rows (text-white class)
+  * Updated status bar from dark (bg-slate-700 with white text) to light gray (bg-slate-300 with dark text)
+  * Updated kbd backgrounds from white/20 to white/60 for light bar
+  * Updated product count text from emerald-300 to slate-600
+- Verified with VLM comparison:
+  * Stock File: All 5 criteria PASS (5 columns, light blue selected row, light gray header, light green bg, 8 buttons)
+  * Stock Search: All 5 criteria PASS (5 columns, solid bright blue selected row, light gray status bar, light green bg, 7 buttons)
+- Lint: 0 errors
+
+Stage Summary:
+- Stock File now has exactly 5 columns matching reference (no Expiry column)
+- Stock Search now has solid bright blue selected row with white text (matching reference)
+- Stock Search status bar is now light gray (matching reference)
+- Both forms maintain same window size, resolution, features, and functionality as the reference images
+- All action buttons, search fields, filters, and status bar text preserved
