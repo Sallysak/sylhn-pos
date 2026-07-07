@@ -33,6 +33,7 @@ import { Reports } from "@/components/reports";
 import { PurchaseModule } from "@/components/purchase-module";
 import { TelephoneModule } from "@/components/telephone-module";
 import { MaintenanceModule } from "@/components/maintenance-module";
+import { SoldItemsReport } from "@/components/sold-items-report";
 
 export default function POSPage() {
   // ===== Top-level View State =====
@@ -409,6 +410,7 @@ export default function POSPage() {
         { label: "Void Transaction", icon: RotateCcw, action: handleVoid, shortcut: "F4" },
         { label: "Pay Now", icon: CreditCard, action: handlePay, shortcut: "F5" },
         { separator: true },
+        { label: "Sold Items Report", icon: FileBarChart, action: () => setView("sold-items") },
         { label: "Sales History", icon: History, action: () => toast({ title: "Sales History", description: "View past transactions" }) },
         { label: "Daily Sales Report", icon: TrendingUp, action: () => toast({ title: "Daily Sales", description: `Today's total: ${formatGHS(dailyTotal)} (${transactionCount} transactions)` }) },
       ],
@@ -424,7 +426,7 @@ export default function POSPage() {
         { label: "Quantity Adjustment", icon: ArrowUpDown, action: () => { setInitialStockView("quantity-adjustment"); setView("stock"); } },
         { label: "Stock History", icon: History, action: () => { setInitialStockView("history"); setView("stock"); } },
         { separator: true },
-        { label: "Stock Qty Report", icon: FileBarChart, action: () => { setOpenStockQtyReport(true); setInitialStockView("stock-file"); setView("stock"); } },
+        { label: "Stock Qty Report", icon: FileBarChart, action: () => { setOpenStockQtyReport(true); setInitialStockView("add-modify"); setView("stock"); } },
         { label: "Stock Reports", icon: FileBarChart, action: () => setView("reports") },
         { label: "Quantities Report", icon: FileText, action: () => setView("reports") },
         { label: "Stock Value Report", icon: BarChart3, action: () => setView("reports") },
@@ -505,6 +507,9 @@ export default function POSPage() {
   }
   if (view === "maintenance") {
     return <MaintenanceModule onBack={() => setView("pos")} cashier={cashier} dailyTotal={dailyTotal} transactionCount={transactionCount} />;
+  }
+  if (view === "sold-items") {
+    return <SoldItemsReport onBack={() => setView("pos")} />;
   }
 
   // ===== Render POS =====

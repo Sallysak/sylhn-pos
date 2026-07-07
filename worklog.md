@@ -787,3 +787,63 @@ Stage Summary:
   4. Edit, Add Supplier buttons work in Suppliers
   5. View button added to Suppliers showing actual products supplied
   6. Search works in Suppliers (by name/contact/email) and Purchase Orders (by supplier/PO)
+
+---
+Task ID: 16
+Agent: Main (Super Z)
+Task: Fix Stock File auto-opening when Stock Qty Report opens. Design and integrate Sold Items Report into Sale menu with same look, border, interface matching SOLD ITEM REPORT.png reference.
+
+Work Log:
+- Fixed Stock File auto-opening issue:
+  * Root cause: Stock menu's "Stock Qty Report" action set initialStockView to "stock-file", which triggered the StockManagement component to open the Stock File popup on mount
+  * Fix: Changed setInitialStockView("stock-file") to setInitialStockView("add-modify") so the Qty Report opens without triggering the Stock File popup
+  * Verified: Opening Stock Qty Report from menu no longer auto-opens Stock File popup
+- Analyzed SOLD ITEM REPORT.png using VLM for exact layout and design:
+  * Centered company header (name, Accra Warehouse, address)
+  * Blue title "Sold Items Report (Summary)"
+  * Period subtitle
+  * 4-column table: Part no, Details, Qty, Amount GHC
+  * Light blue table header (#E6F2FF)
+  * Items grouped by category (Confectionery, Groceries, Hard Liquor, etc.)
+  * Alternating row colors
+  * TOTAL row
+- Created /src/components/sold-items-report.tsx:
+  * Added "sold-items" to ViewMode type
+  * SoldItemsReport component with:
+    - Centered company header (SYLHN COMPANY LTD, Accra Warehouse, East Legon)
+    - Date/time/page number (right-aligned)
+    - Blue title "Sold Items Report (Summary)" (#0066CC)
+    - Period subtitle showing day name + date range
+    - 4-column table with light blue header, solid borders, alternating rows
+    - Items grouped by 6 categories: Confectionery, Groceries, Hard Liquor, Households, Ice Cream, Soft Drinks
+    - Each category has a bold header row followed by item rows
+    - TOTAL row with sum of qty and amount
+    - Date filter bar (From/To + Print/PDF/Excel)
+    - PDF export using jspdf + jspdf-autotable (verified 39KB file downloads)
+    - Excel export using xlsx (verified 22KB file downloads)
+  * 30 sample sold items spanning Jul 1-6, 2026
+- Added SoldItemsReport import and render block to page.tsx
+- Added "Sold Items Report" menu item to Sale dropdown
+- Verified with Agent Browser:
+  * Stock Qty Report opens without Stock File popup (FIXED)
+  * Sold Items Report accessible via Sale menu → "Sold Items Report"
+  * Report shows company header, blue title, 4-column table grouped by 6 categories
+  * TOTAL row present
+  * Date filter works (From/To)
+  * PDF export downloads 39KB .pdf file
+  * Excel export downloads 22KB .xlsx file
+  * No errors
+- VLM comparison confirmed: company header, blue title, period, 4 columns, light blue header, category grouping all match reference
+- Lint: 0 errors
+
+Stage Summary:
+- Fixed: Stock File no longer auto-opens when Stock Qty Report is opened
+- Created: Sold Items Report matching reference design with:
+  * Centered company header
+  * Blue "Sold Items Report (Summary)" title
+  * 4-column table (Part no, Details, Qty, Amount GHC) with solid borders
+  * Items grouped by 6 categories
+  * TOTAL row
+  * Date filter (From/To)
+  * Working PDF and Excel exports
+  * Accessible via Sale menu dropdown
