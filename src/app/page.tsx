@@ -1085,6 +1085,7 @@ export default function POSPage() {
               setShowStockList(false);
             }}
             onClose={() => setShowStockList(false)}
+            onNew={() => { setShowStockList(false); setShowFindProduct(true); }}
           />
         )}
       </AnimatePresence>
@@ -1760,12 +1761,14 @@ function FindProductModal({ products, onAdd, onClose }: {
 }
 
 // ===== Stock List Popup (smaller window, triggered by Part No. input) =====
-function StockListPopup({ products, searchText, onSelect, onClose }: {
+function StockListPopup({ products, searchText, onSelect, onClose, onNew }: {
   products: Product[];
   searchText: string;
   onSelect: (product: Product) => void;
   onClose: () => void;
+  onNew: () => void;
 }) {
+  const { toast } = useToast();
   const [query, setQuery] = useState(searchText);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -1905,16 +1908,16 @@ function StockListPopup({ products, searchText, onSelect, onClose }: {
           <button onClick={handleSelect} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1" style={{ backgroundColor: '#4CAF50' }}>
             <Check className="h-3 w-3" /> Select (Enter)
           </button>
-          <button className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1" style={{ backgroundColor: '#2196F3' }}>
+          <button onClick={onNew} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1" style={{ backgroundColor: '#2196F3' }}>
             <Plus className="h-3 w-3" /> New
           </button>
-          <button className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1" style={{ backgroundColor: '#9E9E9E' }}>
+          <button onClick={() => { if (!filtered[selectedIndex]) { toast({ title: "Select a product first", variant: "destructive" }); return; } toast({ title: "Product Picture", description: `${filtered[selectedIndex].emoji} ${filtered[selectedIndex].name}` }); }} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1" style={{ backgroundColor: '#9E9E9E' }}>
             <ImageIcon className="h-3 w-3" /> Picture
           </button>
-          <button className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1" style={{ backgroundColor: '#FF9800' }}>
+          <button onClick={() => { if (!filtered[selectedIndex]) { toast({ title: "Select a product first", variant: "destructive" }); return; } toast({ title: "Product History", description: `${filtered[selectedIndex].name} (${filtered[selectedIndex].sku})` }); }} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1" style={{ backgroundColor: '#FF9800' }}>
             <History className="h-3 w-3" /> History
           </button>
-          <button className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1" style={{ backgroundColor: '#9C27B0' }}>
+          <button onClick={() => { if (!filtered[selectedIndex]) { toast({ title: "Select a product first", variant: "destructive" }); return; } toast({ title: "Printing (F3)", description: `Printing label for ${filtered[selectedIndex].name}` }); }} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1" style={{ backgroundColor: '#9C27B0' }}>
             <Printer className="h-3 w-3" /> Print (F3)
           </button>
           <div className="flex-1" />
