@@ -8,7 +8,7 @@ import {
   ChevronRight, ScanLine, Pause, Play, RotateCcw, DollarSign, Receipt,
   ShoppingCart as Cart, Settings, Bell, LogOut, Menu as MenuIcon,
   TrendingUp, BarChart3, Tag, AlertCircle, CheckCircle2, ArrowLeft,
-  Zap, Store, Hash, Boxes, FileBarChart, ChevronDown, FileText,
+  Zap, Store, Hash, Boxes, FileBarChart, ChevronDown, FileText, Eye,
   Layers, ArrowUpDown, History, FileSpreadsheet, Home, Power,
   Phone, Truck, Users, Database, Wrench, Shield,
   FileBarChart2, BookOpen, PhoneCall, Archive, Settings2, Lock,
@@ -63,6 +63,7 @@ export default function POSPage() {
   const [activeKeypadMode, setActiveKeypadMode] = useState<"qty" | "price" | "barcode">("qty");
   const [showSidebar, setShowSidebar] = useState(true);
   const [showFindProduct, setShowFindProduct] = useState(false);
+  const [showCartPreview, setShowCartPreview] = useState(false);
 
   const { toast } = useToast();
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -307,10 +308,12 @@ export default function POSPage() {
       if (e.key === 'F3') { e.preventDefault(); handlePrint(); }
       if (e.key === 'F4') { e.preventDefault(); handleVoid(); }
       if (e.key === 'F5') { e.preventDefault(); handlePay(); }
+      if (e.key === 'F6') { e.preventDefault(); setShowCartPreview(true); }
       if (e.key === 'Escape') {
         if (showPayment) setShowPayment(false);
         else if (showReceipt) setShowReceipt(false);
         else if (showFindProduct) setShowFindProduct(false);
+        else if (showCartPreview) setShowCartPreview(false);
         else setSelectedCartIndex(null);
       }
     };
@@ -923,8 +926,16 @@ export default function POSPage() {
                   <FuncBtn icon={<Trash2 className="h-3.5 w-3.5" />} label="Delete Line" sub="Del" onClick={() => selectedCartIndex !== null ? removeLine(selectedCartIndex) : toast({ title: "Select a line first", variant: "destructive" })} variant="slate" />
                   <FuncBtn icon={<Check className="h-3.5 w-3.5" />} label="Enter" sub="↵" onClick={handleKeypadEnter} variant="emerald" />
                   <button
+                    onClick={() => setShowCartPreview(true)}
+                    className="col-span-1 h-11 rounded-lg bg-gradient-to-r from-violet-600 to-purple-600 text-white font-bold text-xs flex items-center justify-center gap-1 hover:from-violet-700 hover:to-purple-700 transition shadow-md hover:shadow-lg"
+                  >
+                    <Eye className="h-3.5 w-3.5" />
+                    PREVIEW
+                    <kbd className="ml-0.5 px-1 py-0.5 rounded bg-white/20 text-[9px] font-mono">F6</kbd>
+                  </button>
+                  <button
                     onClick={handlePay}
-                    className="col-span-2 h-11 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold text-sm flex items-center justify-center gap-2 hover:from-emerald-700 hover:to-teal-700 transition shadow-md hover:shadow-lg"
+                    className="col-span-3 h-11 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold text-sm flex items-center justify-center gap-2 hover:from-emerald-700 hover:to-teal-700 transition shadow-md hover:shadow-lg"
                   >
                     <CreditCard className="h-4 w-4" />
                     PAY NOW
@@ -1017,6 +1028,39 @@ export default function POSPage() {
             products={products}
             onAdd={(product) => { addToCart(product); }}
             onClose={() => setShowFindProduct(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ===== Cart Preview Modal ===== */}
+      <AnimatePresence>
+        {showCartPreview && (
+          <CartPreviewModal
+            cart={cart}
+            subtotal={subtotal}
+            discountAmount={discountAmount}
+            globalDiscount={globalDiscount}
+            taxAmount={taxAmount}
+            total={total}
+            totalItems={totalItems}
+            invoiceNumber={invoiceNumber || '------'}
+            customerName={customerName}
+            cashier={cashier}
+            onUpdateQuantity={setQuantity}
+            onRemoveLine={removeLine}
+            onApplyDiscount={applyDiscount}
+            onSetGlobalDiscount={(v) => setGlobalDiscount(Math.min(100, Math.max(0, v)))}
+            onClearDiscount={() => setGlobalDiscount(0)}
+            onClose={() => setShowCartPreview(false)}
+            onProceedToPayment={() => {
+              setShowCartPreview(false);
+              setShowPayment(true);
+            }}
+            onContinueShopping={() => setShowCartPreview(false)}
+            onClearCart={() => {
+              clearCart();
+              setShowCartPreview(false);
+            }}
           />
         )}
       </AnimatePresence>
@@ -1653,6 +1697,329 @@ function FindProductModal({ products, onAdd, onClose }: {
             Close (Esc)
           </Button>
         </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ===== Cart Preview Modal =====
+function CartPreviewModal({
+  cart, subtotal, discountAmount, globalDiscount, taxAmount, total, totalItems,
+  invoiceNumber, customerName, cashier,
+  onUpdateQuantity, onRemoveLine, onApplyDiscount, onSetGlobalDiscount, onClearDiscount,
+  onClose, onProceedToPayment, onContinueShopping, onClearCart,
+}: {
+  cart: CartItem[];
+  subtotal: number;
+  discountAmount: number;
+  globalDiscount: number;
+  taxAmount: number;
+  total: number;
+  totalItems: number;
+  invoiceNumber: string;
+  customerName: string;
+  cashier: string;
+  onUpdateQuantity: (index: number, qty: number) => void;
+  onRemoveLine: (index: number) => void;
+  onApplyDiscount: (index: number, discount: number) => void;
+  onSetGlobalDiscount: (value: number) => void;
+  onClearDiscount: () => void;
+  onClose: () => void;
+  onProceedToPayment: () => void;
+  onContinueShopping: () => void;
+  onClearCart: () => void;
+}) {
+  const [confirmClear, setConfirmClear] = useState(false);
+  const taxRatePercent = TAX_RATE * 100;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.95, y: 30 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.95, y: 30 }}
+        transition={{ type: "spring", damping: 25, stiffness: 300 }}
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] overflow-hidden flex flex-col"
+      >
+        {/* Header */}
+        <div className="flex-shrink-0 bg-gradient-to-r from-violet-600 via-purple-600 to-fuchsia-600 text-white px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="h-11 w-11 rounded-xl bg-white/15 backdrop-blur flex items-center justify-center ring-1 ring-white/20">
+              <Eye className="h-6 w-6" />
+            </div>
+            <div>
+              <div className="text-lg font-bold">Cart Preview</div>
+              <div className="text-xs text-purple-100/90">Review items before payment · Invoice #{invoiceNumber}</div>
+            </div>
+          </div>
+          <button onClick={onClose} className="h-9 w-9 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center transition">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Order Meta */}
+        <div className="flex-shrink-0 px-6 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-4 text-xs text-slate-600">
+            <span className="flex items-center gap-1.5">
+              <User className="h-3.5 w-3.5 text-slate-400" />
+              <span className="font-semibold text-slate-700">Cashier:</span> {cashier}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <User className="h-3.5 w-3.5 text-slate-400" />
+              <span className="font-semibold text-slate-700">Customer:</span> {customerName || "Walk-in customer"}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Calendar className="h-3.5 w-3.5 text-slate-400" />
+              <span className="font-semibold text-slate-700">Date:</span> {new Date().toLocaleDateString('en-GB')}
+            </span>
+          </div>
+          <Badge variant="secondary" className="bg-violet-100 text-violet-700">
+            {totalItems} items · {cart.length} lines
+          </Badge>
+        </div>
+
+        {/* Cart Items */}
+        <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+          {cart.length === 0 ? (
+            <div className="flex-1 flex flex-col items-center justify-center py-20 text-slate-400">
+              <ShoppingCart className="h-12 w-12 mb-3 opacity-40" />
+              <div className="text-sm font-medium">Cart is empty</div>
+              <div className="text-xs mt-1">Add products to the cart first</div>
+            </div>
+          ) : (
+            <>
+              {/* Table Header */}
+              <div className="flex-shrink-0 grid grid-cols-[40px_1fr_80px_90px_70px_90px_40px] gap-2 px-5 py-2 bg-slate-800 text-white text-[10px] font-semibold uppercase tracking-wide">
+                <div className="text-center">#</div>
+                <div>Item</div>
+                <div className="text-center">Qty</div>
+                <div className="text-right">Price</div>
+                <div className="text-center">Disc%</div>
+                <div className="text-right">Total</div>
+                <div></div>
+              </div>
+
+              {/* Items List */}
+              <ScrollArea className="flex-1 min-h-0">
+                <div className="divide-y divide-slate-100">
+                  <AnimatePresence mode="popLayout">
+                    {cart.map((item, index) => {
+                      const lineTotal = item.price * item.quantity;
+                      const lineDiscount = lineTotal * (item.discount / 100);
+                      const lineFinal = lineTotal - lineDiscount;
+                      return (
+                        <motion.div
+                          key={item.id}
+                          layout
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="grid grid-cols-[40px_1fr_80px_90px_70px_90px_40px] gap-2 px-5 py-2.5 items-center text-sm transition hover:bg-slate-50"
+                        >
+                          {/* Line # */}
+                          <div className="text-center text-[11px] font-mono text-slate-400">{index + 1}</div>
+                          {/* Item */}
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-2xl flex-shrink-0">{item.emoji}</span>
+                            <div className="min-w-0">
+                              <div className="font-semibold text-slate-800 truncate">{item.name}</div>
+                              <div className="text-[10px] text-slate-400 font-mono">
+                                {item.sku} · {item.unit}
+                                {item.taxable && <span className="ml-1 px-1 py-0.5 rounded bg-amber-100 text-amber-700 text-[9px] font-bold">VAT</span>}
+                              </div>
+                            </div>
+                          </div>
+                          {/* Qty */}
+                          <div className="flex items-center justify-center gap-1">
+                            <button
+                              onClick={() => onUpdateQuantity(index, item.quantity - 1)}
+                              className="h-6 w-6 rounded bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition"
+                            >
+                              <Minus className="h-3 w-3" />
+                            </button>
+                            <span className="w-8 text-center font-mono font-semibold text-slate-700 text-xs">
+                              {item.quantity.toFixed(item.unit === 'kg' ? 2 : 0)}
+                            </span>
+                            <button
+                              onClick={() => onUpdateQuantity(index, item.quantity + 1)}
+                              className="h-6 w-6 rounded bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition"
+                            >
+                              <Plus className="h-3 w-3" />
+                            </button>
+                          </div>
+                          {/* Price */}
+                          <div className="text-right font-mono text-slate-700 text-xs">{formatGHS(item.price)}</div>
+                          {/* Discount */}
+                          <div className="text-center">
+                            <input
+                              type="number"
+                              value={item.discount || ''}
+                              onChange={(e) => onApplyDiscount(index, parseFloat(e.target.value) || 0)}
+                              placeholder="0"
+                              className="w-12 text-center text-[11px] bg-transparent border-b border-slate-200 focus:border-violet-400 outline-none font-mono"
+                            />
+                          </div>
+                          {/* Line Total */}
+                          <div className="text-right font-mono font-semibold text-slate-900">{formatGHS(lineFinal)}</div>
+                          {/* Remove */}
+                          <button
+                            onClick={() => onRemoveLine(index)}
+                            className="h-7 w-7 rounded-md bg-rose-100 text-rose-600 hover:bg-rose-200 flex items-center justify-center transition mx-auto"
+                            title="Remove line"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </motion.div>
+                      );
+                    })}
+                  </AnimatePresence>
+                </div>
+              </ScrollArea>
+            </>
+          )}
+        </div>
+
+        {/* Totals + Actions */}
+        {cart.length > 0 && (
+          <div className="flex-shrink-0 border-t border-slate-200 bg-white">
+            {/* Totals Row */}
+            <div className="grid grid-cols-2 gap-0">
+              {/* Left: Discount Controls */}
+              <div className="p-4 bg-slate-50 border-r border-slate-200">
+                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-2">Global Discount</div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    value={globalDiscount || ''}
+                    onChange={(e) => onSetGlobalDiscount(parseFloat(e.target.value) || 0)}
+                    placeholder="0"
+                    className="w-20 h-9 px-2 text-center font-mono font-bold border-2 border-slate-200 focus:border-violet-400 rounded-lg outline-none"
+                  />
+                  <span className="text-sm font-semibold text-slate-600">%</span>
+                  {globalDiscount > 0 && (
+                    <button
+                      onClick={onClearDiscount}
+                      className="ml-auto px-2 py-1 rounded-md bg-rose-100 text-rose-600 hover:bg-rose-200 text-[10px] font-semibold transition"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+                <div className="mt-2 text-[10px] text-slate-500">
+                  Applies to entire cart subtotal
+                </div>
+              </div>
+              {/* Right: Totals */}
+              <div className="p-4 space-y-1">
+                <div className="flex justify-between text-xs text-slate-600">
+                  <span>Subtotal ({totalItems} items)</span>
+                  <span className="font-mono">{formatGHS(subtotal)}</span>
+                </div>
+                {discountAmount > 0 && (
+                  <div className="flex justify-between text-xs text-rose-600">
+                    <span>Discount{globalDiscount > 0 ? ` (${globalDiscount}%)` : ''}</span>
+                    <span className="font-mono">-{formatGHS(discountAmount)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-xs text-slate-600">
+                  <span>{TAX_NAME} ({taxRatePercent.toFixed(0)}%)</span>
+                  <span className="font-mono">{formatGHS(taxAmount)}</span>
+                </div>
+                <div className="flex justify-between items-baseline pt-1 border-t border-slate-200 mt-1">
+                  <span className="text-sm font-bold text-slate-800">Total Due</span>
+                  <span className="text-2xl font-bold font-mono text-violet-600">{formatGHS(total)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="px-4 py-3 bg-white border-t border-slate-200 grid grid-cols-4 gap-2">
+              <button
+                onClick={onContinueShopping}
+                className="h-12 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-sm flex items-center justify-center gap-2 transition"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Continue Shopping
+              </button>
+              <button
+                onClick={() => setConfirmClear(true)}
+                className="h-12 rounded-xl bg-rose-100 hover:bg-rose-200 text-rose-700 font-semibold text-sm flex items-center justify-center gap-2 transition"
+              >
+                <Trash2 className="h-4 w-4" />
+                Clear Cart
+              </button>
+              <button
+                onClick={() => window.print()}
+                className="h-12 rounded-xl bg-white ring-1 ring-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-sm flex items-center justify-center gap-2 transition"
+              >
+                <Printer className="h-4 w-4" />
+                Print Quote
+              </button>
+              <button
+                onClick={onProceedToPayment}
+                className="h-12 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-sm flex items-center justify-center gap-2 transition shadow-md hover:shadow-lg"
+              >
+                <CreditCard className="h-5 w-5" />
+                PROCEED TO PAYMENT
+                <kbd className="ml-1 px-1.5 py-0.5 rounded bg-white/20 text-[10px] font-mono">F5</kbd>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Empty cart action */}
+        {cart.length === 0 && (
+          <div className="flex-shrink-0 px-6 py-4 border-t border-slate-200 bg-slate-50 flex justify-end">
+            <Button variant="outline" onClick={onClose}>Close</Button>
+          </div>
+        )}
+
+        {/* Confirm Clear Dialog */}
+        <AnimatePresence>
+          {confirmClear && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-10"
+              onClick={() => setConfirmClear(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.9 }}
+                animate={{ scale: 1 }}
+                exit={{ scale: 0.9 }}
+                onClick={(e) => e.stopPropagation()}
+                className="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full mx-4"
+              >
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="h-12 w-12 rounded-full bg-rose-100 flex items-center justify-center">
+                    <AlertCircle className="h-6 w-6 text-rose-600" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-slate-800">Clear Cart?</div>
+                    <div className="text-xs text-slate-500">This will remove all {cart.length} items from the cart.</div>
+                  </div>
+                </div>
+                <div className="flex gap-2 mt-4">
+                  <Button variant="outline" className="flex-1" onClick={() => setConfirmClear(false)}>Cancel</Button>
+                  <button
+                    onClick={() => { onClearCart(); setConfirmClear(false); }}
+                    className="flex-1 h-10 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-semibold text-sm transition"
+                  >
+                    Yes, Clear Cart
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.div>
     </motion.div>
   );

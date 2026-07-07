@@ -236,3 +236,50 @@ Stage Summary:
 - Modern modal with search, group filters, product list, detail panel, quantity selector, and add-to-cart
 - Supports both quick-add (double-click or + button) and detailed add with custom quantity
 - Modal stays open for adding multiple products, then closes with Esc or Close button
+
+---
+Task ID: 6
+Agent: Main (Super Z)
+Task: Add an option to preview the cart content before payment.
+
+Work Log:
+- Added `showCartPreview` state to POSPage component
+- Added keyboard shortcut F6 to open the Cart Preview modal (alongside existing F1-F5)
+- Added Escape handling to close the Cart Preview modal
+- Added "Eye" icon to lucide-react imports
+- Added a "PREVIEW" button (violet→purple gradient, col-span-1) next to "PAY NOW" (now col-span-3) in the function buttons area, with F6 keyboard shortcut badge
+- Rendered CartPreviewModal component via AnimatePresence (between FindProductModal and ReceiptModal)
+- Built CartPreviewModal component with:
+  * Modern violet→purple→fuchsia gradient header with Eye icon, "Cart Preview" title, and invoice number
+  * Order meta bar: Cashier, Customer (or "Walk-in customer"), Date, and item/line count badge
+  * Itemized cart table with columns: #, Item (emoji+name+SKU+unit+VAT badge), Qty (+/- controls), Price, Disc% (editable input), Total, and Remove button (trash icon)
+  * Each row supports inline quantity adjustment, per-line discount editing, and line removal
+  * Global Discount section (bottom-left): editable percentage input with Clear button, applies to entire cart subtotal
+  * Totals section (bottom-right): Subtotal, Discount (only shows when >0), VAT (15%), and prominent Total Due in violet
+  * 4 action buttons at the bottom:
+    - Continue Shopping (closes modal, returns to POS)
+    - Clear Cart (shows confirmation dialog before clearing)
+    - Print Quote (triggers browser print)
+    - PROCEED TO PAYMENT (closes preview, opens Payment modal)
+  * Empty cart state with friendly message
+  * Confirmation dialog for Clear Cart with Cancel/Yes buttons
+  * Framer Motion animations throughout (modal entry, row layout, dialog)
+- Props include handlers for: onUpdateQuantity, onRemoveLine, onApplyDiscount, onSetGlobalDiscount, onClearDiscount, onClose, onProceedToPayment, onContinueShopping, onClearCart
+- Fixed a runtime ReferenceError: removed `editingIndex` state reference that was left over from refactoring
+- Verified with Agent Browser:
+  * PREVIEW button visible in function buttons area with F6 badge
+  * Clicking PREVIEW opens modal with cart items, totals, and action buttons
+  * Cart with 3 items (2 Red Apples + 1 Bananas) shows Subtotal ₵88.00, Total Due ₵88.00
+  * PROCEED TO PAYMENT button transitions to Payment modal with correct total
+  * Clear Cart button shows confirmation dialog ("Clear Cart? This will remove all 2 items from the cart.")
+  * Cancel button in confirmation dialog works correctly
+  * F6 keyboard shortcut opens modal (tested via JS dispatch - F6 is intercepted by browser when using agent-browser press)
+  * No console errors after fixing ReferenceError
+- Lint: 0 errors
+
+Stage Summary:
+- Successfully added a "Cart Preview" feature that lets cashiers review cart contents before payment
+- Triggered by a violet PREVIEW button (F6 shortcut) next to PAY NOW in the function buttons
+- Modern modal with itemized cart table, inline editing (qty, discount, remove), global discount, full totals breakdown, and 4 action buttons
+- "Proceed to Payment" seamlessly transitions to the existing Payment modal
+- "Clear Cart" has a confirmation dialog to prevent accidental clearing
