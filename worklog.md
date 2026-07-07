@@ -150,3 +150,44 @@ Stage Summary:
 - All 90 products remapped to new groups
 - Menu bar rearranged to 7 menus in specified order: POS, Sale, Stock, Purchase, Accounts, Telephone, Maintenance
 - Each menu has relevant dropdown items; working actions navigate to views or show toasts
+
+---
+Task ID: 4
+Agent: Main (Super Z)
+Task: Change the stock group to only (Households, Groceries, Confectionery, Soft Drinks, Hard Liquor) in the ENTIRE system - including the POS category filter bar which previously showed 11 separate categories.
+
+Work Log:
+- Identified two parallel categorization systems in use:
+  * `categories` array (11 items: Fruits, Vegetables, Dairy, Meat, Bakery, Beverages, Snacks, Frozen, Pantry, Household) - used in POS filter bar
+  * `stockGroups` array (5 items: Groceries, Confectionery, Soft Drinks, Hard Liquor, Households) - used in Stock Management
+- Consolidated into ONE unified 5-group system in /src/lib/pos-data.ts:
+  * Replaced `categories` array with the same 5 groups (Groceries, Confectionery, Soft Drinks, Hard Liquor, Households) + "All Items"
+  * Both `categories` and `stockGroups` now reference the same 5 groups
+- Created and ran a remap script to update all 90 products' `category` fields:
+  * fruits/vegetables/dairy/meat/bakery/frozen/pantry → groceries (66 products)
+  * snacks → confectionery (8 products)
+  * beverages → soft-drinks (7 products, except wine)
+  * Wine (p56) → hard-liquor (1 product)
+  * household → households (8 products)
+- Verified product counts: Groceries=66, Confectionery=8, Soft Drinks=7, Hard Liquor=1, Households=8 (total=90)
+- Updated /src/components/stock-management.tsx:
+  * Removed duplicate "Category" dropdown from Add Product form (was redundant with "Stock Group")
+  * Form now has single "Stock Group" field that sets both `groupId` and `category` together
+  * Removed unused `categories` import
+- Deleted temporary remap script
+- Verified with Agent Browser:
+  * POS category filter bar now shows only: All Items, Groceries, Confectionery, Soft Drinks, Hard Liquor, Households (no more Fruits/Vegetables/Dairy/etc.)
+  * Clicking "Hard Liquor" shows only Wine Bottle (1 product)
+  * Clicking "Confectionery" shows 8 snack products
+  * Clicking "Groceries" shows 66 products
+  * Stock Management > Group Maintenance shows exactly 5 groups
+  * Add Product form has single "Stock Group" dropdown (no separate "Category" field)
+  * No console errors
+- Lint: 0 errors
+
+Stage Summary:
+- Successfully unified the entire system to use ONLY the 5 stock groups: Households, Groceries, Confectionery, Soft Drinks, Hard Liquor
+- Removed the old 11-category system from the POS filter bar
+- Products now have a single `category` field that matches their `groupId` (both use the 5 group IDs)
+- Add Product form simplified to one "Stock Group" dropdown
+- Entire system is now consistent: POS filter bar, Stock Management, Reports all use the same 5 groups

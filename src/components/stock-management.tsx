@@ -15,7 +15,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import {
-  COMPANY, CURRENCY, formatGHS, categories, stockGroups, products as ALL_PRODUCTS,
+  COMPANY, CURRENCY, formatGHS, stockGroups, products as ALL_PRODUCTS,
   initialStockHistory, type Product, type StockGroup, type StockHistoryEntry,
 } from "@/lib/pos-data";
 import type { StockView } from "@/lib/pos-types";
@@ -365,13 +365,8 @@ function ProductForm({ product, groups, onSave, onClose }: {
             <FormField label="Emoji">
               <input value={form.emoji} onChange={(e) => setForm({ ...form, emoji: e.target.value })} className="form-input text-center text-xl" maxLength={2} />
             </FormField>
-            <FormField label="Category">
-              <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="form-input">
-                {categories.filter(c => c.id !== "all").map(c => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
-              </select>
-            </FormField>
-            <FormField label="Stock Group">
-              <select value={form.groupId} onChange={(e) => setForm({ ...form, groupId: e.target.value })} className="form-input">
+            <FormField label="Stock Group" full>
+              <select value={form.groupId} onChange={(e) => setForm({ ...form, groupId: e.target.value, category: e.target.value })} className="form-input">
                 {groups.map(g => <option key={g.id} value={g.id}>{g.icon} {g.name}</option>)}
               </select>
             </FormField>
