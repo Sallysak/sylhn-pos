@@ -998,34 +998,34 @@ function StockFileView({ products, setProducts, groups, history, setHistory }: {
   };
 
   return (
-    <div className="h-full bg-white rounded-2xl shadow-lg ring-1 ring-slate-200/60 overflow-hidden flex flex-col">
+    <div className="h-full rounded-2xl shadow-lg ring-1 ring-emerald-300/50 overflow-hidden flex flex-col" style={{ backgroundColor: '#C8E6D0' }}>
       {/* Header */}
-      <div className="flex-shrink-0 flex items-center justify-between px-5 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white">
+      <div className="flex-shrink-0 flex items-center justify-between px-5 py-2.5 bg-gradient-to-r from-emerald-700 to-emerald-600 text-white">
         <div className="flex items-center gap-2">
           <FileText className="h-5 w-5" />
           <h2 className="text-base font-bold">Stock File</h2>
-          <Badge variant="secondary" className="font-mono text-xs bg-white/20 text-white">{filtered.length} records</Badge>
+          <Badge variant="secondary" className="font-mono text-xs bg-white/25 text-white">{filtered.length} records</Badge>
         </div>
         <div className="text-xs text-emerald-100/90">Manage your complete stock inventory</div>
       </div>
 
       {/* Search & Filter Section */}
-      <div className="flex-shrink-0 px-5 py-3 bg-emerald-50/50 border-b border-emerald-100 space-y-2.5">
+      <div className="flex-shrink-0 px-5 py-2.5 space-y-2" style={{ backgroundColor: '#B8DCC0' }}>
         {/* Search Row */}
         <div className="flex items-center gap-3">
-          <label className="text-xs font-bold text-slate-600 uppercase tracking-wide whitespace-nowrap w-20">Search Text</label>
+          <label className="text-xs font-bold text-slate-700 uppercase tracking-wide whitespace-nowrap w-20">Search Text</label>
           <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
             <input
               value={searchText}
               onChange={(e) => { setSearchText(e.target.value); setSelectedIndex(0); }}
               placeholder="Part Number"
-              className="w-full h-9 pl-9 pr-3 rounded-lg bg-white border border-slate-200 text-sm outline-none ring-2 ring-transparent focus:ring-emerald-400 transition"
+              className="w-full h-9 pl-9 pr-3 rounded-md bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition"
             />
           </div>
           <button
             onClick={() => setSelectedIndex(0)}
-            className="h-9 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold flex items-center gap-1.5 transition shadow-sm"
+            className="h-9 px-5 rounded-md bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-semibold flex items-center gap-1.5 transition shadow-sm"
           >
             <Search className="h-3.5 w-3.5" />
             Search
@@ -1033,7 +1033,7 @@ function StockFileView({ products, setProducts, groups, history, setHistory }: {
         </div>
         {/* Filter Row */}
         <div className="flex items-center gap-3 flex-wrap">
-          <label className="text-xs font-bold text-slate-600 uppercase tracking-wide whitespace-nowrap w-20">Filter By</label>
+          <label className="text-xs font-bold text-slate-700 uppercase tracking-wide whitespace-nowrap w-20">Filter By</label>
           <FilterDropdown label="Type" value={filterType} onChange={(v) => { setFilterType(v); setSelectedIndex(0); }} options={[
             { value: "all", label: "All Types" },
             { value: "taxable", label: "Taxable (VAT)" },
@@ -1066,9 +1066,9 @@ function StockFileView({ products, setProducts, groups, history, setHistory }: {
       </div>
 
       {/* Data Table */}
-      <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+      <div className="flex-1 overflow-hidden flex flex-col min-h-0 bg-white">
         {/* Table Header */}
-        <div className="flex-shrink-0 grid grid-cols-[180px_1fr_70px_100px_100px_110px] gap-2 px-4 py-2 bg-slate-800 text-white text-[11px] font-semibold uppercase tracking-wide">
+        <div className="flex-shrink-0 grid grid-cols-[180px_1fr_70px_100px_100px_110px] gap-2 px-4 py-2 bg-slate-200 text-slate-700 text-[11px] font-bold uppercase tracking-wide border-b-2 border-slate-300">
           <div>Part No.</div>
           <div>Details</div>
           <div className="text-right">Qty</div>
@@ -1088,21 +1088,22 @@ function StockFileView({ products, setProducts, groups, history, setHistory }: {
                   key={p.id}
                   onClick={() => setSelectedIndex(idx)}
                   className={cn(
-                    "grid grid-cols-[180px_1fr_70px_100px_100px_110px] gap-2 px-4 py-2 text-xs cursor-pointer transition",
-                    isSelected ? "bg-blue-500 text-white" : idx % 2 === 1 ? "bg-slate-50 hover:bg-slate-100" : "bg-white hover:bg-slate-50"
+                    "grid grid-cols-[180px_1fr_70px_100px_100px_110px] gap-2 px-4 py-2 text-xs cursor-pointer transition border-b border-slate-100",
+                    isSelected ? "text-slate-900" : idx % 2 === 1 ? "bg-slate-50 hover:bg-slate-100" : "bg-white hover:bg-slate-50"
                   )}
+                  style={isSelected ? { backgroundColor: '#ADD8E6' } : undefined}
                 >
                   <div className="font-mono truncate">{p.barcode}</div>
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="text-base flex-shrink-0">{p.emoji}</span>
-                    <span className={cn("font-medium truncate", isSelected ? "text-white" : "text-slate-800")}>{p.name}</span>
+                    <span className="font-medium truncate text-slate-800">{p.name}</span>
                   </div>
-                  <div className={cn("text-right font-mono font-semibold", isSelected ? "text-white" : p.stock === 0 ? "text-rose-600" : p.stock <= p.reorderLevel ? "text-amber-600" : "text-slate-700")}>
+                  <div className={cn("text-right font-mono font-semibold", p.stock === 0 ? "text-rose-600" : p.stock <= p.reorderLevel ? "text-amber-600" : "text-slate-700")}>
                     {p.stock}
                   </div>
-                  <div className="text-right font-mono">{p.price.toFixed(2)}</div>
-                  <div className="text-right font-mono">{p.costPrice.toFixed(2)}</div>
-                  <div className={cn("text-center text-[11px]", isSelected ? "text-white" : expDays < 0 ? "text-rose-600" : expDays <= 7 ? "text-amber-600" : "text-slate-500")}>
+                  <div className="text-right font-mono text-slate-700">{p.price.toFixed(2)}</div>
+                  <div className="text-right font-mono text-slate-700">{p.costPrice.toFixed(2)}</div>
+                  <div className={cn("text-center text-[11px]", expDays < 0 ? "text-rose-600" : expDays <= 7 ? "text-amber-600" : "text-slate-500")}>
                     {p.expiryDate}
                   </div>
                 </div>
@@ -1120,7 +1121,7 @@ function StockFileView({ products, setProducts, groups, history, setHistory }: {
       </div>
 
       {/* Action Buttons */}
-      <div className="flex-shrink-0 px-4 py-2.5 bg-slate-100 border-t border-slate-200 flex items-center gap-1.5 flex-wrap">
+      <div className="flex-shrink-0 px-4 py-2 flex items-center gap-1.5 flex-wrap" style={{ backgroundColor: '#B8DCC0' }}>
         <StockActionButton icon={<Edit2 className="h-4 w-4" />} label="Modify" color="emerald" onClick={handleModify} />
         <StockActionButton icon={<Plus className="h-4 w-4" />} label="New" color="blue" onClick={handleNew} />
         <StockActionButton icon={<Copy className="h-4 w-4" />} label="Clone" color="cyan" onClick={handleClone} />
@@ -1133,12 +1134,12 @@ function StockFileView({ products, setProducts, groups, history, setHistory }: {
       </div>
 
       {/* Status Bar */}
-      <div className="flex-shrink-0 px-4 py-1.5 bg-slate-800 text-white text-[10px] font-mono flex items-center gap-4">
-        <span><kbd className="px-1.5 py-0.5 rounded bg-white/15 mr-1">F9</kbd>Part No.</span>
-        <span><kbd className="px-1.5 py-0.5 rounded bg-white/15 mr-1">F10</kbd>Details</span>
-        <span><kbd className="px-1.5 py-0.5 rounded bg-white/15 mr-1">Shift+F12</kbd>Print Labels</span>
+      <div className="flex-shrink-0 px-4 py-1.5 bg-slate-700 text-white text-[10px] font-mono flex items-center gap-4">
+        <span><kbd className="px-1.5 py-0.5 rounded bg-white/20 mr-1">F9</kbd>Part No.</span>
+        <span><kbd className="px-1.5 py-0.5 rounded bg-white/20 mr-1">F10</kbd>Details</span>
+        <span><kbd className="px-1.5 py-0.5 rounded bg-white/20 mr-1">Shift+F12</kbd>Print Labels</span>
         <div className="flex-1" />
-        <span className="text-emerald-400">{filtered.length} of {products.length} products</span>
+        <span className="text-emerald-300">{filtered.length} of {products.length} products</span>
       </div>
 
       {/* Product Form Modal */}
@@ -1330,35 +1331,35 @@ function StockSearchView({ products, groups, history }: {
   };
 
   return (
-    <div className="h-full bg-white rounded-2xl shadow-lg ring-1 ring-slate-200/60 overflow-hidden flex flex-col">
+    <div className="h-full rounded-2xl shadow-lg ring-1 ring-emerald-300/50 overflow-hidden flex flex-col" style={{ backgroundColor: '#C8E6D0' }}>
       {/* Header */}
-      <div className="flex-shrink-0 flex items-center justify-between px-5 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
+      <div className="flex-shrink-0 flex items-center justify-between px-5 py-2.5 bg-gradient-to-r from-emerald-700 to-emerald-600 text-white">
         <div className="flex items-center gap-2">
           <FileSearch className="h-5 w-5" />
           <h2 className="text-base font-bold">Stock Search</h2>
-          <Badge variant="secondary" className="font-mono text-xs bg-white/20 text-white">{filtered.length} results</Badge>
+          <Badge variant="secondary" className="font-mono text-xs bg-white/25 text-white">{filtered.length} results</Badge>
         </div>
-        <div className="text-xs text-blue-100/90">Search and view product information</div>
+        <div className="text-xs text-emerald-100/90">Search and view product information</div>
       </div>
 
       {/* Search & Filter Section */}
-      <div className="flex-shrink-0 px-5 py-3 bg-blue-50/50 border-b border-blue-100 space-y-2.5">
+      <div className="flex-shrink-0 px-5 py-2.5 space-y-2" style={{ backgroundColor: '#B8DCC0' }}>
         {/* Search Row */}
         <div className="flex items-center gap-3">
-          <label className="text-xs font-bold text-slate-600 uppercase tracking-wide whitespace-nowrap w-20">Search Text</label>
+          <label className="text-xs font-bold text-slate-700 uppercase tracking-wide whitespace-nowrap w-20">Search Text</label>
           <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
             <input
               value={searchText}
               onChange={(e) => { setSearchText(e.target.value); setSelectedIndex(0); }}
               onKeyDown={(e) => { if (e.key === 'Enter') handleSelect(); }}
               placeholder="Details"
-              className="w-full h-9 pl-9 pr-3 rounded-lg bg-white border border-slate-200 text-sm outline-none ring-2 ring-transparent focus:ring-blue-400 transition"
+              className="w-full h-9 pl-9 pr-3 rounded-md bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition"
             />
           </div>
           <button
             onClick={() => setSelectedIndex(0)}
-            className="h-9 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold flex items-center gap-1.5 transition shadow-sm"
+            className="h-9 px-5 rounded-md bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-semibold flex items-center gap-1.5 transition shadow-sm"
           >
             <Search className="h-3.5 w-3.5" />
             Search
@@ -1366,7 +1367,7 @@ function StockSearchView({ products, groups, history }: {
         </div>
         {/* Filter Row */}
         <div className="flex items-center gap-3 flex-wrap">
-          <label className="text-xs font-bold text-slate-600 uppercase tracking-wide whitespace-nowrap w-20">Filter By</label>
+          <label className="text-xs font-bold text-slate-700 uppercase tracking-wide whitespace-nowrap w-20">Filter By</label>
           <FilterDropdown label="Type" value={filterType} onChange={(v) => { setFilterType(v); setSelectedIndex(0); }} options={[
             { value: "all", label: "All Types" },
             { value: "taxable", label: "Taxable (VAT)" },
@@ -1398,8 +1399,8 @@ function StockSearchView({ products, groups, history }: {
       </div>
 
       {/* Results Table */}
-      <div className="flex-1 overflow-hidden flex flex-col min-h-0">
-        <div className="flex-shrink-0 grid grid-cols-[180px_1fr_70px_100px_100px] gap-2 px-4 py-2 bg-slate-800 text-white text-[11px] font-semibold uppercase tracking-wide">
+      <div className="flex-1 overflow-hidden flex flex-col min-h-0 bg-white">
+        <div className="flex-shrink-0 grid grid-cols-[180px_1fr_70px_100px_100px] gap-2 px-4 py-2 bg-slate-200 text-slate-700 text-[11px] font-bold uppercase tracking-wide border-b-2 border-slate-300">
           <div>Part No.</div>
           <div>Details</div>
           <div className="text-right">Qty</div>
@@ -1416,21 +1417,22 @@ function StockSearchView({ products, groups, history }: {
                   onClick={() => setSelectedIndex(idx)}
                   onDoubleClick={handleSelect}
                   className={cn(
-                    "grid grid-cols-[180px_1fr_70px_100px_100px] gap-2 px-4 py-2 text-xs cursor-pointer transition",
-                    isSelected ? "bg-blue-500 text-white" : idx % 2 === 1 ? "bg-slate-50 hover:bg-slate-100" : "bg-white hover:bg-slate-50"
+                    "grid grid-cols-[180px_1fr_70px_100px_100px] gap-2 px-4 py-2 text-xs cursor-pointer transition border-b border-slate-100",
+                    idx % 2 === 1 ? "bg-slate-50 hover:bg-slate-100" : "bg-white hover:bg-slate-50"
                   )}
+                  style={isSelected ? { backgroundColor: '#ADD8E6' } : undefined}
                 >
                   <div className="font-mono truncate">{p.barcode}</div>
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="text-base flex-shrink-0">{p.emoji}</span>
-                    <span className={cn("font-medium truncate", isSelected ? "text-white" : "text-slate-800")}>{p.name}</span>
-                    {p.taxable && <span className={cn("px-1 py-0.5 rounded text-[9px] font-bold", isSelected ? "bg-white/20 text-white" : "bg-amber-100 text-amber-700")}>VAT</span>}
+                    <span className="font-medium truncate text-slate-800">{p.name}</span>
+                    {p.taxable && <span className="px-1 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-700">VAT</span>}
                   </div>
-                  <div className={cn("text-right font-mono font-semibold", isSelected ? "text-white" : p.stock === 0 ? "text-rose-600" : p.stock <= p.reorderLevel ? "text-amber-600" : "text-slate-700")}>
+                  <div className={cn("text-right font-mono font-semibold", p.stock === 0 ? "text-rose-600" : p.stock <= p.reorderLevel ? "text-amber-600" : "text-slate-700")}>
                     {p.stock}
                   </div>
-                  <div className="text-right font-mono">{p.price.toFixed(2)}</div>
-                  <div className="text-right font-mono">{p.costPrice.toFixed(2)}</div>
+                  <div className="text-right font-mono text-slate-700">{p.price.toFixed(2)}</div>
+                  <div className="text-right font-mono text-slate-700">{p.costPrice.toFixed(2)}</div>
                 </div>
               );
             })}
@@ -1446,7 +1448,7 @@ function StockSearchView({ products, groups, history }: {
       </div>
 
       {/* Action Buttons */}
-      <div className="flex-shrink-0 px-4 py-2.5 bg-slate-100 border-t border-slate-200 flex items-center gap-1.5 flex-wrap">
+      <div className="flex-shrink-0 px-4 py-2 flex items-center gap-1.5 flex-wrap" style={{ backgroundColor: '#B8DCC0' }}>
         <StockActionButton icon={<CheckCircle2 className="h-4 w-4" />} label="Select (Enter)" color="emerald" onClick={handleSelect} />
         <StockActionButton icon={<Plus className="h-4 w-4" />} label="New" color="blue" onClick={() => toast({ title: "New Product", description: "Use Stock File to add new products" })} />
         <StockActionButton icon={<ImageIcon className="h-4 w-4" />} label="Picture" color="slate" onClick={() => { if (!filtered[selectedIndex]) { toast({ title: "Select a product first", variant: "destructive" }); return; } setShowPicture(filtered[selectedIndex]); }} />
@@ -1458,12 +1460,12 @@ function StockSearchView({ products, groups, history }: {
       </div>
 
       {/* Status Bar */}
-      <div className="flex-shrink-0 px-4 py-1.5 bg-slate-800 text-white text-[10px] font-mono flex items-center gap-4">
-        <span><kbd className="px-1.5 py-0.5 rounded bg-white/15 mr-1">F9</kbd>Part No.</span>
-        <span><kbd className="px-1.5 py-0.5 rounded bg-white/15 mr-1">F10</kbd>Details</span>
-        <span><kbd className="px-1.5 py-0.5 rounded bg-white/15 mr-1">Shift+F12</kbd>Print Labels</span>
+      <div className="flex-shrink-0 px-4 py-1.5 bg-slate-700 text-white text-[10px] font-mono flex items-center gap-4">
+        <span><kbd className="px-1.5 py-0.5 rounded bg-white/20 mr-1">F9</kbd>Part No.</span>
+        <span><kbd className="px-1.5 py-0.5 rounded bg-white/20 mr-1">F10</kbd>Details</span>
+        <span><kbd className="px-1.5 py-0.5 rounded bg-white/20 mr-1">Shift+F12</kbd>Print Labels</span>
         <div className="flex-1" />
-        <span className="text-blue-400">{filtered.length} of {products.length} products</span>
+        <span className="text-emerald-300">{filtered.length} of {products.length} products</span>
       </div>
 
       {/* Product Detail Modal (on Select) */}
@@ -1556,11 +1558,11 @@ function FilterDropdown({ label, value, onChange, options }: {
 }) {
   return (
     <div className="flex items-center gap-1.5">
-      <span className="text-[10px] font-semibold text-slate-500 uppercase">{label}:</span>
+      <span className="text-[10px] font-bold text-slate-700 uppercase">{label}:</span>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="h-8 px-2 rounded-md bg-white border border-slate-200 text-xs font-medium text-slate-700 outline-none focus:ring-2 focus:ring-emerald-400 cursor-pointer hover:border-slate-300 transition"
+        className="h-8 px-2 rounded-md bg-white border border-slate-300 text-xs font-medium text-slate-700 outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer hover:border-slate-400 transition"
       >
         {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
