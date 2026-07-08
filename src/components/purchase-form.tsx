@@ -87,7 +87,8 @@ interface PurchaseFormProps {
   onBack: () => void;
   products: Product[];
   groups: StockGroup[];
-  suppliers: { id: string; name: string }[];
+  /** Suppliers — accepts either simple {id, name} or full Supplier objects with tradingTerms, creditLimit, balance */
+  suppliers: { id: string; name: string; tradingTerms?: string; creditLimit?: number; balance?: number; taxInclusive?: boolean; email?: string; phone?: string }[];
 }
 
 const GREEN = '#4CAF50';
@@ -153,20 +154,37 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
         tax: l.tax ?? true,
         total: l.total,
       })));
-      // Load other fields
-      if (draft.supplier) setSupplier(draft.supplier);
-      if (draft.refNo) setRefNo(draft.refNo);
-      if (draft.details) {
-        // Use the draft details as the order notes
+      // Load supplier + look up trading terms / credit limit / balance from the supplier database
+      if (draft.supplier) {
+        setSupplier(draft.supplier);
+        // Try to match the supplier in the suppliers prop to pull in trading terms, balance, etc.
+        const matchedSupplier = suppliers.find(s => s.name === draft.supplier);
+        if (matchedSupplier) {
+          if (matchedSupplier.tradingTerms) setTerms(matchedSupplier.tradingTerms);
+          if (typeof matchedSupplier.balance === 'number') setBalance(matchedSupplier.balance);
+          if (typeof matchedSupplier.creditLimit === 'number') setLimit(matchedSupplier.creditLimit);
+          if (typeof matchedSupplier.taxInclusive === 'boolean') setTaxInclusive(matchedSupplier.taxInclusive);
+          toast({
+            title: 'Reorder draft loaded',
+            description: `${draft.lines.length} items · ${formatGHS(draft.totalCost || 0)} · Supplier: ${draft.supplier} (${matchedSupplier.tradingTerms || 'no terms'})`,
+          });
+        } else {
+          toast({
+            title: 'Reorder draft loaded',
+            description: `${draft.lines.length} items · ${formatGHS(draft.totalCost || 0)} · Supplier "${draft.supplier}" not in database — terms not auto-filled`,
+          });
+        }
+      } else {
+        toast({
+          title: 'Reorder draft loaded',
+          description: `${draft.lines.length} items · ${formatGHS(draft.totalCost || 0)}`,
+        });
       }
+      if (draft.refNo) setRefNo(draft.refNo);
       // Clear the draft from localStorage (so it doesn't reappear next time)
       window.localStorage.removeItem('sylhn-po-draft-from-reorder');
       setShowDraftBanner(false);
       setSaved(false);
-      toast({
-        title: 'Reorder draft loaded',
-        description: `${draft.lines.length} items · ${formatGHS(draft.totalCost || 0)}`,
-      });
     } catch {
       toast({ title: 'Failed to load draft', variant: 'destructive' });
     }
@@ -515,7 +533,23 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
           <div className="flex-shrink-0 px-3 py-1.5 bg-slate-50 border-b border-slate-300 flex items-center gap-3">
             <div className="flex items-center gap-1.5">
               <label className="text-[10px] font-bold text-slate-700">Supplier:</label>
-              <select value={supplier} onChange={(e) => { setSupplier(e.target.value); setSaved(false); }} className="h-6 px-1.5 text-[10px] border border-slate-400 rounded bg-white outline-none focus:ring-1 focus:ring-green-400 min-w-[140px]">
+              <select
+                value={supplier}
+                onChange={(e) => {
+                  const selectedName = e.target.value;
+                  setSupplier(selectedName);
+                  setSaved(false);
+                  // Auto-fill trading terms, balance, credit limit, tax inclusive from supplier database
+                  const matched = suppliers.find(s => s.name === selectedName);
+                  if (matched) {
+                    if (matched.tradingTerms) setTerms(matched.tradingTerms);
+                    if (typeof matched.balance === 'number') setBalance(matched.balance);
+                    if (typeof matched.creditLimit === 'number') setLimit(matched.creditLimit);
+                    if (typeof matched.taxInclusive === 'boolean') setTaxInclusive(matched.taxInclusive);
+                  }
+                }}
+                className="h-6 px-1.5 text-[10px] border border-slate-400 rounded bg-white outline-none focus:ring-1 focus:ring-green-400 min-w-[140px]"
+              >
                 <option value="">Select supplier...</option>
                 {suppliers.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
               </select>
@@ -524,6 +558,17 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
               <span className="text-[10px] font-bold text-slate-700">Invoice:</span>
               <input value={invoiceNo} onChange={(e) => setInvoiceNo(e.target.value)} className="h-6 w-24 px-1.5 text-[10px] font-mono border border-slate-400 rounded bg-white outline-none" />
             </div>
+            {/* Display supplier details when matched */}
+            {supplier && (() => {
+              const matched = suppliers.find(s => s.name === supplier);
+              return matched && (matched.tradingTerms || typeof matched.balance === 'number') ? (
+                <div className="flex items-center gap-2 text-[9px] text-slate-500 ml-auto">
+                  {matched.tradingTerms && <span>Terms: <span className="font-mono font-semibold text-slate-700">{matched.tradingTerms}</span></span>}
+                  {typeof matched.balance === 'number' && <span>Balance: <span className="font-mono font-semibold text-slate-700">{formatGHS(matched.balance)}</span></span>}
+                  {typeof matched.creditLimit === 'number' && matched.creditLimit > 0 && <span>Limit: <span className="font-mono font-semibold text-slate-700">{formatGHS(matched.creditLimit)}</span></span>}
+                </div>
+              ) : null;
+            })()}
           </div>
 
           {/* Order + Delivery Panels */}

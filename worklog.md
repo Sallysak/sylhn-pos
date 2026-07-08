@@ -1722,3 +1722,69 @@ Stage Summary:
   - Sorted most-recent first
 - Build compiles cleanly (next build ✓) and dev server responds HTTP 200 with no runtime errors
 - Pre-existing TS errors in page.tsx (lines 436, 507, 532 — invoiceNumber null type) are unrelated to these changes
+
+---
+Task ID: compliance-supplier-integration-alerts
+Agent: main
+Task: Implement three suggested enhancements:
+  1) Stocktake Compliance report showing on-time vs overdue history per staff member
+  2) Integrate PO draft with existing supplier database (auto-select trading terms)
+  3) Per-product variance alert threshold (flag items whose shrinkage exceeds a configurable % of sales)
+
+Work Log:
+- Modified /home/z/my-project/src/components/supplier-form.tsx:
+  - Exported the Supplier interface (was private)
+  - Exported initialSuppliers (was private)
+  - Added 5 new suppliers to match product suppliers: AgriCorp Ghana, Global Foods GH, Fan Milk Ghana, Darko Farms, Unilever Ghana (with full details: tradingTerms, creditLimit, balance, taxInclusive)
+
+- Modified /home/z/my-project/src/components/purchase-form.tsx:
+  - Expanded PurchaseFormProps.suppliers type to accept full supplier details (tradingTerms, creditLimit, balance, taxInclusive, email, phone — all optional)
+  - Updated loadReorderDraft: after setting supplier from draft, looks up the supplier in the suppliers prop and auto-fills tradingTerms, balance, creditLimit, taxInclusive
+  - Updated supplier select onChange: when user manually picks a supplier, auto-fills tradingTerms, balance, creditLimit, taxInclusive from the supplier database
+  - Added inline supplier details display in the Supplier Bar (Terms, Balance, Limit) shown when a supplier is matched — gives the user immediate visibility into the supplier's credit profile
+
+- Modified /home/z/my-project/src/app/page.tsx:
+  - Imported initialSuppliers from supplier-form.tsx
+  - Updated PurchaseForm invocation: suppliers={initialSuppliers} (was groups.map(...) which was wrong — groups are stock groups, not suppliers)
+
+- Modified /home/z/my-project/src/components/stock-management.tsx:
+  - Added 'compliance' and 'alerts' to dashboardTab type union
+  - Added complianceData useMemo: groups 'adjusted' history entries by reference, then aggregates per user — events performed, items adjusted, total variance, surplus items, shortage items, first/last event dates. Computes on-time vs overdue rate by checking gaps between consecutive events against the schedule threshold (7/14/30/90 days). Also checks the gap from the last event to now.
+  - Added variance threshold state: varianceThresholds (per-product map), globalThreshold (default 5%), thresholdEditProduct, thresholdEditValue
+  - Added localStorage persistence for thresholds (key 'sylhn-variance-thresholds')
+  - Added varianceAlerts useMemo: for each product with a latest stocktake entry, computes shrinkage (abs of negative variance), compares against threshold (per-product or global, as % of counted stock), assigns severity (critical = 2× threshold, warning = threshold, ok = below). Only includes warning/critical. Sorts critical first, then by shrinkage amount.
+  - Updated tab navigation: added "Alerts" (AlertTriangle icon, rose badge) and "Compliance" (User icon) tabs
+  - Added Compliance tab content:
+    - Blue info banner explaining the report
+    - Per-staff cards: avatar (color-coded by on-time rate), name, event count + items adjusted, large on-time % (color-coded: green ≥80%, amber ≥50%, red <50%), 5-column stat grid (On-time, Overdue, Avg Var, Surplus, Shortage), first/last event dates
+    - Empty state when no staff data
+  - Added Alerts tab content:
+    - Rose info banner explaining thresholds (Warning = ≥threshold, Critical = ≥2×threshold)
+    - Global threshold control: number input (1-100%) with live count of flagged products
+    - Alerts list (rose header): Product, Stock, Shrinkage, Threshold (units), % of Stock, Severity badge, Set % (inline-editable per-product threshold)
+    - Inline threshold editor: click the % button → number input + checkmark save button
+    - Color-coded rows: critical = rose background, warning = amber background
+    - Empty state with green checkmark when no alerts
+
+Stage Summary:
+- 4 modified files: supplier-form.tsx (exported interface + 5 new suppliers), purchase-form.tsx (supplier integration + inline details), page.tsx (pass real suppliers to PurchaseForm), stock-management.tsx (+~280 lines: compliance + alerts)
+- Feature 1 — Stocktake Compliance report:
+  - Per-staff cards with on-time rate (color-coded), events, items adjusted, avg variance, surplus/shortage breakdown
+  - On-time vs overdue computed from gaps between consecutive stocktakes vs schedule frequency
+  - Sorted by event count (most active staff first)
+  - Helps identify staff who need reminders or training
+- Feature 2 — PO draft + supplier database integration:
+  - Supplier database expanded with 5 real suppliers (AgriCorp, Global Foods, Fan Milk, Darko Farms, Unilever)
+  - When loading a reorder draft: auto-fills trading terms, balance, credit limit, tax inclusive from the matched supplier
+  - When manually selecting a supplier: same auto-fill happens
+  - Inline display of Terms/Balance/Limit in the Supplier Bar for immediate visibility
+  - page.tsx now passes real suppliers (was incorrectly passing stock groups before)
+- Feature 3 — Per-product variance alert thresholds:
+  - Global threshold (default 5% of counted stock) + per-product overrides
+  - Persisted to localStorage key 'sylhn-variance-thresholds'
+  - Two severity levels: Warning (≥threshold), Critical (≥2×threshold)
+  - Inline threshold editor per product (click % → edit → save)
+  - Color-coded rows + severity badges
+  - Live count of flagged products in the global threshold control
+  - Sorted: critical first, then by shrinkage amount
+- Build compiles cleanly (next build ✓) and dev server responds HTTP 200 with no runtime errors

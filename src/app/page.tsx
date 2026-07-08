@@ -38,7 +38,7 @@ import { SoldItemsReport } from "@/components/sold-items-report";
 import { PurchaseForm } from "@/components/purchase-form";
 import { SalesMenu } from "@/components/sales-menu";
 import { DailySalesReport, SalesHistory } from "@/components/sales-reports";
-import { SupplierForm } from "@/components/supplier-form";
+import { SupplierForm, initialSuppliers } from "@/components/supplier-form";
 
 export default function POSPage() {
   // ===== Top-level View State =====
@@ -679,7 +679,7 @@ export default function POSPage() {
     );
   }
   if (view === "purchase-form") {
-    return <PurchaseForm onBack={() => setView("pos")} products={products} groups={groups} suppliers={groups.map(g => ({ id: g.id, name: g.name }))} />;
+    return <PurchaseForm onBack={() => setView("pos")} products={products} groups={groups} suppliers={initialSuppliers} />;
   }
   if (view === "telephone") {
     return <TelephoneModule onBack={() => setView("pos")} products={products} />;

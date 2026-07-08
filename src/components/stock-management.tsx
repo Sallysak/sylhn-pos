@@ -2857,7 +2857,7 @@ function StocktakeDashboard({
   };
 
   // ===== Tab state for the dashboard =====
-  const [dashboardTab, setDashboardTab] = useState<'overview' | 'trend' | 'reorder' | 'notify'>('overview');
+  const [dashboardTab, setDashboardTab] = useState<'overview' | 'trend' | 'reorder' | 'notify' | 'compliance' | 'alerts'>('overview');
 
   // ===== Variance trend chart geometry (pure SVG, no charting library needed) =====
   const chart = useMemo(() => {
@@ -2997,6 +2997,201 @@ function StocktakeDashboard({
     return entries;
   }, [history, drillDownProduct]);
 
+  // ===== Compliance report: per-staff stocktake history =====
+  // Groups all 'adjusted' history entries by user, computing:
+  //   - total stocktake events performed
+  //   - total items adjusted
+  //   - total variance (sum of quantityChange)
+  //   - on-time vs overdue rate (based on schedule frequency)
+  //   - average variance per event
+  const complianceData = useMemo(() => {
+    const staffMap = new Map<string, {
+      user: string;
+      events: number;
+      itemsAdjusted: number;
+      totalVariance: number;
+      surplusItems: number;
+      shortageItems: number;
+      firstEvent: string;
+      lastEvent: string;
+    }>();
+
+    // Get all adjusted entries grouped by reference first (to count events properly)
+    const eventMap = new Map<string, { user: string; timestamp: string; entries: StockHistoryEntry[] }>();
+    history.forEach(h => {
+      if (h.action !== 'adjusted' || !h.reference) return;
+      const existing = eventMap.get(h.reference);
+      if (existing) {
+        existing.entries.push(h);
+        if (h.timestamp > existing.timestamp) existing.timestamp = h.timestamp;
+      } else {
+        eventMap.set(h.reference, { user: h.user, timestamp: h.timestamp, entries: [h] });
+      }
+    });
+
+    // Now aggregate per user
+    eventMap.forEach(event => {
+      const user = event.user || 'Unknown';
+      const existing = staffMap.get(user);
+      const eventVariance = event.entries.reduce((s, e) => s + e.quantityChange, 0);
+      const eventSurplus = event.entries.filter(e => e.quantityChange > 0).length;
+      const eventShortage = event.entries.filter(e => e.quantityChange < 0).length;
+      if (existing) {
+        existing.events += 1;
+        existing.itemsAdjusted += event.entries.length;
+        existing.totalVariance += eventVariance;
+        existing.surplusItems += eventSurplus;
+        existing.shortageItems += eventShortage;
+        if (event.timestamp < existing.firstEvent) existing.firstEvent = event.timestamp;
+        if (event.timestamp > existing.lastEvent) existing.lastEvent = event.timestamp;
+      } else {
+        staffMap.set(user, {
+          user,
+          events: 1,
+          itemsAdjusted: event.entries.length,
+          totalVariance: eventVariance,
+          surplusItems: eventSurplus,
+          shortageItems: eventShortage,
+          firstEvent: event.timestamp,
+          lastEvent: event.timestamp,
+        });
+      }
+    });
+
+    // Compute on-time vs overdue per staff (based on gaps between consecutive events)
+    const sortedEvents = Array.from(eventMap.values()).sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+    const thresholdDays = scheduleFreq === 'weekly' ? 7 : scheduleFreq === 'biweekly' ? 14 : scheduleFreq === 'monthly' ? 30 : 90;
+
+    const staffCompliance = Array.from(staffMap.values()).map(staff => {
+      // Get this staff's events sorted chronologically
+      const staffEvents = sortedEvents.filter(e => (e.user || 'Unknown') === staff.user);
+      let onTimeCount = 0;
+      let overdueCount = 0;
+      for (let i = 1; i < staffEvents.length; i++) {
+        const gap = Math.floor((new Date(staffEvents[i].timestamp).getTime() - new Date(staffEvents[i - 1].timestamp).getTime()) / (1000 * 60 * 60 * 24));
+        if (gap <= thresholdDays) onTimeCount++;
+        else overdueCount++;
+      }
+      // Also check if the most recent event is overdue relative to now
+      if (staffEvents.length > 0) {
+        const lastGap = Math.floor((Date.now() - new Date(staffEvents[staffEvents.length - 1].timestamp).getTime()) / (1000 * 60 * 60 * 24));
+        if (lastGap > thresholdDays) overdueCount++;
+        else onTimeCount++;
+      }
+      const totalChecks = onTimeCount + overdueCount;
+      const onTimeRate = totalChecks > 0 ? Math.round((onTimeCount / totalChecks) * 100) : 100;
+      return {
+        ...staff,
+        avgVariancePerEvent: staff.events > 0 ? Math.round(staff.totalVariance / staff.events) : 0,
+        onTimeCount,
+        overdueCount,
+        onTimeRate,
+      };
+    }).sort((a, b) => b.events - a.events);
+
+    return staffCompliance;
+  }, [history, scheduleFreq]);
+
+  // ===== Per-product variance alert thresholds (persisted to localStorage) =====
+  // Each product can have a custom threshold (% of current stock). When a stocktake
+  // reveals shrinkage exceeding this threshold, the product is flagged in the Alerts tab.
+  const THRESHOLD_KEY = 'sylhn-variance-thresholds';
+  const [varianceThresholds, setVarianceThresholds] = useState<Record<string, number>>({});
+  const [globalThreshold, setGlobalThreshold] = useState(5); // default 5%
+  const [thresholdEditProduct, setThresholdEditProduct] = useState<string | null>(null);
+  const [thresholdEditValue, setThresholdEditValue] = useState<number>(5);
+
+  // Load thresholds on mount
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const cached = window.localStorage.getItem(THRESHOLD_KEY);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed.thresholds) setVarianceThresholds(parsed.thresholds);
+        if (typeof parsed.global === 'number') setGlobalThreshold(parsed.global);
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  // Persist thresholds
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(THRESHOLD_KEY, JSON.stringify({
+        thresholds: varianceThresholds,
+        global: globalThreshold,
+      }));
+    } catch { /* ignore */ }
+  }, [varianceThresholds, globalThreshold]);
+
+  // ===== Build alert list: products whose latest stocktake variance exceeds their threshold =====
+  const varianceAlerts = useMemo(() => {
+    const alerts: Array<{
+      productId: string;
+      productName: string;
+      sku: string;
+      emoji: string;
+      currentStock: number;
+      lastVariance: number;
+      threshold: number;
+      thresholdPct: number;
+      severity: 'critical' | 'warning' | 'ok';
+      lastStocktakeDate: string;
+      lastReference: string;
+    }> = [];
+
+    // For each product that has at least one 'adjusted' entry, check the most recent one
+    const productLatest = new Map<string, StockHistoryEntry>();
+    history.forEach(h => {
+      if (h.action !== 'adjusted') return;
+      const existing = productLatest.get(h.productId);
+      if (!existing || h.timestamp > existing.timestamp) {
+        productLatest.set(h.productId, h);
+      }
+    });
+
+    productLatest.forEach(entry => {
+      const product = products.find(p => p.id === entry.productId);
+      if (!product) return;
+      // Shrinkage = negative variance
+      const shrinkage = Math.abs(Math.min(0, entry.quantityChange));
+      if (shrinkage === 0) return; // no shrinkage, no alert
+      // Threshold % — use product-specific if set, otherwise global
+      const thresholdPct = varianceThresholds[entry.productId] ?? globalThreshold;
+      // Compute threshold in units: threshold% of the new quantity (counted)
+      const thresholdUnits = (thresholdPct / 100) * Math.max(1, entry.newQuantity);
+      const threshold = thresholdUnits;
+      // Severity
+      let severity: 'critical' | 'warning' | 'ok';
+      if (shrinkage >= threshold * 2) severity = 'critical';
+      else if (shrinkage >= threshold) severity = 'warning';
+      else severity = 'ok';
+      // Only include if severity is warning or critical
+      if (severity === 'ok') return;
+      alerts.push({
+        productId: entry.productId,
+        productName: entry.productName,
+        sku: entry.sku,
+        emoji: product.emoji,
+        currentStock: product.stock,
+        lastVariance: entry.quantityChange,
+        threshold,
+        thresholdPct,
+        severity,
+        lastStocktakeDate: entry.timestamp,
+        lastReference: entry.reference || '',
+      });
+    });
+
+    // Sort: critical first, then by shrinkage amount descending
+    return alerts.sort((a, b) => {
+      if (a.severity === 'critical' && b.severity !== 'critical') return -1;
+      if (a.severity !== 'critical' && b.severity === 'critical') return 1;
+      return Math.abs(b.lastVariance) - Math.abs(a.lastVariance);
+    });
+  }, [history, products, varianceThresholds, globalThreshold]);
+
   const handleExport = () => {
     if (stocktakeEvents.length === 0) { toast({ title: 'No data to export', variant: 'destructive' }); return; }
     import('xlsx').then((XLSX) => {
@@ -3103,7 +3298,9 @@ function StocktakeDashboard({
           {([
             { id: 'overview' as const, label: 'Overview', icon: TrendingUp, badge: recentEvents.length },
             { id: 'trend' as const, label: 'Variance Trend', icon: TrendingUp, badge: trendData.length },
-            { id: 'reorder' as const, label: 'Reorder Suggestions', icon: Package, badge: reorderSuggestions.length },
+            { id: 'reorder' as const, label: 'Reorder', icon: Package, badge: reorderSuggestions.length },
+            { id: 'alerts' as const, label: 'Alerts', icon: AlertTriangle, badge: varianceAlerts.length },
+            { id: 'compliance' as const, label: 'Compliance', icon: User, badge: complianceData.length },
             { id: 'notify' as const, label: 'Notifications', icon: Mail, badge: null },
           ]).map(tab => (
             <button
@@ -3121,7 +3318,11 @@ function StocktakeDashboard({
               {tab.badge !== null && tab.badge > 0 && (
                 <span className={cn(
                   "ml-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold",
-                  dashboardTab === tab.id ? "bg-purple-600 text-white" : "bg-slate-200 text-slate-600"
+                  dashboardTab === tab.id
+                    ? tab.id === 'alerts' ? "bg-rose-600 text-white"
+                    : "bg-purple-600 text-white"
+                    : tab.id === 'alerts' ? "bg-rose-200 text-rose-700"
+                    : "bg-slate-200 text-slate-600"
                 )}>
                   {tab.badge}
                 </span>
@@ -3578,6 +3779,231 @@ function StocktakeDashboard({
                   {stocktakeStatus.isOverdue ? 'Currently overdue — alerts can be sent' : 'Not currently overdue'}
                 </span>
               </div>
+            </div>
+          )}
+
+          {/* ===== Compliance tab (per-staff stocktake history) ===== */}
+          {dashboardTab === 'compliance' && (
+            <div className="p-3 space-y-3">
+              <div className="bg-blue-50 ring-1 ring-blue-200 rounded-lg p-3 flex items-start gap-2">
+                <User className="h-4 w-4 text-blue-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <div className="text-xs font-bold text-blue-800">Stocktake Compliance Report</div>
+                  <div className="text-[10px] text-blue-700 mt-0.5">
+                    Per-staff stocktake performance: events performed, on-time vs overdue rate (based on {scheduleFreq} schedule),
+                    average variance per event, and total items adjusted. Use this to identify staff who need reminders or training.
+                  </div>
+                </div>
+              </div>
+
+              {complianceData.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+                  <User className="h-10 w-10 mb-2 opacity-40" />
+                  <div className="text-sm font-medium">No staff stocktake data yet</div>
+                  <div className="text-xs mt-1">Perform stocktakes to see per-staff compliance metrics</div>
+                </div>
+              ) : (
+                <>
+                  {/* Staff compliance cards */}
+                  <div className="space-y-2">
+                    {complianceData.map((staff, idx) => (
+                      <motion.div
+                        key={staff.user}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: Math.min(idx * 0.05, 0.3) }}
+                        className="bg-white rounded-lg ring-1 ring-slate-200 p-3 hover:ring-blue-300 transition"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <div className={cn(
+                              "h-9 w-9 rounded-lg flex items-center justify-center text-xs font-bold",
+                              staff.onTimeRate >= 80 ? "bg-emerald-100 text-emerald-700" :
+                              staff.onTimeRate >= 50 ? "bg-amber-100 text-amber-700" :
+                              "bg-rose-100 text-rose-700"
+                            )}>
+                              {staff.user.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <div className="font-bold text-slate-800 text-sm">{staff.user}</div>
+                              <div className="text-[10px] text-slate-500">
+                                {staff.events} event(s) · {staff.itemsAdjusted} items adjusted
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className={cn(
+                              "text-lg font-bold font-mono",
+                              staff.onTimeRate >= 80 ? "text-emerald-600" :
+                              staff.onTimeRate >= 50 ? "text-amber-600" :
+                              "text-rose-600"
+                            )}>
+                              {staff.onTimeRate}%
+                            </div>
+                            <div className="text-[10px] text-slate-500">on-time rate</div>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-5 gap-2 text-[10px]">
+                          <div className="text-center bg-slate-50 rounded p-1">
+                            <div className="text-slate-500">On-time</div>
+                            <div className="font-bold text-emerald-700 font-mono">{staff.onTimeCount}</div>
+                          </div>
+                          <div className="text-center bg-slate-50 rounded p-1">
+                            <div className="text-slate-500">Overdue</div>
+                            <div className="font-bold text-rose-700 font-mono">{staff.overdueCount}</div>
+                          </div>
+                          <div className="text-center bg-slate-50 rounded p-1">
+                            <div className="text-slate-500">Avg Var</div>
+                            <div className={cn("font-bold font-mono", staff.avgVariancePerEvent > 0 ? "text-emerald-700" : staff.avgVariancePerEvent < 0 ? "text-rose-700" : "text-slate-600")}>
+                              {staff.avgVariancePerEvent > 0 ? '+' : ''}{staff.avgVariancePerEvent}
+                            </div>
+                          </div>
+                          <div className="text-center bg-slate-50 rounded p-1">
+                            <div className="text-slate-500">Surplus</div>
+                            <div className="font-bold text-emerald-700 font-mono">{staff.surplusItems}</div>
+                          </div>
+                          <div className="text-center bg-slate-50 rounded p-1">
+                            <div className="text-slate-500">Shortage</div>
+                            <div className="font-bold text-rose-700 font-mono">{staff.shortageItems}</div>
+                          </div>
+                        </div>
+                        <div className="mt-2 text-[9px] text-slate-400">
+                          First: {new Date(staff.firstEvent).toLocaleDateString('en-GB')} · Last: {new Date(staff.lastEvent).toLocaleDateString('en-GB')}
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* ===== Alerts tab (per-product variance thresholds) ===== */}
+          {dashboardTab === 'alerts' && (
+            <div className="p-3 space-y-3">
+              <div className="bg-rose-50 ring-1 ring-rose-200 rounded-lg p-3 flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 text-rose-600 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <div className="text-xs font-bold text-rose-800">Variance Alert Thresholds</div>
+                  <div className="text-[10px] text-rose-700 mt-0.5">
+                    Products are flagged when their latest stocktake shrinkage exceeds the threshold (as a % of counted stock).
+                    <strong> Warning</strong> = shrinkage ≥ threshold · <strong>Critical</strong> = shrinkage ≥ 2× threshold.
+                    Set a global default below, or click a product to set a custom threshold.
+                  </div>
+                </div>
+              </div>
+
+              {/* Global threshold control */}
+              <div className="bg-white rounded-lg ring-1 ring-slate-200 p-3 flex items-center gap-3">
+                <label className="text-xs font-bold text-slate-700">Global threshold:</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={globalThreshold}
+                  onChange={(e) => setGlobalThreshold(Math.max(1, Math.min(100, parseInt(e.target.value) || 5)))}
+                  className="w-16 h-7 px-2 text-xs font-mono border border-slate-300 rounded outline-none focus:ring-1 focus:ring-rose-400"
+                />
+                <span className="text-xs text-slate-600">% of counted stock</span>
+                <div className="flex-1" />
+                <span className="text-[10px] text-slate-500">
+                  {varianceAlerts.length} product(s) currently flagged · {varianceAlerts.filter(a => a.severity === 'critical').length} critical
+                </span>
+              </div>
+
+              {varianceAlerts.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+                  <CheckCircle2 className="h-10 w-10 mb-2 opacity-40 text-emerald-500" />
+                  <div className="text-sm font-medium">No variance alerts</div>
+                  <div className="text-xs mt-1">All products are within their threshold. Adjust the global threshold above to see more alerts.</div>
+                </div>
+              ) : (
+                <>
+                  {/* Alerts list */}
+                  <div className="bg-white rounded-lg ring-1 ring-slate-200 overflow-hidden">
+                    <div className="grid grid-cols-[1.5fr_60px_70px_70px_70px_60px_60px] gap-0 px-3 py-1.5 text-[9px] font-bold text-white" style={{ backgroundColor: '#BE123C' }}>
+                      <div>Product</div>
+                      <div className="text-right">Stock</div>
+                      <div className="text-right">Shrinkage</div>
+                      <div className="text-right">Threshold</div>
+                      <div className="text-right">% of Stock</div>
+                      <div className="text-center">Severity</div>
+                      <div className="text-center">Set %</div>
+                    </div>
+                    <div className="max-h-64 overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
+                      {varianceAlerts.map((alert, idx) => {
+                        const actualPct = alert.threshold > 0 ? (Math.abs(alert.lastVariance) / alert.threshold) * alert.thresholdPct : 0;
+                        const isEditing = thresholdEditProduct === alert.productId;
+                        return (
+                          <motion.div
+                            key={alert.productId}
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: Math.min(idx * 0.03, 0.3) }}
+                            className={cn(
+                              "grid grid-cols-[1.5fr_60px_70px_70px_70px_60px_60px] gap-0 px-3 py-2 text-[10px] border-b border-slate-50 transition",
+                              alert.severity === 'critical' ? "bg-rose-50/50 hover:bg-rose-100" : "bg-amber-50/30 hover:bg-amber-100"
+                            )}
+                          >
+                            <div className="min-w-0">
+                              <div className="font-semibold text-slate-800 truncate">{alert.emoji} {alert.productName}</div>
+                              <div className="text-[9px] text-slate-500 truncate font-mono">{alert.sku} · {alert.lastReference}</div>
+                            </div>
+                            <div className="text-right font-mono text-slate-700">{alert.currentStock}</div>
+                            <div className="text-right font-mono font-bold text-rose-700">−{Math.abs(alert.lastVariance)}</div>
+                            <div className="text-right font-mono text-slate-600">{alert.threshold.toFixed(1)}</div>
+                            <div className="text-right font-mono font-bold text-rose-700">{alert.thresholdPct}%</div>
+                            <div className="text-center">
+                              <span className={cn(
+                                "px-1.5 py-0.5 rounded text-[8px] font-bold uppercase text-white",
+                                alert.severity === 'critical' ? "bg-rose-600" : "bg-amber-500"
+                              )}>
+                                {alert.severity}
+                              </span>
+                            </div>
+                            <div className="text-center">
+                              {isEditing ? (
+                                <div className="flex items-center gap-0.5 justify-center">
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    max="100"
+                                    value={thresholdEditValue}
+                                    onChange={(e) => setThresholdEditValue(Math.max(1, Math.min(100, parseInt(e.target.value) || 5)))}
+                                    className="w-10 h-5 px-1 text-[9px] font-mono border border-slate-300 rounded outline-none focus:ring-1 focus:ring-rose-400"
+                                    autoFocus
+                                  />
+                                  <button
+                                    onClick={() => {
+                                      setVarianceThresholds(prev => ({ ...prev, [alert.productId]: thresholdEditValue }));
+                                      setThresholdEditProduct(null);
+                                      toast({ title: 'Threshold set', description: `${alert.productName}: ${thresholdEditValue}%` });
+                                    }}
+                                    className="h-5 w-5 rounded bg-emerald-600 text-white flex items-center justify-center"
+                                  >
+                                    <CheckCircle2 className="h-3 w-3" />
+                                  </button>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => {
+                                    setThresholdEditProduct(alert.productId);
+                                    setThresholdEditValue(alert.thresholdPct);
+                                  }}
+                                  className="h-5 px-1.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 text-[9px] font-semibold transition"
+                                  title="Set custom threshold for this product"
+                                >
+                                  {alert.thresholdPct}%
+                                </button>
+                              )}
+                            </div>
+                          </motion.div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>

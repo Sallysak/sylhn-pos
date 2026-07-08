@@ -14,8 +14,8 @@ import { cn } from "@/lib/utils";
 import { COMPANY, CURRENCY, formatGHS, type Product } from "@/lib/pos-data";
 import { PopupWindow } from "@/components/popup-window";
 
-// Supplier interface
-interface Supplier {
+// Supplier interface — exported so other components (e.g. PurchaseForm) can use real supplier data
+export interface Supplier {
   id: string;
   code: string;
   name: string;
@@ -37,12 +37,17 @@ interface Supplier {
   notes: string;
 }
 
-// Sample suppliers
-const initialSuppliers: Supplier[] = [
+// Sample suppliers — exported so page.tsx can pass real supplier data to PurchaseForm
+export const initialSuppliers: Supplier[] = [
   { id: "s1", code: "00008", name: "Som Agency", address: "123 Main St", city: "Accra", state: "Greater Accra", country: "Ghana", phone: "+233 24 111 2222", mobile: "+233 24 111 2222", fax: "", email: "som@agency.com", contactName: "Som Manager", businessNo: "BN-001", title: "Mr", tradingTerms: "Net 30", creditLimit: 5000, balance: 5334, taxInclusive: false, notes: "" },
   { id: "s2", code: "00002", name: "Sri Sri", address: "456 Market Rd", city: "Kumasi", state: "Ashanti", country: "Ghana", phone: "+233 24 333 4444", mobile: "+233 24 333 4444", fax: "", email: "srisri@mail.com", contactName: "Sri Manager", businessNo: "BN-002", title: "Ms", tradingTerms: "Net 15", creditLimit: 3000, balance: 0, taxInclusive: true, notes: "" },
   { id: "s3", code: "00003", name: "Uday Banerjee", address: "789 Trade St", city: "Tema", state: "Greater Accra", country: "Ghana", phone: "+233 24 555 6666", mobile: "+233 24 555 6666", fax: "", email: "uday@mail.com", contactName: "Uday", businessNo: "BN-003", title: "Mr", tradingTerms: "COD", creditLimit: 2000, balance: 0, taxInclusive: false, notes: "" },
   { id: "s4", code: "00009", name: "Test Supplier", address: "", city: "", state: "", country: "", phone: "", mobile: "", fax: "", email: "", contactName: "", businessNo: "", title: "", tradingTerms: "", creditLimit: 0, balance: 0, taxInclusive: false, notes: "" },
+  { id: "s5", code: "00010", name: "AgriCorp Ghana", address: "Kumasi, Ashanti Region", city: "Kumasi", state: "Ashanti", country: "Ghana", phone: "+233 51 100 200", mobile: "+233 24 111 9999", fax: "+233 51 100 300", email: "sales@agricorp.gh", contactName: "AgriCorp Manager", businessNo: "BN-004", title: "Mr", tradingTerms: "Net 30", creditLimit: 8000, balance: 1250, taxInclusive: false, notes: "Primary fruit supplier" },
+  { id: "s6", code: "00011", name: "Global Foods GH", address: "Tema Industrial Area, Accra", city: "Tema", state: "Greater Accra", country: "Ghana", phone: "+233 30 333 555", mobile: "+233 24 333 4444", fax: "", email: "sales@globalfoods.gh", contactName: "Global Foods Manager", businessNo: "BN-005", title: "Mr", tradingTerms: "Net 15", creditLimit: 10000, balance: 3200, taxInclusive: true, notes: "Packaged foods distributor" },
+  { id: "s7", code: "00012", name: "Fan Milk Ghana", address: "Tema, Greater Accra", city: "Tema", state: "Greater Accra", country: "Ghana", phone: "+233 30 333 555", mobile: "+233 24 333 4444", fax: "", email: "orders@fanmilk.gh", contactName: "Fan Milk Rep", businessNo: "BN-006", title: "Mr", tradingTerms: "Net 30", creditLimit: 5000, balance: 850, taxInclusive: true, notes: "Dairy supplier" },
+  { id: "s8", code: "00013", name: "Darko Farms", address: "Dodowa, Eastern Region", city: "Dodowa", state: "Eastern", country: "Ghana", phone: "+233 24 555 6666", mobile: "+233 24 555 6666", fax: "", email: "info@darkofarms.gh", contactName: "Darko Farms Manager", businessNo: "BN-007", title: "Mr", tradingTerms: "COD", creditLimit: 2000, balance: 0, taxInclusive: false, notes: "Vegetable supplier" },
+  { id: "s9", code: "00014", name: "Unilever Ghana", address: "Spintex Road, Accra", city: "Accra", state: "Greater Accra", country: "Ghana", phone: "+233 24 999 0000", mobile: "+233 24 999 0000", fax: "", email: "orders@unilever.gh", contactName: "Unilever Rep", businessNo: "BN-008", title: "Mrs", tradingTerms: "Net 60", creditLimit: 15000, balance: 1800, taxInclusive: true, notes: "Household products supplier" },
 ];
 
 // Purchase line item
