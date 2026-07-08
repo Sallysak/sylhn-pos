@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Save, Printer, Trash2, Upload, Download, X, Search as SearchIcon,
-  Package, AlertTriangle, TrendingUp, ScanLine, FileText,
+  Package, AlertTriangle, TrendingUp, ScanLine, FileText, Zap,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -12,6 +12,7 @@ import {
   COMPANY, formatGHS, type Product, type StockGroup, type StockHistoryEntry,
 } from "@/lib/pos-data";
 import { PopupWindow } from "@/components/popup-window";
+import { QuickStockAdjustment } from "@/components/quick-stock-adjustment";
 
 // ===== Light blue palette (matches reference image) =====
 const HEADER_DARK_BLUE = '#1E5A8E';     // dark blue title bar
@@ -117,6 +118,13 @@ export function StockQuantityAdjustment({
 
   // ===== Compare-with-last-Stocktake report state =====
   const [showCompareReport, setShowCompareReport] = useState(false);
+
+  // ===== Quick Stock Adjustment popup state =====
+  // Opens the QuickStockAdjustment popup from within this form.
+  // When a quick adjustment is saved, the adjusted product is automatically
+  // added/updated in this form's table — relating the two forms.
+  const [showQuickAdjust, setShowQuickAdjust] = useState(false);
+  const [quickAdjustProductId, setQuickAdjustProductId] = useState<string | undefined>(undefined);
 
   // ===== Barcode scanner mode state =====
   // Barcode scanners act as HID keyboards — they type characters rapidly (within ~50ms)
@@ -1055,7 +1063,7 @@ export function StockQuantityAdjustment({
                 <div
                   key={l.id}
                   onClick={() => setSelectedLine(idx)}
-                  className="grid grid-cols-[40px_120px_1fr_70px_70px_70px_90px_90px] gap-0 px-2 py-0.5 text-[10px] cursor-pointer border-b"
+                  className="grid grid-cols-[40px_120px_1fr_70px_70px_70px_90px_90px_24px] gap-0 px-2 py-0.5 text-[10px] cursor-pointer border-b group"
                   style={{
                     backgroundColor: isSelected ? '#D6E6F5' : (idx % 2 === 1 ? '#F8F8F8' : '#FFFFFF'),
                     borderColor: '#E0E0E0',
@@ -1086,6 +1094,22 @@ export function StockQuantityAdjustment({
                     />
                   </div>
                   <div className="text-right font-mono font-semibold text-slate-800">{l.total.toFixed(3)}</div>
+                  {/* Quick Adjust button per row */}
+                  <div className="flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      onClick={() => {
+                        setQuickAdjustProductId(l.productId);
+                        setShowQuickAdjust(true);
+                      }}
+                      className={cn(
+                        "h-4 w-4 rounded flex items-center justify-center transition",
+                        isSelected ? "bg-emerald-500 text-white opacity-100" : "bg-emerald-100 text-emerald-600 opacity-0 group-hover:opacity-100"
+                      )}
+                      title="Quick Adjust this product"
+                    >
+                      <Zap className="h-2.5 w-2.5" />
+                    </button>
+                  </div>
                 </div>
               );
             })
@@ -1172,6 +1196,22 @@ export function StockQuantityAdjustment({
             </span>
           )}
         </button>
+        <button
+          onClick={() => {
+            // If a line is selected, pre-select that product in the Quick Adjust popup
+            if (selectedLine !== null && lines[selectedLine]) {
+              setQuickAdjustProductId(lines[selectedLine].productId);
+            } else {
+              setQuickAdjustProductId(undefined);
+            }
+            setShowQuickAdjust(true);
+          }}
+          className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1 transition shadow-sm"
+          style={{ backgroundColor: '#059669' }}
+          title="Open Quick Stock Adjustment for a single product — adjustments are synced back to this form"
+        >
+          <Zap className="h-3 w-3" style={{ color: '#FFC107' }} /> Quick Adjust
+        </button>
         <div className="flex-1" />
         {selectedLine !== null && lines[selectedLine] && (
           <button
@@ -1197,6 +1237,10 @@ export function StockQuantityAdjustment({
           </span>
         )}
         <div className="flex-1" />
+        <span className="text-emerald-700 font-semibold flex items-center gap-0.5">
+          <Zap className="h-2.5 w-2.5" /> Quick Adjust available — click the button to adjust a single product
+        </span>
+        <span>·</span>
         <span>{COMPANY.name} · {COMPANY.address}</span>
       </div>
 
@@ -1228,6 +1272,24 @@ export function StockQuantityAdjustment({
             rows={comparisonRows}
             totals={comparisonTotals}
             onClose={() => setShowCompareReport(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ===== Quick Stock Adjustment Popup ===== */}
+      {/* Opens the QuickStockAdjustment from within this form.
+          When a quick adjustment is saved, the product's new quantity
+          is synced back to this form's table (adding or updating the line). */}
+      <AnimatePresence>
+        {showQuickAdjust && (
+          <QuickStockAdjustment
+            products={products}
+            setProducts={setProducts}
+            setHistory={setHistory}
+            history={history}
+            groups={groups}
+            onClose={() => { setShowQuickAdjust(false); setQuickAdjustProductId(undefined); }}
+            initialProductId={quickAdjustProductId}
           />
         )}
       </AnimatePresence>
