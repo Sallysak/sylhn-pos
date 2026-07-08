@@ -114,8 +114,69 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
   const [listPopupMode, setListPopupMode] = useState<ListPopupMode>('none');
   const [paidAmount, setPaidAmount] = useState(0);
   const [saved, setSaved] = useState(false);
+  const [showDraftBanner, setShowDraftBanner] = useState(false);
 
   const findPartNoRef = useRef<HTMLInputElement>(null);
+
+  // ===== Detect reorder-suggestions draft on mount =====
+  // If the user clicked "Create Purchase Order" from the Stocktake Dashboard,
+  // a draft is saved in localStorage under 'sylhn-po-draft-from-reorder'.
+  // We show a banner offering to load it.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const draftRaw = window.localStorage.getItem('sylhn-po-draft-from-reorder');
+      if (draftRaw) {
+        const draft = JSON.parse(draftRaw);
+        if (draft && Array.isArray(draft.lines) && draft.lines.length > 0) {
+          setShowDraftBanner(true);
+        }
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  // ===== Load the reorder draft into the form =====
+  const loadReorderDraft = () => {
+    try {
+      const draftRaw = window.localStorage.getItem('sylhn-po-draft-from-reorder');
+      if (!draftRaw) { toast({ title: 'No draft found', variant: 'destructive' }); return; }
+      const draft = JSON.parse(draftRaw);
+      // Load lines
+      setLines(draft.lines.map((l: any) => ({
+        id: l.id || `line-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        partNo: l.partNo,
+        details: l.details,
+        emoji: l.emoji || '',
+        quantity: l.quantity,
+        cost: l.cost,
+        expiry: l.expiry || '',
+        tax: l.tax ?? true,
+        total: l.total,
+      })));
+      // Load other fields
+      if (draft.supplier) setSupplier(draft.supplier);
+      if (draft.refNo) setRefNo(draft.refNo);
+      if (draft.details) {
+        // Use the draft details as the order notes
+      }
+      // Clear the draft from localStorage (so it doesn't reappear next time)
+      window.localStorage.removeItem('sylhn-po-draft-from-reorder');
+      setShowDraftBanner(false);
+      setSaved(false);
+      toast({
+        title: 'Reorder draft loaded',
+        description: `${draft.lines.length} items · ${formatGHS(draft.totalCost || 0)}`,
+      });
+    } catch {
+      toast({ title: 'Failed to load draft', variant: 'destructive' });
+    }
+  };
+
+  // ===== Dismiss the draft banner without loading =====
+  const dismissDraftBanner = () => {
+    try { window.localStorage.removeItem('sylhn-po-draft-from-reorder'); } catch { /* ignore */ }
+    setShowDraftBanner(false);
+  };
 
   const totals = useMemo(() => {
     const totalQty = lines.reduce((s, l) => s + l.quantity, 0);
@@ -413,6 +474,42 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
               </div>
             </div>
           </div>
+
+          {/* ===== Reorder Draft Banner (shown when a draft from Stocktake Dashboard is detected) ===== */}
+          <AnimatePresence>
+            {showDraftBanner && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="flex-shrink-0 overflow-hidden"
+              >
+                <div className="px-3 py-2 bg-emerald-50 border-b border-emerald-200 flex items-center gap-3">
+                  <Package className="h-5 w-5 text-emerald-600 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[11px] font-bold text-emerald-800">Reorder Draft Available</div>
+                    <div className="text-[10px] text-emerald-700">
+                      A purchase order draft from the Stocktake Dashboard Reorder Suggestions was detected.
+                      Click "Load Draft" to populate the form with suggested reorder quantities.
+                    </div>
+                  </div>
+                  <button
+                    onClick={loadReorderDraft}
+                    className="h-7 px-3 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold flex items-center gap-1 transition shadow-sm"
+                  >
+                    <Package className="h-3 w-3" /> Load Draft
+                  </button>
+                  <button
+                    onClick={dismissDraftBanner}
+                    className="h-7 w-7 rounded bg-white hover:bg-emerald-100 text-emerald-700 flex items-center justify-center transition border border-emerald-300"
+                    title="Dismiss"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Supplier Bar */}
           <div className="flex-shrink-0 px-3 py-1.5 bg-slate-50 border-b border-slate-300 flex items-center gap-3">

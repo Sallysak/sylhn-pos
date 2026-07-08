@@ -112,6 +112,152 @@ export default function POSPage() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
+  // ===== Background Stocktake Overdue Check =====
+  // Runs every 5 minutes while the app is open. Checks if a stocktake is overdue
+  // based on the configured schedule. If newly overdue (not previously notified),
+  // fires a browser notification + optional email/SMS via mailto:/sms:.
+  useEffect(() => {
+    const SCHEDULE_KEY = 'sylhn-stocktake-schedule';
+    const NOTIFY_KEY = 'sylhn-stocktake-notifications';
+    const NOTIFIED_KEY = 'sylhn-stocktake-last-notified';
+
+    const checkOverdue = () => {
+      if (typeof window === 'undefined') return;
+
+      // Load schedule settings
+      let scheduleFreq: 'weekly' | 'biweekly' | 'monthly' | 'quarterly' = 'weekly';
+      try {
+        const cached = window.localStorage.getItem(SCHEDULE_KEY);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed.freq) scheduleFreq = parsed.freq;
+        }
+      } catch { /* ignore */ }
+
+      // Find the most recent stocktake (action='adjusted')
+      const adjustedEntries = history.filter(h => h.action === 'adjusted');
+      let lastDate: Date | null = null;
+      let lastReference: string | null = null;
+
+      if (adjustedEntries.length > 0) {
+        const sorted = [...adjustedEntries].sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+        lastDate = new Date(sorted[0].timestamp);
+        lastReference = sorted[0].reference || null;
+      }
+
+      const now = new Date();
+      const thresholdDays = scheduleFreq === 'weekly' ? 7 : scheduleFreq === 'biweekly' ? 14 : scheduleFreq === 'monthly' ? 30 : 90;
+
+      let isOverdue = false;
+      let daysOverdue = 0;
+      let nextDueDate = '';
+
+      if (lastDate) {
+        const diffDays = Math.floor((now.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
+        isOverdue = diffDays >= thresholdDays;
+        daysOverdue = diffDays - thresholdDays;
+        nextDueDate = new Date(lastDate.getTime() + thresholdDays * 86400000).toISOString().split('T')[0];
+      } else {
+        // No previous stocktake — treat as overdue
+        isOverdue = true;
+        daysOverdue = Math.floor((now.getTime() - new Date('2026-01-01').getTime()) / (1000 * 60 * 60 * 24));
+        nextDueDate = now.toISOString().split('T')[0];
+      }
+
+      if (!isOverdue) return;
+
+      // Check if we've already notified for this specific due date
+      let lastNotified = '';
+      try {
+        lastNotified = window.localStorage.getItem(NOTIFIED_KEY) || '';
+      } catch { /* ignore */ }
+
+      if (lastNotified === nextDueDate) return; // already notified for this cycle
+
+      // ===== Fire notification =====
+      // 1. Browser notification (if permission granted)
+      if ('Notification' in window && Notification.permission === 'granted') {
+        try {
+          new Notification('Stocktake Overdue', {
+            body: `Stocktake is ${daysOverdue} day(s) overdue. Last: ${lastReference || 'Never'}. Click to open Stock Management.`,
+            icon: '/favicon.ico',
+            tag: 'stocktake-overdue',
+          });
+        } catch { /* ignore */ }
+      }
+
+      // 2. Email/SMS (if enabled and recipients configured)
+      let notifyEmails = '';
+      let notifyPhones = '';
+      let emailEnabled = true;
+      let smsEnabled = false;
+      try {
+        const notifyCached = window.localStorage.getItem(NOTIFY_KEY);
+        if (notifyCached) {
+          const parsed = JSON.parse(notifyCached);
+          notifyEmails = parsed.emails || '';
+          notifyPhones = parsed.phones || '';
+          emailEnabled = parsed.emailEnabled !== false;
+          smsEnabled = parsed.smsEnabled === true;
+        }
+      } catch { /* ignore */ }
+
+      const emails = notifyEmails.split(',').map(s => s.trim()).filter(Boolean);
+      const phones = notifyPhones.split(',').map(s => s.trim()).filter(Boolean);
+
+      // Only auto-send email if it's been more than 1 hour since the last notification
+      // (to avoid spamming on every 5-min check cycle if the user doesn't dismiss)
+      // We use the notified timestamp appended to the NOTIFIED_KEY value
+      const notifiedParts = lastNotified.split('|');
+      const lastNotifiedTime = notifiedParts[1] ? parseInt(notifiedParts[1]) : 0;
+      const oneHour = 60 * 60 * 1000;
+      const shouldSendEmail = (now.getTime() - lastNotifiedTime) > oneHour;
+
+      if (shouldSendEmail) {
+        const subject = encodeURIComponent(`[SYLHN POS] Stocktake Overdue — ${daysOverdue} day(s)`);
+        const body = encodeURIComponent(
+          `STOCKTAKE OVERDUE ALERT\n\n` +
+          `Days overdue: ${daysOverdue}\n` +
+          `Last stocktake: ${lastDate ? lastDate.toLocaleDateString('en-GB') : 'Never'}\n` +
+          `Last reference: ${lastReference || '—'}\n` +
+          `Schedule: ${scheduleFreq}\n` +
+          `Next due date: ${nextDueDate}\n\n` +
+          `This is an automatic alert from SYLHN POS. Please perform a stocktake as soon as possible.\n\n` +
+          `— SYLHN COMPANY LTD`
+        );
+
+        if (emailEnabled && emails.length > 0) {
+          // Open mailto in a new tab to avoid navigating away from the POS
+          try {
+            window.open(`mailto:${emails.join(',')}?subject=${subject}&body=${body}`, '_blank');
+          } catch { /* ignore */ }
+        }
+
+        if (smsEnabled && phones.length > 0) {
+          const smsBody = encodeURIComponent(`[SYLHN POS] Stocktake OVERDUE by ${daysOverdue} day(s). Last: ${lastReference || 'Never'}. Perform stocktake now.`);
+          try {
+            window.location.href = `sms:${phones[0]}?body=${smsBody}`;
+          } catch { /* ignore */ }
+        }
+      }
+
+      // Mark as notified for this due date (with timestamp)
+      try {
+        window.localStorage.setItem(NOTIFIED_KEY, `${nextDueDate}|${now.getTime()}`);
+      } catch { /* ignore */ }
+    };
+
+    // Request notification permission on mount
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => { /* ignore */ });
+    }
+
+    // Run immediately on mount, then every 5 minutes
+    checkOverdue();
+    const interval = setInterval(checkOverdue, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [history]);
+
   // ===== Computed =====
   const filteredProducts = useMemo(() => {
     let result = products;
@@ -517,7 +663,7 @@ export default function POSPage() {
 
   // ===== Render Other Views =====
   if (view === "stock") {
-    return <StockManagement onBack={() => { setView("pos"); setOpenStockQtyReport(false); }} products={products} setProducts={setProducts} groups={groups} setGroups={setGroups} history={history} setHistory={setHistory} initialView={initialStockView} openQtyReport={openStockQtyReport} />;
+    return <StockManagement onBack={() => { setView("pos"); setOpenStockQtyReport(false); }} products={products} setProducts={setProducts} groups={groups} setGroups={setGroups} history={history} setHistory={setHistory} initialView={initialStockView} openQtyReport={openStockQtyReport} onNavigateToPurchase={() => setView("purchase-form")} />;
   }
   if (view === "reports") {
     return <Reports onBack={() => setView("pos")} products={products} groups={groups} history={history} />;

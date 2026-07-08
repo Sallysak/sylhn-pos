@@ -35,9 +35,11 @@ interface StockManagementProps {
   setHistory: React.Dispatch<React.SetStateAction<StockHistoryEntry[]>>;
   initialView?: StockView;
   openQtyReport?: boolean;
+  /** Called when the user wants to navigate to the Purchase menu (e.g. to create a PO from reorder suggestions) */
+  onNavigateToPurchase?: () => void;
 }
 
-export function StockManagement({ onBack, products, setProducts, groups, setGroups, history, setHistory, initialView, openQtyReport }: StockManagementProps) {
+export function StockManagement({ onBack, products, setProducts, groups, setGroups, history, setHistory, initialView, openQtyReport, onNavigateToPurchase }: StockManagementProps) {
   const [view, setView] = useState<StockView>(initialView === "stock-file" || initialView === "stock-search" || initialView === "quantity-adjustment" ? "add-modify" : (initialView || "add-modify"));
   const [showQtyReport, setShowQtyReport] = useState(false);
   const [showStockFilePopup, setShowStockFilePopup] = useState(initialView === "stock-file");
@@ -408,6 +410,7 @@ export function StockManagement({ onBack, products, setProducts, groups, setGrou
               setShowDashboard(false);
               setShowQtyAdjustmentPopup(true);
             }}
+            onNavigateToPurchase={onNavigateToPurchase}
           />
         )}
       </AnimatePresence>
@@ -2581,6 +2584,7 @@ function StocktakeDashboard({
   scheduleFreq,
   onClose,
   onStartStocktake,
+  onNavigateToPurchase,
 }: {
   history: StockHistoryEntry[];
   products: Product[];
@@ -2588,6 +2592,7 @@ function StocktakeDashboard({
   scheduleFreq: 'weekly' | 'biweekly' | 'monthly' | 'quarterly';
   onClose: () => void;
   onStartStocktake: () => void;
+  onNavigateToPurchase?: () => void;
 }) {
   const { toast } = useToast();
 
@@ -2915,6 +2920,82 @@ function StocktakeDashboard({
       toast({ title: 'Exported successfully', description: `${reorderSuggestions.length} suggestions` });
     });
   };
+
+  // ===== Create Purchase Order from reorder suggestions =====
+  // Saves a draft PO to localStorage under 'sylhn-po-draft-from-reorder' and navigates
+  // to the Purchase menu. The PurchaseForm detects the draft on mount and offers to load it.
+  const handleCreatePO = () => {
+    if (reorderSuggestions.length === 0) {
+      toast({ title: 'No suggestions to create PO from', variant: 'destructive' });
+      return;
+    }
+    // Build the draft PO
+    const draftLines = reorderSuggestions.map(s => {
+      const suggestedQty = Math.max(s.reorderLevel * 3 - s.currentStock, s.reorderLevel);
+      return {
+        id: `po-line-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        partNo: s.sku,
+        details: `${s.emoji} ${s.productName}`,
+        emoji: s.emoji,
+        quantity: suggestedQty,
+        cost: s.costPrice,
+        expiry: '',
+        tax: true, // default to taxable; user can uncheck in the form
+        total: suggestedQty * s.costPrice,
+      };
+    });
+    const totalCost = draftLines.reduce((s, l) => s + l.total, 0);
+
+    // Group by supplier to pick the most common one as default
+    const supplierCounts = new Map<string, number>();
+    reorderSuggestions.forEach(s => {
+      supplierCounts.set(s.supplier, (supplierCounts.get(s.supplier) || 0) + 1);
+    });
+    const defaultSupplier = Array.from(supplierCounts.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] || '';
+
+    const draft = {
+      lines: draftLines,
+      supplier: defaultSupplier,
+      details: `Auto-generated from Reorder Suggestions — ${reorderSuggestions.length} items, ${draftLines.reduce((s, l) => s + l.quantity, 0)} total units`,
+      refNo: `REORDER-${new Date().toISOString().split('T')[0]}`,
+      source: 'reorder-suggestions',
+      createdAt: Date.now(),
+      totalCost,
+    };
+
+    try {
+      window.localStorage.setItem('sylhn-po-draft-from-reorder', JSON.stringify(draft));
+    } catch { /* ignore */ }
+
+    toast({
+      title: 'PO draft created',
+      description: `${reorderSuggestions.length} items · ${formatGHS(totalCost)} · Opening Purchase form…`,
+    });
+
+    // Close the dashboard and navigate to the purchase form
+    onClose();
+    if (onNavigateToPurchase) {
+      setTimeout(() => onNavigateToPurchase(), 300);
+    }
+  };
+
+  // ===== Per-product variance drill-down state =====
+  const [drillDownProduct, setDrillDownProduct] = useState<{
+    productId: string;
+    productName: string;
+    sku: string;
+    emoji: string;
+  } | null>(null);
+
+  // ===== Build per-product stocktake history for drill-down =====
+  const productHistory = useMemo(() => {
+    if (!drillDownProduct) return null;
+    // Find all 'adjusted' history entries for this product, sorted most-recent first
+    const entries = history
+      .filter(h => h.action === 'adjusted' && h.productId === drillDownProduct.productId)
+      .sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+    return entries;
+  }, [history, drillDownProduct]);
 
   const handleExport = () => {
     if (stocktakeEvents.length === 0) { toast({ title: 'No data to export', variant: 'destructive' }); return; }
@@ -3352,10 +3433,20 @@ function StocktakeDashboard({
                             initial={{ opacity: 0, x: -10 }}
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ delay: Math.min(idx * 0.03, 0.3) }}
-                            className="grid grid-cols-[1fr_50px_60px_70px_70px_90px] gap-0 px-3 py-2 text-[10px] border-b border-slate-50 hover:bg-amber-50/40 transition"
+                            onClick={() => setDrillDownProduct({
+                              productId: s.productId,
+                              productName: s.productName,
+                              sku: s.sku,
+                              emoji: s.emoji,
+                            })}
+                            className="grid grid-cols-[1fr_50px_60px_70px_70px_90px] gap-0 px-3 py-2 text-[10px] border-b border-slate-50 hover:bg-amber-50/40 transition cursor-pointer"
+                            title="Click to view full stocktake history for this product"
                           >
                             <div className="min-w-0">
-                              <div className="font-semibold text-slate-800 truncate">{s.emoji} {s.productName}</div>
+                              <div className="font-semibold text-slate-800 truncate flex items-center gap-1">
+                                {s.emoji} {s.productName}
+                                <ChevronRight className="h-2.5 w-2.5 text-amber-500 flex-shrink-0" />
+                              </div>
                               <div className="text-[9px] text-slate-500 truncate font-mono">{s.sku} · {s.supplier}</div>
                             </div>
                             <div className={cn("text-right font-mono font-bold", s.currentStock === 0 ? "text-rose-700" : "text-amber-700")}>
@@ -3370,12 +3461,22 @@ function StocktakeDashboard({
                       })}
                     </div>
                   </div>
-                  <button
-                    onClick={handleExportReorder}
-                    className="h-8 px-4 rounded-md bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold flex items-center gap-1.5 transition shadow-sm"
-                  >
-                    <Download className="h-3.5 w-3.5" /> Export Reorder List (XLSX)
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleExportReorder}
+                      className="h-8 px-4 rounded-md bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold flex items-center gap-1.5 transition shadow-sm"
+                    >
+                      <Download className="h-3.5 w-3.5" /> Export Reorder List (XLSX)
+                    </button>
+                    <button
+                      onClick={handleCreatePO}
+                      disabled={!onNavigateToPurchase}
+                      className="h-8 px-4 rounded-md bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-bold flex items-center gap-1.5 transition shadow-sm disabled:opacity-50"
+                      title="Create a Purchase Order draft from these suggestions and open the Purchase form"
+                    >
+                      <Package className="h-3.5 w-3.5" /> Create Purchase Order
+                    </button>
+                  </div>
                 </>
               )}
             </div>
@@ -3498,6 +3599,190 @@ function StocktakeDashboard({
           </button>
           <div className="flex-1" />
           <span className="text-[10px] text-slate-500">{stocktakeEvents.length} total events on record</span>
+          <button onClick={onClose} className="h-8 px-4 rounded-md bg-rose-100 hover:bg-rose-200 text-rose-700 text-xs font-bold flex items-center gap-1.5 transition">
+            <X className="h-3.5 w-3.5" /> Close
+          </button>
+        </div>
+      </motion.div>
+
+      {/* ===== Per-Product Variance Drill-Down Popup ===== */}
+      <AnimatePresence>
+        {drillDownProduct && productHistory && (
+          <ProductVarianceDrillDown
+            product={drillDownProduct}
+            entries={productHistory}
+            onClose={() => setDrillDownProduct(null)}
+          />
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+}
+
+// ===== Product Variance Drill-Down Popup =====
+// Shows the full stocktake history for a single product — every stocktake event
+// where this product appeared, with date, reference, on-hand, counted, variance.
+function ProductVarianceDrillDown({
+  product,
+  entries,
+  onClose,
+}: {
+  product: { productId: string; productName: string; sku: string; emoji: string };
+  entries: StockHistoryEntry[];
+  onClose: () => void;
+}) {
+  const { toast } = useToast();
+
+  // Compute stats
+  const stats = useMemo(() => {
+    if (entries.length === 0) return { totalEvents: 0, totalShortage: 0, totalSurplus: 0, avgVariance: 0, worstVariance: 0, worstDate: '' };
+    const totalVariance = entries.reduce((s, e) => s + e.quantityChange, 0);
+    const totalShortage = entries.filter(e => e.quantityChange < 0).reduce((s, e) => s + Math.abs(e.quantityChange), 0);
+    const totalSurplus = entries.filter(e => e.quantityChange > 0).reduce((s, e) => s + e.quantityChange, 0);
+    const avgVariance = Math.round(totalVariance / entries.length);
+    let worstVariance = 0;
+    let worstDate = '';
+    entries.forEach(e => {
+      if (e.quantityChange < worstVariance) {
+        worstVariance = e.quantityChange;
+        worstDate = e.timestamp;
+      }
+    });
+    return { totalEvents: entries.length, totalShortage, totalSurplus, avgVariance, worstVariance, worstDate };
+  }, [entries]);
+
+  const fmtDate = (ts: string) => {
+    try {
+      const d = new Date(ts);
+      return d.toLocaleDateString('en-GB') + ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    } catch { return ts; }
+  };
+
+  const handleExport = () => {
+    if (entries.length === 0) { toast({ title: 'No data to export', variant: 'destructive' }); return; }
+    import('xlsx').then((XLSX) => {
+      type Row = Record<string, string | number>;
+      const data: Row[] = entries.map((e, i) => ({
+        '#': i + 1,
+        'Date': fmtDate(e.timestamp),
+        'Reference': e.reference || '',
+        'Variance': e.quantityChange,
+        'New Quantity': e.newQuantity,
+        'User': e.user,
+        'Reason': e.reason,
+      }));
+      const ws = XLSX.utils.json_to_sheet(data);
+      ws['!cols'] = [{ wch: 4 }, { wch: 18 }, { wch: 16 }, { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 40 }];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, product.productName.slice(0, 20));
+      XLSX.writeFile(wb, `variance-history-${product.sku}-${new Date().toISOString().split('T')[0]}.xlsx`);
+      toast({ title: 'Exported successfully', description: `${entries.length} entries` });
+    });
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[80] flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.95, y: 20 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.95, y: 20 }}
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-lg shadow-2xl overflow-hidden flex flex-col"
+        style={{ width: '680px', maxHeight: '85vh', fontFamily: 'Arial, Helvetica, sans-serif' }}
+      >
+        {/* Title bar */}
+        <div className="flex-shrink-0 flex items-center justify-between px-4 h-9 text-white" style={{ background: 'linear-gradient(to right, #B45309, #D97706)' }}>
+          <div className="flex items-center gap-2">
+            <Package className="h-4 w-4" />
+            <span className="text-sm font-bold">Variance History — {product.emoji} {product.productName}</span>
+          </div>
+          <button onClick={onClose} className="h-6 w-6 rounded bg-red-600 hover:bg-red-700 flex items-center justify-center transition"><X className="h-3.5 w-3.5 text-white" /></button>
+        </div>
+
+        {/* Product info + stats */}
+        <div className="flex-shrink-0 px-4 py-3 bg-amber-50 border-b border-amber-200">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="h-10 w-10 rounded-lg bg-amber-100 flex items-center justify-center text-2xl">{product.emoji}</div>
+            <div>
+              <div className="font-bold text-slate-800 text-sm">{product.productName}</div>
+              <div className="text-[10px] text-slate-500 font-mono">SKU: {product.sku}</div>
+            </div>
+          </div>
+          <div className="grid grid-cols-5 gap-2">
+            <div className="bg-white rounded p-1.5 ring-1 ring-slate-200 text-center">
+              <div className="text-[8px] text-slate-500 uppercase font-semibold">Events</div>
+              <div className="text-sm font-bold text-slate-800">{stats.totalEvents}</div>
+            </div>
+            <div className="bg-white rounded p-1.5 ring-1 ring-slate-200 text-center">
+              <div className="text-[8px] text-slate-500 uppercase font-semibold">Total Lost</div>
+              <div className="text-sm font-bold text-rose-600 font-mono">−{stats.totalShortage}</div>
+            </div>
+            <div className="bg-white rounded p-1.5 ring-1 ring-slate-200 text-center">
+              <div className="text-[8px] text-slate-500 uppercase font-semibold">Total Gain</div>
+              <div className="text-sm font-bold text-emerald-600 font-mono">+{stats.totalSurplus}</div>
+            </div>
+            <div className="bg-white rounded p-1.5 ring-1 ring-slate-200 text-center">
+              <div className="text-[8px] text-slate-500 uppercase font-semibold">Avg Var</div>
+              <div className={cn("text-sm font-bold font-mono", stats.avgVariance > 0 ? "text-emerald-600" : stats.avgVariance < 0 ? "text-rose-600" : "text-slate-600")}>
+                {stats.avgVariance > 0 ? '+' : ''}{stats.avgVariance}
+              </div>
+            </div>
+            <div className="bg-white rounded p-1.5 ring-1 ring-slate-200 text-center">
+              <div className="text-[8px] text-slate-500 uppercase font-semibold">Worst</div>
+              <div className="text-sm font-bold text-rose-700 font-mono">{stats.worstVariance}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* History table */}
+        <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+          <div className="flex-shrink-0 grid grid-cols-[1fr_100px_1.2fr_70px_70px] gap-0 px-3 py-1.5 text-[9px] font-bold text-white" style={{ backgroundColor: '#B45309' }}>
+            <div>Date</div>
+            <div>Reference</div>
+            <div>Reason</div>
+            <div className="text-right">Variance</div>
+            <div className="text-right">New Qty</div>
+          </div>
+          <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
+            {entries.length === 0 ? (
+              <div className="text-center py-8 text-slate-400 text-[11px]">No stocktake history for this product</div>
+            ) : (
+              entries.map((e, idx) => (
+                <div
+                  key={e.id}
+                  className="grid grid-cols-[1fr_100px_1.2fr_70px_70px] gap-0 px-3 py-1.5 text-[10px] border-b border-slate-50"
+                  style={{ backgroundColor: idx % 2 === 1 ? '#FAFAFA' : '#FFFFFF' }}
+                >
+                  <div className="text-slate-700">{fmtDate(e.timestamp)}</div>
+                  <div className="font-mono text-slate-600 truncate">{e.reference || '—'}</div>
+                  <div className="text-slate-600 truncate text-[9px]">{e.reason}</div>
+                  <div className={cn("text-right font-mono font-bold", e.quantityChange > 0 ? "text-emerald-700" : e.quantityChange < 0 ? "text-rose-700" : "text-slate-500")}>
+                    {e.quantityChange > 0 ? '+' : ''}{e.quantityChange}
+                  </div>
+                  <div className="text-right font-mono text-slate-700">{e.newQuantity}</div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Action buttons */}
+        <div className="flex-shrink-0 px-4 py-2 flex items-center gap-2 border-t border-slate-200 bg-slate-50">
+          <button
+            onClick={handleExport}
+            disabled={entries.length === 0}
+            className="h-8 px-4 rounded-md bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold flex items-center gap-1.5 transition disabled:opacity-50"
+          >
+            <Download className="h-3.5 w-3.5" /> Export History (XLSX)
+          </button>
+          <div className="flex-1" />
+          <span className="text-[10px] text-slate-500">{entries.length} stocktake event(s) for this product</span>
           <button onClick={onClose} className="h-8 px-4 rounded-md bg-rose-100 hover:bg-rose-200 text-rose-700 text-xs font-bold flex items-center gap-1.5 transition">
             <X className="h-3.5 w-3.5" /> Close
           </button>

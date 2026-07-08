@@ -1640,3 +1640,85 @@ Stage Summary:
   - Trend data table below the chart for reference
 - Build compiles cleanly (next build ✓) and dev server responds HTTP 200 with no runtime errors
 - All three features accessible from the Stocktake Dashboard popup (purple-pink button in Stock Management nav)
+
+---
+Task ID: background-check-po-drilldown
+Agent: main
+Task: Implement three suggested enhancements:
+  1) Schedule automatic background checks for overdue stocktakes (notifications fire without opening the dashboard)
+  2) Add 'Create Purchase Order' button on Reorder Suggestions tab to draft POs for suggested items
+  3) Add per-product variance drill-down (click a product in reorder list to see its full stocktake history)
+
+Work Log:
+- Modified /home/z/my-project/src/app/page.tsx:
+  - Added background overdue check useEffect (runs on mount + every 5 minutes)
+  - Loads schedule frequency from localStorage key 'sylhn-stocktake-schedule'
+  - Scans history for action='adjusted' entries, finds most recent, computes overdue status
+  - Tracks last-notified due date in localStorage key 'sylhn-stocktake-last-notified' (format: 'YYYY-MM-DD|timestamp')
+  - If newly overdue (not previously notified for this due date):
+    - Fires browser Notification (if permission granted) — title "Stocktake Overdue", body with days + last reference
+    - Requests Notification.permission on mount if default
+    - Auto-sends email via mailto: (if email enabled + recipients configured) — but only if >1 hour since last notification (anti-spam)
+    - Auto-sends SMS via sms: URI (if SMS enabled + phones configured)
+  - Cleanup: clearInterval on unmount
+  - Added onNavigateToPurchase prop pass-through to StockManagement: onNavigateToPurchase={() => setView("purchase-form")}
+
+- Modified /home/z/my-project/src/components/stock-management.tsx:
+  - Added onNavigateToPurchase prop to StockManagementProps interface
+  - Passed onNavigateToPurchase through to StocktakeDashboard component
+  - Updated StocktakeDashboard signature to accept onNavigateToPurchase
+  - Added handleCreatePO function:
+    - Builds draft PO lines from reorder suggestions (each line: partNo, details, emoji, quantity=suggestedQty, cost, tax=true, total)
+    - Picks default supplier (most common among suggestions)
+    - Sets refNo to 'REORDER-YYYY-MM-DD'
+    - Saves draft to localStorage key 'sylhn-po-draft-from-reorder'
+    - Shows toast with item count + total cost
+    - Closes dashboard + calls onNavigateToPurchase after 300ms delay
+  - Added drillDownProduct state + productHistory useMemo (filters history by productId, sorts most-recent first)
+  - Made reorder suggestion rows clickable (onClick sets drillDownProduct)
+  - Added ChevronRight icon to product name in suggestion rows (visual hint for clickability)
+  - Added "Create Purchase Order" button (emerald gradient, Package icon) next to Export Reorder List
+  - Added ProductVarianceDrillDown component (new, ~170 lines):
+    - Amber gradient title bar "Variance History — [emoji] [product name]"
+    - Product info header with emoji + SKU
+    - 5-column stat grid: Events, Total Lost, Total Gain, Avg Variance, Worst Variance
+    - 5-column history table: Date, Reference, Reason, Variance (color-coded), New Qty
+    - Export History (XLSX) button
+    - z-index 80 (above the dashboard's 70)
+
+- Modified /home/z/my-project/src/components/purchase-form.tsx:
+  - Added showDraftBanner state
+  - Added useEffect on mount: checks localStorage for 'sylhn-po-draft-from-reorder' draft, shows banner if found
+  - Added loadReorderDraft function: parses draft JSON, loads lines + supplier + refNo into form state, clears draft from localStorage, shows toast
+  - Added dismissDraftBanner function: removes draft from localStorage + hides banner
+  - Added Reorder Draft Banner UI (emerald background, between Green Header and Supplier Bar):
+    - Package icon + "Reorder Draft Available" title + description
+    - "Load Draft" button (emerald) — calls loadReorderDraft
+    - Dismiss X button — calls dismissDraftBanner
+    - Animated enter/exit via AnimatePresence
+
+Stage Summary:
+- 3 modified files: page.tsx (+~145 lines: background check), stock-management.tsx (+~230 lines: Create PO + drill-down), purchase-form.tsx (+~85 lines: draft banner)
+- Feature 1 — Background overdue check:
+  - Runs every 5 minutes while the app is open (no need to open the dashboard)
+  - Browser Notification API with permission request on mount
+  - Auto-email via mailto: (anti-spam: max 1 per hour per due date)
+  - Auto-SMS via sms: URI
+  - Tracked via localStorage key 'sylhn-stocktake-last-notified' (format: 'YYYY-MM-DD|timestamp')
+  - Uses the same schedule frequency from 'sylhn-stocktake-schedule'
+- Feature 2 — Create Purchase Order:
+  - "Create Purchase Order" button on Reorder Suggestions tab
+  - Saves draft PO (lines, supplier, refNo, totalCost) to localStorage key 'sylhn-po-draft-from-reorder'
+  - Navigates to Purchase Form via onNavigateToPurchase callback
+  - Purchase Form detects draft on mount, shows emerald banner with "Load Draft" / Dismiss buttons
+  - Loading the draft populates: lines (with suggested quantities + costs), supplier (most common), refNo (REORDER-YYYY-MM-DD)
+  - Draft is cleared from localStorage after loading (one-shot)
+  - Suggested reorder qty = max(3 × reorder level − current stock, reorder level)
+- Feature 3 — Per-product variance drill-down:
+  - Reorder suggestion rows are now clickable (cursor-pointer + ChevronRight hint)
+  - Opens ProductVarianceDrillDown popup (z-80, above dashboard)
+  - Shows: product info header, 5 stat cards (Events, Total Lost, Total Gain, Avg Variance, Worst Variance), full history table (Date, Reference, Reason, Variance color-coded, New Qty)
+  - Export History (XLSX) button per product
+  - Sorted most-recent first
+- Build compiles cleanly (next build ✓) and dev server responds HTTP 200 with no runtime errors
+- Pre-existing TS errors in page.tsx (lines 436, 507, 532 — invoiceNumber null type) are unrelated to these changes
