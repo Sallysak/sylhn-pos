@@ -25,6 +25,7 @@ import type { StockView, ReportData } from "@/lib/pos-types";
 import { PopupWindow } from "@/components/popup-window";
 import { StockQuantityAdjustment } from "@/components/stock-quantity-adjustment";
 import { QuickStockAdjustment } from "@/components/quick-stock-adjustment";
+import { StockAdjustmentForm } from "@/components/stock-adjustment-form";
 
 interface StockManagementProps {
   onBack: () => void;
@@ -49,6 +50,8 @@ export function StockManagement({ onBack, products, setProducts, groups, setGrou
   const [showDashboard, setShowDashboard] = useState(false);
   const [showQuickAdjustPopup, setShowQuickAdjustPopup] = useState(false);
   const [quickAdjustProductId, setQuickAdjustProductId] = useState<string | undefined>(undefined);
+  const [showStockAdjustmentForm, setShowStockAdjustmentForm] = useState(false);
+  const [stockAdjustmentProductId, setStockAdjustmentProductId] = useState<string | undefined>(undefined);
   const { toast } = useToast();
 
   // ===== Stocktake schedule settings (persisted to localStorage) =====
@@ -192,6 +195,14 @@ export function StockManagement({ onBack, products, setProducts, groups, setGrou
             );
           })}
           <div className="flex-1" />
+          <button
+            onClick={() => { setStockAdjustmentProductId(undefined); setShowStockAdjustmentForm(true); }}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md hover:from-amber-600 hover:to-orange-600"
+            title="Professional stock adjustment form with reason tracking, multi-product support, and barcode scanning"
+          >
+            <ArrowUpDown className="h-4 w-4" />
+            Stock Adjustment
+          </button>
           <button
             onClick={() => { setQuickAdjustProductId(undefined); setShowQuickAdjustPopup(true); }}
             className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md hover:from-emerald-600 hover:to-teal-600"
@@ -437,6 +448,20 @@ export function StockManagement({ onBack, products, setProducts, groups, setGrou
             groups={groups}
             onClose={() => { setShowQuickAdjustPopup(false); setQuickAdjustProductId(undefined); }}
             initialProductId={quickAdjustProductId}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ===== Professional Stock Adjustment Form Popup ===== */}
+      <AnimatePresence>
+        {showStockAdjustmentForm && (
+          <StockAdjustmentForm
+            products={products}
+            setProducts={setProducts}
+            setHistory={setHistory}
+            groups={groups}
+            onClose={() => { setShowStockAdjustmentForm(false); setStockAdjustmentProductId(undefined); }}
+            initialProductId={stockAdjustmentProductId}
           />
         )}
       </AnimatePresence>
