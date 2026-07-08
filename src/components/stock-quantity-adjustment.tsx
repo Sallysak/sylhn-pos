@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Save, Printer, Trash2, Upload, Download, X, Search as SearchIcon,
-  Package, AlertTriangle,
+  Package, AlertTriangle, TrendingUp,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -40,6 +40,8 @@ interface StockQuantityAdjustmentProps {
   products: Product[];
   setProducts: React.Dispatch<React.SetStateAction<Product[]>>;
   setHistory: React.Dispatch<React.SetStateAction<StockHistoryEntry[]>>;
+  /** Stock history (used by the "Compare with last Stocktake" report) */
+  history?: StockHistoryEntry[];
   groups: StockGroup[];
   onClose: () => void;
   /** When provided, opens as overlay inside another popup. When true (default), opens as its own PopupWindow. */
@@ -54,6 +56,7 @@ export function StockQuantityAdjustment({
   products,
   setProducts,
   setHistory,
+  history = [],
   groups,
   onClose,
   asWindow = true,
@@ -62,7 +65,10 @@ export function StockQuantityAdjustment({
 }: StockQuantityAdjustmentProps) {
   const { toast } = useToast();
 
-  // ===== Form state =====
+  // ===== Draft persistence key (per browser) =====
+  const DRAFT_KEY = 'sylhn-stock-adjustment-draft';
+
+  // ===== Form state (with draft restore) =====
   const [adjNumber, setAdjNumber] = useState(`ADJ-${Date.now().toString().slice(-6)}`);
   const [adjType, setAdjType] = useState<AdjustmentType>(initialAdjustmentType);
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -75,20 +81,105 @@ export function StockQuantityAdjustment({
   const [lines, setLines] = useState<AdjustmentLine[]>([]);
   const [selectedLine, setSelectedLine] = useState<number | null>(null);
   const [saved, setSaved] = useState(false);
+  const [draftRestored, setDraftRestored] = useState(false);
 
   // ===== Stock Search popup state =====
   const [showStockSearch, setShowStockSearch] = useState(false);
   const [findPartNo, setFindPartNo] = useState('');
   const findPartNoRef = useRef<HTMLInputElement>(null);
 
-  // Auto-add initial product if provided
+  // ===== Compare-with-last-Stocktake report state =====
+  const [showCompareReport, setShowCompareReport] = useState(false);
+
+  // ===== Restore draft from localStorage on first mount =====
+  // Only restore if there's a draft AND no initialProductId was passed in
+  // (initialProductId is a "jump to product" action that shouldn't be trumped by a stale draft)
   useEffect(() => {
     if (initialProductId) {
       const p = products.find(p => p.id === initialProductId);
       if (p) addProductToLines(p);
+      return;
+    }
+    if (typeof window === 'undefined') return;
+    try {
+      const cached = window.localStorage.getItem(DRAFT_KEY);
+      if (!cached) return;
+      const draft = JSON.parse(cached);
+      if (!draft || !Array.isArray(draft.lines) || draft.lines.length === 0) return;
+      // Only restore if the draft is from the current session (within last 24h)
+      const draftAge = Date.now() - (draft.savedAt || 0);
+      if (draftAge > 24 * 60 * 60 * 1000) {
+        // Draft is stale — clear it
+        window.localStorage.removeItem(DRAFT_KEY);
+        return;
+      }
+      // Restore all fields
+      if (draft.adjNumber) setAdjNumber(draft.adjNumber);
+      if (draft.adjType) setAdjType(draft.adjType);
+      if (draft.date) setDate(draft.date);
+      if (draft.details !== undefined) setDetails(draft.details);
+      if (draft.postToAC !== undefined) setPostToAC(draft.postToAC);
+      if (draft.fromPartNo !== undefined) setFromPartNo(draft.fromPartNo);
+      if (draft.toPartNo !== undefined) setToPartNo(draft.toPartNo);
+      if (draft.groupFilter !== undefined) setGroupFilter(draft.groupFilter);
+      if (draft.bin !== undefined) setBin(draft.bin);
+      // Rehydrate lines — refresh onHand from current product data so the displayed
+      // current stock is fresh, but keep the user's counted value
+      const restoredLines: AdjustmentLine[] = draft.lines
+        .map((l: any) => {
+          const product = products.find(p => p.id === l.productId);
+          if (!product) return null; // product was deleted since draft was saved
+          const freshOnHand = product.stock;
+          const freshCost = product.costPrice;
+          // Recompute variance against current on-hand (may differ from draft)
+          const counted = l.counted ?? l.onHand ?? freshOnHand;
+          const qty = counted - freshOnHand;
+          return {
+            id: l.id || `line-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            partNo: product.sku,
+            details: `${product.emoji} ${product.name}`,
+            onHand: freshOnHand,
+            counted,
+            qty,
+            cost: freshCost,
+            total: qty * freshCost,
+            productId: product.id,
+            emoji: product.emoji,
+          };
+        })
+        .filter(Boolean);
+      if (restoredLines.length > 0) {
+        setLines(restoredLines);
+        setDraftRestored(true);
+        toast({
+          title: 'Draft restored',
+          description: `${restoredLines.length} lines from your previous session`,
+        });
+      }
+    } catch {
+      // ignore corrupt draft
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialProductId]);
+  }, []);
+
+  // ===== Auto-save draft to localStorage whenever state changes =====
+  // Skip saving when the form is empty (no lines) AND no draft has been restored —
+  // this avoids creating a draft just from opening the form.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    // Don't save if the form is "fresh" (no lines, no details, no draft restored)
+    if (lines.length === 0 && !details && !draftRestored && !saved) return;
+    // Don't save after a successful save (saved drafts are cleared separately)
+    if (saved) return;
+    const draft = {
+      adjNumber, adjType, date, details, postToAC,
+      fromPartNo, toPartNo, groupFilter, bin,
+      lines, savedAt: Date.now(),
+    };
+    try {
+      window.localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    } catch { /* storage full or unavailable */ }
+  }, [adjNumber, adjType, date, details, postToAC, fromPartNo, toPartNo, groupFilter, bin, lines, saved, draftRestored]);
 
   // ===== Compute totals =====
   const totals = useMemo(() => {
@@ -97,6 +188,79 @@ export function StockQuantityAdjustment({
     const totalVariance = lines.reduce((s, l) => s + l.qty, 0);
     return { totalQty, totalCost, totalVariance };
   }, [lines]);
+
+  // ===== Find the most recent committed stocktake/adjustment for comparison =====
+  // Looks through history for entries with action='adjusted' (i.e. previous stocktakes/adjustments),
+  // groups them by reference, and picks the most recent reference (excluding the current adjNumber
+  // if it has already been saved).
+  const lastStocktakeData = useMemo(() => {
+    // Group history entries by reference, keeping the latest timestamp per reference
+    const groups = new Map<string, { reference: string; timestamp: string; entries: StockHistoryEntry[] }>();
+    history.forEach(h => {
+      if (h.action !== 'adjusted' || !h.reference) return;
+      // Skip the current adjustment (in case it was already saved and the user is comparing again)
+      if (h.reference === adjNumber) return;
+      const existing = groups.get(h.reference);
+      if (existing) {
+        existing.entries.push(h);
+        if (h.timestamp > existing.timestamp) existing.timestamp = h.timestamp;
+      } else {
+        groups.set(h.reference, { reference: h.reference, timestamp: h.timestamp, entries: [h] });
+      }
+    });
+    if (groups.size === 0) return null;
+    // Pick the most recent reference
+    const sorted = Array.from(groups.values()).sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+    const lastEvent = sorted[0];
+    // Build a map of productId -> { counted, variance, productName, sku } from the last event
+    const productMap = new Map<string, { counted: number; variance: number; productName: string; sku: string }>();
+    lastEvent.entries.forEach(e => {
+      productMap.set(e.productId, {
+        counted: e.newQuantity,
+        variance: e.quantityChange,
+        productName: e.productName,
+        sku: e.sku,
+      });
+    });
+    return {
+      reference: lastEvent.reference,
+      timestamp: lastEvent.timestamp,
+      entries: lastEvent.entries,
+      productMap,
+    };
+  }, [history, adjNumber]);
+
+  // ===== Build the comparison rows: current adjustment lines vs. last stocktake =====
+  const comparisonRows = useMemo(() => {
+    if (!lastStocktakeData) return [];
+    return lines.map(l => {
+      const prev = lastStocktakeData.productMap.get(l.productId);
+      const prevCounted = prev?.counted ?? null;
+      // Delta = current counted - previous counted
+      // (positive means we have more than the last stocktake recorded)
+      const delta = prevCounted !== null ? l.counted - prevCounted : null;
+      return {
+        productId: l.productId,
+        partNo: l.partNo,
+        details: l.details,
+        currentOnHand: l.onHand,
+        currentCounted: l.counted,
+        previousCounted: prevCounted,
+        previousReference: prev ? lastStocktakeData.reference : null,
+        deltaFromLast: delta,
+      };
+    });
+  }, [lines, lastStocktakeData]);
+
+  // ===== Totals for comparison report =====
+  const comparisonTotals = useMemo(() => {
+    const totalCurrentCounted = comparisonRows.reduce((s, r) => s + r.currentCounted, 0);
+    const totalPreviousCounted = comparisonRows.reduce((s, r) => s + (r.previousCounted ?? 0), 0);
+    const totalDelta = comparisonRows.reduce((s, r) => s + (r.deltaFromLast ?? 0), 0);
+    const matchedProducts = comparisonRows.filter(r => r.previousCounted !== null).length;
+    const newProducts = comparisonRows.length - matchedProducts;
+    return { totalCurrentCounted, totalPreviousCounted, totalDelta, matchedProducts, newProducts };
+  }, [comparisonRows]);
 
   // ===== Add product to adjustment table =====
   const addProductToLines = (product: Product) => {
@@ -247,6 +411,11 @@ export function StockQuantityAdjustment({
     }));
     setHistory(prev => [...prev, ...newHistory]);
     setSaved(true);
+    // Clear the in-progress draft (the adjustment has been committed)
+    if (typeof window !== 'undefined') {
+      try { window.localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
+    }
+    setDraftRestored(false);
     toast({
       title: `Saved (F2) — ${adjType === 'stocktake' ? 'Stocktake' : 'Stock Adjustment'}`,
       description: `${changedLines.length} items adjusted · Variance total: ${totals.totalVariance > 0 ? '+' : ''}${totals.totalVariance} · ${formatGHS(Math.abs(totals.totalCost))}`,
@@ -323,6 +492,11 @@ export function StockQuantityAdjustment({
     setLines([]);
     setSelectedLine(null);
     setSaved(false);
+    // Clear the in-progress draft as well
+    if (typeof window !== 'undefined') {
+      try { window.localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
+    }
+    setDraftRestored(false);
     toast({ title: 'Deleted (F4)', description: 'All lines cleared' });
   };
 
@@ -525,6 +699,34 @@ export function StockQuantityAdjustment({
         </button>
         <div className="flex-1" />
         {saved && <span className="text-[10px] font-bold text-emerald-700">✓ Saved</span>}
+        {!saved && lines.length > 0 && (
+          <span className="text-[10px] font-bold text-amber-700 flex items-center gap-0.5" title="Auto-saved to localStorage — restored if you refresh or close the form">
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+            Draft auto-saved
+          </span>
+        )}
+        {draftRestored && !saved && (
+          <button
+            onClick={() => {
+              if (typeof window !== 'undefined') {
+                try { window.localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
+              }
+              setLines([]);
+              setDetails('');
+              setFromPartNo('');
+              setToPartNo('');
+              setBin('');
+              setGroupFilter('all');
+              setAdjNumber(`ADJ-${Date.now().toString().slice(-6)}`);
+              setDraftRestored(false);
+              toast({ title: 'Draft discarded', description: 'Form reset to blank' });
+            }}
+            className="h-5 px-2 rounded bg-rose-100 hover:bg-rose-200 text-rose-700 text-[9px] font-semibold transition"
+            title="Discard the restored draft and start fresh"
+          >
+            Discard draft
+          </button>
+        )}
         <span className="text-[10px] text-slate-600 font-mono">{lines.length} lines</span>
       </div>
 
@@ -637,6 +839,18 @@ export function StockQuantityAdjustment({
         <button onClick={handleExport} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1 transition shadow-sm" style={{ backgroundColor: HEADER_DARK_BLUE }}>
           <Download className="h-3 w-3" style={{ color: '#4CAF50' }} /> Export
         </button>
+        <button
+          onClick={() => {
+            if (lines.length === 0) { toast({ title: 'Add products first', description: 'Load the current adjustment before comparing', variant: 'destructive' }); return; }
+            if (!lastStocktakeData) { toast({ title: 'No previous stocktake found', description: 'Save this stocktake first, then compare against future ones', variant: 'destructive' }); return; }
+            setShowCompareReport(true);
+          }}
+          className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1 transition shadow-sm"
+          style={{ backgroundColor: HEADER_DARK_BLUE }}
+          title="Compare the current adjustment with the most recent committed stocktake"
+        >
+          <TrendingUp className="h-3 w-3" style={{ color: '#FFC107' }} /> Compare
+        </button>
         <div className="flex-1" />
         {selectedLine !== null && lines[selectedLine] && (
           <button
@@ -677,6 +891,22 @@ export function StockQuantityAdjustment({
               setShowStockSearch(false);
             }}
             onClose={() => setShowStockSearch(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ===== Compare with last Stocktake Report Popup ===== */}
+      <AnimatePresence>
+        {showCompareReport && lastStocktakeData && (
+          <CompareWithLastStocktakeReport
+            currentAdjNumber={adjNumber}
+            currentAdjType={adjType}
+            currentDate={date}
+            previousReference={lastStocktakeData.reference}
+            previousTimestamp={lastStocktakeData.timestamp}
+            rows={comparisonRows}
+            totals={comparisonTotals}
+            onClose={() => setShowCompareReport(false)}
           />
         )}
       </AnimatePresence>
@@ -893,6 +1123,301 @@ function StockSearchMiniPopup({
           <span className="font-mono">{filtered.length} of {products.length} products</span>
           <div className="flex-1" />
           <span>↑↓ Navigate · Enter Select · Esc Close</span>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ===== Compare with last Stocktake Report Popup =====
+// Shows a side-by-side comparison of the current adjustment's counted quantities
+// against the most recent committed stocktake (or adjustment), highlighting
+// items where the count has changed and items that are new since the last event.
+interface ComparisonRow {
+  productId: string;
+  partNo: string;
+  details: string;
+  currentOnHand: number;
+  currentCounted: number;
+  previousCounted: number | null;
+  previousReference: string | null;
+  deltaFromLast: number | null;
+}
+
+interface ComparisonTotals {
+  totalCurrentCounted: number;
+  totalPreviousCounted: number;
+  totalDelta: number;
+  matchedProducts: number;
+  newProducts: number;
+}
+
+interface CompareReportProps {
+  currentAdjNumber: string;
+  currentAdjType: 'stocktake' | 'adjustment';
+  currentDate: string;
+  previousReference: string;
+  previousTimestamp: string;
+  rows: ComparisonRow[];
+  totals: ComparisonTotals;
+  onClose: () => void;
+}
+
+function CompareWithLastStocktakeReport({
+  currentAdjNumber,
+  currentAdjType,
+  currentDate,
+  previousReference,
+  previousTimestamp,
+  rows,
+  totals,
+  onClose,
+}: CompareReportProps) {
+  const { toast } = useToast();
+
+  // Format timestamp for display
+  const fmtPrevDate = (() => {
+    try {
+      const d = new Date(previousTimestamp);
+      return d.toLocaleDateString('en-GB') + ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    } catch {
+      return previousTimestamp;
+    }
+  })();
+
+  // Sort rows: items with delta first (descending by abs delta), then matched items with no delta, then new items
+  const sortedRows = [...rows].sort((a, b) => {
+    const aDelta = a.deltaFromLast ?? -Infinity; // null = new item, push to end
+    const bDelta = b.deltaFromLast ?? -Infinity;
+    if (aDelta === null && bDelta === null) return 0;
+    if (aDelta === null) return 1;
+    if (bDelta === null) return -1;
+    return Math.abs(bDelta) - Math.abs(aDelta);
+  });
+
+  const handlePrint = () => {
+    const printWin = window.open('', '_blank', 'width=900,height=600');
+    if (!printWin) { toast({ title: 'Popup blocked', variant: 'destructive' }); return; }
+    const rowsHtml = sortedRows.map((r, i) => {
+      const delta = r.deltaFromLast;
+      const deltaColor = delta === null ? '#666' : (delta > 0 ? '#16A34A' : delta < 0 ? '#DC2626' : '#666');
+      const deltaText = delta === null ? 'NEW' : (delta > 0 ? `+${delta}` : `${delta}`);
+      return `
+        <tr style="background:${i % 2 === 1 ? '#F8F8F8' : '#FFFFFF'}">
+          <td style="border:1px solid #999;padding:4px 6px;text-align:center">${i + 1}</td>
+          <td style="border:1px solid #999;padding:4px 6px;font-family:monospace">${r.partNo}</td>
+          <td style="border:1px solid #999;padding:4px 6px">${r.details}</td>
+          <td style="border:1px solid #999;padding:4px 6px;text-align:right;background:#FFF8DC">${r.currentOnHand}</td>
+          <td style="border:1px solid #999;padding:4px 6px;text-align:right">${r.currentCounted}</td>
+          <td style="border:1px solid #999;padding:4px 6px;text-align:right">${r.previousCounted ?? '—'}</td>
+          <td style="border:1px solid #999;padding:4px 6px;text-align:right;color:${deltaColor};font-weight:bold">${deltaText}</td>
+        </tr>`;
+    }).join('');
+    printWin.document.write(`<!DOCTYPE html><html><head><title>Compare with last Stocktake — ${currentAdjNumber}</title>
+      <style>
+        body { font-family: Arial, Helvetica, sans-serif; margin: 20px; }
+        .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 15px; }
+        .header h1 { margin: 0; font-size: 18px; }
+        .header div { font-size: 12px; color: #666; }
+        .compare-info { display: flex; justify-content: space-between; margin-bottom: 10px; padding: 10px; background: #E6F0FF; border-radius: 4px; font-size: 11px; }
+        .compare-info strong { color: #1E5A8E; }
+        table { width: 100%; border-collapse: collapse; font-size: 11px; }
+        th { background: #1E5A8E; color: white; border: 1px solid #999; padding: 5px 6px; font-weight: bold; }
+        .totals { margin-top: 15px; margin-left: auto; width: 380px; font-size: 11px; }
+        .totals td { padding: 4px 8px; }
+        .totals .total-row { font-weight: bold; border-top: 2px solid #333; }
+        @media print { body { margin: 10px; } }
+      </style></head><body>
+      <div class="header">
+        <h1>${COMPANY.name}</h1>
+        <div>${COMPANY.address} · ${COMPANY.contact}</div>
+      </div>
+      <h2 style="text-align:center;font-size:14px;margin:10px 0">Compare with last Stocktake</h2>
+      <div class="compare-info">
+        <div><strong>Current:</strong> ${currentAdjType === 'stocktake' ? 'Stocktake' : 'Stock Adjustment'} ${currentAdjNumber} · ${currentDate}</div>
+        <div><strong>Previous:</strong> ${previousReference} · ${fmtPrevDate}</div>
+      </div>
+      <table>
+        <thead><tr>
+          <th style="width:30px;text-align:center">#</th>
+          <th style="text-align:left">Part Number</th>
+          <th style="text-align:left">Details</th>
+          <th style="text-align:right">On Hand</th>
+          <th style="text-align:right">Current Counted</th>
+          <th style="text-align:right">Previous Counted</th>
+          <th style="text-align:right">Delta</th>
+        </tr></thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>
+      <table class="totals">
+        <tr><td>Matched items:</td><td style="text-align:right">${totals.matchedProducts}</td></tr>
+        <tr><td>New items (not in previous):</td><td style="text-align:right">${totals.newProducts}</td></tr>
+        <tr><td>Total current counted:</td><td style="text-align:right">${totals.totalCurrentCounted}</td></tr>
+        <tr><td>Total previous counted:</td><td style="text-align:right">${totals.totalPreviousCounted}</td></tr>
+        <tr class="total-row"><td>Net delta:</td><td style="text-align:right;color:${totals.totalDelta > 0 ? '#16A34A' : (totals.totalDelta < 0 ? '#DC2626' : '#666')}">${totals.totalDelta > 0 ? '+' : ''}${totals.totalDelta}</td></tr>
+      </table>
+      </body></html>`);
+    printWin.document.close();
+    setTimeout(() => { printWin.focus(); printWin.print(); }, 300);
+    toast({ title: 'Printing comparison report' });
+  };
+
+  const handleExport = () => {
+    import('xlsx').then((XLSX) => {
+      type Row = Record<string, string | number>;
+      const data: Row[] = sortedRows.map((r, i) => ({
+        '#': i + 1,
+        'Part Number': r.partNo,
+        'Details': r.details,
+        'On Hand': r.currentOnHand,
+        'Current Counted': r.currentCounted,
+        'Previous Counted': r.previousCounted ?? '',
+        'Delta from Last': r.deltaFromLast ?? 'NEW',
+      }));
+      data.push({
+        '#': '',
+        'Part Number': '',
+        'Details': 'TOTAL',
+        'On Hand': '',
+        'Current Counted': totals.totalCurrentCounted,
+        'Previous Counted': totals.totalPreviousCounted,
+        'Delta from Last': totals.totalDelta,
+      });
+      const ws = XLSX.utils.json_to_sheet(data);
+      ws['!cols'] = [{ wch: 5 }, { wch: 16 }, { wch: 30 }, { wch: 10 }, { wch: 16 }, { wch: 16 }, { wch: 14 }];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Comparison');
+      XLSX.writeFile(wb, `compare-stocktake-${currentAdjNumber}-${new Date().toISOString().split('T')[0]}.xlsx`);
+      toast({ title: 'Exported successfully', description: `${sortedRows.length} rows` });
+    });
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.95, y: 20 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.95, y: 20 }}
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-lg shadow-2xl overflow-hidden flex flex-col"
+        style={{ width: '900px', maxHeight: '85vh', fontFamily: 'Arial, Helvetica, sans-serif' }}
+      >
+        {/* Title bar */}
+        <div className="flex-shrink-0 flex items-center justify-between px-4 h-9 text-white" style={{ backgroundColor: HEADER_DARK_BLUE }}>
+          <div className="flex items-center gap-2">
+            <TrendingUp className="h-4 w-4" />
+            <span className="text-sm font-bold">Compare with last Stocktake</span>
+          </div>
+          <button onClick={onClose} className="h-6 w-6 rounded bg-red-600 hover:bg-red-700 flex items-center justify-center transition"><X className="h-3.5 w-3.5 text-white" /></button>
+        </div>
+
+        {/* Comparison info banner */}
+        <div className="flex-shrink-0 px-4 py-3 bg-blue-50 border-b border-blue-200 grid grid-cols-2 gap-4">
+          <div>
+            <div className="text-[10px] font-bold text-slate-500 uppercase">Current</div>
+            <div className="text-sm font-bold text-slate-800">{currentAdjType === 'stocktake' ? 'Stocktake' : 'Stock Adjustment'} {currentAdjNumber}</div>
+            <div className="text-[10px] text-slate-500">{currentDate} · {rows.length} items</div>
+          </div>
+          <div className="text-right">
+            <div className="text-[10px] font-bold text-slate-500 uppercase">Compared against</div>
+            <div className="text-sm font-bold text-slate-800">{previousReference}</div>
+            <div className="text-[10px] text-slate-500">{fmtPrevDate}</div>
+          </div>
+        </div>
+
+        {/* Summary stats */}
+        <div className="flex-shrink-0 px-4 py-2 bg-slate-50 border-b border-slate-200 flex items-center gap-4 text-[10px]">
+          <div>
+            <span className="text-slate-500">Matched items:</span>
+            <span className="font-bold text-slate-800 ml-1">{totals.matchedProducts}</span>
+          </div>
+          <div>
+            <span className="text-slate-500">New items:</span>
+            <span className="font-bold text-blue-700 ml-1">{totals.newProducts}</span>
+          </div>
+          <div>
+            <span className="text-slate-500">Current total:</span>
+            <span className="font-bold text-slate-800 ml-1 font-mono">{totals.totalCurrentCounted}</span>
+          </div>
+          <div>
+            <span className="text-slate-500">Previous total:</span>
+            <span className="font-bold text-slate-800 ml-1 font-mono">{totals.totalPreviousCounted}</span>
+          </div>
+          <div>
+            <span className="text-slate-500">Net delta:</span>
+            <span className={cn("font-bold ml-1 font-mono", totals.totalDelta > 0 ? "text-emerald-700" : totals.totalDelta < 0 ? "text-rose-700" : "text-slate-600")}>
+              {totals.totalDelta > 0 ? '+' : ''}{totals.totalDelta}
+            </span>
+          </div>
+        </div>
+
+        {/* Table */}
+        <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+          <div className="flex-shrink-0 grid grid-cols-[30px_120px_1fr_70px_90px_90px_80px] gap-0 px-3 py-1 text-[9px] font-bold text-white" style={{ backgroundColor: HEADER_DARK_BLUE }}>
+            <div className="text-center">#</div>
+            <div>Part Number</div>
+            <div>Details</div>
+            <div className="text-right">On Hand</div>
+            <div className="text-right">Current Counted</div>
+            <div className="text-right">Previous Counted</div>
+            <div className="text-right">Delta</div>
+          </div>
+          <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
+            {sortedRows.length === 0 ? (
+              <div className="text-center py-8 text-slate-400 text-[11px]">No items to compare</div>
+            ) : (
+              sortedRows.map((r, idx) => {
+                const delta = r.deltaFromLast;
+                const isNew = delta === null;
+                return (
+                  <div
+                    key={r.productId}
+                    className="grid grid-cols-[30px_120px_1fr_70px_90px_90px_80px] gap-0 px-3 py-0.5 text-[10px] border-b border-slate-100"
+                    style={{
+                      backgroundColor: isNew ? '#E3F2FD' : (idx % 2 === 1 ? '#F8F8F8' : '#FFFFFF'),
+                    }}
+                  >
+                    <div className="text-center text-slate-500">{idx + 1}</div>
+                    <div className="font-mono truncate text-slate-700">{r.partNo}</div>
+                    <div className="truncate text-slate-800">{r.details}</div>
+                    <div className="text-right font-mono text-slate-700" style={{ backgroundColor: ON_HAND_BG }}>{r.currentOnHand}</div>
+                    <div className="text-right font-mono font-semibold text-slate-800">{r.currentCounted}</div>
+                    <div className="text-right font-mono text-slate-600">{r.previousCounted ?? '—'}</div>
+                    <div className={cn(
+                      "text-right font-mono font-bold",
+                      isNew ? "text-blue-700" : (delta! > 0 ? "text-emerald-700" : delta! < 0 ? "text-rose-700" : "text-slate-500")
+                    )}>
+                      {isNew ? 'NEW' : (delta! > 0 ? `+${delta}` : `${delta}`)}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        {/* Action buttons */}
+        <div className="flex-shrink-0 px-4 py-2 flex items-center gap-2 border-t" style={{ borderColor: FIELD_BORDER, backgroundColor: '#F0F4F8' }}>
+          <button onClick={handlePrint} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1 transition" style={{ backgroundColor: HEADER_DARK_BLUE }}>
+            <Printer className="h-3 w-3" /> Print
+          </button>
+          <button onClick={handleExport} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1 transition" style={{ backgroundColor: HEADER_DARK_BLUE }}>
+            <Download className="h-3 w-3" style={{ color: '#4CAF50' }} /> Export
+          </button>
+          <div className="flex-1" />
+          <span className="text-[9px] text-slate-500">
+            Items in <span className="bg-blue-100 px-1 rounded">blue</span> are new since the previous stocktake ·
+            Delta colors: <span className="text-emerald-700 font-bold">+</span> surplus · <span className="text-rose-700 font-bold">−</span> shortage
+          </span>
+          <button onClick={onClose} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1 transition" style={{ backgroundColor: '#F44336' }}>
+            <X className="h-3 w-3" /> Close
+          </button>
         </div>
       </motion.div>
     </motion.div>

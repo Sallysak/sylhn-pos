@@ -1422,3 +1422,81 @@ Stage Summary:
 - No duplicate logic: the old QuantityAdjustment function (175 lines) is gone; the new component is the single source of truth for stock quantity adjustments
 - Colors match reference images: dark blue title bar (#1E5A8E), light blue button bar, light yellow On Hand column (#FFF8DC), light blue/green Stock Search popup
 - Window size: ~920×620 — consistent with other popups in the system
+
+---
+Task ID: stock-adjustment-enhancements
+Agent: main
+Task: Implement three suggested next-step enhancements for the Stock Quantity Adjustment feature:
+  1) Persist drafts to localStorage so an in-progress stocktake isn't lost on refresh
+  2) Add a history view filter for adjustment references (see all lines from a single Stocktake event)
+  3) Add a "Compare with last Stocktake" report inside the StockQuantityAdjustment popup
+
+Work Log:
+- Modified /home/z/my-project/src/components/stock-quantity-adjustment.tsx (now ~1280 lines):
+  - Added DRAFT_KEY constant ('sylhn-stock-adjustment-draft')
+  - Added draftRestored state flag
+  - Added restore-on-mount useEffect: reads localStorage draft, validates age (<24h), rehydrates lines (refreshing onHand/cost from current product data while preserving user's counted value), restores all top-level fields (adjNumber, adjType, date, details, postToAC, fromPartNo, toPartNo, groupFilter, bin), shows toast on restore
+  - Added auto-save useEffect: writes the entire form state to localStorage on every state change (skips when form is fresh/empty and not restored, skips after a successful save)
+  - Updated handleSave to clear the draft from localStorage after a successful commit + reset draftRestored
+  - Updated handleDelete to clear the draft + reset draftRestored
+  - Added visual indicators in the Find Part No bar:
+    - "Draft auto-saved" pulsing amber dot when there are unsaved lines
+    - "Discard draft" rose button shown only when a draft was restored (lets the user explicitly throw away the restored state and start fresh)
+  - Added history prop to component interface (optional, defaults to [])
+  - Added lastStocktakeData useMemo: scans history for action='adjusted' entries, groups by reference, picks the most recent reference (excluding the current adjNumber if it was already saved), builds a productId→{counted,variance,productName,sku} map
+  - Added comparisonRows useMemo: maps current adjustment lines to { productId, partNo, details, currentOnHand, currentCounted, previousCounted, previousReference, deltaFromLast }
+  - Added comparisonTotals useMemo: totalCurrentCounted, totalPreviousCounted, totalDelta, matchedProducts, newProducts
+  - Added showCompareReport state
+  - Added "Compare" action button (TrendingUp icon, amber icon color) next to Export — disabled with a toast if no lines or no previous stocktake exists
+  - Added AnimatePresence block rendering <CompareWithLastStocktakeReport /> when showCompareReport is true
+  - Added new CompareWithLastStocktakeReport component at end of file:
+    - Dark blue title bar "Compare with last Stocktake" with TrendingUp icon
+    - Comparison info banner: Current (type, number, date, item count) vs Compared against (reference, timestamp)
+    - Summary stats bar: matched items, new items, current total, previous total, net delta (color-coded)
+    - 7-column table: #, Part Number, Details, On Hand (yellow), Current Counted, Previous Counted, Delta (color-coded: green surplus, red shortage, blue NEW)
+    - New items highlighted with light blue background
+    - Sorted by abs(delta) descending — biggest changes at top, new items at bottom
+    - Print button: opens new window with full HTML report (company header + comparison info + table + totals)
+    - Export button: writes XLSX with all rows + totals row
+    - Close button
+- Modified /home/z/my-project/src/components/stock-management.tsx:
+  - Added useMemo to React imports (was missing)
+  - Updated StockQuantityAdjustment render to pass history={history} prop
+  - Reworked StockHistoryView component:
+    - Added referenceFilter state (default "all")
+    - Added referenceGroups useMemo that scans history, groups entries by reference, and produces a sorted list of { reference, count, totalVariance, firstTimestamp, actions } (most-recent first)
+    - Updated filtered computation to apply both action filter AND reference filter
+    - Added reference filter bar (amber background) with:
+      - "Adjustment Reference:" label
+      - Dropdown listing all unique references with summary text ("ADJ-123456 — 5 entries · variance +12 · 7/8/2026")
+      - "Clear reference filter" button (rose) shown when a reference is selected
+      - Badge showing "Showing N entries for REFERENCE" when filtered
+    - Made history rows clickable: clicking a row sets the reference filter to that row's reference (or clears it if already set) — surfaces the grouping intuitively
+    - Highlighted filtered rows with amber background + ring
+    - Updated header badge to show "N of M entries" instead of just total
+    - Updated empty-state to show "No history entries match the current filters" with a "Clear all filters" button when any filter is active
+- Verified npx tsc --noEmit produces no errors in stock files
+- Verified npx next build compiles successfully
+- Verified dev server responds with HTTP 200 with no runtime errors
+
+Stage Summary:
+- 2 modified files: stock-quantity-adjustment.tsx (+~370 lines: draft persistence + compare report component), stock-management.tsx (StockHistoryView reworked with reference filter, +useMemo import, +history prop pass-through)
+- Feature 1 — Draft persistence:
+  - Auto-saves to localStorage key 'sylhn-stock-adjustment-draft' on every state change
+  - Restores on mount (if draft is <24h old and has lines)
+  - Rehydrates lines with fresh onHand/cost from current product data while preserving user's counted value (so refreshed stock doesn't lose the count)
+  - Visual indicator: pulsing amber "Draft auto-saved" + "Discard draft" button when restored
+  - Clears draft on Save (committed) or Delete (intentional discard)
+- Feature 2 — Adjustment reference filter:
+  - New amber filter bar above the history list
+  - Dropdown lists every unique reference with entry count, total variance, and date
+  - Clicking a history row toggles the reference filter (intuitive UX)
+  - Filtered rows are highlighted amber
+  - "Clear all filters" button in empty state
+- Feature 3 — Compare with last Stocktake report:
+  - "Compare" button in the action bar (disabled with toast if no previous stocktake exists)
+  - Side-by-side popup showing current counted vs. previous counted, with delta column
+  - New items (not in previous stocktake) highlighted blue and labeled "NEW"
+  - Sorted by abs(delta) — biggest variances float to the top
+  - Summary stats: matched count, new count, current total, previous total, net delta
+  - Print and Export buttons for the comparison report

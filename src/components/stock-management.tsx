@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Package, Plus, Edit2, Trash2, Search, Layers, Settings2, History,
@@ -192,6 +192,7 @@ export function StockManagement({ onBack, products, setProducts, groups, setGrou
             products={products}
             setProducts={setProducts}
             setHistory={setHistory}
+            history={history}
             groups={groups}
             onClose={() => setShowQtyAdjustmentPopup(false)}
           />
@@ -702,7 +703,44 @@ function GroupForm({ group, onSave, onClose }: {
 // ===== Stock History =====
 function StockHistoryView({ history, products }: { history: StockHistoryEntry[]; products: Product[] }) {
   const [filter, setFilter] = useState<string>("all");
-  const filtered = filter === "all" ? history : history.filter(h => h.action === filter);
+  // ===== Reference filter: when set, only entries with this reference are shown =====
+  // (e.g. all lines belonging to a single Stocktake event ADJ-123456)
+  const [referenceFilter, setReferenceFilter] = useState<string>("all");
+
+  // Build the list of unique references from history (most-recent first)
+  // Each reference is grouped with its earliest timestamp + entry count + total variance
+  const referenceGroups = useMemo(() => {
+    const groups = new Map<string, { reference: string; count: number; totalVariance: number; firstTimestamp: string; actions: Set<string> }>();
+    history.forEach(h => {
+      if (!h.reference) return;
+      const existing = groups.get(h.reference);
+      if (existing) {
+        existing.count += 1;
+        existing.totalVariance += h.quantityChange;
+        existing.actions.add(h.action);
+        if (h.timestamp < existing.firstTimestamp) existing.firstTimestamp = h.timestamp;
+      } else {
+        groups.set(h.reference, {
+          reference: h.reference,
+          count: 1,
+          totalVariance: h.quantityChange,
+          firstTimestamp: h.timestamp,
+          actions: new Set([h.action]),
+        });
+      }
+    });
+    return Array.from(groups.values()).sort((a, b) => b.firstTimestamp.localeCompare(a.firstTimestamp));
+  }, [history]);
+
+  // ===== Compute filtered list =====
+  // Apply action filter first, then reference filter
+  const filtered = useMemo(() => {
+    let result = filter === "all" ? history : history.filter(h => h.action === filter);
+    if (referenceFilter !== "all") {
+      result = result.filter(h => h.reference === referenceFilter);
+    }
+    return result;
+  }, [history, filter, referenceFilter]);
 
   const actionColors: Record<string, string> = {
     added: "bg-emerald-100 text-emerald-700",
@@ -720,7 +758,7 @@ function StockHistoryView({ history, products }: { history: StockHistoryEntry[];
         <div className="flex items-center gap-3">
           <History className="h-5 w-5 text-emerald-600" />
           <h2 className="text-base font-bold text-slate-800">Stock Movement History</h2>
-          <Badge variant="outline" className="font-mono text-xs">{history.length} entries</Badge>
+          <Badge variant="outline" className="font-mono text-xs">{filtered.length} of {history.length} entries</Badge>
         </div>
         <div className="flex gap-1">
           {["all", "received", "added", "modified", "adjusted", "removed"].map(f => (
@@ -736,6 +774,40 @@ function StockHistoryView({ history, products }: { history: StockHistoryEntry[];
         </div>
       </div>
 
+      {/* ===== Reference filter bar (new) ===== */}
+      {referenceGroups.length > 0 && (
+        <div className="flex-shrink-0 px-5 py-2 bg-amber-50/60 border-b border-amber-100 flex items-center gap-2 flex-wrap">
+          <span className="text-[11px] font-bold text-slate-700 flex items-center gap-1">
+            <Filter className="h-3 w-3" /> Adjustment Reference:
+          </span>
+          <select
+            value={referenceFilter}
+            onChange={(e) => setReferenceFilter(e.target.value)}
+            className="h-7 px-2 text-[11px] rounded-md border border-slate-300 bg-white text-slate-700 outline-none focus:ring-2 focus:ring-emerald-400 cursor-pointer"
+          >
+            <option value="all">All references ({history.length} entries)</option>
+            {referenceGroups.map(g => (
+              <option key={g.reference} value={g.reference}>
+                {g.reference} — {g.count} entries · variance {g.totalVariance > 0 ? '+' : ''}{g.totalVariance} · {new Date(g.firstTimestamp).toLocaleDateString('en-GB')}
+              </option>
+            ))}
+          </select>
+          {referenceFilter !== "all" && (
+            <button
+              onClick={() => setReferenceFilter("all")}
+              className="h-7 px-2 rounded-md bg-rose-100 hover:bg-rose-200 text-rose-700 text-[10px] font-semibold flex items-center gap-1 transition"
+            >
+              <X className="h-3 w-3" /> Clear reference filter
+            </button>
+          )}
+          {referenceFilter !== "all" && (
+            <Badge variant="secondary" className="bg-amber-100 text-amber-800 text-[10px]">
+              Showing {filtered.length} entries for {referenceFilter}
+            </Badge>
+          )}
+        </div>
+      )}
+
       <ScrollArea className="flex-1">
         <div className="p-4 space-y-2">
           {filtered.slice().reverse().map((h, i) => (
@@ -744,7 +816,16 @@ function StockHistoryView({ history, products }: { history: StockHistoryEntry[];
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: Math.min(i * 0.02, 0.3) }}
-              className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 hover:bg-slate-100 transition"
+              className={cn(
+                "flex items-center gap-3 p-3 rounded-xl transition cursor-pointer",
+                referenceFilter === h.reference ? "bg-amber-100 ring-1 ring-amber-300 hover:bg-amber-200" : "bg-slate-50 hover:bg-slate-100"
+              )}
+              onClick={() => {
+                // Click on a row whose reference matches the current filter clears it; otherwise sets it
+                if (referenceFilter === h.reference) setReferenceFilter("all");
+                else if (h.reference) setReferenceFilter(h.reference);
+              }}
+              title={h.reference ? `Click to filter by ${h.reference}` : undefined}
             >
               <div className={cn("h-10 w-10 rounded-lg flex items-center justify-center text-xs font-bold uppercase", actionColors[h.action])}>
                 {h.action.slice(0, 3)}
@@ -768,7 +849,7 @@ function StockHistoryView({ history, products }: { history: StockHistoryEntry[];
               </div>
               <div className="text-right">
                 <div className="text-[10px] text-slate-400">Ref</div>
-                <div className="text-[10px] font-mono text-slate-600">{h.reference}</div>
+                <div className={cn("text-[10px] font-mono", referenceFilter === h.reference ? "text-amber-700 font-bold" : "text-slate-600")}>{h.reference}</div>
               </div>
               <div className="flex items-center gap-1 text-[10px] text-slate-500">
                 <User className="h-3 w-3" />
@@ -779,7 +860,15 @@ function StockHistoryView({ history, products }: { history: StockHistoryEntry[];
           {filtered.length === 0 && (
             <div className="flex flex-col items-center justify-center py-20 text-slate-400">
               <History className="h-10 w-10 mb-2 opacity-40" />
-              <div className="text-sm font-medium">No history entries</div>
+              <div className="text-sm font-medium">No history entries match the current filters</div>
+              {(filter !== "all" || referenceFilter !== "all") && (
+                <button
+                  onClick={() => { setFilter("all"); setReferenceFilter("all"); }}
+                  className="mt-2 h-7 px-3 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold"
+                >
+                  Clear all filters
+                </button>
+              )}
             </div>
           )}
         </div>
