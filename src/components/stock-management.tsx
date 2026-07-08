@@ -8,7 +8,7 @@ import {
   Filter, ChevronRight, Calendar, User, Tag, DollarSign, Barcode,
   ArrowUpDown, ArrowUp, ArrowDown, RotateCcw,
   FileText, Copy, Image as ImageIcon, Tags, FileSearch, FolderTree, SlidersHorizontal,
-  Monitor, Printer, Folder, FileBarChart, Download,
+  Monitor, Printer, Folder, FileBarChart, Download, Mail, MessageSquare, Send,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -105,7 +105,7 @@ export function StockManagement({ onBack, products, setProducts, groups, setGrou
 
     return {
       lastDate: lastEntry.timestamp,
-      lastReference: lastEntry.reference,
+      lastReference: lastEntry.reference || null,
       isOverdue,
       daysOverdue: Math.max(0, daysOverdue),
       nextDueDate,
@@ -400,6 +400,9 @@ export function StockManagement({ onBack, products, setProducts, groups, setGrou
         {showDashboard && (
           <StocktakeDashboard
             history={history}
+            products={products}
+            stocktakeStatus={stocktakeStatus}
+            scheduleFreq={scheduleFreq}
             onClose={() => setShowDashboard(false)}
             onStartStocktake={() => {
               setShowDashboard(false);
@@ -2573,14 +2576,116 @@ function QtyReportViewer({ report, onClose }: { report: ReportData; onClose: () 
 // providing management oversight at a glance.
 function StocktakeDashboard({
   history,
+  products,
+  stocktakeStatus,
+  scheduleFreq,
   onClose,
   onStartStocktake,
 }: {
   history: StockHistoryEntry[];
+  products: Product[];
+  stocktakeStatus: { lastDate: string | null; lastReference: string | null; isOverdue: boolean; daysOverdue: number; nextDueDate: string; message: string };
+  scheduleFreq: 'weekly' | 'biweekly' | 'monthly' | 'quarterly';
   onClose: () => void;
   onStartStocktake: () => void;
 }) {
   const { toast } = useToast();
+
+  // ===== Notification settings (persisted to localStorage) =====
+  const NOTIFY_KEY = 'sylhn-stocktake-notifications';
+  const [notifyEmails, setNotifyEmails] = useState('');
+  const [notifyPhones, setNotifyPhones] = useState('');
+  const [notifyEmailEnabled, setNotifyEmailEnabled] = useState(true);
+  const [notifySmsEnabled, setNotifySmsEnabled] = useState(false);
+  const [showNotifySettings, setShowNotifySettings] = useState(false);
+
+  // Load notification settings on mount
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const cached = window.localStorage.getItem(NOTIFY_KEY);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        setNotifyEmails(parsed.emails || '');
+        setNotifyPhones(parsed.phones || '');
+        setNotifyEmailEnabled(parsed.emailEnabled !== false);
+        setNotifySmsEnabled(parsed.smsEnabled === true);
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  // Persist notification settings
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(NOTIFY_KEY, JSON.stringify({
+        emails: notifyEmails, phones: notifyPhones,
+        emailEnabled: notifyEmailEnabled, smsEnabled: notifySmsEnabled,
+      }));
+    } catch { /* ignore */ }
+  }, [notifyEmails, notifyPhones, notifyEmailEnabled, notifySmsEnabled]);
+
+  // ===== Send overdue notification (email + SMS) =====
+  const sendOverdueNotification = (mode: 'test' | 'real') => {
+    if (!stocktakeStatus.isOverdue) {
+      toast({ title: 'Not overdue', description: 'Stocktake is not currently overdue — no notification to send', variant: 'destructive' });
+      return;
+    }
+    const emails = notifyEmails.split(',').map(s => s.trim()).filter(Boolean);
+    const phones = notifyPhones.split(',').map(s => s.trim()).filter(Boolean);
+
+    if (mode === 'real') {
+      if (notifyEmailEnabled && emails.length === 0 && notifySmsEnabled && phones.length === 0) {
+        toast({ title: 'No recipients', description: 'Add at least one email or phone number in notification settings', variant: 'destructive' });
+        return;
+      }
+    }
+
+    const subject = encodeURIComponent(`[SYLHN POS] Stocktake Overdue — ${stocktakeStatus.daysOverdue} day(s)`);
+    const body = encodeURIComponent(
+      `STOCKTAKE OVERDUE ALERT\n\n` +
+      `Days overdue: ${stocktakeStatus.daysOverdue}\n` +
+      `Last stocktake: ${stocktakeStatus.lastDate ? new Date(stocktakeStatus.lastDate).toLocaleDateString('en-GB') : 'Never'}\n` +
+      `Last reference: ${stocktakeStatus.lastReference || '—'}\n` +
+      `Schedule frequency: ${scheduleFreq}\n` +
+      `Next due date: ${stocktakeStatus.nextDueDate}\n\n` +
+      `Action required: Please perform a stocktake as soon as possible to maintain inventory accuracy.\n\n` +
+      `— SYLHN COMPANY LTD POS System\n${COMPANY.address} · ${COMPANY.contact}`
+    );
+
+    let sentChannels: string[] = [];
+
+    if (notifyEmailEnabled && emails.length > 0) {
+      const to = mode === 'test' ? '' : emails.join(',');
+      const bcc = mode === 'test' ? emails.join(',') : '';
+      window.location.href = `mailto:${to}?bcc=${bcc}&subject=${subject}&body=${body}`;
+      sentChannels.push(`Email to ${emails.length} recipient(s)`);
+    }
+
+    if (notifySmsEnabled && phones.length > 0) {
+      // SMS via sms: URI (works on mobile devices; on desktop, just show a toast)
+      const smsBody = encodeURIComponent(
+        `[SYLHN POS] Stocktake OVERDUE by ${stocktakeStatus.daysOverdue} day(s). Last: ${stocktakeStatus.lastReference || 'Never'}. Please perform stocktake now.`
+      );
+      try {
+        // Open SMS composer for the first phone (browsers limit multi-recipient SMS)
+        if (mode === 'real' && phones.length > 0) {
+          window.location.href = `sms:${phones[0]}?body=${smsBody}`;
+        }
+      } catch { /* sms: URI not supported */ }
+      sentChannels.push(`SMS to ${phones.length} phone(s)`);
+    }
+
+    if (sentChannels.length === 0) {
+      toast({ title: 'No channels enabled', description: 'Enable Email or SMS in notification settings', variant: 'destructive' });
+      return;
+    }
+
+    toast({
+      title: mode === 'test' ? 'Test notification sent' : 'Overdue notification sent',
+      description: sentChannels.join(' · '),
+    });
+  };
 
   // ===== Group history entries by reference (only adjusted entries) =====
   const stocktakeEvents = useMemo(() => {
@@ -2635,11 +2740,180 @@ function StocktakeDashboard({
     };
   }, [stocktakeEvents]);
 
+  // ===== Variance trend data (chronological, oldest first for the chart) =====
+  // We use up to the last 20 stocktake events to show the trend over time.
+  const trendData = useMemo(() => {
+    // stocktakeEvents is sorted most-recent first; reverse for chronological order
+    const chronological = [...stocktakeEvents].reverse();
+    return chronological.slice(-20).map(e => ({
+      reference: e.reference,
+      timestamp: e.timestamp,
+      variance: e.totalVariance,
+      surplus: e.surplusItems,
+      shortage: e.shortageItems,
+      dateLabel: (() => {
+        try {
+          const d = new Date(e.timestamp);
+          return `${d.getDate()}/${d.getMonth() + 1}`;
+        } catch { return e.reference; }
+      })(),
+    }));
+  }, [stocktakeEvents]);
+
+  // ===== Trend analysis: is shrinkage improving or worsening? =====
+  const trendAnalysis = useMemo(() => {
+    if (trendData.length < 2) {
+      return { direction: 'neutral', slope: 0, recentAvg: 0, olderAvg: 0, message: 'Need at least 2 stocktake events to analyze the trend' };
+    }
+    // Compare the average variance of the first half vs the second half
+    const mid = Math.floor(trendData.length / 2);
+    const olderHalf = trendData.slice(0, mid);
+    const recentHalf = trendData.slice(mid);
+    const olderAvg = olderHalf.reduce((s, d) => s + d.variance, 0) / olderHalf.length;
+    const recentAvg = recentHalf.reduce((s, d) => s + d.variance, 0) / recentHalf.length;
+    const slope = recentAvg - olderAvg;
+
+    let direction: 'improving' | 'worsening' | 'stable';
+    if (Math.abs(slope) < 1) direction = 'stable';
+    else if (slope > 0) direction = 'improving'; // variance moving toward positive = less shrinkage
+    else direction = 'worsening'; // variance moving toward negative = more shrinkage
+
+    const message = direction === 'improving'
+      ? `Shrinkage is improving — average variance moved from ${olderAvg.toFixed(1)} to ${recentAvg.toFixed(1)} (+${slope.toFixed(1)})`
+      : direction === 'worsening'
+      ? `Shrinkage is worsening — average variance moved from ${olderAvg.toFixed(1)} to ${recentAvg.toFixed(1)} (${slope.toFixed(1)})`
+      : `Shrinkage is stable — average variance is ${recentAvg.toFixed(1)}`;
+
+    return { direction, slope, recentAvg, olderAvg, message };
+  }, [trendData]);
+
+  // ===== Reorder suggestions based on persistent shortages =====
+  // A product is flagged as a reorder suggestion if:
+  //   1. It has appeared in >= 2 stocktake events with a shortage (negative variance)
+  //   2. Its current stock is at or below its reorder level
+  //   3. The total shortage across events exceeds a threshold (e.g. >= 3 units lost)
+  const reorderSuggestions = useMemo(() => {
+    // Build a map of productId -> { shortageEvents, totalShortage, productName, sku, currentStock, reorderLevel, costPrice, supplier, emoji }
+    const productShortageStats = new Map<string, {
+      productId: string;
+      productName: string;
+      sku: string;
+      currentStock: number;
+      reorderLevel: number;
+      costPrice: number;
+      supplier: string;
+      emoji: string;
+      shortageEvents: number;
+      totalShortage: number;
+      lastShortageDate: string;
+    }>();
+
+    // Iterate through all stocktake events, tracking shortage occurrences per product
+    stocktakeEvents.forEach(event => {
+      event.entries.forEach(entry => {
+        if (entry.quantityChange >= 0) return; // only shortages
+        const existing = productShortageStats.get(entry.productId);
+        if (existing) {
+          existing.shortageEvents += 1;
+          existing.totalShortage += Math.abs(entry.quantityChange);
+          if (entry.timestamp > existing.lastShortageDate) existing.lastShortageDate = entry.timestamp;
+        } else {
+          // Look up current product info
+          const product = products.find(p => p.id === entry.productId);
+          if (!product) return; // product was deleted
+          productShortageStats.set(entry.productId, {
+            productId: entry.productId,
+            productName: entry.productName,
+            sku: entry.sku,
+            currentStock: product.stock,
+            reorderLevel: product.reorderLevel,
+            costPrice: product.costPrice,
+            supplier: product.supplier,
+            emoji: product.emoji,
+            shortageEvents: 1,
+            totalShortage: Math.abs(entry.quantityChange),
+            lastShortageDate: entry.timestamp,
+          });
+        }
+      });
+    });
+
+    // Filter: persistent shortages (>= 2 events) AND current stock at/below reorder level
+    return Array.from(productShortageStats.values())
+      .filter(s => s.shortageEvents >= 2 && s.currentStock <= s.reorderLevel)
+      .sort((a, b) => b.totalShortage - a.totalShortage); // worst shrinkage first
+  }, [stocktakeEvents, products]);
+
   const fmtDate = (ts: string) => {
     try {
       const d = new Date(ts);
       return d.toLocaleDateString('en-GB') + ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
     } catch { return ts; }
+  };
+
+  // ===== Tab state for the dashboard =====
+  const [dashboardTab, setDashboardTab] = useState<'overview' | 'trend' | 'reorder' | 'notify'>('overview');
+
+  // ===== Variance trend chart geometry (pure SVG, no charting library needed) =====
+  const chart = useMemo(() => {
+    if (trendData.length === 0) return null;
+    const W = 640;       // viewBox width
+    const H = 180;       // viewBox height
+    const padX = 40;     // left padding for axis labels
+    const padY = 20;     // top/bottom padding
+    const chartW = W - padX - 20;
+    const chartH = H - padY * 2;
+
+    // Find the value range
+    const allValues = trendData.map(d => d.variance);
+    const maxValue = Math.max(0, ...allValues);
+    const minValue = Math.min(0, ...allValues);
+    const range = Math.max(1, maxValue - minValue);
+
+    // Compute points
+    const points = trendData.map((d, i) => {
+      const x = padX + (trendData.length === 1 ? chartW / 2 : (i / (trendData.length - 1)) * chartW);
+      const y = padY + chartH - ((d.variance - minValue) / range) * chartH;
+      return { x, y, value: d.variance, label: d.dateLabel, reference: d.reference };
+    });
+
+    // Zero line position (if zero is in range)
+    const zeroY = padY + chartH - ((0 - minValue) / range) * chartH;
+    const zeroVisible = 0 >= minValue && 0 <= maxValue;
+
+    // Build line path
+    const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
+    // Build area path (for shading below the line)
+    const areaPath = `${linePath} L ${points[points.length - 1].x.toFixed(1)} ${zeroY.toFixed(1)} L ${points[0].x.toFixed(1)} ${zeroY.toFixed(1)} Z`;
+
+    return { W, H, padX, padY, chartW, chartH, points, zeroY, zeroVisible, linePath, areaPath, maxValue, minValue };
+  }, [trendData]);
+
+  // ===== Export reorder suggestions to Excel =====
+  const handleExportReorder = () => {
+    if (reorderSuggestions.length === 0) { toast({ title: 'No suggestions to export', variant: 'destructive' }); return; }
+    import('xlsx').then((XLSX) => {
+      type Row = Record<string, string | number>;
+      const data: Row[] = reorderSuggestions.map((s, i) => ({
+        '#': i + 1,
+        'Product': s.productName,
+        'SKU': s.sku,
+        'Current Stock': s.currentStock,
+        'Reorder Level': s.reorderLevel,
+        'Shortage Events': s.shortageEvents,
+        'Total Units Lost': s.totalShortage,
+        'Supplier': s.supplier,
+        'Cost per Unit GHC': s.costPrice,
+        'Suggested Reorder Qty': Math.max(s.reorderLevel * 3 - s.currentStock, s.reorderLevel),
+        'Est. Reorder Cost GHC': Math.max(s.reorderLevel * 3 - s.currentStock, s.reorderLevel) * s.costPrice,
+      }));
+      const ws = XLSX.utils.json_to_sheet(data);
+      ws['!cols'] = [{ wch: 4 }, { wch: 28 }, { wch: 12 }, { wch: 13 }, { wch: 13 }, { wch: 14 }, { wch: 16 }, { wch: 20 }, { wch: 16 }, { wch: 20 }, { wch: 20 }];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Reorder Suggestions');
+      XLSX.writeFile(wb, `reorder-suggestions-${new Date().toISOString().split('T')[0]}.xlsx`);
+      toast({ title: 'Exported successfully', description: `${reorderSuggestions.length} suggestions` });
+    });
   };
 
   const handleExport = () => {
@@ -2711,79 +2985,499 @@ function StocktakeDashboard({
           </div>
         </div>
 
-        {/* Header for recent events list */}
-        <div className="flex-shrink-0 px-4 py-2 bg-purple-50 border-b border-purple-100 flex items-center justify-between">
-          <span className="text-xs font-bold text-slate-700">5 Most Recent Stocktake Events</span>
-          <span className="text-[10px] text-slate-500">Click an event to see details in Stock History</span>
+        {/* ===== Overdue notification banner (only when overdue) ===== */}
+        {stocktakeStatus.isOverdue && (
+          <div className="flex-shrink-0 px-4 py-2 bg-rose-50 border-b border-rose-200 flex items-center gap-3">
+            <AlertTriangle className="h-5 w-5 text-rose-600 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <div className="text-xs font-bold text-rose-800">Stocktake {stocktakeStatus.daysOverdue} day(s) overdue</div>
+              <div className="text-[10px] text-rose-700">{stocktakeStatus.message}</div>
+            </div>
+            <button
+              onClick={() => sendOverdueNotification('real')}
+              className="h-7 px-3 rounded-md bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-bold flex items-center gap-1.5 transition shadow-sm"
+              title="Send overdue notification to configured recipients"
+            >
+              <Mail className="h-3.5 w-3.5" /> Notify
+            </button>
+            <button
+              onClick={() => sendOverdueNotification('test')}
+              className="h-7 px-3 rounded-md bg-white hover:bg-rose-50 text-rose-700 text-[11px] font-bold flex items-center gap-1.5 transition border border-rose-300"
+              title="Send a test notification to verify your settings"
+            >
+              Test
+            </button>
+            <button
+              onClick={() => setShowNotifySettings(true)}
+              className="h-7 w-7 rounded-md bg-white hover:bg-rose-50 text-rose-700 flex items-center justify-center transition border border-rose-300"
+              title="Notification settings"
+            >
+              <Settings2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
+
+        {/* ===== Tab navigation ===== */}
+        <div className="flex-shrink-0 flex border-b border-slate-200 bg-white">
+          {([
+            { id: 'overview' as const, label: 'Overview', icon: TrendingUp, badge: recentEvents.length },
+            { id: 'trend' as const, label: 'Variance Trend', icon: TrendingUp, badge: trendData.length },
+            { id: 'reorder' as const, label: 'Reorder Suggestions', icon: Package, badge: reorderSuggestions.length },
+            { id: 'notify' as const, label: 'Notifications', icon: Mail, badge: null },
+          ]).map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setDashboardTab(tab.id)}
+              className={cn(
+                "flex items-center gap-1.5 px-4 py-2 text-xs font-bold transition border-b-2",
+                dashboardTab === tab.id
+                  ? "border-purple-600 text-purple-700 bg-purple-50"
+                  : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50"
+              )}
+            >
+              <tab.icon className="h-3.5 w-3.5" />
+              {tab.label}
+              {tab.badge !== null && tab.badge > 0 && (
+                <span className={cn(
+                  "ml-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold",
+                  dashboardTab === tab.id ? "bg-purple-600 text-white" : "bg-slate-200 text-slate-600"
+                )}>
+                  {tab.badge}
+                </span>
+              )}
+            </button>
+          ))}
         </div>
 
-        {/* Recent events list */}
-        <div className="flex-1 overflow-y-auto p-3 space-y-2" style={{ scrollbarWidth: 'thin' }}>
-          {recentEvents.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-slate-400">
-              <TrendingUp className="h-10 w-10 mb-2 opacity-40" />
-              <div className="text-sm font-medium">No stocktake events yet</div>
-              <div className="text-xs mt-1">Perform your first stocktake to see variance trends here</div>
+        {/* ===== Tab content ===== */}
+        <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
+
+          {/* ===== Overview tab (existing 5 recent events list) ===== */}
+          {dashboardTab === 'overview' && (
+            <div className="p-3 space-y-2">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-bold text-slate-700">5 Most Recent Stocktake Events</span>
+                <span className="text-[10px] text-slate-500">Click an event to see details</span>
+              </div>
+              {recentEvents.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+                  <TrendingUp className="h-10 w-10 mb-2 opacity-40" />
+                  <div className="text-sm font-medium">No stocktake events yet</div>
+                  <div className="text-xs mt-1">Perform your first stocktake to see variance trends here</div>
+                </div>
+              ) : (
+                recentEvents.map((event, idx) => (
+                  <motion.div
+                    key={event.reference}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: idx * 0.05 }}
+                    className="bg-white rounded-lg ring-1 ring-slate-200 p-3 hover:ring-purple-300 hover:shadow-md transition cursor-pointer"
+                    onClick={() => {
+                      toast({
+                        title: event.reference,
+                        description: `${event.itemCount} items · Variance: ${event.totalVariance > 0 ? '+' : ''}${event.totalVariance} · ${fmtDate(event.timestamp)}`,
+                      });
+                    }}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className={cn(
+                          "h-8 w-8 rounded-lg flex items-center justify-center text-xs font-bold",
+                          event.totalVariance > 0 ? "bg-emerald-100 text-emerald-700" :
+                          event.totalVariance < 0 ? "bg-rose-100 text-rose-700" :
+                          "bg-slate-100 text-slate-600"
+                        )}>
+                          {event.totalVariance > 0 ? '↑' : event.totalVariance < 0 ? '↓' : '='}
+                        </div>
+                        <div>
+                          <div className="font-bold text-slate-800 text-sm font-mono">{event.reference}</div>
+                          <div className="text-[10px] text-slate-500">{fmtDate(event.timestamp)}</div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className={cn("text-base font-bold font-mono", event.totalVariance > 0 ? "text-emerald-600" : event.totalVariance < 0 ? "text-rose-600" : "text-slate-600")}>
+                          {event.totalVariance > 0 ? '+' : ''}{event.totalVariance}
+                        </div>
+                        <div className="text-[10px] text-slate-500">net variance</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 text-[10px]">
+                      <span className="flex items-center gap-1 text-slate-600">
+                        <Package className="h-3 w-3" /> {event.itemCount} items
+                      </span>
+                      <span className="flex items-center gap-1 text-emerald-700">
+                        <ArrowUp className="h-3 w-3" /> {event.surplusItems} surplus
+                      </span>
+                      <span className="flex items-center gap-1 text-rose-700">
+                        <ArrowDown className="h-3 w-3" /> {event.shortageItems} shortage
+                      </span>
+                      {/* Mini variance bar */}
+                      <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden flex">
+                        {event.surplusItems > 0 && (
+                          <div className="bg-emerald-500 h-full" style={{ width: `${(event.surplusItems / event.itemCount) * 100}%` }} />
+                        )}
+                        {event.shortageItems > 0 && (
+                          <div className="bg-rose-500 h-full" style={{ width: `${(event.shortageItems / event.itemCount) * 100}%` }} />
+                        )}
+                      </div>
+                    </div>
+                  </motion.div>
+                ))
+              )}
             </div>
-          ) : (
-            recentEvents.map((event, idx) => (
-              <motion.div
-                key={event.reference}
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: idx * 0.05 }}
-                className="bg-white rounded-lg ring-1 ring-slate-200 p-3 hover:ring-purple-300 hover:shadow-md transition cursor-pointer"
-                onClick={() => {
-                  toast({
-                    title: event.reference,
-                    description: `${event.itemCount} items · Variance: ${event.totalVariance > 0 ? '+' : ''}${event.totalVariance} · ${fmtDate(event.timestamp)}`,
-                  });
-                }}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
+          )}
+
+          {/* ===== Variance Trend tab (SVG line chart) ===== */}
+          {dashboardTab === 'trend' && (
+            <div className="p-3 space-y-3">
+              {/* Trend analysis banner */}
+              <div className={cn(
+                "rounded-lg p-3 ring-1",
+                trendAnalysis.direction === 'improving' ? "bg-emerald-50 ring-emerald-200" :
+                trendAnalysis.direction === 'worsening' ? "bg-rose-50 ring-rose-200" :
+                "bg-slate-50 ring-slate-200"
+              )}>
+                <div className="flex items-center gap-2">
+                  {trendAnalysis.direction === 'improving' ? (
+                    <ArrowUp className="h-5 w-5 text-emerald-600" />
+                  ) : trendAnalysis.direction === 'worsening' ? (
+                    <ArrowDown className="h-5 w-5 text-rose-600" />
+                  ) : (
+                    <TrendingUp className="h-5 w-5 text-slate-500" />
+                  )}
+                  <div className="flex-1">
                     <div className={cn(
-                      "h-8 w-8 rounded-lg flex items-center justify-center text-xs font-bold",
-                      event.totalVariance > 0 ? "bg-emerald-100 text-emerald-700" :
-                      event.totalVariance < 0 ? "bg-rose-100 text-rose-700" :
-                      "bg-slate-100 text-slate-600"
+                      "text-sm font-bold",
+                      trendAnalysis.direction === 'improving' ? "text-emerald-800" :
+                      trendAnalysis.direction === 'worsening' ? "text-rose-800" :
+                      "text-slate-700"
                     )}>
-                      {event.totalVariance > 0 ? '↑' : event.totalVariance < 0 ? '↓' : '='}
+                      {trendAnalysis.direction === 'improving' ? 'Shrinkage Improving' :
+                       trendAnalysis.direction === 'worsening' ? 'Shrinkage Worsening' :
+                       'Insufficient Data'}
+                    </div>
+                    <div className={cn(
+                      "text-[11px]",
+                      trendAnalysis.direction === 'improving' ? "text-emerald-700" :
+                      trendAnalysis.direction === 'worsening' ? "text-rose-700" :
+                      "text-slate-500"
+                    )}>
+                      {trendAnalysis.message}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* SVG line chart */}
+              {chart ? (
+                <div className="bg-white rounded-lg ring-1 ring-slate-200 p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold text-slate-700">Net Variance per Stocktake (Chronological)</span>
+                    <div className="flex items-center gap-3 text-[10px]">
+                      <span className="flex items-center gap-1">
+                        <span className="inline-block w-3 h-0.5 bg-purple-500" /> Variance
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <span className="inline-block w-3 h-0.5 border-t border-dashed border-slate-400" /> Zero baseline
+                      </span>
+                    </div>
+                  </div>
+                  <svg viewBox={`0 0 ${chart.W} ${chart.H}`} className="w-full" style={{ height: '180px' }}>
+                    {/* Y-axis grid lines */}
+                    {[0, 0.25, 0.5, 0.75, 1].map(t => {
+                      const y = chart.padY + t * chart.chartH;
+                      const value = chart.maxValue - t * (chart.maxValue - chart.minValue);
+                      return (
+                        <g key={t}>
+                          <line x1={chart.padX} y1={y} x2={chart.W - 20} y2={y} stroke="#E2E8F0" strokeWidth={0.5} />
+                          <text x={chart.padX - 4} y={y + 3} textAnchor="end" fontSize="9" fill="#64748B" fontFamily="monospace">
+                            {value > 0 ? '+' : ''}{Math.round(value)}
+                          </text>
+                        </g>
+                      );
+                    })}
+                    {/* Zero baseline (emphasized) */}
+                    {chart.zeroVisible && (
+                      <line x1={chart.padX} y1={chart.zeroY} x2={chart.W - 20} y2={chart.zeroY} stroke="#94A3B8" strokeWidth={1} strokeDasharray="4,3" />
+                    )}
+                    {/* Area fill (green for positive, red for negative) */}
+                    <defs>
+                      <linearGradient id="varianceAreaPos" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#10B981" stopOpacity="0.3" />
+                        <stop offset="100%" stopColor="#10B981" stopOpacity="0" />
+                      </linearGradient>
+                      <linearGradient id="varianceAreaNeg" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#F43F5E" stopOpacity="0" />
+                        <stop offset="100%" stopColor="#F43F5E" stopOpacity="0.3" />
+                      </linearGradient>
+                    </defs>
+                    {/* Split area into positive (above zero) and negative (below zero) */}
+                    {chart.zeroVisible && (
+                      <>
+                        <clipPath id="clipPos">
+                          <rect x={chart.padX} y={chart.padY} width={chart.chartW} height={chart.zeroY - chart.padY} />
+                        </clipPath>
+                        <clipPath id="clipNeg">
+                          <rect x={chart.padX} y={chart.zeroY} width={chart.chartW} height={chart.padY + chart.chartH - chart.zeroY} />
+                        </clipPath>
+                        <path d={chart.areaPath} fill="url(#varianceAreaPos)" clipPath="url(#clipPos)" />
+                        <path d={chart.areaPath} fill="url(#varianceAreaNeg)" clipPath="url(#clipNeg)" />
+                      </>
+                    )}
+                    {/* Line */}
+                    <path d={chart.linePath} fill="none" stroke="#7C3AED" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+                    {/* Points */}
+                    {chart.points.map((p, i) => (
+                      <g key={i}>
+                        <circle
+                          cx={p.x}
+                          cy={p.y}
+                          r={3}
+                          fill={p.value > 0 ? '#10B981' : p.value < 0 ? '#F43F5E' : '#64748B'}
+                          stroke="white"
+                          strokeWidth={1.5}
+                        />
+                        {/* X-axis label (every other point to avoid crowding) */}
+                        {i % 2 === 0 && (
+                          <text x={p.x} y={chart.H - 4} textAnchor="middle" fontSize="8" fill="#64748B" fontFamily="monospace">
+                            {p.label}
+                          </text>
+                        )}
+                      </g>
+                    ))}
+                  </svg>
+                  <div className="mt-2 text-[10px] text-slate-500 text-center">
+                    Showing {trendData.length} stocktake event(s) in chronological order · Hover chart points to see exact values
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+                  <TrendingUp className="h-10 w-10 mb-2 opacity-40" />
+                  <div className="text-sm font-medium">No trend data yet</div>
+                  <div className="text-xs mt-1">Perform at least 2 stocktakes to see the variance trend</div>
+                </div>
+              )}
+
+              {/* Trend data table */}
+              {trendData.length > 0 && (
+                <div className="bg-white rounded-lg ring-1 ring-slate-200 overflow-hidden">
+                  <div className="px-3 py-2 bg-slate-50 border-b border-slate-200">
+                    <span className="text-xs font-bold text-slate-700">Trend Data (chronological)</span>
+                  </div>
+                  <div className="grid grid-cols-[1fr_80px_80px_80px_80px] gap-0 px-3 py-1 text-[9px] font-bold text-slate-600 border-b border-slate-100">
+                    <div>Reference</div>
+                    <div className="text-right">Date</div>
+                    <div className="text-right">Variance</div>
+                    <div className="text-right">Surplus</div>
+                    <div className="text-right">Shortage</div>
+                  </div>
+                  <div className="max-h-40 overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
+                    {trendData.map((d, i) => (
+                      <div key={i} className="grid grid-cols-[1fr_80px_80px_80px_80px] gap-0 px-3 py-1 text-[10px] border-b border-slate-50">
+                        <div className="font-mono text-slate-700 truncate">{d.reference}</div>
+                        <div className="text-right text-slate-600">{d.dateLabel}</div>
+                        <div className={cn("text-right font-mono font-bold", d.variance > 0 ? "text-emerald-700" : d.variance < 0 ? "text-rose-700" : "text-slate-600")}>
+                          {d.variance > 0 ? '+' : ''}{d.variance}
+                        </div>
+                        <div className="text-right text-emerald-700 font-mono">{d.surplus}</div>
+                        <div className="text-right text-rose-700 font-mono">{d.shortage}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ===== Reorder Suggestions tab ===== */}
+          {dashboardTab === 'reorder' && (
+            <div className="p-3 space-y-3">
+              <div className="bg-amber-50 ring-1 ring-amber-200 rounded-lg p-3 flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <div className="text-xs font-bold text-amber-800">Automatic Reorder Suggestions</div>
+                  <div className="text-[10px] text-amber-700 mt-0.5">
+                    Products appearing in <strong>≥2 stocktakes with shortages</strong> AND currently at/below reorder level.
+                    These items show persistent shrinkage patterns and should be reordered to prevent stockouts.
+                    Suggested reorder quantity = 3× reorder level − current stock (minimum: reorder level).
+                  </div>
+                </div>
+              </div>
+
+              {reorderSuggestions.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+                  <Package className="h-10 w-10 mb-2 opacity-40" />
+                  <div className="text-sm font-medium">No reorder suggestions</div>
+                  <div className="text-xs mt-1">Perform more stocktakes to identify persistent shortage patterns</div>
+                </div>
+              ) : (
+                <>
+                  {/* Summary card */}
+                  <div className="bg-white rounded-lg ring-1 ring-slate-200 p-3 grid grid-cols-3 gap-3">
+                    <div>
+                      <div className="text-[9px] text-slate-500 uppercase font-semibold">Items to Reorder</div>
+                      <div className="text-lg font-bold text-amber-600">{reorderSuggestions.length}</div>
                     </div>
                     <div>
-                      <div className="font-bold text-slate-800 text-sm font-mono">{event.reference}</div>
-                      <div className="text-[10px] text-slate-500">{fmtDate(event.timestamp)}</div>
+                      <div className="text-[9px] text-slate-500 uppercase font-semibold">Total Units Lost</div>
+                      <div className="text-lg font-bold text-rose-600 font-mono">
+                        {reorderSuggestions.reduce((s, r) => s + r.totalShortage, 0)}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[9px] text-slate-500 uppercase font-semibold">Est. Reorder Cost</div>
+                      <div className="text-lg font-bold text-slate-800 font-mono">
+                        {formatGHS(reorderSuggestions.reduce((s, r) => s + Math.max(r.reorderLevel * 3 - r.currentStock, r.reorderLevel) * r.costPrice, 0))}
+                      </div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className={cn("text-base font-bold font-mono", event.totalVariance > 0 ? "text-emerald-600" : event.totalVariance < 0 ? "text-rose-600" : "text-slate-600")}>
-                      {event.totalVariance > 0 ? '+' : ''}{event.totalVariance}
+
+                  {/* Suggestions list */}
+                  <div className="bg-white rounded-lg ring-1 ring-slate-200 overflow-hidden">
+                    <div className="grid grid-cols-[1fr_50px_60px_70px_70px_90px] gap-0 px-3 py-1.5 text-[9px] font-bold text-slate-600 border-b border-slate-200 bg-slate-50">
+                      <div>Product</div>
+                      <div className="text-right">Stock</div>
+                      <div className="text-right">Reorder</div>
+                      <div className="text-right">Lost</div>
+                      <div className="text-right">Events</div>
+                      <div className="text-right">Suggest Qty</div>
                     </div>
-                    <div className="text-[10px] text-slate-500">net variance</div>
+                    <div className="max-h-64 overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
+                      {reorderSuggestions.map((s, idx) => {
+                        const suggestedQty = Math.max(s.reorderLevel * 3 - s.currentStock, s.reorderLevel);
+                        return (
+                          <motion.div
+                            key={s.productId}
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: Math.min(idx * 0.03, 0.3) }}
+                            className="grid grid-cols-[1fr_50px_60px_70px_70px_90px] gap-0 px-3 py-2 text-[10px] border-b border-slate-50 hover:bg-amber-50/40 transition"
+                          >
+                            <div className="min-w-0">
+                              <div className="font-semibold text-slate-800 truncate">{s.emoji} {s.productName}</div>
+                              <div className="text-[9px] text-slate-500 truncate font-mono">{s.sku} · {s.supplier}</div>
+                            </div>
+                            <div className={cn("text-right font-mono font-bold", s.currentStock === 0 ? "text-rose-700" : "text-amber-700")}>
+                              {s.currentStock}
+                            </div>
+                            <div className="text-right font-mono text-slate-600">{s.reorderLevel}</div>
+                            <div className="text-right font-mono text-rose-700 font-bold">−{s.totalShortage}</div>
+                            <div className="text-right font-mono text-slate-600">{s.shortageEvents}</div>
+                            <div className="text-right font-mono font-bold text-blue-700">{suggestedQty}</div>
+                          </motion.div>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-3 text-[10px]">
-                  <span className="flex items-center gap-1 text-slate-600">
-                    <Package className="h-3 w-3" /> {event.itemCount} items
-                  </span>
-                  <span className="flex items-center gap-1 text-emerald-700">
-                    <ArrowUp className="h-3 w-3" /> {event.surplusItems} surplus
-                  </span>
-                  <span className="flex items-center gap-1 text-rose-700">
-                    <ArrowDown className="h-3 w-3" /> {event.shortageItems} shortage
-                  </span>
-                  {/* Mini variance bar */}
-                  <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden flex">
-                    {event.surplusItems > 0 && (
-                      <div className="bg-emerald-500 h-full" style={{ width: `${(event.surplusItems / event.itemCount) * 100}%` }} />
-                    )}
-                    {event.shortageItems > 0 && (
-                      <div className="bg-rose-500 h-full" style={{ width: `${(event.shortageItems / event.itemCount) * 100}%` }} />
-                    )}
+                  <button
+                    onClick={handleExportReorder}
+                    className="h-8 px-4 rounded-md bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold flex items-center gap-1.5 transition shadow-sm"
+                  >
+                    <Download className="h-3.5 w-3.5" /> Export Reorder List (XLSX)
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* ===== Notifications tab ===== */}
+          {dashboardTab === 'notify' && (
+            <div className="p-4 space-y-4">
+              <div>
+                <h3 className="text-sm font-bold text-slate-800 mb-1">Overdue Stocktake Notifications</h3>
+                <p className="text-[11px] text-slate-500">
+                  Configure email and SMS recipients to receive alerts when a stocktake becomes overdue.
+                  Settings are persisted to this browser.
+                </p>
+              </div>
+
+              {/* Email settings */}
+              <div className="bg-white rounded-lg ring-1 ring-slate-200 p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Mail className="h-4 w-4 text-blue-600" />
+                    <span className="text-xs font-bold text-slate-800">Email Notifications</span>
                   </div>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={notifyEmailEnabled}
+                      onChange={(e) => setNotifyEmailEnabled(e.target.checked)}
+                      className="h-3.5 w-3.5 accent-blue-600"
+                    />
+                    <span className="text-[10px] font-semibold text-slate-600">Enabled</span>
+                  </label>
                 </div>
-              </motion.div>
-            ))
+                <div>
+                  <label className="text-[10px] font-bold text-slate-600 block mb-1">Recipient emails (comma-separated)</label>
+                  <input
+                    type="text"
+                    value={notifyEmails}
+                    onChange={(e) => setNotifyEmails(e.target.value)}
+                    placeholder="manager@sylhn.com, supervisor@sylhn.com"
+                    disabled={!notifyEmailEnabled}
+                    className="w-full h-8 px-2 text-[11px] border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-400 disabled:bg-slate-100 disabled:text-slate-400"
+                  />
+                </div>
+              </div>
+
+              {/* SMS settings */}
+              <div className="bg-white rounded-lg ring-1 ring-slate-200 p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="h-4 w-4 text-emerald-600" />
+                    <span className="text-xs font-bold text-slate-800">SMS Notifications</span>
+                  </div>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={notifySmsEnabled}
+                      onChange={(e) => setNotifySmsEnabled(e.target.checked)}
+                      className="h-3.5 w-3.5 accent-emerald-600"
+                    />
+                    <span className="text-[10px] font-semibold text-slate-600">Enabled</span>
+                  </label>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-600 block mb-1">Recipient phone numbers (comma-separated, with country code)</label>
+                  <input
+                    type="text"
+                    value={notifyPhones}
+                    onChange={(e) => setNotifyPhones(e.target.value)}
+                    placeholder="+233592766044, +233241112222"
+                    disabled={!notifySmsEnabled}
+                    className="w-full h-8 px-2 text-[11px] border border-slate-300 rounded outline-none focus:ring-1 focus:ring-emerald-400 disabled:bg-slate-100 disabled:text-slate-400"
+                  />
+                </div>
+                <div className="text-[9px] text-slate-500 italic">
+                  Note: SMS composer opens via your device's default messaging app (mobile only). On desktop, the SMS body is shown in a toast for manual sending.
+                </div>
+              </div>
+
+              {/* Test/Send buttons */}
+              <div className="flex items-center gap-2 pt-2">
+                <button
+                  onClick={() => sendOverdueNotification('test')}
+                  disabled={!stocktakeStatus.isOverdue}
+                  className="h-8 px-4 rounded-md bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold flex items-center gap-1.5 transition disabled:opacity-50"
+                  title="Send a test notification to verify your settings"
+                >
+                  <Send className="h-3.5 w-3.5" /> Send Test
+                </button>
+                <button
+                  onClick={() => sendOverdueNotification('real')}
+                  disabled={!stocktakeStatus.isOverdue}
+                  className="h-8 px-4 rounded-md bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold flex items-center gap-1.5 transition shadow-sm disabled:opacity-50"
+                >
+                  <Mail className="h-3.5 w-3.5" /> Send Overdue Alert Now
+                </button>
+                <div className="flex-1" />
+                <span className="text-[10px] text-slate-500">
+                  {stocktakeStatus.isOverdue ? 'Currently overdue — alerts can be sent' : 'Not currently overdue'}
+                </span>
+              </div>
+            </div>
           )}
         </div>
 

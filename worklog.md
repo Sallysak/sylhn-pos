@@ -1577,3 +1577,66 @@ Stage Summary:
 - Verified npx tsc --noEmit produces no errors
 - Verified npx next build compiles successfully
 - Verified dev server responds with HTTP 200 with no runtime errors
+
+---
+Task ID: notifications-reorder-trendchart
+Agent: main
+Task: Implement three suggested enhancements:
+  1) Email/SMS notifications when stocktake becomes overdue (multi-user)
+  2) Automatic reorder suggestions based on persistent shortages from stocktake history
+  3) Variance trend chart in dashboard to visualize whether shrinkage is improving or worsening over time
+
+Work Log:
+- Modified /home/z/my-project/src/components/stock-management.tsx:
+  - Added Mail, MessageSquare, Send icons to lucide-react imports
+  - Fixed stocktakeStatus.lastReference to coerce undefined → null (TS type compatibility)
+  - Updated <StocktakeDashboard> invocation to pass products, stocktakeStatus, and scheduleFreq props
+  - Updated StocktakeDashboard component signature to accept new props
+  - Added notification settings state (notifyEmails, notifyPhones, notifyEmailEnabled, notifySmsEnabled, showNotifySettings) with localStorage persistence (key 'sylhn-stocktake-notifications')
+  - Added sendOverdueNotification(mode: 'test' | 'real') function:
+    - Validates overdue status and recipient lists
+    - Builds prefilled mailto: link with subject + body (days overdue, last stocktake, last reference, schedule frequency, next due date, company signature)
+    - For test mode: sends to BCC only (so recipients see it as a test)
+    - For real mode: sends to TO + BCC
+    - For SMS: uses sms: URI with prefilled body (works on mobile; desktop shows toast)
+    - Toast confirmation with channels used
+  - Added dashboardTab state ('overview' | 'trend' | 'reorder' | 'notify')
+  - Added trendData useMemo: chronological array of up to 20 stocktake events with variance, surplus, shortage, dateLabel
+  - Added trendAnalysis useMemo: splits trendData into older half + recent half, computes average variance for each, determines direction (improving/worsening/stable) based on slope, generates human-readable message
+  - Added reorderSuggestions useMemo: scans all stocktake events for shortage entries (negative variance), groups by productId, tracks shortageEvents count + totalShortage, filters to products with ≥2 shortage events AND current stock at/below reorder level, sorts by total shortage descending
+  - Added chart useMemo: pure SVG geometry (no charting library) — computes W/H/padding, value range, points, zero baseline, line path, area path for shading
+  - Added handleExportReorder function: exports suggestions to XLSX with columns including suggested reorder quantity (= 3× reorder level − current stock, min: reorder level) and estimated reorder cost
+  - Replaced single-list dashboard body with tabbed interface:
+    - Overdue notification banner (rose) at top when overdue — shows AlertTriangle, message, Notify button, Test button, Settings button (links to Notifications tab)
+    - Tab navigation: Overview / Variance Trend / Reorder Suggestions / Notifications (with badge counts)
+    - Overview tab: existing 5 recent events list (preserved)
+    - Variance Trend tab: trend analysis banner (color-coded), SVG line chart with area shading (green above zero, red below zero), grid lines with value labels, zero baseline dashed, color-coded points (green/red/grey), trend data table
+    - Reorder Suggestions tab: amber info banner explaining the logic, summary card (items to reorder, total units lost, est. reorder cost), sortable suggestions list (product, current stock, reorder level, units lost, shortage events, suggested qty), Export Reorder List button
+    - Notifications tab: Email settings card (enabled toggle + comma-separated recipient input), SMS settings card (enabled toggle + comma-separated phone input), Send Test + Send Overdue Alert buttons
+  - Action buttons at bottom (Start New Stocktake, Export All Events, Close) preserved
+
+Stage Summary:
+- 1 modified file: stock-management.tsx (+~550 lines)
+- Feature 1 — Email/SMS notifications:
+  - Settings persisted to localStorage key 'sylhn-stocktake-notifications'
+  - Email uses mailto: with prefilled subject + body (opens user's email client)
+  - SMS uses sms: URI (mobile only; desktop shows toast with body for manual sending)
+  - Test mode sends to BCC only; real mode sends to TO + BCC
+  - Quick-access Notify/Test/Settings buttons in the overdue banner at the top of the dashboard
+  - Full settings UI in the Notifications tab
+- Feature 2 — Reorder suggestions:
+  - Algorithm: products with ≥2 stocktake events showing shortages AND currently at/below reorder level
+  - Suggested reorder qty = max(3× reorder level − current stock, reorder level)
+  - Shows total units lost across all stocktakes + estimated reorder cost (GHS)
+  - Exportable to XLSX with all calculation columns
+  - Sorted by total shortage (worst shrinkage first)
+- Feature 3 — Variance trend chart:
+  - Pure SVG implementation (no charting library needed) — keeps bundle size small
+  - Chronological line chart of net variance per stocktake (up to 20 events)
+  - Area shading: green gradient above zero baseline, red gradient below
+  - Color-coded points: green (surplus), red (shortage), grey (zero)
+  - Grid lines with value labels, dashed zero baseline
+  - Trend analysis banner: "Shrinkage Improving" / "Shrinkage Worsening" / "Insufficient Data" with specific numbers (older avg → recent avg, slope)
+  - Trend data table below the chart for reference
+- Build compiles cleanly (next build ✓) and dev server responds HTTP 200 with no runtime errors
+- All three features accessible from the Stocktake Dashboard popup (purple-pink button in Stock Management nav)
