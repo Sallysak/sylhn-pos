@@ -24,8 +24,6 @@ import { generateReport, exportReportToPDF, exportReportToExcel, exportReportToC
 import type { StockView, ReportData } from "@/lib/pos-types";
 import { PopupWindow } from "@/components/popup-window";
 import { StockQuantityAdjustment } from "@/components/stock-quantity-adjustment";
-import { QuickStockAdjustment } from "@/components/quick-stock-adjustment";
-import { StockAdjustmentForm } from "@/components/stock-adjustment-form";
 
 interface StockManagementProps {
   onBack: () => void;
@@ -48,10 +46,6 @@ export function StockManagement({ onBack, products, setProducts, groups, setGrou
   const [showStockSearchPopup, setShowStockSearchPopup] = useState(initialView === "stock-search");
   const [showQtyAdjustmentPopup, setShowQtyAdjustmentPopup] = useState(initialView === "quantity-adjustment");
   const [showDashboard, setShowDashboard] = useState(false);
-  const [showQuickAdjustPopup, setShowQuickAdjustPopup] = useState(false);
-  const [quickAdjustProductId, setQuickAdjustProductId] = useState<string | undefined>(undefined);
-  const [showStockAdjustmentForm, setShowStockAdjustmentForm] = useState(false);
-  const [stockAdjustmentProductId, setStockAdjustmentProductId] = useState<string | undefined>(undefined);
   const { toast } = useToast();
 
   // ===== Stocktake schedule settings (persisted to localStorage) =====
@@ -196,22 +190,6 @@ export function StockManagement({ onBack, products, setProducts, groups, setGrou
           })}
           <div className="flex-1" />
           <button
-            onClick={() => { setStockAdjustmentProductId(undefined); setShowStockAdjustmentForm(true); }}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md hover:from-amber-600 hover:to-orange-600"
-            title="Professional stock adjustment form with reason tracking, multi-product support, and barcode scanning"
-          >
-            <ArrowUpDown className="h-4 w-4" />
-            Stock Adjustment
-          </button>
-          <button
-            onClick={() => { setQuickAdjustProductId(undefined); setShowQuickAdjustPopup(true); }}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md hover:from-emerald-600 hover:to-teal-600"
-            title="Quick single-product stock adjustment (add, remove, or set quantity)"
-          >
-            <ArrowUpDown className="h-4 w-4" />
-            Quick Adjust
-          </button>
-          <button
             onClick={() => setShowQtyReport(true)}
             className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md hover:from-blue-700 hover:to-indigo-700"
           >
@@ -355,7 +333,7 @@ export function StockManagement({ onBack, products, setProducts, groups, setGrou
             transition={{ duration: 0.2 }}
             className="h-full"
           >
-            {view === "add-modify" && <AddModifyStock products={products} setProducts={setProducts} groups={groups} setHistory={setHistory} onQuickAdjust={(productId) => { setQuickAdjustProductId(productId); setShowQuickAdjustPopup(true); }} />}
+            {view === "add-modify" && <AddModifyStock products={products} setProducts={setProducts} groups={groups} setHistory={setHistory} />}
             {view === "group-maintenance" && <GroupMaintenance groups={groups} setGroups={setGroups} products={products} />}
             {view === "history" && <StockHistoryView history={history} products={products} />}
           </motion.div>
@@ -436,46 +414,16 @@ export function StockManagement({ onBack, products, setProducts, groups, setGrou
           />
         )}
       </AnimatePresence>
-
-      {/* ===== Quick Stock Adjustment Popup ===== */}
-      <AnimatePresence>
-        {showQuickAdjustPopup && (
-          <QuickStockAdjustment
-            products={products}
-            setProducts={setProducts}
-            setHistory={setHistory}
-            history={history}
-            groups={groups}
-            onClose={() => { setShowQuickAdjustPopup(false); setQuickAdjustProductId(undefined); }}
-            initialProductId={quickAdjustProductId}
-          />
-        )}
-      </AnimatePresence>
-
-      {/* ===== Professional Stock Adjustment Form Popup ===== */}
-      <AnimatePresence>
-        {showStockAdjustmentForm && (
-          <StockAdjustmentForm
-            products={products}
-            setProducts={setProducts}
-            setHistory={setHistory}
-            groups={groups}
-            onClose={() => { setShowStockAdjustmentForm(false); setStockAdjustmentProductId(undefined); }}
-            initialProductId={stockAdjustmentProductId}
-          />
-        )}
-      </AnimatePresence>
     </div>
   );
 }
 
 // ===== Add / Modify Stock =====
-function AddModifyStock({ products, setProducts, groups, setHistory, onQuickAdjust }: {
+function AddModifyStock({ products, setProducts, groups, setHistory }: {
   products: Product[];
   setProducts: React.Dispatch<React.SetStateAction<Product[]>>;
   groups: StockGroup[];
   setHistory: React.Dispatch<React.SetStateAction<StockHistoryEntry[]>>;
-  onQuickAdjust?: (productId: string) => void;
 }) {
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<Product | null>(null);
@@ -586,16 +534,6 @@ function AddModifyStock({ products, setProducts, groups, setHistory, onQuickAdju
               className="h-9 pl-8 pr-3 rounded-lg bg-white text-sm outline-none ring-2 ring-transparent focus:ring-emerald-300 focus:bg-white transition w-56 text-slate-700"
             />
           </div>
-          {onQuickAdjust && (
-            <button
-              onClick={() => onQuickAdjust('')}
-              className="h-9 px-3 rounded-lg bg-white/20 hover:bg-white/30 text-white text-sm font-semibold flex items-center gap-1.5 transition ring-1 ring-white/30"
-              title="Quick stock adjustment (add, remove, or set quantity for a single product)"
-            >
-              <ArrowUpDown className="h-4 w-4" />
-              Adjust Stock
-            </button>
-          )}
           <button
             onClick={() => { setEditing(null); setShowForm(true); }}
             className="h-9 px-4 rounded-lg bg-white text-emerald-700 text-sm font-bold flex items-center gap-1.5 transition hover:bg-emerald-50 shadow-sm"
@@ -616,8 +554,6 @@ function AddModifyStock({ products, setProducts, groups, setHistory, onQuickAdju
         <span className="text-slate-600">{products.filter(p => p.stock <= p.reorderLevel).length} low-stock items</span>
         <span className="text-slate-300">·</span>
         <span className="text-slate-600">{products.filter(p => p.stock === 0).length} out of stock</span>
-        <div className="flex-1" />
-        <span className="text-emerald-600 font-semibold">Click "Adjust Stock" on any row to quickly change quantity</span>
       </div>
 
       {/* Table */}
@@ -677,17 +613,6 @@ function AddModifyStock({ products, setProducts, groups, setHistory, onQuickAdju
                   </td>
                   <td className="px-3 py-2.5">
                     <div className="flex items-center justify-center gap-1">
-                      {/* Adjust Stock button — emerald, prominent */}
-                      {onQuickAdjust && (
-                        <button
-                          onClick={() => onQuickAdjust(p.id)}
-                          className="h-7 px-2 rounded-md bg-emerald-100 text-emerald-700 hover:bg-emerald-200 flex items-center gap-1 transition shadow-sm text-[10px] font-bold border border-emerald-300"
-                          title="Quick stock adjustment for this product"
-                        >
-                          <ArrowUpDown className="h-3.5 w-3.5" />
-                          Adjust
-                        </button>
-                      )}
                       <button
                         onClick={() => { setEditing(p); setShowForm(true); }}
                         className="h-7 w-7 rounded-md bg-blue-100 text-blue-600 hover:bg-blue-200 flex items-center justify-center transition shadow-sm"
