@@ -2604,6 +2604,11 @@ function StocktakeDashboard({
   const [notifySmsEnabled, setNotifySmsEnabled] = useState(false);
   const [showNotifySettings, setShowNotifySettings] = useState(false);
 
+  // ===== Email digest settings (daily/weekly summary of stocktake activity) =====
+  const [digestEnabled, setDigestEnabled] = useState(false);
+  const [digestFreq, setDigestFreq] = useState<'daily' | 'weekly'>('daily');
+  const [lastDigestSent, setLastDigestSent] = useState<string>(''); // ISO date of last sent digest
+
   // Load notification settings on mount
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -2615,20 +2620,89 @@ function StocktakeDashboard({
         setNotifyPhones(parsed.phones || '');
         setNotifyEmailEnabled(parsed.emailEnabled !== false);
         setNotifySmsEnabled(parsed.smsEnabled === true);
+        setDigestEnabled(parsed.digestEnabled === true);
+        setDigestFreq(parsed.digestFreq === 'weekly' ? 'weekly' : 'daily');
+        setLastDigestSent(parsed.lastDigestSent || '');
       }
     } catch { /* ignore */ }
   }, []);
 
-  // Persist notification settings
+  // Persist notification settings (including digest config)
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
       window.localStorage.setItem(NOTIFY_KEY, JSON.stringify({
         emails: notifyEmails, phones: notifyPhones,
         emailEnabled: notifyEmailEnabled, smsEnabled: notifySmsEnabled,
+        digestEnabled, digestFreq, lastDigestSent,
       }));
     } catch { /* ignore */ }
-  }, [notifyEmails, notifyPhones, notifyEmailEnabled, notifySmsEnabled]);
+  }, [notifyEmails, notifyPhones, notifyEmailEnabled, notifySmsEnabled, digestEnabled, digestFreq, lastDigestSent]);
+
+  // ===== Send email digest of stocktake activity =====
+  const sendDigest = (mode: 'test' | 'real') => {
+    const emails = notifyEmails.split(',').map(s => s.trim()).filter(Boolean);
+    if (mode === 'real' && emails.length === 0) {
+      toast({ title: 'No recipients', description: 'Add at least one email in the notification settings', variant: 'destructive' });
+      return;
+    }
+
+    // Build digest summary from stocktake events
+    const period = digestFreq === 'daily' ? '24 hours' : '7 days';
+    const cutoff = new Date(Date.now() - (digestFreq === 'daily' ? 24 : 7 * 24) * 60 * 60 * 1000);
+    const recentEvents = stocktakeEvents.filter(e => new Date(e.timestamp) >= cutoff);
+    const totalVariance = recentEvents.reduce((s, e) => s + e.totalVariance, 0);
+    const totalSurplus = recentEvents.reduce((s, e) => s + e.surplusItems, 0);
+    const totalShortage = recentEvents.reduce((s, e) => s + e.shortageItems, 0);
+    const totalItems = recentEvents.reduce((s, e) => s + e.itemCount, 0);
+
+    const subject = encodeURIComponent(`[SYLHN POS] Stocktake Digest — ${digestFreq === 'daily' ? 'Daily' : 'Weekly'} Summary`);
+    const body = encodeURIComponent(
+      `STOCKTAKE ACTIVITY DIGEST (${digestFreq === 'daily' ? 'Daily' : 'Weekly'})\n` +
+      `Period: last ${period}\n` +
+      `Generated: ${new Date().toLocaleString('en-GB')}\n\n` +
+      `SUMMARY\n` +
+      `=======\n` +
+      `Stocktake events performed: ${recentEvents.length}\n` +
+      `Total items adjusted: ${totalItems}\n` +
+      `Total surplus items: ${totalSurplus}\n` +
+      `Total shortage items: ${totalShortage}\n` +
+      `Net variance: ${totalVariance > 0 ? '+' : ''}${totalVariance}\n\n` +
+      `RECENT EVENTS\n` +
+      `=============\n` +
+      (recentEvents.length === 0
+        ? 'No stocktake events in this period.\n'
+        : recentEvents.slice(0, 10).map((e, i) =>
+            `${i + 1}. ${e.reference} — ${new Date(e.timestamp).toLocaleDateString('en-GB')}\n` +
+            `   Items: ${e.itemCount} · Variance: ${e.totalVariance > 0 ? '+' : ''}${e.totalVariance} · Surplus: ${e.surplusItems} · Shortage: ${e.shortageItems}`
+          ).join('\n')) +
+      (recentEvents.length > 10 ? `\n... and ${recentEvents.length - 10} more event(s)` : '') +
+      `\n\nSCHEDULE STATUS\n` +
+      `===============\n` +
+      `Schedule: ${scheduleFreq}\n` +
+      `Currently overdue: ${stocktakeStatus.isOverdue ? `YES (${stocktakeStatus.daysOverdue} days)` : 'No'}\n` +
+      `Next due: ${stocktakeStatus.nextDueDate}\n` +
+      `Last stocktake: ${stocktakeStatus.lastDate ? new Date(stocktakeStatus.lastDate).toLocaleDateString('en-GB') : 'Never'}\n\n` +
+      `— SYLHN COMPANY LTD POS System\n${COMPANY.address} · ${COMPANY.contact}`
+    );
+
+    if (mode === 'real' && emails.length > 0) {
+      try {
+        window.open(`mailto:${emails.join(',')}?subject=${subject}&body=${body}`, '_blank');
+      } catch { /* ignore */ }
+      setLastDigestSent(new Date().toISOString());
+      toast({
+        title: `${digestFreq === 'daily' ? 'Daily' : 'Weekly'} digest sent`,
+        description: `${recentEvents.length} events · ${emails.length} recipient(s)`,
+      });
+    } else {
+      // Test mode — just show the summary in a toast
+      toast({
+        title: `Test digest (${digestFreq === 'daily' ? 'Daily' : 'Weekly'})`,
+        description: `${recentEvents.length} events · ${totalItems} items · Variance: ${totalVariance > 0 ? '+' : ''}${totalVariance}`,
+      });
+    }
+  };
 
   // ===== Send overdue notification (email + SMS) =====
   const sendOverdueNotification = (mode: 'test' | 'real') => {
@@ -3778,6 +3852,63 @@ function StocktakeDashboard({
                 <span className="text-[10px] text-slate-500">
                   {stocktakeStatus.isOverdue ? 'Currently overdue — alerts can be sent' : 'Not currently overdue'}
                 </span>
+              </div>
+
+              {/* ===== Email Digest Settings (new) ===== */}
+              <div className="bg-white rounded-lg ring-1 ring-slate-200 p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-purple-600" />
+                    <span className="text-xs font-bold text-slate-800">Scheduled Email Digest</span>
+                  </div>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={digestEnabled}
+                      onChange={(e) => setDigestEnabled(e.target.checked)}
+                      className="h-3.5 w-3.5 accent-purple-600"
+                    />
+                    <span className="text-[10px] font-semibold text-slate-600">Enabled</span>
+                  </label>
+                </div>
+                <div className="flex items-center gap-3">
+                  <label className="text-[10px] font-bold text-slate-600">Frequency:</label>
+                  <select
+                    value={digestFreq}
+                    onChange={(e) => setDigestFreq(e.target.value as 'daily' | 'weekly')}
+                    disabled={!digestEnabled}
+                    className="h-7 px-2 text-[11px] border border-slate-300 rounded outline-none focus:ring-1 focus:ring-purple-400 disabled:bg-slate-100"
+                  >
+                    <option value="daily">Daily (every 24 hours)</option>
+                    <option value="weekly">Weekly (every 7 days)</option>
+                  </select>
+                  <div className="flex-1" />
+                  {lastDigestSent && (
+                    <span className="text-[9px] text-slate-500">
+                      Last sent: {new Date(lastDigestSent).toLocaleDateString('en-GB')}
+                    </span>
+                  )}
+                </div>
+                <div className="text-[9px] text-slate-500 italic">
+                  When enabled, the system automatically sends a summary email of all stocktake activity
+                  (events, variances, surplus/shortage counts, schedule status) to the configured email recipients.
+                  The background checker in the POS runs every 5 minutes and sends the digest when the period elapses.
+                </div>
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    onClick={() => sendDigest('test')}
+                    className="h-7 px-3 rounded bg-slate-200 hover:bg-slate-300 text-slate-700 text-[10px] font-bold flex items-center gap-1 transition"
+                  >
+                    <Send className="h-3 w-3" /> Test Digest
+                  </button>
+                  <button
+                    onClick={() => sendDigest('real')}
+                    disabled={!digestEnabled}
+                    className="h-7 px-3 rounded bg-purple-600 hover:bg-purple-700 text-white text-[10px] font-bold flex items-center gap-1 transition disabled:opacity-50"
+                  >
+                    <Mail className="h-3 w-3" /> Send Digest Now
+                  </button>
+                </div>
               </div>
             </div>
           )}

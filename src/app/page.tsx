@@ -247,6 +247,184 @@ export default function POSPage() {
       } catch { /* ignore */ }
     };
 
+    // ===== Check for critical variance alerts and notify =====
+    // Reads the variance thresholds from localStorage, finds products whose latest
+    // stocktake shrinkage exceeds 2× the threshold (critical), and fires a browser
+    // notification + email. Tracks last-notified state to avoid spamming.
+    const checkCriticalAlerts = () => {
+      if (typeof window === 'undefined') return;
+
+      // Load thresholds
+      let globalThreshold = 5;
+      let varianceThresholds: Record<string, number> = {};
+      try {
+        const cached = window.localStorage.getItem('sylhn-variance-thresholds');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (typeof parsed.global === 'number') globalThreshold = parsed.global;
+          if (parsed.thresholds) varianceThresholds = parsed.thresholds;
+        }
+      } catch { /* ignore */ }
+
+      // Find the latest 'adjusted' entry per product
+      const productLatest = new Map<string, typeof history[number]>();
+      history.forEach(h => {
+        if (h.action !== 'adjusted') return;
+        const existing = productLatest.get(h.productId);
+        if (!existing || h.timestamp > existing.timestamp) {
+          productLatest.set(h.productId, h);
+        }
+      });
+
+      // Find critical alerts (shrinkage ≥ 2× threshold)
+      const criticalAlerts: Array<{ productName: string; shrinkage: number; threshold: number; reference: string }> = [];
+      productLatest.forEach(entry => {
+        const shrinkage = Math.abs(Math.min(0, entry.quantityChange));
+        if (shrinkage === 0) return;
+        const thresholdPct = varianceThresholds[entry.productId] ?? globalThreshold;
+        const thresholdUnits = (thresholdPct / 100) * Math.max(1, entry.newQuantity);
+        if (shrinkage >= thresholdUnits * 2) {
+          criticalAlerts.push({
+            productName: entry.productName,
+            shrinkage,
+            threshold: thresholdUnits,
+            reference: entry.reference || '',
+          });
+        }
+      });
+
+      if (criticalAlerts.length === 0) return;
+
+      // Check if we've already notified for these alerts today
+      const ALERT_NOTIFIED_KEY = 'sylhn-critical-alerts-last-notified';
+      const today = new Date().toISOString().split('T')[0];
+      let lastAlertNotified = '';
+      try {
+        lastAlertNotified = window.localStorage.getItem(ALERT_NOTIFIED_KEY) || '';
+      } catch { /* ignore */ }
+
+      if (lastAlertNotified === today) return; // already notified today
+
+      // Fire browser notification
+      if ('Notification' in window && Notification.permission === 'granted') {
+        try {
+          new Notification('Critical Variance Alert', {
+            body: `${criticalAlerts.length} product(s) have critical shrinkage. Worst: ${criticalAlerts[0].productName} (−${criticalAlerts[0].shrinkage} units). Click to review in Stocktake Dashboard.`,
+            icon: '/favicon.ico',
+            tag: 'critical-variance-alert',
+          });
+        } catch { /* ignore */ }
+      }
+
+      // Auto-send email if enabled
+      let notifyEmails = '';
+      let emailEnabled = true;
+      try {
+        const notifyCached = window.localStorage.getItem(NOTIFY_KEY);
+        if (notifyCached) {
+          const parsed = JSON.parse(notifyCached);
+          notifyEmails = parsed.emails || '';
+          emailEnabled = parsed.emailEnabled !== false;
+        }
+      } catch { /* ignore */ }
+
+      const emails = notifyEmails.split(',').map(s => s.trim()).filter(Boolean);
+      if (emailEnabled && emails.length > 0) {
+        const subject = encodeURIComponent(`[SYLHN POS] Critical Variance Alert — ${criticalAlerts.length} product(s)`);
+        const body = encodeURIComponent(
+          `CRITICAL VARIANCE ALERT\n\n` +
+          `${criticalAlerts.length} product(s) have shrinkage exceeding 2× their threshold:\n\n` +
+          criticalAlerts.slice(0, 10).map((a, i) =>
+            `${i + 1}. ${a.productName} — shrinkage: ${a.shrinkage} units (threshold: ${a.threshold.toFixed(1)})`
+          ).join('\n') +
+          (criticalAlerts.length > 10 ? `\n... and ${criticalAlerts.length - 10} more` : '') +
+          `\n\nAction required: Review these products in the Stocktake Dashboard → Alerts tab.\n\n— SYLHN COMPANY LTD POS System`
+        );
+        try {
+          window.open(`mailto:${emails.join(',')}?subject=${subject}&body=${body}`, '_blank');
+        } catch { /* ignore */ }
+      }
+
+      // Mark as notified for today
+      try {
+        window.localStorage.setItem(ALERT_NOTIFIED_KEY, today);
+      } catch { /* ignore */ }
+    };
+
+    // ===== Check if a digest should be sent =====
+    const checkDigest = () => {
+      if (typeof window === 'undefined') return;
+
+      let digestEnabled = false;
+      let digestFreq: 'daily' | 'weekly' = 'daily';
+      let lastDigestSent = '';
+      let notifyEmails = '';
+      let emailEnabled = true;
+      try {
+        const cached = window.localStorage.getItem(NOTIFY_KEY);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          digestEnabled = parsed.digestEnabled === true;
+          digestFreq = parsed.digestFreq === 'weekly' ? 'weekly' : 'daily';
+          lastDigestSent = parsed.lastDigestSent || '';
+          notifyEmails = parsed.emails || '';
+          emailEnabled = parsed.emailEnabled !== false;
+        }
+      } catch { /* ignore */ }
+
+      if (!digestEnabled) return;
+
+      const emails = notifyEmails.split(',').map(s => s.trim()).filter(Boolean);
+      if (!emailEnabled || emails.length === 0) return;
+
+      // Check if enough time has elapsed since the last digest
+      const periodMs = digestFreq === 'daily' ? 24 * 60 * 60 * 1000 : 7 * 24 * 60 * 60 * 1000;
+      const lastSentTime = lastDigestSent ? new Date(lastDigestSent).getTime() : 0;
+      if (Date.now() - lastSentTime < periodMs) return;
+
+      // Build and send the digest
+      const periodLabel = digestFreq === 'daily' ? '24 hours' : '7 days';
+      const cutoff = new Date(Date.now() - periodMs);
+      const adjustedEntries = history.filter(h => h.action === 'adjusted' && new Date(h.timestamp) >= cutoff);
+
+      // Group by reference for event count
+      const eventRefs = new Set<string>();
+      adjustedEntries.forEach(h => { if (h.reference) eventRefs.add(h.reference); });
+      const eventCount = eventRefs.size;
+      const totalItems = adjustedEntries.length;
+      const totalVariance = adjustedEntries.reduce((s, e) => s + e.quantityChange, 0);
+      const surplusCount = adjustedEntries.filter(e => e.quantityChange > 0).length;
+      const shortageCount = adjustedEntries.filter(e => e.quantityChange < 0).length;
+
+      const subject = encodeURIComponent(`[SYLHN POS] Stocktake Digest — ${digestFreq === 'daily' ? 'Daily' : 'Weekly'} Summary`);
+      const body = encodeURIComponent(
+        `STOCKTAKE ACTIVITY DIGEST (${digestFreq === 'daily' ? 'Daily' : 'Weekly'})\n` +
+        `Period: last ${periodLabel}\n` +
+        `Generated: ${new Date().toLocaleString('en-GB')}\n\n` +
+        `SUMMARY\n=======\n` +
+        `Stocktake events: ${eventCount}\n` +
+        `Items adjusted: ${totalItems}\n` +
+        `Surplus items: ${surplusCount}\n` +
+        `Shortage items: ${shortageCount}\n` +
+        `Net variance: ${totalVariance > 0 ? '+' : ''}${totalVariance}\n\n` +
+        `— SYLHN COMPANY LTD POS System (automatic digest)`
+      );
+
+      try {
+        window.open(`mailto:${emails.join(',')}?subject=${subject}&body=${body}`, '_blank');
+      } catch { /* ignore */ }
+
+      // Update lastDigestSent
+      try {
+        const cached = window.localStorage.getItem(NOTIFY_KEY);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          parsed.lastDigestSent = new Date().toISOString();
+          window.localStorage.setItem(NOTIFY_KEY, JSON.stringify(parsed));
+        }
+      } catch { /* ignore */ }
+    };
+
     // Request notification permission on mount
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission().catch(() => { /* ignore */ });
@@ -254,7 +432,13 @@ export default function POSPage() {
 
     // Run immediately on mount, then every 5 minutes
     checkOverdue();
-    const interval = setInterval(checkOverdue, 5 * 60 * 1000);
+    checkCriticalAlerts();
+    checkDigest();
+    const interval = setInterval(() => {
+      checkOverdue();
+      checkCriticalAlerts();
+      checkDigest();
+    }, 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, [history]);
 

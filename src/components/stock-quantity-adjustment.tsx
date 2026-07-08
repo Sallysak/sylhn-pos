@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Save, Printer, Trash2, Upload, Download, X, Search as SearchIcon,
-  Package, AlertTriangle, TrendingUp, ScanLine,
+  Package, AlertTriangle, TrendingUp, ScanLine, FileText,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -34,6 +34,20 @@ export interface AdjustmentLine {
   total: number;         // qty * cost (computed)
   productId: string;     // for syncing back
   emoji: string;
+}
+
+// ===== Audit trail entry: records a single mutation to the draft =====
+export interface AuditEntry {
+  id: string;
+  timestamp: string;       // ISO string
+  action: 'add' | 'counted_change' | 'cost_change' | 'remove' | 'bulk_load' | 'scan_add' | 'scan_increment' | 'import' | 'clear' | 'restore' | 'save';
+  productId: string;
+  productName: string;
+  partNo: string;
+  oldValue?: string;       // previous counted/cost/qty
+  newValue?: string;       // new counted/cost/qty
+  user: string;
+  notes?: string;
 }
 
 interface StockQuantityAdjustmentProps {
@@ -82,6 +96,14 @@ export function StockQuantityAdjustment({
   const [selectedLine, setSelectedLine] = useState<number | null>(null);
   const [saved, setSaved] = useState(false);
   const [draftRestored, setDraftRestored] = useState(false);
+
+  // ===== Audit trail: records every mutation to the draft before it's saved =====
+  // Each entry captures: timestamp, action type, product affected, old/new values, user.
+  // Persisted alongside the draft in localStorage so it survives refresh.
+  // On Save, the audit trail is committed to the main history (via a separate key)
+  // so managers can review every change that led to the final stocktake.
+  const [auditTrail, setAuditTrail] = useState<AuditEntry[]>([]);
+  const [showAuditTrail, setShowAuditTrail] = useState(false);
 
   // ===== Stock Search popup state =====
   const [showStockSearch, setShowStockSearch] = useState(false);
@@ -193,6 +215,68 @@ export function StockQuantityAdjustment({
     } catch { /* storage full or unavailable */ }
   }, [adjNumber, adjType, date, details, postToAC, fromPartNo, toPartNo, groupFilter, bin, lines, saved, draftRestored]);
 
+  // ===== Persist audit trail alongside the draft =====
+  const AUDIT_KEY = 'sylhn-stock-adjustment-audit';
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (auditTrail.length === 0) return;
+    try {
+      window.localStorage.setItem(AUDIT_KEY, JSON.stringify(auditTrail));
+    } catch { /* ignore */ }
+  }, [auditTrail]);
+
+  // ===== Helper: log an audit entry =====
+  const logAudit = (
+    action: AuditEntry['action'],
+    productId: string,
+    productName: string,
+    partNo: string,
+    oldValue?: string,
+    newValue?: string,
+    notes?: string,
+  ) => {
+    const entry: AuditEntry = {
+      id: `audit-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      timestamp: new Date().toISOString(),
+      action,
+      productId,
+      productName,
+      partNo,
+      oldValue,
+      newValue,
+      user: 'Sarah Johnson', // current cashier
+      notes,
+    };
+    setAuditTrail(prev => [...prev, entry]);
+  };
+
+  // ===== Commit audit trail to permanent storage on Save =====
+  // The audit trail is saved to a separate localStorage key that the Stocktake
+  // Dashboard can read to show "every change made to a stocktake draft before it was saved".
+  const commitAuditTrail = () => {
+    if (typeof window === 'undefined') return;
+    if (auditTrail.length === 0) return;
+    try {
+      // Append to the committed audit log (keyed by adjustment number)
+      const COMMITTED_KEY = 'sylhn-stocktake-audit-committed';
+      const existing = window.localStorage.getItem(COMMITTED_KEY);
+      const log = existing ? JSON.parse(existing) : [];
+      log.push({
+        adjNumber,
+        adjType,
+        date,
+        savedAt: new Date().toISOString(),
+        entries: auditTrail,
+      });
+      // Keep only the last 50 saved stocktakes to avoid unbounded growth
+      const trimmed = log.slice(-50);
+      window.localStorage.setItem(COMMITTED_KEY, JSON.stringify(trimmed));
+      // Clear the in-progress audit trail
+      window.localStorage.removeItem(AUDIT_KEY);
+      setAuditTrail([]);
+    } catch { /* ignore */ }
+  };
+
   // ===== Compute totals =====
   const totals = useMemo(() => {
     const totalQty = lines.reduce((s, l) => s + l.onHand, 0);
@@ -297,21 +381,27 @@ export function StockQuantityAdjustment({
     setSelectedLine(lines.length); // select the newly added line
     setFindPartNo('');
     setSaved(false);
+    logAudit('add', product.id, `${product.emoji} ${product.name}`, product.sku, undefined, String(product.stock), 'Product added to stocktake');
     toast({ title: 'Product added', description: `${product.emoji} ${product.name}` });
   };
 
   // ===== Update a line's counted value (recomputes qty and total) =====
   const updateLineCounted = (idx: number, counted: number) => {
+    const oldLine = lines[idx];
     setLines(prev => prev.map((l, i) => {
       if (i !== idx) return l;
       const qty = counted - l.onHand; // positive = surplus, negative = shortage
       return { ...l, counted, qty, total: qty * l.cost };
     }));
     setSaved(false);
+    if (oldLine) {
+      logAudit('counted_change', oldLine.productId, oldLine.details, oldLine.partNo, `counted=${oldLine.counted}`, `counted=${counted}`, `Variance: ${oldLine.qty} → ${counted - oldLine.onHand}`);
+    }
   };
 
   // ===== Update a line's cost (recomputes total) =====
   const updateLineCost = (idx: number, cost: number) => {
+    const oldLine = lines[idx];
     setLines(prev => prev.map((l, i) => {
       if (i !== idx) return l;
       return { ...l, cost, total: l.qty * cost };
@@ -321,9 +411,13 @@ export function StockQuantityAdjustment({
 
   // ===== Remove a line =====
   const removeLine = (idx: number) => {
+    const oldLine = lines[idx];
     setLines(prev => prev.filter((_, i) => i !== idx));
     setSelectedLine(null);
     setSaved(false);
+    if (oldLine) {
+      logAudit('remove', oldLine.productId, oldLine.details, oldLine.partNo, `counted=${oldLine.counted}`, undefined, 'Line removed from stocktake');
+    }
     toast({ title: 'Line removed' });
   };
 
@@ -428,6 +522,10 @@ export function StockQuantityAdjustment({
       try { window.localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
     }
     setDraftRestored(false);
+    // Commit the audit trail to permanent storage (for the Audit Trail report)
+    logAudit('save', '', `${adjType === 'stocktake' ? 'Stocktake' : 'Stock Adjustment'} ${adjNumber}`, adjNumber, undefined, `${changedLines.length} items`, `Saved with variance ${totals.totalVariance > 0 ? '+' : ''}${totals.totalVariance}`);
+    // Use a small timeout so the 'save' audit entry is captured before committing
+    setTimeout(() => commitAuditTrail(), 100);
     toast({
       title: `Saved (F2) — ${adjType === 'stocktake' ? 'Stocktake' : 'Stock Adjustment'}`,
       description: `${changedLines.length} items adjusted · Variance total: ${totals.totalVariance > 0 ? '+' : ''}${totals.totalVariance} · ${formatGHS(Math.abs(totals.totalCost))}`,
@@ -1017,6 +1115,19 @@ export function StockQuantityAdjustment({
         >
           <TrendingUp className="h-3 w-3" style={{ color: '#FFC107' }} /> Compare
         </button>
+        <button
+          onClick={() => setShowAuditTrail(true)}
+          className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1 transition shadow-sm"
+          style={{ backgroundColor: HEADER_DARK_BLUE }}
+          title="View audit trail of all changes made to this draft"
+        >
+          <FileText className="h-3 w-3" style={{ color: '#FFC107' }} /> Audit
+          {auditTrail.length > 0 && (
+            <span className="ml-0.5 px-1 py-0.5 rounded-full text-[7px] font-bold bg-amber-500 text-white">
+              {auditTrail.length}
+            </span>
+          )}
+        </button>
         <div className="flex-1" />
         {selectedLine !== null && lines[selectedLine] && (
           <button
@@ -1073,6 +1184,17 @@ export function StockQuantityAdjustment({
             rows={comparisonRows}
             totals={comparisonTotals}
             onClose={() => setShowCompareReport(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ===== Audit Trail Popup ===== */}
+      <AnimatePresence>
+        {showAuditTrail && (
+          <AuditTrailPopup
+            entries={auditTrail}
+            adjNumber={adjNumber}
+            onClose={() => setShowAuditTrail(false)}
           />
         )}
       </AnimatePresence>
@@ -1677,6 +1799,178 @@ function CompareWithLastStocktakeReport({
           </span>
           <button onClick={onClose} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1 transition" style={{ backgroundColor: '#F44336' }}>
             <X className="h-3 w-3" /> Close
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ===== Audit Trail Popup =====
+// Shows every change made to the stocktake draft before it was saved.
+// Entries are color-coded by action type and show old → new values.
+function AuditTrailPopup({
+  entries,
+  adjNumber,
+  onClose,
+}: {
+  entries: AuditEntry[];
+  adjNumber: string;
+  onClose: () => void;
+}) {
+  const { toast } = useToast();
+
+  const fmtTime = (ts: string) => {
+    try {
+      const d = new Date(ts);
+      return d.toLocaleDateString('en-GB') + ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    } catch { return ts; }
+  };
+
+  const actionConfig: Record<string, { label: string; color: string; bg: string }> = {
+    add: { label: 'Added', color: 'text-emerald-700', bg: 'bg-emerald-100' },
+    counted_change: { label: 'Count Changed', color: 'text-blue-700', bg: 'bg-blue-100' },
+    cost_change: { label: 'Cost Changed', color: 'text-amber-700', bg: 'bg-amber-100' },
+    remove: { label: 'Removed', color: 'text-rose-700', bg: 'bg-rose-100' },
+    bulk_load: { label: 'Bulk Load', color: 'text-purple-700', bg: 'bg-purple-100' },
+    scan_add: { label: 'Scan Add', color: 'text-emerald-700', bg: 'bg-emerald-100' },
+    scan_increment: { label: 'Scan +1', color: 'text-blue-700', bg: 'bg-blue-100' },
+    import: { label: 'Imported', color: 'text-purple-700', bg: 'bg-purple-100' },
+    clear: { label: 'Cleared', color: 'text-rose-700', bg: 'bg-rose-100' },
+    restore: { label: 'Restored', color: 'text-amber-700', bg: 'bg-amber-100' },
+    save: { label: 'Saved', color: 'text-emerald-700', bg: 'bg-emerald-100' },
+  };
+
+  const handleExport = () => {
+    if (entries.length === 0) { toast({ title: 'No audit entries to export', variant: 'destructive' }); return; }
+    import('xlsx').then((XLSX) => {
+      type Row = Record<string, string | number>;
+      const data: Row[] = entries.map((e, i) => ({
+        '#': i + 1,
+        'Time': fmtTime(e.timestamp),
+        'Action': actionConfig[e.action]?.label || e.action,
+        'Product': e.productName,
+        'Part No': e.partNo,
+        'Old Value': e.oldValue || '',
+        'New Value': e.newValue || '',
+        'User': e.user,
+        'Notes': e.notes || '',
+      }));
+      const ws = XLSX.utils.json_to_sheet(data);
+      ws['!cols'] = [{ wch: 4 }, { wch: 20 }, { wch: 16 }, { wch: 28 }, { wch: 14 }, { wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 30 }];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Audit Trail');
+      XLSX.writeFile(wb, `audit-trail-${adjNumber}-${new Date().toISOString().split('T')[0]}.xlsx`);
+      toast({ title: 'Exported successfully', description: `${entries.length} entries` });
+    });
+  };
+
+  // Reverse to show most-recent first
+  const sorted = [...entries].reverse();
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[80] flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.95, y: 20 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.95, y: 20 }}
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-lg shadow-2xl overflow-hidden flex flex-col"
+        style={{ width: '780px', maxHeight: '85vh', fontFamily: 'Arial, Helvetica, sans-serif' }}
+      >
+        {/* Title bar */}
+        <div className="flex-shrink-0 flex items-center justify-between px-4 h-9 text-white" style={{ background: 'linear-gradient(to right, #6B7280, #4B5563)' }}>
+          <div className="flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            <span className="text-sm font-bold">Audit Trail — {adjNumber}</span>
+          </div>
+          <button onClick={onClose} className="h-6 w-6 rounded bg-red-600 hover:bg-red-700 flex items-center justify-center transition"><X className="h-3.5 w-3.5 text-white" /></button>
+        </div>
+
+        {/* Summary bar */}
+        <div className="flex-shrink-0 px-4 py-2 bg-slate-50 border-b border-slate-200 flex items-center gap-4 text-[10px]">
+          <span className="font-bold text-slate-700">{entries.length} change(s) recorded</span>
+          <span className="text-slate-500">·</span>
+          <span className="text-slate-600">
+            {entries.filter(e => e.action === 'add' || e.action === 'scan_add').length} additions ·
+            {entries.filter(e => e.action === 'counted_change' || e.action === 'scan_increment').length} count changes ·
+            {entries.filter(e => e.action === 'remove').length} removals
+          </span>
+          <div className="flex-1" />
+          <span className="text-slate-500">Most recent first</span>
+        </div>
+
+        {/* Audit entries list */}
+        <div className="flex-1 overflow-y-auto p-3 space-y-1.5" style={{ scrollbarWidth: 'thin' }}>
+          {sorted.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+              <FileText className="h-10 w-10 mb-2 opacity-40" />
+              <div className="text-sm font-medium">No changes recorded yet</div>
+              <div className="text-xs mt-1">Changes to the draft (add, count, remove, scan) will appear here in real time</div>
+            </div>
+          ) : (
+            sorted.map((entry, idx) => {
+              const config = actionConfig[entry.action] || { label: entry.action, color: 'text-slate-700', bg: 'bg-slate-100' };
+              return (
+                <motion.div
+                  key={entry.id}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: Math.min(idx * 0.02, 0.2) }}
+                  className="flex items-start gap-2 p-2 rounded-lg bg-white ring-1 ring-slate-100 hover:ring-slate-200 transition"
+                >
+                  <div className={cn("h-7 w-7 rounded-md flex items-center justify-center flex-shrink-0", config.bg)}>
+                    <FileText className={cn("h-3.5 w-3.5", config.color)} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={cn("text-[10px] font-bold uppercase px-1.5 py-0.5 rounded", config.bg, config.color)}>
+                        {config.label}
+                      </span>
+                      <span className="text-[11px] font-semibold text-slate-800 truncate">{entry.productName}</span>
+                      {entry.partNo && <span className="text-[9px] font-mono text-slate-400">{entry.partNo}</span>}
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5 text-[10px]">
+                      {entry.oldValue && (
+                        <span className="text-slate-500">
+                          <span className="line-through">{entry.oldValue}</span>
+                          {' → '}
+                          <span className="font-mono font-bold text-slate-700">{entry.newValue}</span>
+                        </span>
+                      )}
+                      {entry.notes && <span className="text-slate-500 italic">· {entry.notes}</span>}
+                    </div>
+                    <div className="text-[9px] text-slate-400 mt-0.5">
+                      {fmtTime(entry.timestamp)} · by {entry.user}
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Action buttons */}
+        <div className="flex-shrink-0 px-4 py-2 flex items-center gap-2 border-t border-slate-200 bg-slate-50">
+          <button
+            onClick={handleExport}
+            disabled={entries.length === 0}
+            className="h-8 px-4 rounded-md bg-slate-600 hover:bg-slate-700 text-white text-xs font-bold flex items-center gap-1.5 transition disabled:opacity-50"
+          >
+            <Download className="h-3.5 w-3.5" /> Export (XLSX)
+          </button>
+          <div className="flex-1" />
+          <span className="text-[10px] text-slate-500">
+            Audit trail is committed to permanent storage on Save — view past stocktakes' audit trails in the Stocktake Dashboard
+          </span>
+          <button onClick={onClose} className="h-8 px-4 rounded-md bg-rose-100 hover:bg-rose-200 text-rose-700 text-xs font-bold flex items-center gap-1.5 transition">
+            <X className="h-3.5 w-3.5" /> Close
           </button>
         </div>
       </motion.div>

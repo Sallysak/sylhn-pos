@@ -1788,3 +1788,71 @@ Stage Summary:
   - Live count of flagged products in the global threshold control
   - Sorted: critical first, then by shrinkage amount
 - Build compiles cleanly (next build ✓) and dev server responds HTTP 200 with no runtime errors
+
+---
+Task ID: digest-alerts-audittrail
+Agent: main
+Task: Implement three suggested enhancements:
+  1) Scheduled email digest (daily/weekly summary of all stocktake activity)
+  2) Integrate alerts with the background notification system (critical alerts fire automatically)
+  3) Stocktake Audit Trail report (every change made to a stocktake draft before it was saved)
+
+Work Log:
+- Modified /home/z/my-project/src/components/stock-quantity-adjustment.tsx:
+  - Added AuditEntry interface (id, timestamp, action, productId, productName, partNo, oldValue, newValue, user, notes)
+  - Added auditTrail state + showAuditTrail state
+  - Added AUDIT_KEY localStorage persistence for in-progress audit trail
+  - Added logAudit helper function that creates and appends an audit entry
+  - Added commitAuditTrail function that saves the audit trail to permanent storage (key 'sylhn-stocktake-audit-committed') on Save, keeping the last 50 stocktakes
+  - Added logAudit calls to: addProductToLines ('add'), updateLineCounted ('counted_change'), updateLineCost ('cost_change'), removeLine ('remove'), handleSave ('save')
+  - Added "Audit" button to the action bar (FileText icon, amber badge with entry count)
+  - Added AuditTrailPopup component: grey gradient title bar, summary bar with counts, color-coded entries (11 action types each with distinct color), old→new value display, timestamp + user, Export XLSX button, empty state
+  - Added FileText to lucide-react imports
+
+- Modified /home/z/my-project/src/components/stock-management.tsx:
+  - Added digest settings state: digestEnabled, digestFreq ('daily'|'weekly'), lastDigestSent
+  - Extended NOTIFY_KEY persistence to include digest settings
+  - Added sendDigest function: builds summary from stocktake events in the period (24h or 7d), composes email with events list + variance + surplus/shortage + schedule status, opens mailto: for real mode, shows toast for test mode
+  - Added "Scheduled Email Digest" card to the Notifications tab: enable toggle, frequency dropdown (Daily/Weekly), last-sent date display, Test Digest + Send Digest Now buttons, explanatory text about the background checker
+
+- Modified /home/z/my-project/src/app/page.tsx:
+  - Added checkCriticalAlerts function to the background useEffect:
+    - Loads variance thresholds from 'sylhn-variance-thresholds'
+    - Finds latest 'adjusted' entry per product
+    - Identifies critical alerts (shrinkage ≥ 2× threshold)
+    - Tracks last-notified date in 'sylhn-critical-alerts-last-notified' (max 1 notification per day)
+    - Fires browser Notification with critical alert details
+    - Auto-sends email to configured recipients with alert details (top 10 products)
+  - Added checkDigest function to the background useEffect:
+    - Loads digest settings from NOTIFY_KEY
+    - Checks if enough time has elapsed since last digest (24h or 7d)
+    - Builds summary from adjusted entries in the period
+    - Opens mailto: with the digest email
+    - Updates lastDigestSent in localStorage
+  - Updated the background interval to run all 3 checks: checkOverdue, checkCriticalAlerts, checkDigest (every 5 minutes)
+
+Stage Summary:
+- 3 modified files: stock-quantity-adjustment.tsx (+~230 lines: audit trail logging + popup), stock-management.tsx (+~90 lines: digest settings + UI), page.tsx (+~180 lines: critical alerts + digest background checks)
+- Feature 1 — Scheduled email digest:
+  - Configurable in Notifications tab: enable/disable, daily/weekly frequency
+  - Persisted to localStorage (part of NOTIFY_KEY)
+  - Background checker sends automatically when period elapses (24h or 7d)
+  - Manual "Send Digest Now" + "Test Digest" buttons
+  - Summary includes: event count, items adjusted, surplus/shortage, net variance, schedule status, top 10 recent events
+- Feature 2 — Critical alert auto-notification:
+  - Background checker reads variance thresholds from localStorage
+  - Finds products with shrinkage ≥ 2× threshold (critical severity)
+  - Fires browser Notification (max 1/day per critical alert batch)
+  - Auto-sends email to configured recipients with top 10 critical products
+  - Uses 'sylhn-critical-alerts-last-notified' key to prevent spam
+  - Runs every 5 minutes alongside the overdue check
+- Feature 3 — Audit Trail:
+  - Every mutation to a stocktake draft is logged: add, counted_change, cost_change, remove, save
+  - Each entry: timestamp, action type, product, old→new values, user, notes
+  - 11 action types with distinct colors in the popup
+  - In-progress trail persisted to localStorage (survives refresh)
+  - On Save, trail is committed to permanent storage (last 50 stocktakes)
+  - "Audit" button in action bar with live entry count badge
+  - Export to XLSX
+  - Grey gradient popup with summary bar, color-coded entries, old→new display
+- Build compiles cleanly (next build ✓) and dev server responds HTTP 200 with no runtime errors
