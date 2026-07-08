@@ -818,13 +818,147 @@ function GroupMaintenance({ groups, setGroups, products }: {
     toast({ title: "Group deleted" });
   };
 
+  // ===== Vibrant color scheme per group =====
+  // Each group gets a unique vibrant border + matching accent colors
+  // that make the cards stand out clearly and look professional.
+  const groupColorScheme: Record<string, {
+    border: string;       // vibrant border color (hex)
+    borderHover: string;  // darker border on hover
+    bgTint: string;       // very light background tint (rgba)
+    iconBg: string;       // icon container gradient (from)
+    iconBgTo: string;     // icon container gradient (to)
+    iconBorder: string;   // icon container border
+    badgeBg: string;      // product count badge background
+    badgeText: string;    // product count badge text
+    accent: string;       // accent color for value text
+    shadow: string;       // box shadow color (rgba)
+  }> = {
+    emerald: {
+      border: '#10B981',
+      borderHover: '#059669',
+      bgTint: 'rgba(16, 185, 129, 0.04)',
+      iconBg: '#10B981',
+      iconBgTo: '#059669',
+      iconBorder: '#059669',
+      badgeBg: '#D1FAE5',
+      badgeText: '#065F46',
+      accent: '#059669',
+      shadow: 'rgba(16, 185, 129, 0.15)',
+    },
+    purple: {
+      border: '#8B5CF6',
+      borderHover: '#7C3AED',
+      bgTint: 'rgba(139, 92, 246, 0.04)',
+      iconBg: '#8B5CF6',
+      iconBgTo: '#7C3AED',
+      iconBorder: '#7C3AED',
+      badgeBg: '#EDE9FE',
+      badgeText: '#5B21B6',
+      accent: '#7C3AED',
+      shadow: 'rgba(139, 92, 246, 0.15)',
+    },
+    cyan: {
+      border: '#06B6D4',
+      borderHover: '#0891B2',
+      bgTint: 'rgba(6, 182, 212, 0.04)',
+      iconBg: '#06B6D4',
+      iconBgTo: '#0891B2',
+      iconBorder: '#0891B2',
+      badgeBg: '#CFFAFE',
+      badgeText: '#155E75',
+      accent: '#0891B2',
+      shadow: 'rgba(6, 182, 212, 0.15)',
+    },
+    red: {
+      border: '#EF4444',
+      borderHover: '#DC2626',
+      bgTint: 'rgba(239, 68, 68, 0.04)',
+      iconBg: '#EF4444',
+      iconBgTo: '#DC2626',
+      iconBorder: '#DC2626',
+      badgeBg: '#FEE2E2',
+      badgeText: '#991B1B',
+      accent: '#DC2626',
+      shadow: 'rgba(239, 68, 68, 0.15)',
+    },
+    teal: {
+      border: '#14B8A6',
+      borderHover: '#0D9488',
+      bgTint: 'rgba(20, 184, 166, 0.04)',
+      iconBg: '#14B8A6',
+      iconBgTo: '#0D9488',
+      iconBorder: '#0D9488',
+      badgeBg: '#CCFBF1',
+      badgeText: '#115E59',
+      accent: '#0D9488',
+      shadow: 'rgba(20, 184, 166, 0.15)',
+    },
+    blue: {
+      border: '#3B82F6',
+      borderHover: '#2563EB',
+      bgTint: 'rgba(59, 130, 246, 0.04)',
+      iconBg: '#3B82F6',
+      iconBgTo: '#2563EB',
+      iconBorder: '#2563EB',
+      badgeBg: '#DBEAFE',
+      badgeText: '#1E40AF',
+      accent: '#2563EB',
+      shadow: 'rgba(59, 130, 246, 0.15)',
+    },
+    amber: {
+      border: '#F59E0B',
+      borderHover: '#D97706',
+      bgTint: 'rgba(245, 158, 11, 0.04)',
+      iconBg: '#F59E0B',
+      iconBgTo: '#D97706',
+      iconBorder: '#D97706',
+      badgeBg: '#FEF3C7',
+      badgeText: '#92400E',
+      accent: '#D97706',
+      shadow: 'rgba(245, 158, 11, 0.15)',
+    },
+    rose: {
+      border: '#F43F5E',
+      borderHover: '#E11D48',
+      bgTint: 'rgba(244, 63, 94, 0.04)',
+      iconBg: '#F43F5E',
+      iconBgTo: '#E11D48',
+      iconBorder: '#E11D48',
+      badgeBg: '#FFE4E6',
+      badgeText: '#9F1239',
+      accent: '#E11D48',
+      shadow: 'rgba(244, 63, 94, 0.15)',
+    },
+    indigo: {
+      border: '#6366F1',
+      borderHover: '#4F46E5',
+      bgTint: 'rgba(99, 102, 241, 0.04)',
+      iconBg: '#6366F1',
+      iconBgTo: '#4F46E5',
+      iconBorder: '#4F46E5',
+      badgeBg: '#E0E7FF',
+      badgeText: '#3730A3',
+      accent: '#4F46E5',
+      shadow: 'rgba(99, 102, 241, 0.15)',
+    },
+  };
+
+  // Fallback for unknown colors
+  const getColorScheme = (color: string) => groupColorScheme[color] || groupColorScheme.emerald;
+
   return (
     <div className="h-full bg-white rounded-2xl shadow-lg ring-1 ring-slate-200/60 overflow-hidden flex flex-col">
+      {/* Header with enhanced styling */}
       <div className="flex-shrink-0 flex items-center justify-between px-5 py-3 bg-gradient-to-r from-slate-50 to-white border-b border-slate-200">
         <div className="flex items-center gap-3">
-          <Layers className="h-5 w-5 text-emerald-600" />
-          <h2 className="text-base font-bold text-slate-800">Stock Groups</h2>
-          <Badge variant="outline" className="font-mono text-xs">{groups.length} groups</Badge>
+          <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-sm">
+            <Layers className="h-5 w-5 text-white" />
+          </div>
+          <div>
+            <h2 className="text-base font-bold text-slate-800">Stock Groups</h2>
+            <div className="text-[10px] text-slate-500">Organize products into categories</div>
+          </div>
+          <Badge variant="outline" className="font-mono text-xs ml-1">{groups.length} groups</Badge>
         </div>
         <Button onClick={() => { setEditing(null); setShowForm(true); }} className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700">
           <Plus className="h-4 w-4" />
@@ -832,38 +966,101 @@ function GroupMaintenance({ groups, setGroups, products }: {
         </Button>
       </div>
 
+      {/* Summary bar showing total value across all groups */}
+      <div className="flex-shrink-0 px-5 py-2 bg-slate-50 border-b border-slate-200 flex items-center gap-4 text-[11px]">
+        <span className="text-slate-500">Total inventory value across all groups:</span>
+        <span className="font-bold font-mono text-slate-800">
+          {formatGHS(groups.reduce((s, g) => s + products.filter(p => p.groupId === g.id).reduce((s2, p) => s2 + p.price * p.stock, 0), 0))}
+        </span>
+        <span className="text-slate-300">·</span>
+        <span className="text-slate-500">{products.length} total products</span>
+      </div>
+
       <ScrollArea className="flex-1">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-5">
           {groups.map(g => {
             const count = products.filter(p => p.groupId === g.id).length;
             const value = products.filter(p => p.groupId === g.id).reduce((s, p) => s + p.price * p.stock, 0);
+            const scheme = getColorScheme(g.color);
             return (
               <motion.div
                 key={g.id}
                 layout
-                whileHover={{ y: -3 }}
-                className="bg-white rounded-xl ring-1 ring-slate-200 p-4 shadow-sm hover:shadow-md transition"
+                whileHover={{ y: -4 }}
+                className="relative rounded-xl p-4 transition-all"
+                style={{
+                  backgroundColor: scheme.bgTint,
+                  border: `2px solid ${scheme.border}`,
+                  boxShadow: `0 4px 12px ${scheme.shadow}, inset 0 1px 0 rgba(255,255,255,0.5)`,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = scheme.borderHover;
+                  e.currentTarget.style.boxShadow = `0 8px 24px ${scheme.shadow}, inset 0 1px 0 rgba(255,255,255,0.5)`;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = scheme.border;
+                  e.currentTarget.style.boxShadow = `0 4px 12px ${scheme.shadow}, inset 0 1px 0 rgba(255,255,255,0.5)`;
+                }}
               >
-                <div className="flex items-start justify-between mb-2">
-                  <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-emerald-100 to-teal-100 flex items-center justify-center text-2xl">
+                {/* Top accent bar (vibrant color strip at the top of each card) */}
+                <div
+                  className="absolute top-0 left-0 right-0 h-1 rounded-t-xl"
+                  style={{ background: `linear-gradient(to right, ${scheme.iconBg}, ${scheme.iconBgTo})` }}
+                />
+
+                <div className="flex items-start justify-between mb-3">
+                  {/* Icon container with vibrant gradient + border */}
+                  <div
+                    className="h-12 w-12 rounded-xl flex items-center justify-center text-2xl shadow-sm"
+                    style={{
+                      background: `linear-gradient(135deg, ${scheme.iconBg}, ${scheme.iconBgTo})`,
+                      border: `2px solid ${scheme.iconBorder}`,
+                      boxShadow: `0 2px 8px ${scheme.shadow}`,
+                    }}
+                  >
                     {g.icon}
                   </div>
+                  {/* Action buttons */}
                   <div className="flex gap-1">
-                    <button onClick={() => { setEditing(g); setShowForm(true); }} className="h-7 w-7 rounded-md bg-blue-100 text-blue-600 hover:bg-blue-200 flex items-center justify-center">
+                    <button
+                      onClick={() => { setEditing(g); setShowForm(true); }}
+                      className="h-7 w-7 rounded-md bg-blue-100 text-blue-600 hover:bg-blue-200 flex items-center justify-center transition shadow-sm"
+                      title="Edit group"
+                    >
                       <Edit2 className="h-3.5 w-3.5" />
                     </button>
-                    <button onClick={() => handleDelete(g.id)} className="h-7 w-7 rounded-md bg-rose-100 text-rose-600 hover:bg-rose-200 flex items-center justify-center">
+                    <button
+                      onClick={() => handleDelete(g.id)}
+                      className="h-7 w-7 rounded-md bg-rose-100 text-rose-600 hover:bg-rose-200 flex items-center justify-center transition shadow-sm"
+                      title="Delete group"
+                    >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </div>
                 </div>
-                <div className="font-bold text-slate-800">{g.name}</div>
-                <div className="text-xs text-slate-500 mb-3">{g.description}</div>
-                <div className="flex items-center justify-between text-xs">
-                  <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-700 font-semibold">
-                    {count} products
+
+                {/* Group name with accent underline */}
+                <div className="font-bold text-slate-800 text-sm">{g.name}</div>
+                <div
+                  className="h-0.5 w-12 rounded-full mb-2"
+                  style={{ backgroundColor: scheme.accent }}
+                />
+                <div className="text-xs text-slate-500 mb-3 leading-relaxed">{g.description}</div>
+
+                {/* Footer with product count badge + value */}
+                <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-200/60">
+                  <span
+                    className="px-2 py-0.5 rounded-md font-semibold"
+                    style={{ backgroundColor: scheme.badgeBg, color: scheme.badgeText }}
+                  >
+                    {count} product{count !== 1 ? 's' : ''}
                   </span>
-                  <span className="font-mono font-semibold text-slate-700">{formatGHS(value)}</span>
+                  <div className="text-right">
+                    <div className="text-[8px] text-slate-400 uppercase font-semibold">Value</div>
+                    <span className="font-mono font-bold" style={{ color: scheme.accent }}>
+                      {formatGHS(value)}
+                    </span>
+                  </div>
                 </div>
               </motion.div>
             );
@@ -893,6 +1090,7 @@ function GroupMaintenance({ groups, setGroups, products }: {
     </div>
   );
 }
+
 
 function GroupForm({ group, onSave, onClose }: {
   group: StockGroup | null;
