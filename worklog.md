@@ -1363,3 +1363,62 @@ Stage Summary:
   - Directory-originated customer cards are visually marked (amber) so the user knows the source
 - 'Directory' button in the Customers tab header provides a one-click shortcut to open the Phone Directory popup without leaving the tab
 - All previously-working features (New, Modify, Delete F4, Envelop F3, keyboard nav) remain functional
+
+---
+Task ID: stock-quantity-adjustment-redesign
+Agent: main
+Task: Redesign the Stock Quantity Adjustment form to match the reference images (stock adjustment report.png + stock search.png). Stock Search popup should load when "Find Part No" is typed on the form. Dropdown showing "Stocktake" must offer both "Stocktake" and "Stock Adjustment". Link the existing stock adjustment to this form to avoid duplicates and integrate well into the Stock menu.
+
+Work Log:
+- Analyzed 2 reference images via VLM:
+  - stock adjustment report.png: dark blue title bar, light blue button bar, white form, light yellow "On Hand" column, 7-column table (Part Number, Details, On Hand, Counted, Qty, Cost GHC, Total GHC), top fields (Number, Date, Details, Post To A/C, From/To Part No., Group, Bin), bottom buttons (Save F2, Print F3, Delete F4, Import, Export, Close Esc)
+  - stock search.png: light blue title bar, light green filter section, 5 filter dropdowns (Type, Stock Group, Sub Group, Brand, Supplier), Search Text field + Search button, 5-column table (Part no., Details, Qty, Retail GHC, Cost GHC), 7 bottom buttons (Modify, New, Picture, History, Labels, Qty, Close Esc)
+- Created /home/z/my-project/src/components/stock-quantity-adjustment.tsx (~895 lines):
+  - PopupWindow with dark blue (#1E5A8E) title bar "Stock Quantity Adjustment"
+  - Top header fields: Number (auto-generated ADJ-XXXXXX), Date, Details, Post To A/C (left column); From/To Part No., Group, Bin, Load Range button (right column)
+  - **Type dropdown with "Stocktake" and "Stock Adjustment" options** (replaces the single stocktake shown in reference) — this drives the saved history reason and print report title
+  - Find Part No bar (yellow background, matches reference) — typing opens Stock Search popup; direct SKU/barcode match auto-adds the product
+  - 8-column data grid (#, Part Number, Details, On Hand, Counted, Qty, Cost GHC, Total GHC) with light yellow On Hand column matching reference
+  - Counted and Cost are inline-editable; Qty (variance) and Total auto-computed
+  - Bottom summary bar: Bin, Qty On Hand, Variance (color-coded), Total GHC
+  - Action buttons (dark blue): Save F2, Print F3, Delete F4, Import, Export, Close Esc (red)
+  - Status bar with type indicator and variance warning
+  - Save handler: commits counted quantities to product stock, logs each non-zero variance as a StockHistoryEntry (action='adjusted', reason includes type + variance, reference=adjNumber) — reuses the exact same setProducts/setHistory pattern as the old QuantityAdjustment
+  - Print handler: opens new window with full HTML report (company header, info row, table, totals)
+  - Import handler: file picker → reads XLSX/CSV → matches by SKU/barcode → adds lines
+  - Export handler: writes XLSX with all lines + totals row using xlsx library
+  - Delete handler: clears all lines
+  - Keyboard shortcuts: F2 Save, F3 Print, F4 Delete, Esc Close (suppressed when typing or when stock search popup is open)
+  - Load Range button: loads all products matching the From/To SKU range + Group + Bin filter
+- Created embedded StockSearchMiniPopup (light blue title bar, light green filter section, 5-column table, 7 action buttons) that opens when Find Part No is typed
+  - Filter By row: Type, Stock Group, Sub Group, Brand, Supplier dropdowns
+  - Search Text row: text input + Search button
+  - Keyboard navigation: Arrow Up/Down, Enter Select, Esc Close
+  - Selecting a product adds it to the adjustment table
+- Modified /home/z/my-project/src/components/stock-management.tsx:
+  - Added import: `import { StockQuantityAdjustment } from "@/components/stock-quantity-adjustment";`
+  - Added showQtyAdjustmentPopup state, initialized from initialView === "quantity-adjustment" (so menu deep-link opens the popup on mount)
+  - Updated initial view state: when initialView === "quantity-adjustment", fall back to "add-modify" (so the background content shows something sensible)
+  - Updated tab navigation: "Quantity Adjustment" tab is now a popup tab (like Stock File and Stock Search) — clicking opens the popup instead of switching the in-content view
+  - Removed the in-content rendering of QuantityAdjustment (replaced with the popup)
+  - Added AnimatePresence block rendering <StockQuantityAdjustment /> when showQtyAdjustmentPopup is true
+  - **Deleted the old QuantityAdjustment function (175 lines)** and replaced with a brief comment pointing to the new file — no duplicate logic, the new component reuses the same setProducts/setHistory interface
+- Verified npx tsc --noEmit produces no errors in stock files
+- Verified npx next build compiles successfully (16s compile time)
+- Verified dev server responds with HTTP 200 with no runtime errors
+
+Stage Summary:
+- 1 new file: stock-quantity-adjustment.tsx (~895 lines) — full Stocktake + Stock Adjustment form
+- 1 modified file: stock-management.tsx — popup-based routing for Quantity Adjustment tab, removed old function
+- Form features:
+  - Stocktake / Stock Adjustment dropdown (selectable)
+  - Find Part No input triggers Stock Search popup (or auto-adds direct SKU/barcode matches)
+  - Stock Search popup with 5 filter dropdowns + 5-column table + 7 action buttons
+  - Load Range button to bulk-add products by SKU range + group + bin
+  - 8-column editable table with auto-computed variance and total
+  - All buttons functional: Save F2 (commits to stock + history), Print F3 (full HTML report), Delete F4, Import (XLSX/CSV), Export (XLSX), Close Esc
+  - Keyboard shortcuts for all main actions
+  - Save history entries: action='adjusted', reason includes type, reference=adjNumber — matches existing StockHistoryView format
+- No duplicate logic: the old QuantityAdjustment function (175 lines) is gone; the new component is the single source of truth for stock quantity adjustments
+- Colors match reference images: dark blue title bar (#1E5A8E), light blue button bar, light yellow On Hand column (#FFF8DC), light blue/green Stock Search popup
+- Window size: ~920×620 — consistent with other popups in the system

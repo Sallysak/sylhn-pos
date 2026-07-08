@@ -23,6 +23,7 @@ import {
 import { generateReport, exportReportToPDF, exportReportToExcel, exportReportToCSV, printReport } from "@/lib/report-utils";
 import type { StockView, ReportData } from "@/lib/pos-types";
 import { PopupWindow } from "@/components/popup-window";
+import { StockQuantityAdjustment } from "@/components/stock-quantity-adjustment";
 
 interface StockManagementProps {
   onBack: () => void;
@@ -37,10 +38,11 @@ interface StockManagementProps {
 }
 
 export function StockManagement({ onBack, products, setProducts, groups, setGroups, history, setHistory, initialView, openQtyReport }: StockManagementProps) {
-  const [view, setView] = useState<StockView>(initialView === "stock-file" || initialView === "stock-search" ? "add-modify" : (initialView || "add-modify"));
+  const [view, setView] = useState<StockView>(initialView === "stock-file" || initialView === "stock-search" || initialView === "quantity-adjustment" ? "add-modify" : (initialView || "add-modify"));
   const [showQtyReport, setShowQtyReport] = useState(false);
   const [showStockFilePopup, setShowStockFilePopup] = useState(initialView === "stock-file");
   const [showStockSearchPopup, setShowStockSearchPopup] = useState(initialView === "stock-search");
+  const [showQtyAdjustmentPopup, setShowQtyAdjustmentPopup] = useState(initialView === "quantity-adjustment");
   const { toast } = useToast();
 
   // Open Qty Report modal on mount if requested via menu.
@@ -88,14 +90,15 @@ export function StockManagement({ onBack, products, setProducts, groups, setGrou
             { id: "quantity-adjustment" as const, label: "Quantity Adjustment", icon: ArrowUpDown },
             { id: "history" as const, label: "Stock History", icon: History },
           ].map(tab => {
-            const isPopupTab = tab.id === "stock-file-popup" || tab.id === "stock-search-popup";
-            const isActivePopup = (tab.id === "stock-file-popup" && showStockFilePopup) || (tab.id === "stock-search-popup" && showStockSearchPopup);
+            const isPopupTab = tab.id === "stock-file-popup" || tab.id === "stock-search-popup" || tab.id === "quantity-adjustment";
+            const isActivePopup = (tab.id === "stock-file-popup" && showStockFilePopup) || (tab.id === "stock-search-popup" && showStockSearchPopup) || (tab.id === "quantity-adjustment" && showQtyAdjustmentPopup);
             return (
               <button
                 key={tab.id}
                 onClick={() => {
                   if (tab.id === "stock-file-popup") setShowStockFilePopup(true);
                   else if (tab.id === "stock-search-popup") setShowStockSearchPopup(true);
+                  else if (tab.id === "quantity-adjustment") setShowQtyAdjustmentPopup(true);
                   else setView(tab.id);
                 }}
                 className={cn(
@@ -134,7 +137,6 @@ export function StockManagement({ onBack, products, setProducts, groups, setGrou
           >
             {view === "add-modify" && <AddModifyStock products={products} setProducts={setProducts} groups={groups} setHistory={setHistory} />}
             {view === "group-maintenance" && <GroupMaintenance groups={groups} setGroups={setGroups} products={products} />}
-            {view === "quantity-adjustment" && <QuantityAdjustment products={products} setProducts={setProducts} setHistory={setHistory} />}
             {view === "history" && <StockHistoryView history={history} products={products} />}
           </motion.div>
         </AnimatePresence>
@@ -180,6 +182,19 @@ export function StockManagement({ onBack, products, setProducts, groups, setGrou
           >
             <StockSearchView products={products} groups={groups} history={history} />
           </PopupWindow>
+        )}
+      </AnimatePresence>
+
+      {/* ===== Stock Quantity Adjustment Popup Window ===== */}
+      <AnimatePresence>
+        {showQtyAdjustmentPopup && (
+          <StockQuantityAdjustment
+            products={products}
+            setProducts={setProducts}
+            setHistory={setHistory}
+            groups={groups}
+            onClose={() => setShowQtyAdjustmentPopup(false)}
+          />
         )}
       </AnimatePresence>
     </div>
@@ -681,179 +696,8 @@ function GroupForm({ group, onSave, onClose }: {
 }
 
 // ===== Quantity Adjustment =====
-function QuantityAdjustment({ products, setProducts, setHistory }: {
-  products: Product[];
-  setProducts: React.Dispatch<React.SetStateAction<Product[]>>;
-  setHistory: React.Dispatch<React.SetStateAction<StockHistoryEntry[]>>;
-}) {
-  const [search, setSearch] = useState("");
-  const [selected, setSelected] = useState<Product | null>(null);
-  const [adjustType, setAdjustType] = useState<"add" | "remove" | "set">("add");
-  const [amount, setAmount] = useState(0);
-  const [reason, setReason] = useState("");
-  const { toast } = useToast();
-
-  const filtered = products.filter(p => p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase()));
-
-  const handleAdjust = () => {
-    if (!selected || amount <= 0) {
-      toast({ title: "Select product and enter amount", variant: "destructive" });
-      return;
-    }
-    let newQty = selected.stock;
-    let change = 0;
-    if (adjustType === "add") { newQty = selected.stock + amount; change = amount; }
-    else if (adjustType === "remove") { newQty = Math.max(0, selected.stock - amount); change = -amount; }
-    else { newQty = amount; change = amount - selected.stock; }
-
-    setProducts(prev => prev.map(p => p.id === selected.id ? { ...p, stock: newQty } : p));
-    setHistory(prev => [...prev, {
-      id: `h-${Date.now()}`,
-      productId: selected.id,
-      productName: selected.name,
-      sku: selected.sku,
-      action: 'adjusted',
-      quantityChange: change,
-      newQuantity: newQty,
-      timestamp: new Date().toISOString(),
-      user: "Sarah Johnson",
-      reason: reason || `Quantity ${adjustType === "set" ? "set to" : adjustType + "ed"} ${amount}`,
-      reference: `ADJ-${Date.now().toString().slice(-6)}`,
-    }]);
-    toast({ title: "Quantity adjusted", description: `${selected.name}: ${selected.stock} → ${newQty}` });
-    setSelected(null); setAmount(0); setReason("");
-  };
-
-  return (
-    <div className="h-full grid grid-cols-2 gap-4">
-      {/* Left: Product List */}
-      <div className="bg-white rounded-2xl shadow-lg ring-1 ring-slate-200/60 overflow-hidden flex flex-col">
-        <div className="flex-shrink-0 flex items-center justify-between px-5 py-3 bg-gradient-to-r from-slate-50 to-white border-b border-slate-200">
-          <div className="flex items-center gap-3">
-            <ArrowUpDown className="h-5 w-5 text-emerald-600" />
-            <h2 className="text-base font-bold text-slate-800">Select Product</h2>
-          </div>
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search..." className="h-9 pl-8 pr-3 rounded-lg bg-slate-100 text-sm outline-none focus:ring-2 focus:ring-emerald-300 w-48" />
-          </div>
-        </div>
-        <ScrollArea className="flex-1">
-          <div className="divide-y divide-slate-100">
-            {filtered.map(p => (
-              <button
-                key={p.id}
-                onClick={() => setSelected(p)}
-                className={cn("w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-emerald-50/50 transition", selected?.id === p.id && "bg-emerald-50 ring-1 ring-emerald-300")}
-              >
-                <span className="text-2xl">{p.emoji}</span>
-                <div className="flex-1 min-w-0">
-                  <div className="font-semibold text-slate-800 text-sm truncate">{p.name}</div>
-                  <div className="text-[10px] text-slate-400 font-mono">{p.sku} · Stock: {p.stock}</div>
-                </div>
-                <ChevronRight className="h-4 w-4 text-slate-300" />
-              </button>
-            ))}
-          </div>
-        </ScrollArea>
-      </div>
-
-      {/* Right: Adjustment Form */}
-      <div className="bg-white rounded-2xl shadow-lg ring-1 ring-slate-200/60 overflow-hidden flex flex-col">
-        <div className="flex-shrink-0 flex items-center gap-3 px-5 py-3 bg-gradient-to-r from-slate-50 to-white border-b border-slate-200">
-          <Settings2 className="h-5 w-5 text-emerald-600" />
-          <h2 className="text-base font-bold text-slate-800">Adjust Quantity</h2>
-        </div>
-        <div className="flex-1 p-6 overflow-y-auto">
-          {selected ? (
-            <div className="space-y-5">
-              {/* Selected Product */}
-              <div className="p-4 rounded-xl bg-gradient-to-br from-emerald-50 to-teal-50 ring-1 ring-emerald-200">
-                <div className="flex items-center gap-3 mb-2">
-                  <span className="text-4xl">{selected.emoji}</span>
-                  <div>
-                    <div className="font-bold text-slate-800 text-lg">{selected.name}</div>
-                    <div className="text-xs text-slate-500 font-mono">{selected.sku} · {selected.barcode}</div>
-                  </div>
-                </div>
-                <div className="grid grid-cols-3 gap-2 mt-3">
-                  <div className="bg-white rounded-lg p-2 text-center">
-                    <div className="text-[10px] text-slate-500 uppercase">Current Qty</div>
-                    <div className="text-lg font-bold text-slate-800 font-mono">{selected.stock}</div>
-                  </div>
-                  <div className="bg-white rounded-lg p-2 text-center">
-                    <div className="text-[10px] text-slate-500 uppercase">Reorder Lvl</div>
-                    <div className="text-lg font-bold text-slate-800 font-mono">{selected.reorderLevel}</div>
-                  </div>
-                  <div className="bg-white rounded-lg p-2 text-center">
-                    <div className="text-[10px] text-slate-500 uppercase">Unit</div>
-                    <div className="text-lg font-bold text-slate-800">{selected.unit}</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Adjustment Type */}
-              <div>
-                <label className="text-xs font-semibold text-slate-600 mb-2 block">Adjustment Type</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { id: "add" as const, label: "Add Stock", icon: ArrowUp, color: "emerald" },
-                    { id: "remove" as const, label: "Remove Stock", icon: ArrowDown, color: "rose" },
-                    { id: "set" as const, label: "Set Quantity", icon: RotateCcw, color: "blue" },
-                  ].map(opt => (
-                    <button
-                      key={opt.id}
-                      onClick={() => setAdjustType(opt.id)}
-                      className={cn("flex flex-col items-center gap-1 py-3 rounded-lg ring-2 transition",
-                        adjustType === opt.id ? `ring-${opt.color}-500 bg-${opt.color}-50` : "ring-slate-200 hover:ring-slate-300")}
-                      style={adjustType === opt.id ? { background: opt.color === 'emerald' ? '#ecfdf5' : opt.color === 'rose' ? '#fff1f2' : '#eff6ff', borderColor: opt.color === 'emerald' ? '#10b981' : opt.color === 'rose' ? '#f43f5e' : '#3b82f6' } : {}}
-                    >
-                      <opt.icon className="h-5 w-5" style={{ color: adjustType === opt.id ? (opt.color === 'emerald' ? '#10b981' : opt.color === 'rose' ? '#f43f5e' : '#3b82f6') : '#64748b' }} />
-                      <span className="text-[11px] font-semibold">{opt.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Amount */}
-              <div>
-                <label className="text-xs font-semibold text-slate-600 mb-1 block">Amount</label>
-                <input type="number" value={amount || ""} onChange={(e) => setAmount(parseInt(e.target.value) || 0)} className="w-full h-12 px-4 rounded-lg border-2 border-slate-200 focus:border-emerald-500 outline-none text-xl font-mono font-bold text-right" placeholder="0" />
-              </div>
-
-              {/* Reason */}
-              <div>
-                <label className="text-xs font-semibold text-slate-600 mb-1 block">Reason (optional)</label>
-                <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-emerald-500 outline-none text-sm" placeholder="e.g. Damaged goods, stock received, recount..." />
-              </div>
-
-              {/* Preview */}
-              {amount > 0 && (
-                <div className="p-3 rounded-lg bg-slate-800 text-white flex justify-between items-center">
-                  <span className="text-xs font-semibold uppercase opacity-80">New Quantity</span>
-                  <span className="text-2xl font-bold font-mono text-emerald-400">
-                    {adjustType === "add" ? selected.stock + amount : adjustType === "remove" ? Math.max(0, selected.stock - amount) : amount}
-                  </span>
-                </div>
-              )}
-
-              <Button onClick={handleAdjust} className="w-full h-12 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-base font-bold">
-                <CheckCircle2 className="h-5 w-5" />
-                Confirm Adjustment
-              </Button>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-full text-slate-400">
-              <ArrowUpDown className="h-12 w-12 mb-3 opacity-40" />
-              <div className="text-sm font-medium">Select a product to adjust</div>
-              <div className="text-xs mt-1">Choose from the list on the left</div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
+// NOTE: Quantity Adjustment now lives in src/components/stock-quantity-adjustment.tsx
+// and is opened as a popup window via the showQtyAdjustmentPopup state.
 
 // ===== Stock History =====
 function StockHistoryView({ history, products }: { history: StockHistoryEntry[]; products: Product[] }) {
