@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Save, Printer, Trash2, Upload, Download, X, Search as SearchIcon,
-  Package, AlertTriangle, TrendingUp, ScanLine, FileText,
+  Package, AlertTriangle, TrendingUp, ScanLine, FileText, Plus,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
