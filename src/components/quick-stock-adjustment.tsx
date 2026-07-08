@@ -202,13 +202,13 @@ export function QuickStockAdjustment({
       title="Quick Stock Adjustment"
       titleBarColor={HEADER_GREEN}
       initialWidth={680}
-      initialHeight={620}
+      initialHeight={700}
       minWidth={560}
-      minHeight={520}
+      minHeight={580}
       onClose={onClose}
     >
       <div className="h-full flex flex-col bg-white" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
-        {/* ===== Product Search Bar ===== */}
+        {/* ===== Product Search Bar (fixed at top) ===== */}
         <div className="flex-shrink-0 px-4 py-2.5 bg-slate-50 border-b border-slate-200">
           <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">Product</label>
           <div className="flex items-center gap-2">
@@ -247,12 +247,15 @@ export function QuickStockAdjustment({
           </div>
         </div>
 
+        {/* ===== Scrollable content area (holds all middle sections) ===== */}
+        <div className="flex-1 overflow-y-auto min-h-0" style={{ scrollbarWidth: 'thin' }}>
+
         {/* ===== Product Info Card ===== */}
         {selectedProduct ? (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="flex-shrink-0 px-4 py-3 bg-gradient-to-br from-emerald-50 to-teal-50 border-b border-emerald-100"
+            className="px-4 py-3 bg-gradient-to-br from-emerald-50 to-teal-50 border-b border-emerald-100"
           >
             <div className="flex items-start gap-3">
               <div className="h-14 w-14 rounded-xl bg-white ring-1 ring-emerald-200 flex items-center justify-center text-3xl flex-shrink-0">
@@ -298,7 +301,7 @@ export function QuickStockAdjustment({
             </div>
           </motion.div>
         ) : (
-          <div className="flex-shrink-0 px-4 py-8 flex flex-col items-center justify-center text-slate-400 border-b border-slate-100">
+          <div className="px-4 py-8 flex flex-col items-center justify-center text-slate-400 border-b border-slate-100">
             <Package className="h-10 w-10 mb-2 opacity-30" />
             <div className="text-sm font-medium">No product selected</div>
             <div className="text-xs mt-1">Type a SKU/barcode above or click "Browse" to search</div>
@@ -307,7 +310,7 @@ export function QuickStockAdjustment({
 
         {/* ===== Adjustment Mode + Amount ===== */}
         {selectedProduct && (
-          <div className="flex-shrink-0 px-4 py-3 border-b border-slate-100">
+          <div className="px-4 py-3 border-b border-slate-100">
             {/* Mode buttons */}
             <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1.5">Adjustment Type</label>
             <div className="grid grid-cols-3 gap-2 mb-3">
@@ -394,7 +397,7 @@ export function QuickStockAdjustment({
 
         {/* ===== Preview + Reason ===== */}
         {selectedProduct && (
-          <div className="flex-shrink-0 px-4 py-3 border-b border-slate-100">
+          <div className="px-4 py-3 border-b border-slate-100">
             {/* Live preview */}
             <div className={cn(
               "rounded-lg p-3 mb-3 ring-1",
@@ -468,7 +471,7 @@ export function QuickStockAdjustment({
 
         {/* ===== Recent Adjustments (for selected product) ===== */}
         {selectedProduct && recentAdjustments.length > 0 && (
-          <div className="flex-1 overflow-y-auto px-4 py-2 min-h-0" style={{ scrollbarWidth: 'thin' }}>
+          <div className="px-4 py-2">
             <div className="text-[10px] font-bold text-slate-600 uppercase mb-1.5 flex items-center gap-1">
               <History className="h-3 w-3" /> Recent Adjustments for this Product
             </div>
@@ -494,7 +497,10 @@ export function QuickStockAdjustment({
           </div>
         )}
 
-        {/* ===== Action Buttons ===== */}
+        </div>
+        {/* ===== End scrollable content area ===== */}
+
+        {/* ===== Action Buttons (fixed at bottom) ===== */}
         <div className="flex-shrink-0 px-4 py-2.5 flex items-center gap-2 border-t" style={{ borderColor: FIELD_BORDER, backgroundColor: '#F0FDF4' }}>
           <button
             onClick={handleSave}
