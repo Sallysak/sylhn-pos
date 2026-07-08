@@ -148,6 +148,11 @@ export function QuickStockAdjustment({
       p.id === selectedProduct.id ? { ...p, stock: newQuantity } : p
     ));
 
+    // Immediately update the selectedProduct state so the UI reflects the new stock
+    // without needing to close and reopen the form
+    const updatedProduct = { ...selectedProduct, stock: newQuantity };
+    setSelectedProduct(updatedProduct);
+
     // Log to history
     const historyEntry: StockHistoryEntry = {
       id: `h-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -170,7 +175,7 @@ export function QuickStockAdjustment({
       description: `${selectedProduct.emoji} ${selectedProduct.name}: ${selectedProduct.stock} → ${newQuantity} (${changeAmount > 0 ? '+' : ''}${changeAmount})`,
     });
 
-    // Reset for next adjustment but keep the product selected
+    // Reset for next adjustment but keep the product selected (with updated stock)
     setAmount(adjustMode === 'set' ? newQuantity : 1);
     setCustomReason('');
     // Generate a new reference for the next adjustment

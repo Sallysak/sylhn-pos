@@ -98,6 +98,28 @@ export function StockQuantityAdjustment({
   const [saved, setSaved] = useState(false);
   const [draftRestored, setDraftRestored] = useState(false);
 
+  // ===== Sync lines' onHand with current products state =====
+  // When a quick adjustment (or any external stock change) updates the products
+  // array, we need to refresh the onHand values in our lines so the table
+  // reflects the true current stock immediately — without needing to close
+  // and reopen the form.
+  useEffect(() => {
+    setLines(prev => prev.map(line => {
+      const product = products.find(p => p.id === line.productId);
+      if (!product) return line;
+      // Only update if the onHand has actually changed
+      if (product.stock === line.onHand) return line;
+      // Recompute qty (variance) = counted - new onHand
+      const newQty = line.counted - product.stock;
+      return {
+        ...line,
+        onHand: product.stock,
+        qty: newQty,
+        total: newQty * line.cost,
+      };
+    }));
+  }, [products]);
+
   // ===== Stock Adjustment mode: reason integration =====
   // When adjType === 'adjustment', the form shows a Reason dropdown
   // that is applied to all adjusted items when saved.
