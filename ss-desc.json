@@ -1,0 +1,28 @@
+{
+  "choices": [
+    {
+      "finish_reason": "stop",
+      "index": 0,
+      "message": {
+        "content": "### 1) Window Size and Proportions  \nThe interface is a **modal dialog window** (not full-screen) with a fixed, rectangular shape. It occupies approximately 70% of the screen width and 60% of the screen height, centered on the display. The window has a subtle border, distinguishing it from the underlying application background.  \n\n\n### 2) Exact Background Color  \nThe primary background color of the dialog is a **pale, muted green** (RGB: ~#C5D5C5 or similar), creating a soft, non-distracting backdrop for the content.  \n\n\n### 3) Header Bar Color and Content  \n- **Header Bar Color**: A darker, muted green (RGB: ~#A5B5A5), slightly darker than the main background to create visual hierarchy.  \n- **Content**: The header contains the title **\"Stock Search\"** in bold, black text, left-aligned. To the right of the title, there are three column headers: **\"Quantity\"**, **\"Cost GHC\"**, and **\"Expiry\"**, each in smaller, black text and right-aligned.  \n\n\n### 4) Search Section Layout  \n- **Placeholder Text**: The \"Search Text\" input field has the placeholder text **\"Details\"** (gray, italicized).  \n- **Search Button**: A rectangular button labeled **\"Search\"** (black text, white background) is positioned to the right of the input field.  \n- **Layout**: The \"Search Text\" label is left-aligned above the input field, with the input field and \"Search\" button aligned horizontally.  \n\n\n### 5) Filter By Section  \nThe \"Filter By\" section includes **four dropdown menus**, each with a label and a downward-pointing arrow (indicating a dropdown):  \n1. **Type** (leftmost)  \n2. **Stock Group**  \n3. **Group1**  \n4. **Group2**  \n5. **Group3** (rightmost)  \nAll dropdowns are aligned horizontally, with labels in black text and dropdown arrows in gray.  \n\n\n### 6) Table Columns (Exact List)  \nThe table has **six columns**, listed in order from left to right:  \n1. **Part no.** (leftmost, contains alphanumeric part numbers)  \n2. **Details** (contains product descriptions)  \n3. **Qty** (numeric quantity values)  \n4. **Retail GHC** (numeric retail cost values)  \n5. **Cost GHC** (numeric cost values)  \n6. **Expiry** (rightmost, contains expiration dates)  \n\n\n### 7) Selected Row Color  \nThe selected row (highlighted) uses a **bright blue background** (RGB: ~#0099FF) with **black text**, making it stand out from unselected rows (which have a white background and black text).  \n\n\n### 8) Action Buttons (Exact Labels)  \nBelow the table, there are **six rectangular buttons** with icons and labels, arranged horizontally:  \n1. **Select (Enter)**: Green checkmark icon + \"Select (Enter)\" text (leftmost)  \n2. **New**: Blue plus icon + \"New\" text  \n3. **Picture**: Gray camera icon + \"Picture\" text  \n4. **History**: Blue clock icon + \"History\" text  \n5. **Labels**: Blue tag icon + \"Labels\" text  \n6. **Qty**: Blue \"i\" (information) icon + \"Qty\" text  \n7. **Close (Esc)**: Red \"X\" icon + \"Close (Esc)\" text (rightmost)  \n\n\n### 9) Status Bar Text  \nAt the bottom of the dialog, a status bar displays:  \n- **Left**: \"F9 - Part No.\" (gray text)  \n- **Center**: \"F10 - Details\" (gray text)  \n- **Right**: \"Shift+F12 - Print Labels\" (gray text)  \n\n\n### 10) Modal Dialog vs. Full Page  \nThis is a **modal dialog** (not a full-page interface). It overlays the main application window, with a semi-transparent or solid background that dims the underlying content, focusing user attention on the search functionality.  \n\n\n### 11) Differences from a Stock File Form  \nA \"Stock File\" form (for creating/editing individual stock records) would differ in:  \n- **Purpose**: The Stock Search dialog is for *browsing/filtering* stock, while a Stock File form is for *editing* a single record.  \n- **Layout**: The Stock Search has a table (multiple rows) and filter/search tools; a Stock File form would have input fields for a single record (e.g., Part No., Description, Quantity, Cost) with save/cancel buttons.  \n- **Buttons**: The Stock Search has action buttons for searching/filtering (e.g., \"Search,\" \"Filter By\"); a Stock File form would have \"Save,\" \"Cancel,\" or \"Update\" buttons.  \n- **Content**: The Stock Search displays a list of stock items; a Stock File form displays fields for one item (e.g., \"Part Number,\" \"Description,\" \"Unit Cost\").  \n- **Interaction**: The Stock Search is for selection (e.g., choosing a row to edit); a Stock File form is for data entry/modification.",
+        "role": "assistant"
+      }
+    }
+  ],
+  "created": 1783438583,
+  "id": "2026070723360426a88ab615914819",
+  "model": "glm-4.6v",
+  "object": "chat.completion",
+  "request_id": "2026070723360426a88ab615914819",
+  "usage": {
+    "completion_tokens": 1104,
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    },
+    "prompt_tokens": 870,
+    "prompt_tokens_details": {
+      "cached_tokens": 5
+    },
+    "total_tokens": 1974
+  }
+}

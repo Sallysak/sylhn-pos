@@ -1136,3 +1136,192 @@ Stage Summary:
 - Reduced widths, heights, and spacing throughout the cart panel
 - All function buttons and keypad buttons now fit on screen
 - All cart columns, totals, and buttons visible and accessible
+
+---
+Task ID: 22
+Agent: Main (Super Z)
+Task: Design Sales Menu and Invoice List Report forms matching reference images with same looks, features, buttons, and functions. Relate the Sales Menu and Invoice List Report. Report type: totals/summary/detailed. Status: outstanding/paid. Filter between two dates.
+
+Work Log:
+- Analyzed 3 reference images: salesmenu.png (Sales Menu grid), invlistreport.png (Invoice List Report filter dialog), invoice report.png (report output)
+- Added "sales-menu" to ViewMode type
+- Created /src/components/sales-menu.tsx with:
+  1. SalesMenu component (PopupWindow with blue header):
+     * Tab navigation: "Sales Menu" and "Sales Reports"
+     * Left sidebar: Invoicing, Payments Received, Add/Modify Clients, Close (Esc)
+     * Grid of 20 report options matching reference: List of Clients, Invoices List Report, Summary Sales Report, Aged Clients Report, Client's Statement, Sales Analysis Report, Back Orders Report, Sales Tax Report, Bank Deposit, Sale Payments Report, Sales by Client, Sales by Product, Client Sales/Product, Product Sales/Client, Staff Sales Report, Loyalty Points Report, Sales Sources Report, Sold Items Report, Cashflow Report, Sales by Supplier
+     * Each grid item has blue icon and label
+     * Status bar with company info
+     * Minimize/Maximize/Close buttons (PopupWindow)
+  
+  2. InvoiceListReportDialog (blue filter dialog matching reference):
+     * Blue background (#0078D7) matching reference
+     * Title: "Invoice List Report" with red close button
+     * Filter fields matching reference exactly:
+       - Location (dropdown: All Locations, Main Store, Warehouse)
+       - Type (dropdown: Invoice, Quote, Order)
+       - Reference No. (text input)
+       - Client Name (text input)
+       - Report Type (dropdown: Totals, Summary, Detailed)
+       - Status (dropdown: All, Outstanding, Paid)
+       - From Date (date input)
+       - To Date (date input)
+     * 4 action buttons matching reference: Screen, Printer (F3), File, Close (Esc)
+     * Screen → generates filtered report and displays in viewer
+     * Printer → opens print window with only the report (company header, title, period, table, totals)
+     * File → exports to Excel
+     * Close → closes dialog
+  
+  3. InvoiceReportViewer (screen output matching reference):
+     * Company header: SYLHN COMPANY LTD, Accra Warehouse, address, contact
+     * Date/time/page number (right-aligned)
+     * Title: "[Totals/Summary/Detailed] Invoice Report"
+     * Period: "For The Period [from] - [to] · Status: [status]"
+     * 6-column table matching reference: Date, Qty, TAX GHC, Amount GHC, Paid GHC, Due GHC
+     * Lavender header (#E6E6FA) matching reference
+     * Alternating row colors (white/#F8F8F8)
+     * Due GHC in red if >0 (matching reference)
+     * TOTAL row with bold text
+     * Multi-page print support (header repeats, rows don't split)
+  
+  4. 10 sample invoices with realistic Ghana Cedis values spanning Jan-Mar 2026
+     * Mix of paid and outstanding statuses
+     * Various clients (Ama Osei, Kwame Mensah, Akosua Frimpong, Yao Adjei, Walk-in Customer)
+
+- Integration:
+  * "Sales Menu" added to Sale menu dropdown
+  * Clicking "Sales Menu" opens the Sales Menu popup window
+  * Clicking "Invoices List Report" in the grid opens the blue Invoice List Report filter dialog
+  * Clicking "Screen" generates the report and displays it in the viewer
+  * Report is filtered by date range, status, client name, and reference number
+  * Report type (Totals/Summary/Detailed) changes the title
+
+- Verified with Agent Browser:
+  * Sales Menu opens from Sale menu dropdown
+  * Popup window with minimize/maximize/close
+  * Tab navigation (Sales Menu / Sales Reports)
+  * Sidebar items (Invoicing, Payments, Clients, Close)
+  * Grid of 20 report options
+  * Clicking "Invoices List Report" opens blue filter dialog
+  * All 7 filter fields present (Location, Type, Ref No, Client, Report Type, Status, From/To Date)
+  * 4 action buttons (Screen, Printer F3, File, Close Esc)
+  * Clicking Screen generates report with company header, title, period, table, TOTAL row
+  * No errors
+- Lint: 0 errors
+
+Stage Summary:
+- Sales Menu designed matching reference with blue header, sidebar, grid of report options
+- Invoice List Report dialog matching reference with blue background, all filter fields, 4 action buttons
+- Report type: Totals, Summary, Detailed
+- Status: All, Outstanding, Paid
+- Date filter: From/To dates
+- Invoice Report output matching reference: company header, title, period, 6-column table (Date, Qty, TAX, Amount, Paid, Due), TOTAL row
+- Sales Menu and Invoice List Report related: clicking "Invoices List Report" in the grid opens the filter dialog
+- Print opens separate window with only the report (multi-page support)
+- Excel export works
+- Accessible via Sale menu → "Sales Menu"
+
+---
+Task ID: purchase-menu-redesign
+Agent: main
+Task: Redesign Purchase Menu (light blue) + Purchase List (light teal) + Purchase Order List (light green) based on user-provided reference images. Link Find Part No in the Purchase Form to the appropriate list based on docType (Purchase → Purchase List, Order → Purchase Order List).
+
+Work Log:
+- Analyzed 4 reference images (purchase Menu.png, purchase List.png, purchase order list.png, PURCHASE.png) using VLM
+- Created /home/z/my-project/src/components/purchase-list-popup.tsx — light teal Purchases List popup with:
+  - Filter bar (Supplier dropdown, Reference, Reference 2, Date range, Type dropdown)
+  - 9-column table (Checkbox, Transaction Type, Invoice #, Date, Reference #, Reference #2, Amount, Paid, Due)
+  - Totals bar, status bar, 9 action buttons (Select, Screen, Print, Email, SMS, Payments, Picture, Export, Close)
+  - Search input with keyboard navigation (Arrow/Enter/Esc)
+  - Excel export via xlsx
+- Created /home/z/my-project/src/components/purchase-order-list-popup.tsx — light green Purchase Order List popup with same structure but for PO data + Status column
+- Created /home/z/my-project/src/components/purchase-menu.tsx — light blue Purchase Menu (PopupWindow, ~760×520) with:
+  - Left panel: "Purchase Menu" with 3 items (Purchasing, Add/Modify Suppliers, Close) + Quick Stats
+  - Right panel: "Purchase Reports" with 13 reports in 2 columns (matches reference image exactly: List of Suppliers, Purchases List Report, Purchase Orders Report, Summary Purchases, Aged Suppliers, Supplier's Statements, Purchase Analysis, Back Orders, Stock On Order, Purchases Tax, Purchase Payments, Equivalent Part Numbers, Staff Invoice, Trading Terms)
+  - Bottom action bar with Open Purchases List, Open Purchase Orders, Close buttons
+  - Nested popups: clicking Purchases List Report opens PurchaseListPopup; clicking Purchase Orders Report opens PurchaseOrderListPopup
+- Modified /home/z/my-project/src/components/purchase-form.tsx:
+  - Imported PurchaseListPopup and PurchaseOrderListPopup
+  - Added existingPurchases and existingOrders sample data with line items
+  - Added listPopupMode state ('none' | 'purchase-list' | 'order-list')
+  - Updated handleFindPartNo to open the correct popup based on docType
+  - Added loadPurchaseIntoForm and loadOrderIntoForm handlers (loads selected transaction into the form)
+  - Updated Find Part No input with F7 shortcut button and label hint
+  - Added useEffect for keyboard shortcuts (F2 Save, F3 Print, F4 Delete, F5 Payment, F7 List, Esc Close)
+- Updated /home/z/my-project/src/app/page.tsx:
+  - Replaced PurchaseModule import with PurchaseMenu
+  - Updated view === "purchase" route to use new PurchaseMenu
+  - Passes onOpenPurchasingForm and onOpenSupplierForm callbacks
+- Verified build succeeds (npx next build compiled successfully)
+- Verified dev server responds with HTTP 200
+- Confirmed no TypeScript errors in new/modified files
+
+Stage Summary:
+- 3 new files: purchase-list-popup.tsx, purchase-order-list-popup.tsx, purchase-menu.tsx
+- 2 modified files: purchase-form.tsx, page.tsx
+- All buttons are interactive (Select, Screen, Print, Email, SMS, Payments, Picture, Export, Close, plus all 13 reports and 3 menu items)
+- Find Part No in the Purchase Form now opens Purchase List (Purchase/Quote mode) or Purchase Order List (Order mode) based on docType dropdown
+- Colors match reference images: light blue (#D6E6F5) menu, light teal (#D6ECE5) purchases list, light green (#D6EBD0) purchase orders list
+- Window sizes match reference images: 760×520 menu, 900×560 list popups
+- All buttons functional with toast feedback; Excel export uses xlsx; Print uses window.print()
+- Existing supplier-form and purchase-module files preserved (still available if needed for legacy paths)
+
+---
+Task ID: telephone-directory-integration
+Agent: main
+Task: Design Telephone Directory popup + Add Telephone popup form based on user-provided reference images (telephone directory.png + add telephone.png). Integrate into the Telephone menu, ensure all buttons and controls work.
+
+Work Log:
+- Analyzed 2 reference images (telephone directory.png + add telephone.png) using VLM
+- Created /home/z/my-project/src/components/add-telephone-form.tsx — light green (#D6EBD0) popup with green title bar matching reference:
+  - 14 fields in 2-column layout: Title, Name, Address, City, State+Code, Country, Group (left); Home Tel, Work Tel, Mobile, Fax, http://, Email (right); Notes (full width, multiline)
+  - Save (F2) and Close (Esc) buttons with light blue borders matching reference image
+  - Status bar showing entry ID and name
+  - F2 keyboard shortcut for Save, Esc to Close
+  - Required field validation on Name
+  - Supports both Add (new entry) and Modify (existing entry) modes
+- Created /home/z/my-project/src/components/telephone-directory.tsx — light blue (#D6E6F5) popup with dark blue title bar matching reference:
+  - "Search for:" filter bar that filters by name, phones, fax, email, or group
+  - 6-column table (Name, Home Tel., Work Tel., Mobile, Fax, Email) with sortable header (▲)
+  - 8 sample contacts pre-loaded (Ghana-based customers and suppliers)
+  - 7 action buttons (Modify, New, Delete F4, Email, Bulk Email, Envelop F3, Close Esc) with white backgrounds and dark blue icons matching reference
+  - Keyboard navigation (Arrow Up/Down, Enter to Modify, Esc to Close, F3 Envelope, F4 Delete)
+  - Status bar showing entry count and keyboard hints
+  - Opens AddTelephoneForm popup when New or Modify is clicked
+  - Envelop (F3) prints an envelope for the selected contact (opens print window)
+  - Email opens toast with email composition
+  - Bulk Email composes to all filtered contacts
+- Modified /home/z/my-project/src/components/telephone-module.tsx:
+  - Added imports for TelephoneDirectory and PhoneDirectoryEntry
+  - Added BookOpen icon to imports
+  - Added "directory" to TelephoneTab type
+  - Added new "Phone Directory" tab to tabs array
+  - Added showDirectory state + directoryEntries state
+  - Updated tab button onClick: when directory tab clicked, opens the directory popup instead of switching tab
+  - Added AnimatePresence block at the bottom rendering TelephoneDirectory popup when showDirectory is true
+  - Passes entries/onEntriesChange callbacks to sync state with parent
+- Modified /home/z/my-project/src/app/page.tsx:
+  - Imported TelephoneDirectory component
+  - Added "telephone-directory" route that renders TelephoneDirectory as standalone popup
+  - Added "Phone Directory" menu item to the Telephone dropdown (separated by separators above and below)
+- Modified /home/z/my-project/src/lib/pos-types.ts:
+  - Added "telephone-directory" to ViewMode type union
+- Verified npx tsc --noEmit shows no errors in telephone files
+- Verified npx next build compiles successfully
+- Verified dev server responds with HTTP 200
+
+Stage Summary:
+- 2 new files: add-telephone-form.tsx (264 lines), telephone-directory.tsx (~360 lines)
+- 4 modified files: telephone-module.tsx, page.tsx, pos-types.ts
+- All buttons functional:
+  - Telephone Directory: Modify (opens edit form), New (opens add form), Delete F4, Email, Bulk Email, Envelop F3 (prints envelope), Close Esc
+  - Add Telephone Form: Save F2 (validates + saves), Close Esc
+  - Search filter works (filters by name, all phone types, fax, email, group)
+  - Keyboard navigation (arrows, Enter, Esc, F3, F4) all functional
+  - Add/Modify modes both supported (entry prop determines mode)
+  - State syncs between parent (TelephoneModule) and popup via onEntriesChange callback
+- Colors match reference images:
+  - Telephone Directory: light blue (#D6E6F5) bg, dark blue (#1E5A8E) title bar, white buttons with dark blue icons
+  - Add Telephone: light green (#D6EBD0) bg, green (#4CAF50) title bar, white buttons with blue (Save) / red (Close) icons
+- Window sizes: Directory ~900×560, Add Form ~620×560
+- Two entry points: (1) Phone Directory tab inside TelephoneModule, (2) Phone Directory menu item in Telephone dropdown

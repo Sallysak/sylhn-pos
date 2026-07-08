@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, Save, Printer, Mail, Trash2, CreditCard, X, Search,
@@ -13,6 +13,63 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { COMPANY, CURRENCY, formatGHS, type Product, type StockGroup } from "@/lib/pos-data";
 import { PopupWindow } from "@/components/popup-window";
+import { PurchaseListPopup, type PurchaseListRow } from "@/components/purchase-list-popup";
+import { PurchaseOrderListPopup, type PurchaseOrderListRow } from "@/components/purchase-order-list-popup";
+
+// ===== Sample existing purchase transactions (linked to Purchase List) =====
+const existingPurchases: (PurchaseListRow & { items?: { sku: string; name: string; emoji: string; qty: number; cost: number; taxable: boolean }[]; supplier?: string; date?: string })[] = [
+  {
+    id: 'ep1', transactionType: '1-AgriCorp Ghana', invoiceNo: 'PUR-100231', date: '2026-07-01',
+    reference: 'REF-001', amount: 540.00, paid: 540.00, due: 0, supplier: 'AgriCorp Ghana',
+    items: [{ sku: 'FR-001', name: 'Red Apples', emoji: '🍎', qty: 10, cost: 24.00, taxable: false }, { sku: 'FR-002', name: 'Bananas', emoji: '🍌', qty: 20, cost: 11.00, taxable: false }],
+  },
+  {
+    id: 'ep2', transactionType: '2-Global Foods GH', invoiceNo: 'PUR-100232', date: '2026-07-03',
+    reference: 'REF-002', amount: 3200.00, paid: 0, due: 3200.00, supplier: 'Global Foods GH',
+    items: [{ sku: 'GR-001', name: 'Rice 5kg', emoji: '🍚', qty: 40, cost: 72.00, taxable: true }],
+  },
+  {
+    id: 'ep3', transactionType: '3-Fan Milk Ghana', invoiceNo: 'PUR-100233', date: '2026-07-05',
+    reference: 'REF-003', amount: 850.50, paid: 0, due: 850.50, supplier: 'Fan Milk Ghana',
+    items: [{ sku: 'DR-001', name: 'Whole Milk 1L', emoji: '🥛', qty: 65, cost: 13.00, taxable: true }],
+  },
+  {
+    id: 'ep4', transactionType: '4-Darko Farms', invoiceNo: 'PUR-100234', date: '2026-07-06',
+    reference: 'REF-004', amount: 420.00, paid: 0, due: 420.00, supplier: 'Darko Farms',
+    items: [{ sku: 'VEG-001', name: 'Tomatoes', emoji: '🍅', qty: 30, cost: 14.00, taxable: false }],
+  },
+  {
+    id: 'ep5', transactionType: '5-Unilever Ghana', invoiceNo: 'PUR-100235', date: '2026-07-07',
+    reference: 'REF-005', amount: 5680.00, paid: 0, due: 5680.00, supplier: 'Unilever Ghana',
+    items: [{ sku: 'HH-001', name: 'Soap Bar', emoji: '🧼', qty: 100, cost: 56.80, taxable: true }],
+  },
+];
+
+// ===== Sample existing purchase orders (linked to Purchase Order List) =====
+const existingOrders: (PurchaseOrderListRow & { items?: { sku: string; name: string; emoji: string; qty: number; cost: number; taxable: boolean }[]; supplier?: string; date?: string })[] = [
+  {
+    id: 'eo1', transactionType: '1-AgriCorp Ghana', invoiceNo: 'PO-2026-001', date: '2026-07-01',
+    amount: 1250.00, paid: 1250.00, due: 0, status: 'received', supplier: 'AgriCorp Ghana',
+    items: [{ sku: 'FR-001', name: 'Red Apples', emoji: '🍎', qty: 50, cost: 24.00, taxable: false }],
+  },
+  {
+    id: 'eo2', transactionType: '2-Global Foods GH', invoiceNo: 'PO-2026-002', date: '2026-07-03',
+    amount: 3200.00, paid: 0, due: 3200.00, status: 'partial', supplier: 'Global Foods GH',
+    items: [{ sku: 'GR-001', name: 'Rice 5kg', emoji: '🍚', qty: 40, cost: 72.00, taxable: true }],
+  },
+  {
+    id: 'eo3', transactionType: '3-Fan Milk Ghana', invoiceNo: 'PO-2026-003', date: '2026-07-05',
+    amount: 850.50, paid: 0, due: 850.50, status: 'sent', supplier: 'Fan Milk Ghana',
+    items: [{ sku: 'DR-001', name: 'Whole Milk 1L', emoji: '🥛', qty: 100, cost: 13.00, taxable: true }],
+  },
+  {
+    id: 'eo4', transactionType: '4-Darko Farms', invoiceNo: 'PO-2026-004', date: '2026-07-06',
+    amount: 420.00, paid: 0, due: 420.00, status: 'draft', supplier: 'Darko Farms',
+    items: [{ sku: 'VEG-001', name: 'Tomatoes', emoji: '🍅', qty: 30, cost: 14.00, taxable: false }],
+  },
+];
+
+type ListPopupMode = 'none' | 'purchase-list' | 'order-list';
 
 interface PurchaseLine {
   id: string;
@@ -39,6 +96,7 @@ const GREEN_DARK = '#388E3C';
 export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFormProps) {
   const { toast } = useToast();
   const [invoiceNo, setInvoiceNo] = useState(`PUR-${Date.now().toString().slice(-6)}`);
+  const [docType, setDocType] = useState("Purchase");
   const [supplier, setSupplier] = useState("");
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [refNo, setRefNo] = useState("");
@@ -53,6 +111,7 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
   const [onHand, setOnHand] = useState(0);
   const [bin, setBin] = useState("");
   const [showStockList, setShowStockList] = useState(false);
+  const [listPopupMode, setListPopupMode] = useState<ListPopupMode>('none');
   const [paidAmount, setPaidAmount] = useState(0);
   const [saved, setSaved] = useState(false);
 
@@ -69,11 +128,91 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
 
   const handleFindPartNo = (value: string) => {
     setFindPartNo(value);
+    // When user types in Find Part No, open the appropriate list popup based on docType:
+    //  - docType = "Order"  -> Purchase Order List
+    //  - docType = "Purchase" or "Quote" -> Purchase List
     if (value.length > 0) {
-      const product = products.find(p => p.barcode === value || p.sku.toLowerCase() === value.toLowerCase());
-      if (product) { setOnHand(product.stock); setBin(product.batchNumber); }
-      setShowStockList(true);
-    } else { setShowStockList(false); setOnHand(0); setBin(""); }
+      // Try to match by invoice / PO number for quick On Hand lookup
+      const source = docType === 'Order' ? existingOrders : existingPurchases;
+      const match = source.find(t => t.invoiceNo.toLowerCase() === value.toLowerCase());
+      if (match) {
+        setOnHand(match.items?.length || 0);
+        setBin(match.invoiceNo);
+      }
+      // Open the correct popup based on docType
+      setListPopupMode(docType === 'Order' ? 'order-list' : 'purchase-list');
+      setShowStockList(false);
+    } else {
+      setListPopupMode('none');
+      setShowStockList(false);
+      setOnHand(0);
+      setBin("");
+    }
+  };
+
+  // ===== Load an existing purchase into the form =====
+  const loadPurchaseIntoForm = (row: PurchaseListRow) => {
+    const found = existingPurchases.find(p => p.id === row.id);
+    if (!found) {
+      toast({ title: 'Purchase not found', variant: 'destructive' });
+      return;
+    }
+    setInvoiceNo(found.invoiceNo);
+    setSupplier(found.supplier || found.transactionType.replace(/^\d+-/, ''));
+    setDate(found.date || new Date().toISOString().split('T')[0]);
+    setRefNo(found.reference || '');
+    setPaidAmount(found.paid);
+    if (found.items && found.items.length > 0) {
+      setLines(found.items.map(it => ({
+        id: `line-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        partNo: it.sku,
+        details: `${it.emoji} ${it.name}`,
+        emoji: it.emoji,
+        quantity: it.qty,
+        cost: it.cost,
+        expiry: '',
+        tax: it.taxable,
+        total: it.qty * it.cost,
+      })));
+    }
+    setFindPartNo('');
+    setListPopupMode('none');
+    setOnHand(0);
+    setBin('');
+    setSaved(false);
+    toast({ title: 'Purchase loaded', description: `${found.invoiceNo} · ${found.items?.length || 0} items` });
+  };
+
+  // ===== Load an existing purchase order into the form =====
+  const loadOrderIntoForm = (row: PurchaseOrderListRow) => {
+    const found = existingOrders.find(o => o.id === row.id);
+    if (!found) {
+      toast({ title: 'Order not found', variant: 'destructive' });
+      return;
+    }
+    setInvoiceNo(found.invoiceNo);
+    setSupplier(found.supplier || found.transactionType.replace(/^\d+-/, ''));
+    setDate(found.date || new Date().toISOString().split('T')[0]);
+    setPaidAmount(found.paid);
+    if (found.items && found.items.length > 0) {
+      setLines(found.items.map(it => ({
+        id: `line-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        partNo: it.sku,
+        details: `${it.emoji} ${it.name}`,
+        emoji: it.emoji,
+        quantity: it.qty,
+        cost: it.cost,
+        expiry: '',
+        tax: it.taxable,
+        total: it.qty * it.cost,
+      })));
+    }
+    setFindPartNo('');
+    setListPopupMode('none');
+    setOnHand(0);
+    setBin('');
+    setSaved(false);
+    toast({ title: 'Purchase order loaded', description: `${found.invoiceNo} · ${found.items?.length || 0} items` });
   };
 
   const addProductToLine = (product: Product) => {
@@ -200,6 +339,32 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
     toast({ title: "Payment recorded (F5)", description: `Paid ${formatGHS(totals.grandTotal)} · Due ${formatGHS(0)}` });
   };
 
+  // ===== Keyboard shortcuts: F2/F3/F4/F5/F7/Esc =====
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      // Skip if user is typing in an input/textarea/select — except for F-keys and Esc
+      const target = e.target as HTMLElement;
+      const isTyping = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT');
+
+      if (e.key === 'F7') {
+        e.preventDefault();
+        setListPopupMode(prev => prev !== 'none' ? 'none' : (docType === 'Order' ? 'order-list' : 'purchase-list'));
+        return;
+      }
+      if (e.key === 'F2') { e.preventDefault(); handleSave(); return; }
+      if (e.key === 'F3') { e.preventDefault(); handlePrint(); return; }
+      if (e.key === 'F4') { e.preventDefault(); handleDelete(); return; }
+      if (e.key === 'F5') { e.preventDefault(); handlePayment(); return; }
+      if (e.key === 'Escape' && listPopupMode !== 'none' && !isTyping) {
+        e.preventDefault();
+        setListPopupMode('none');
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [docType, lines, supplier, invoiceNo, listPopupMode, paidAmount, taxInclusive, totals]);
+
   return (
     <div className="h-screen flex flex-col bg-slate-100">
       <PopupWindow
@@ -215,17 +380,37 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
           {/* Green Header Bar */}
           <div className="flex-shrink-0 flex items-center justify-between px-3 py-1.5 text-white" style={{ backgroundColor: GREEN_DARK }}>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold">Purchase</span>
+              <select value={docType} onChange={(e) => setDocType(e.target.value)} className="bg-white/15 border border-white/20 rounded px-1.5 py-0.5 text-[10px] text-white font-bold outline-none">
+                <option value="Purchase">Purchase</option>
+                <option value="Quote">Quote</option>
+                <option value="Order">Order</option>
+              </select>
               <Badge variant="secondary" className="bg-white/25 text-white text-[9px]">{invoiceNo}</Badge>
               {saved && <Badge variant="secondary" className="bg-green-200 text-green-800 text-[9px]">✓ Saved</Badge>}
             </div>
             <div className="flex items-center gap-2 text-[10px]">
-              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="bg-white/15 border border-white/20 rounded px-1 py-0.5 text-[9px] text-white outline-none" />
-              <input value={refNo} onChange={(e) => setRefNo(e.target.value)} placeholder="Ref" className="w-16 bg-white/15 border border-white/20 rounded px-1 py-0.5 text-[9px] text-white placeholder:text-white/60 outline-none" />
-              <select value={terms} onChange={(e) => setTerms(e.target.value)} className="bg-white/15 border border-white/20 rounded px-1 py-0.5 text-[9px] text-white outline-none">
-                <option value="Net 15">Net 15</option><option value="Net 30">Net 30</option><option value="Net 60">Net 60</option><option value="COD">COD</option><option value="Prepaid">Prepaid</option>
-              </select>
-              <input value={salesperson} onChange={(e) => setSalesperson(e.target.value)} className="w-20 bg-white/15 border border-white/20 rounded px-1 py-0.5 text-[9px] text-white outline-none" />
+              <div className="flex items-center gap-1">
+                <span className="text-white/70 text-[9px]">Date:</span>
+                <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="bg-white/15 border border-white/20 rounded px-1 py-0.5 text-[9px] text-white outline-none" />
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-white/70 text-[9px]">Ref:</span>
+                <input value={refNo} onChange={(e) => setRefNo(e.target.value)} placeholder="Ref No." className="w-16 bg-white/15 border border-white/20 rounded px-1 py-0.5 text-[9px] text-white placeholder:text-white/60 outline-none" />
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-white/70 text-[9px]">Terms:</span>
+                <select value={terms} onChange={(e) => setTerms(e.target.value)} className="bg-white/15 border border-white/20 rounded px-1 py-0.5 text-[9px] text-white outline-none">
+                  <option value="Net 15">Net 15</option><option value="Net 30">Net 30</option><option value="Net 60">Net 60</option><option value="COD">COD</option><option value="Prepaid">Prepaid</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-white/70 text-[9px]">Salesperson:</span>
+                <select value={salesperson} onChange={(e) => setSalesperson(e.target.value)} className="bg-white/15 border border-white/20 rounded px-1 py-0.5 text-[9px] text-white outline-none">
+                  <option value="Sarah Johnson">Sarah Johnson</option>
+                  <option value="Mike Mensah">Mike Mensah</option>
+                  <option value="Grace Owusu">Grace Owusu</option>
+                </select>
+              </div>
             </div>
           </div>
 
@@ -300,23 +485,54 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
           </div>
 
           {/* Bottom: Find Part No + Totals */}
-          <div className="flex-shrink-0 px-3 py-1.5 bg-slate-50 border-t border-slate-300 flex items-center gap-3">
+          <div className="flex-shrink-0 px-3 py-1.5 bg-slate-50 border-t border-slate-300 flex items-center gap-2 flex-wrap">
             <div className="flex items-center gap-1.5">
-              <div><label className="text-[8px] font-bold text-slate-600 block">Find Part no</label>
-                <input ref={findPartNoRef} value={findPartNo} onChange={(e) => handleFindPartNo(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') { const p = products.find(p => p.barcode === findPartNo || p.sku.toLowerCase() === findPartNo.toLowerCase()); if (p) addProductToLine(p); } if (e.key === 'Escape') setShowStockList(false); }}
-                  onFocus={() => { if (findPartNo) setShowStockList(true); }}
-                  placeholder="Type..." className="w-24 h-5 px-1.5 text-[9px] font-mono border border-slate-400 rounded outline-none focus:ring-1 focus:ring-green-400" style={{ backgroundColor: '#FFFFCC' }} />
+              <div>
+                <label className="text-[8px] font-bold text-slate-600 block">
+                  Find Part no <span className="text-[7px] font-normal text-blue-600">({docType === 'Order' ? 'Purchase Order List' : 'Purchases List'})</span>
+                </label>
+                <div className="flex items-center gap-0.5">
+                  <input ref={findPartNoRef} value={findPartNo} onChange={(e) => handleFindPartNo(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        // Open the appropriate list popup based on docType
+                        setListPopupMode(docType === 'Order' ? 'order-list' : 'purchase-list');
+                      }
+                      if (e.key === 'Escape') { setListPopupMode('none'); setShowStockList(false); }
+                    }}
+                    onFocus={() => {
+                      // Show the appropriate list based on docType when input is focused
+                      if (findPartNo) {
+                        setListPopupMode(docType === 'Order' ? 'order-list' : 'purchase-list');
+                      }
+                    }}
+                    placeholder="Type / Enter..."
+                    className="w-24 h-5 px-1.5 text-[9px] font-mono border border-slate-400 rounded outline-none focus:ring-1 focus:ring-green-400"
+                    style={{ backgroundColor: '#FFFFCC' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setListPopupMode(docType === 'Order' ? 'order-list' : 'purchase-list')}
+                    className="h-5 px-1.5 rounded text-white text-[8px] font-bold flex items-center gap-0.5 transition"
+                    style={{ backgroundColor: '#2196F3' }}
+                    title={`Open ${docType === 'Order' ? 'Purchase Order List' : 'Purchases List'} (F7)`}
+                  >
+                    <Search className="h-2.5 w-2.5" /> F7
+                  </button>
+                </div>
               </div>
-              <div><label className="text-[8px] font-bold text-slate-600 block">On Hand</label><input value={onHand} readOnly className="w-14 h-5 px-1 text-[9px] font-mono border border-slate-300 rounded bg-slate-100 outline-none text-center" /></div>
-              <div><label className="text-[8px] font-bold text-slate-600 block">Bin</label><input value={bin} readOnly className="w-20 h-5 px-1 text-[9px] font-mono border border-slate-300 rounded bg-slate-100 outline-none" /></div>
+              <div><label className="text-[8px] font-bold text-slate-600 block">On Hand</label><input value={onHand} readOnly className="w-12 h-5 px-1 text-[9px] font-mono border border-slate-300 rounded bg-slate-100 outline-none text-center" /></div>
+              <div><label className="text-[8px] font-bold text-slate-600 block">Bin</label><input value={bin} readOnly className="w-16 h-5 px-1 text-[9px] font-mono border border-slate-300 rounded bg-slate-100 outline-none" /></div>
             </div>
-            <div className="flex-1 flex items-center justify-end gap-2">
+            <div className="flex-1 flex items-center justify-end gap-1.5 flex-wrap">
               <div className="text-right"><label className="text-[8px] font-bold text-slate-600 block">Total Qty</label><input value={totals.totalQty} readOnly className="w-12 h-5 px-1 text-[9px] font-mono border border-slate-300 rounded bg-white outline-none text-center" /></div>
-              <div className="text-right"><label className="text-[8px] font-bold text-slate-600 block">TAX GHC</label><input value={totals.taxAmount.toFixed(2)} readOnly className="w-16 h-5 px-1 text-[9px] font-mono border border-slate-300 rounded bg-white outline-none text-right" /></div>
-              <div className="text-right"><label className="text-[8px] font-bold text-slate-600 block">Total GHC</label><input value={totals.grandTotal.toFixed(2)} readOnly className="w-20 h-5 px-1 text-[9px] font-mono font-bold border border-slate-400 rounded outline-none text-right" style={{ backgroundColor: '#E6F0FF' }} /></div>
-              <div className="text-right"><label className="text-[8px] font-bold text-slate-600 block">Paid GHC</label><input type="number" value={paidAmount || ''} onChange={(e) => setPaidAmount(parseFloat(e.target.value) || 0)} className="w-20 h-5 px-1 text-[9px] font-mono border border-slate-400 rounded bg-white outline-none text-right" placeholder="0.00" /></div>
-              <div className="text-right"><label className="text-[8px] font-bold text-slate-600 block">Due GHC</label><input value={totals.due.toFixed(2)} readOnly className={cn("w-20 h-5 px-1 text-[9px] font-mono font-bold border border-slate-400 rounded outline-none text-right", totals.due > 0 ? "text-rose-600" : "text-emerald-600")} style={{ backgroundColor: '#FFF8E1' }} /></div>
+              <div className="text-right"><label className="text-[8px] font-bold text-slate-600 block">TAX GHC</label><input value={totals.taxAmount.toFixed(2)} readOnly className="w-14 h-5 px-1 text-[9px] font-mono border border-slate-300 rounded bg-white outline-none text-right" /></div>
+              <div className="text-right"><label className="text-[8px] font-bold text-slate-600 block">Retail %</label><input type="number" placeholder="0" className="w-10 h-5 px-1 text-[9px] font-mono border border-slate-300 rounded bg-white outline-none text-right" /></div>
+              <div className="text-right"><label className="text-[8px] font-bold text-slate-600 block">Total GHC</label><input value={totals.grandTotal.toFixed(2)} readOnly className="w-16 h-5 px-1 text-[9px] font-mono font-bold border border-slate-400 rounded outline-none text-right" style={{ backgroundColor: '#E6F0FF' }} /></div>
+              <div className="text-right"><label className="text-[8px] font-bold text-slate-600 block">Trade %</label><input type="number" placeholder="0" className="w-10 h-5 px-1 text-[9px] font-mono border border-slate-300 rounded bg-white outline-none text-right" /></div>
+              <div className="text-right"><label className="text-[8px] font-bold text-slate-600 block">Paid GHC</label><input type="number" value={paidAmount || ''} onChange={(e) => setPaidAmount(parseFloat(e.target.value) || 0)} className="w-16 h-5 px-1 text-[9px] font-mono border border-slate-400 rounded bg-white outline-none text-right" placeholder="0.00" /></div>
+              <div className="text-right"><label className="text-[8px] font-bold text-slate-600 block">WSale %</label><input type="number" placeholder="0" className="w-10 h-5 px-1 text-[9px] font-mono border border-slate-300 rounded bg-white outline-none text-right" /></div>
+              <div className="text-right"><label className="text-[8px] font-bold text-slate-600 block">Due GHC</label><input value={totals.due.toFixed(2)} readOnly className={cn("w-16 h-5 px-1 text-[9px] font-mono font-bold border border-slate-400 rounded outline-none text-right", totals.due > 0 ? "text-rose-600" : "text-emerald-600")} style={{ backgroundColor: '#FFF8E1' }} /></div>
             </div>
           </div>
 
@@ -342,10 +558,34 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
           </div>
         </div>
 
-        {/* Stock List Popup */}
+        {/* Stock List Popup (legacy, kept for fallback) */}
         <AnimatePresence>
           {showStockList && (
             <StockListMiniPopup products={products} searchText={findPartNo} onSelect={addProductToLine} onClose={() => setShowStockList(false)} />
+          )}
+        </AnimatePresence>
+
+        {/* ===== Purchase List Popup (when docType = Purchase/Quote) ===== */}
+        <AnimatePresence>
+          {listPopupMode === 'purchase-list' && (
+            <PurchaseListPopup
+              transactions={existingPurchases}
+              onSelect={loadPurchaseIntoForm}
+              onClose={() => setListPopupMode('none')}
+              title="Purchases List"
+            />
+          )}
+        </AnimatePresence>
+
+        {/* ===== Purchase Order List Popup (when docType = Order) ===== */}
+        <AnimatePresence>
+          {listPopupMode === 'order-list' && (
+            <PurchaseOrderListPopup
+              orders={existingOrders}
+              onSelect={loadOrderIntoForm}
+              onClose={() => setListPopupMode('none')}
+              title="Purchase Order List"
+            />
           )}
         </AnimatePresence>
       </PopupWindow>

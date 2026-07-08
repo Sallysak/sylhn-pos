@@ -1,0 +1,463 @@
+     1→"use client";
+     2→
+     3→import { useState, useMemo, useRef, useEffect } from "react";
+     4→import { motion, AnimatePresence } from "framer-motion";
+     5→import {
+     6→  ArrowLeft, Save, Printer, Mail, Trash2, CreditCard, X, Search,
+     7→  Plus, Check, Package, Calendar, User, Hash,
+     8→} from "lucide-react";
+     9→import { Button } from "@/components/ui/button";
+    10→import { Badge } from "@/components/ui/badge";
+    11→import { ScrollArea } from "@/components/ui/scroll-area";
+    12→import { useToast } from "@/hooks/use-toast";
+    13→import { cn } from "@/lib/utils";
+    14→import { COMPANY, CURRENCY, formatGHS, type Product, type StockGroup } from "@/lib/pos-data";
+    15→import { PopupWindow } from "@/components/popup-window";
+    16→
+    17→interface PurchaseLine {
+    18→  id: string;
+    19→  partNo: string;
+    20→  details: string;
+    21→  emoji: string;
+    22→  quantity: number;
+    23→  cost: number;
+    24→  expiry: string;
+    25→  tax: boolean;
+    26→  total: number;
+    27→}
+    28→
+    29→interface PurchaseFormProps {
+    30→  onBack: () => void;
+    31→  products: Product[];
+    32→  groups: StockGroup[];
+    33→  suppliers: { id: string; name: string }[];
+    34→}
+    35→
+    36→const GREEN = '#4CAF50';
+    37→const GREEN_DARK = '#388E3C';
+    38→
+    39→export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFormProps) {
+    40→  const { toast } = useToast();
+    41→  const [invoiceNo, setInvoiceNo] = useState(`PUR-${Date.now().toString().slice(-6)}`);
+    42→  const [docType, setDocType] = useState("Purchase");
+    43→  const [supplier, setSupplier] = useState("");
+    44→  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+    45→  const [refNo, setRefNo] = useState("");
+    46→  const [terms, setTerms] = useState("Net 30");
+    47→  const [salesperson, setSalesperson] = useState("Sarah Johnson");
+    48→  const [taxInclusive, setTaxInclusive] = useState(true);
+    49→  const [balance, setBalance] = useState(0);
+    50→  const [limit, setLimit] = useState(0);
+    51→  const [lines, setLines] = useState<PurchaseLine[]>([]);
+    52→  const [selectedLine, setSelectedLine] = useState<number | null>(null);
+    53→  const [findPartNo, setFindPartNo] = useState("");
+    54→  const [onHand, setOnHand] = useState(0);
+    55→  const [bin, setBin] = useState("");
+    56→  const [showStockList, setShowStockList] = useState(false);
+    57→  const [paidAmount, setPaidAmount] = useState(0);
+    58→  const [saved, setSaved] = useState(false);
+    59→
+    60→  const findPartNoRef = useRef<HTMLInputElement>(null);
+    61→
+    62→  const totals = useMemo(() => {
+    63→    const totalQty = lines.reduce((s, l) => s + l.quantity, 0);
+    64→    const totalCost = lines.reduce((s, l) => s + l.total, 0);
+    65→    const taxAmount = lines.filter(l => l.tax).reduce((s, l) => s + l.total * 0.15, 0);
+    66→    const grandTotal = taxInclusive ? totalCost : totalCost + taxAmount;
+    67→    const due = grandTotal - paidAmount;
+    68→    return { totalQty, totalCost, taxAmount, grandTotal, due };
+    69→  }, [lines, taxInclusive, paidAmount]);
+    70→
+    71→  const handleFindPartNo = (value: string) => {
+    72→    setFindPartNo(value);
+    73→    if (value.length > 0) {
+    74→      const product = products.find(p => p.barcode === value || p.sku.toLowerCase() === value.toLowerCase());
+    75→      if (product) { setOnHand(product.stock); setBin(product.batchNumber); }
+    76→      setShowStockList(true);
+    77→    } else { setShowStockList(false); setOnHand(0); setBin(""); }
+    78→  };
+    79→
+    80→  const addProductToLine = (product: Product) => {
+    81→    const existingIdx = lines.findIndex(l => l.partNo === product.sku);
+    82→    if (existingIdx >= 0) {
+    83→      setLines(prev => prev.map((l, i) => i === existingIdx ? { ...l, quantity: l.quantity + 1, total: (l.quantity + 1) * l.cost } : l));
+    84→      toast({ title: "Quantity updated", description: `${product.emoji} ${product.name} qty +1` });
+    85→    } else {
+    86→      setLines(prev => [...prev, { id: `line-${Date.now()}`, partNo: product.sku, details: `${product.emoji} ${product.name}`, emoji: product.emoji, quantity: 1, cost: product.costPrice, expiry: product.expiryDate, tax: product.taxable, total: product.costPrice }]);
+    87→      toast({ title: "Product added", description: `${product.emoji} ${product.name}` });
+    88→    }
+    89→    setFindPartNo(""); setShowStockList(false); setOnHand(0); setBin(""); setSaved(false);
+    90→  };
+    91→
+    92→  const updateLine = (idx: number, field: keyof PurchaseLine, value: any) => {
+    93→    setLines(prev => prev.map((l, i) => {
+    94→      if (i !== idx) return l;
+    95→      const updated = { ...l, [field]: value };
+    96→      if (field === 'quantity' || field === 'cost') updated.total = updated.quantity * updated.cost;
+    97→      return updated;
+    98→    }));
+    99→    setSaved(false);
+   100→  };
+   101→
+   102→  const removeLine = (idx: number) => {
+   103→    setLines(prev => prev.filter((_, i) => i !== idx));
+   104→    setSelectedLine(null);
+   105→    setSaved(false);
+   106→    toast({ title: "Line removed" });
+   107→  };
+   108→
+   109→  // ===== Working Action Handlers =====
+   110→  const handleSave = () => {
+   111→    if (lines.length === 0) { toast({ title: "No items to save", variant: "destructive" }); return; }
+   112→    if (!supplier) { toast({ title: "Select a supplier first", variant: "destructive" }); return; }
+   113→    setSaved(true);
+   114→    toast({ title: "Purchase saved (F2)", description: `${invoiceNo} · ${lines.length} items · ${formatGHS(totals.grandTotal)}` });
+   115→  };
+   116→
+   117→  const handlePrint = () => {
+   118→    if (lines.length === 0) { toast({ title: "Nothing to print", variant: "destructive" }); return; }
+   119→    // Open a print window with only the report content
+   120→    const printWin = window.open('', '_blank', 'width=800,height=600');
+   121→    if (!printWin) { toast({ title: "Popup blocked", description: "Allow popups to print", variant: "destructive" }); return; }
+   122→
+   123→    const rows = lines.map((l, i) => `
+   124→      <tr style="background:${i % 2 === 1 ? '#F8F8F8' : '#FFFFFF'}">
+   125→        <td style="border:1px solid #999;padding:3px 6px;text-align:center">${i + 1}</td>
+   126→        <td style="border:1px solid #999;padding:3px 6px;font-family:monospace">${l.partNo}</td>
+   127→        <td style="border:1px solid #999;padding:3px 6px">${l.details}</td>
+   128→        <td style="border:1px solid #999;padding:3px 6px;text-align:right">${l.quantity}</td>
+   129→        <td style="border:1px solid #999;padding:3px 6px;text-align:right">${l.cost.toFixed(2)}</td>
+   130→        <td style="border:1px solid #999;padding:3px 6px;text-align:center">${l.expiry}</td>
+   131→        <td style="border:1px solid #999;padding:3px 6px;text-align:center">${l.tax ? '✓' : ''}</td>
+   132→        <td style="border:1px solid #999;padding:3px 6px;text-align:right;font-weight:bold">${l.total.toFixed(2)}</td>
+   133→      </tr>`).join('');
+   134→
+   135→    printWin.document.write(`<!DOCTYPE html><html><head><title>Purchase Order ${invoiceNo}</title>
+   136→      <style>
+   137→        body { font-family: Arial, Helvetica, sans-serif; margin: 20px; }
+   138→        .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 15px; }
+   139→        .header h1 { margin: 0; font-size: 18px; }
+   140→        .header div { font-size: 12px; color: #666; }
+   141→        .info { display: flex; justify-content: space-between; margin-bottom: 15px; font-size: 11px; }
+   142→        .info div { margin-right: 20px; }
+   143→        table { width: 100%; border-collapse: collapse; font-size: 11px; }
+   144→        th { background: #E0E0E0; border: 1px solid #999; padding: 4px 6px; font-weight: bold; text-align: left; }
+   145→        .totals { margin-top: 15px; margin-left: auto; width: 300px; font-size: 11px; }
+   146→        .totals td { padding: 3px 8px; }
+   147→        .totals .total-row { font-weight: bold; border-top: 2px solid #333; }
+   148→        @media print { body { margin: 10px; } }
+   149→      </style></head><body>
+   150→      <div class="header">
+   151→        <h1>${COMPANY.name}</h1>
+   152→        <div>Accra Warehouse · ${COMPANY.address} · ${COMPANY.contact}</div>
+   153→      </div>
+   154→      <h2 style="text-align:center;font-size:14px;margin:10px 0">Purchase Order</h2>
+   155→      <div class="info">
+   156→        <div><strong>Invoice:</strong> ${invoiceNo}</div>
+   157→        <div><strong>Supplier:</strong> ${supplier || 'N/A'}</div>
+   158→        <div><strong>Date:</strong> ${date}</div>
+   159→        <div><strong>Terms:</strong> ${terms}</div>
+   160→        <div><strong>Salesperson:</strong> ${salesperson}</div>
+   161→      </div>
+   162→      <table>
+   163→        <thead><tr>
+   164→          <th style="width:30px">#</th><th>Part Number</th><th>Details</th>
+   165→          <th style="text-align:right">Qty</th><th style="text-align:right">Cost GHC</th>
+   166→          <th style="text-align:center">Expiry</th><th style="text-align:center">TAX</th>
+   167→          <th style="text-align:right">Total GHC</th>
+   168→        </tr></thead>
+   169→        <tbody>${rows}</tbody>
+   170→      </table>
+   171→      <table class="totals">
+   172→        <tr><td>Total Qty:</td><td style="text-align:right">${totals.totalQty}</td></tr>
+   173→        <tr><td>TAX GHC:</td><td style="text-align:right">${totals.taxAmount.toFixed(2)}</td></tr>
+   174→        <tr class="total-row"><td>Total GHC:</td><td style="text-align:right">${totals.grandTotal.toFixed(2)}</td></tr>
+   175→        <tr><td>Paid GHC:</td><td style="text-align:right">${paidAmount.toFixed(2)}</td></tr>
+   176→        <tr class="total-row"><td>Due GHC:</td><td style="text-align:right;color:${totals.due > 0 ? '#D32F2F' : '#388E3C'}">${totals.due.toFixed(2)}</td></tr>
+   177→      </table>
+   178→      </body></html>`);
+   179→    printWin.document.close();
+   180→    setTimeout(() => { printWin.focus(); printWin.print(); }, 300);
+   181→    toast({ title: "Printing (F3)", description: `${lines.length} items` });
+   182→  };
+   183→
+   184→  const handleEmail = () => {
+   185→    if (!supplier) { toast({ title: "Select a supplier first", variant: "destructive" }); return; }
+   186→    if (lines.length === 0) { toast({ title: "No items to email", variant: "destructive" }); return; }
+   187→    toast({ title: "Email sent ✓", description: `Purchase order ${invoiceNo} emailed to ${supplier}` });
+   188→  };
+   189→
+   190→  const handleDelete = () => {
+   191→    if (lines.length === 0) { toast({ title: "Nothing to delete" }); return; }
+   192→    setLines([]); setSelectedLine(null); setPaidAmount(0); setSaved(false);
+   193→    toast({ title: "Purchase deleted (F4)", description: "All lines cleared" });
+   194→  };
+   195→
+   196→  const handlePayment = () => {
+   197→    if (lines.length === 0) { toast({ title: "No items", variant: "destructive" }); return; }
+   198→    const due = totals.due;
+   199→    if (due <= 0) { toast({ title: "Fully paid", description: "No balance due" }); return; }
+   200→    setPaidAmount(totals.grandTotal);
+   201→    toast({ title: "Payment recorded (F5)", description: `Paid ${formatGHS(totals.grandTotal)} · Due ${formatGHS(0)}` });
+   202→  };
+   203→
+   204→  return (
+   205→    <div className="h-screen flex flex-col bg-slate-100">
+   206→      <PopupWindow
+   207→        title="Purchase"
+   208→        titleBarColor={GREEN_DARK}
+   209→        initialWidth={920}
+   210→        initialHeight={650}
+   211→        minWidth={700}
+   212→        minHeight={500}
+   213→        onClose={onBack}
+   214→      >
+   215→        <div className="h-full flex flex-col bg-white" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
+   216→          {/* Green Header Bar */}
+   217→          <div className="flex-shrink-0 flex items-center justify-between px-3 py-1.5 text-white" style={{ backgroundColor: GREEN_DARK }}>
+   218→            <div className="flex items-center gap-2">
+   219→              <select value={docType} onChange={(e) => setDocType(e.target.value)} className="bg-white/15 border border-white/20 rounded px-1.5 py-0.5 text-[10px] text-white font-bold outline-none">
+   220→                <option value="Purchase">Purchase</option>
+   221→                <option value="Quote">Quote</option>
+   222→                <option value="Order">Order</option>
+   223→              </select>
+   224→              <Badge variant="secondary" className="bg-white/25 text-white text-[9px]">{invoiceNo}</Badge>
+   225→              {saved && <Badge variant="secondary" className="bg-green-200 text-green-800 text-[9px]">✓ Saved</Badge>}
+   226→            </div>
+   227→            <div className="flex items-center gap-2 text-[10px]">
+   228→              <div className="flex items-center gap-1">
+   229→                <span className="text-white/70 text-[9px]">Date:</span>
+   230→                <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="bg-white/15 border border-white/20 rounded px-1 py-0.5 text-[9px] text-white outline-none" />
+   231→              </div>
+   232→              <div className="flex items-center gap-1">
+   233→                <span className="text-white/70 text-[9px]">Ref:</span>
+   234→                <input value={refNo} onChange={(e) => setRefNo(e.target.value)} placeholder="Ref No." className="w-16 bg-white/15 border border-white/20 rounded px-1 py-0.5 text-[9px] text-white placeholder:text-white/60 outline-none" />
+   235→              </div>
+   236→              <div className="flex items-center gap-1">
+   237→                <span className="text-white/70 text-[9px]">Terms:</span>
+   238→                <select value={terms} onChange={(e) => setTerms(e.target.value)} className="bg-white/15 border border-white/20 rounded px-1 py-0.5 text-[9px] text-white outline-none">
+   239→                  <option value="Net 15">Net 15</option><option value="Net 30">Net 30</option><option value="Net 60">Net 60</option><option value="COD">COD</option><option value="Prepaid">Prepaid</option>
+   240→                </select>
+   241→              </div>
+   242→              <div className="flex items-center gap-1">
+   243→                <span className="text-white/70 text-[9px]">Salesperson:</span>
+   244→                <select value={salesperson} onChange={(e) => setSalesperson(e.target.value)} className="bg-white/15 border border-white/20 rounded px-1 py-0.5 text-[9px] text-white outline-none">
+   245→                  <option value="Sarah Johnson">Sarah Johnson</option>
+   246→                  <option value="Mike Mensah">Mike Mensah</option>
+   247→                  <option value="Grace Owusu">Grace Owusu</option>
+   248→                </select>
+   249→              </div>
+   250→            </div>
+   251→          </div>
+   252→
+   253→          {/* Supplier Bar */}
+   254→          <div className="flex-shrink-0 px-3 py-1.5 bg-slate-50 border-b border-slate-300 flex items-center gap-3">
+   255→            <div className="flex items-center gap-1.5">
+   256→              <label className="text-[10px] font-bold text-slate-700">Supplier:</label>
+   257→              <select value={supplier} onChange={(e) => { setSupplier(e.target.value); setSaved(false); }} className="h-6 px-1.5 text-[10px] border border-slate-400 rounded bg-white outline-none focus:ring-1 focus:ring-green-400 min-w-[140px]">
+   258→                <option value="">Select supplier...</option>
+   259→                {suppliers.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+   260→              </select>
+   261→            </div>
+   262→            <div className="flex items-center gap-1.5">
+   263→              <span className="text-[10px] font-bold text-slate-700">Invoice:</span>
+   264→              <input value={invoiceNo} onChange={(e) => setInvoiceNo(e.target.value)} className="h-6 w-24 px-1.5 text-[10px] font-mono border border-slate-400 rounded bg-white outline-none" />
+   265→            </div>
+   266→          </div>
+   267→
+   268→          {/* Order + Delivery Panels */}
+   269→          <div className="flex-shrink-0 px-3 py-1.5 flex items-start gap-3 border-b border-slate-200">
+   270→            <div className="flex-1 border border-slate-300 rounded p-1.5">
+   271→              <div className="text-[9px] font-bold text-slate-700 mb-0.5">Order Details</div>
+   272→              <textarea placeholder="Order notes..." rows={1} className="w-full text-[9px] border border-slate-200 rounded px-1.5 py-0.5 outline-none focus:ring-1 focus:ring-green-400 resize-none" />
+   273→              <label className="flex items-center gap-1 mt-0.5 text-[9px] text-slate-700 cursor-pointer">
+   274→                <input type="checkbox" checked={taxInclusive} onChange={(e) => setTaxInclusive(e.target.checked)} className="h-2.5 w-2.5 accent-green-600" /> Tax Inclusive
+   275→              </label>
+   276→            </div>
+   277→            <div className="flex-1 border border-slate-300 rounded p-1.5">
+   278→              <div className="text-[9px] font-bold text-slate-700 mb-0.5">Delivery Details</div>
+   279→              <div className="grid grid-cols-3 gap-1.5">
+   280→                <div><label className="text-[8px] text-slate-500 font-semibold">Balance</label><input type="number" value={balance.toFixed(2)} readOnly className="w-full h-5 px-1 text-[9px] font-mono border border-slate-200 rounded bg-slate-50 outline-none" /></div>
+   281→                <div><label className="text-[8px] text-slate-500 font-semibold">Limit</label><input type="number" value={limit.toFixed(2)} readOnly className="w-full h-5 px-1 text-[9px] font-mono border border-slate-200 rounded bg-slate-50 outline-none" /></div>
+   282→                <div><label className="text-[8px] text-slate-500 font-semibold">Available</label><input type="number" value={(limit - balance).toFixed(2)} readOnly className="w-full h-5 px-1 text-[9px] font-mono border border-slate-200 rounded bg-slate-50 outline-none" /></div>
+   283→              </div>
+   284→            </div>
+   285→          </div>
+   286→
+   287→          {/* Data Grid */}
+   288→          <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+   289→            <div className="flex-shrink-0 grid grid-cols-[25px_100px_1fr_55px_70px_80px_30px_80px] gap-1 px-2 py-1 text-[9px] font-bold text-slate-700 border-b border-slate-400" style={{ backgroundColor: '#E0E0E0' }}>
+   290→              <div className="text-center">#</div><div>Part Number</div><div>Details</div><div className="text-right">Qty</div><div className="text-right">Cost GHC</div><div className="text-center">Expiry</div><div className="text-center">TAX</div><div className="text-right">Total GHC</div>
+   291→            </div>
+   292→            <ScrollArea className="flex-1 min-h-0">
+   293→              <div>
+   294→                {lines.length === 0 ? (
+   295→                  <div className="flex flex-col items-center justify-center py-8 text-slate-400">
+   296→                    <Package className="h-8 w-8 mb-1 opacity-40" />
+   297→                    <div className="text-[10px] font-medium">No items added yet</div>
+   298→                    <div className="text-[9px] mt-0.5">Type a Part No. below to search</div>
+   299→                  </div>
+   300→                ) : (
+   301→                  lines.map((line, idx) => {
+   302→                    const isSelected = selectedLine === idx;
+   303→                    return (
+   304→                      <div key={line.id} onClick={() => setSelectedLine(idx)}
+   305→                        className="grid grid-cols-[25px_100px_1fr_55px_70px_80px_30px_80px] gap-1 px-2 py-0.5 text-[9px] cursor-pointer border-b border-slate-100"
+   306→                        style={{ backgroundColor: isSelected ? '#E6F0FF' : (idx % 2 === 1 ? '#F8F8F8' : '#FFFFFF') }}>
+   307→                        <div className="text-center text-slate-500">{idx + 1}</div>
+   308→                        <div className="font-mono truncate">{line.partNo}</div>
+   309→                        <div className="truncate">{line.details}</div>
+   310→                        <div className="text-right"><input type="number" value={line.quantity} onClick={(e) => e.stopPropagation()} onChange={(e) => updateLine(idx, 'quantity', parseFloat(e.target.value) || 0)} className="w-full text-right font-mono bg-transparent border-b border-transparent hover:border-slate-300 focus:border-green-400 outline-none" /></div>
+   311→                        <div className="text-right"><input type="number" step="0.01" value={line.cost} onClick={(e) => e.stopPropagation()} onChange={(e) => updateLine(idx, 'cost', parseFloat(e.target.value) || 0)} className="w-full text-right font-mono bg-transparent border-b border-transparent hover:border-slate-300 focus:border-green-400 outline-none" /></div>
+   312→                        <div className="text-center text-slate-600">{line.expiry}</div>
+   313→                        <div className="text-center"><input type="checkbox" checked={line.tax} onClick={(e) => e.stopPropagation()} onChange={(e) => updateLine(idx, 'tax', e.target.checked)} className="h-2.5 w-2.5 accent-green-600" /></div>
+   314→                        <div className="text-right font-mono font-semibold">{line.total.toFixed(2)}</div>
+   315→                      </div>
+   316→                    );
+   317→                  })
+   318→                )}
+   319→              </div>
+   320→            </ScrollArea>
+   321→          </div>
+   322→
+   323→          {/* Bottom: Find Part No + Totals */}
+   324→          <div className="flex-shrink-0 px-3 py-1.5 bg-slate-50 border-t border-slate-300 flex items-center gap-2 flex-wrap">
+   325→            <div className="flex items-center gap-1.5">
+   326→              <div><label className="text-[8px] font-bold text-slate-600 block">Find Part no</label>
+   327→                <input ref={findPartNoRef} value={findPartNo} onChange={(e) => handleFindPartNo(e.target.value)}
+   328→                  onKeyDown={(e) => { if (e.key === 'Enter') { const p = products.find(p => p.barcode === findPartNo || p.sku.toLowerCase() === findPartNo.toLowerCase()); if (p) addProductToLine(p); } if (e.key === 'Escape') setShowStockList(false); }}
+   329→                  onFocus={() => { if (findPartNo) setShowStockList(true); }}
+   330→                  placeholder="Type..." className="w-24 h-5 px-1.5 text-[9px] font-mono border border-slate-400 rounded outline-none focus:ring-1 focus:ring-green-400" style={{ backgroundColor: '#FFFFCC' }} />
+   331→              </div>
+   332→              <div><label className="text-[8px] font-bold text-slate-600 block">On Hand</label><input value={onHand} readOnly className="w-12 h-5 px-1 text-[9px] font-mono border border-slate-300 rounded bg-slate-100 outline-none text-center" /></div>
+   333→              <div><label className="text-[8px] font-bold text-slate-600 block">Bin</label><input value={bin} readOnly className="w-16 h-5 px-1 text-[9px] font-mono border border-slate-300 rounded bg-slate-100 outline-none" /></div>
+   334→            </div>
+   335→            <div className="flex-1 flex items-center justify-end gap-1.5 flex-wrap">
+   336→              <div className="text-right"><label className="text-[8px] font-bold text-slate-600 block">Total Qty</label><input value={totals.totalQty} readOnly className="w-12 h-5 px-1 text-[9px] font-mono border border-slate-300 rounded bg-white outline-none text-center" /></div>
+   337→              <div className="text-right"><label className="text-[8px] font-bold text-slate-600 block">TAX GHC</label><input value={totals.taxAmount.toFixed(2)} readOnly className="w-14 h-5 px-1 text-[9px] font-mono border border-slate-300 rounded bg-white outline-none text-right" /></div>
+   338→              <div className="text-right"><label className="text-[8px] font-bold text-slate-600 block">Retail %</label><input type="number" placeholder="0" className="w-10 h-5 px-1 text-[9px] font-mono border border-slate-300 rounded bg-white outline-none text-right" /></div>
+   339→              <div className="text-right"><label className="text-[8px] font-bold text-slate-600 block">Total GHC</label><input value={totals.grandTotal.toFixed(2)} readOnly className="w-16 h-5 px-1 text-[9px] font-mono font-bold border border-slate-400 rounded outline-none text-right" style={{ backgroundColor: '#E6F0FF' }} /></div>
+   340→              <div className="text-right"><label className="text-[8px] font-bold text-slate-600 block">Trade %</label><input type="number" placeholder="0" className="w-10 h-5 px-1 text-[9px] font-mono border border-slate-300 rounded bg-white outline-none text-right" /></div>
+   341→              <div className="text-right"><label className="text-[8px] font-bold text-slate-600 block">Paid GHC</label><input type="number" value={paidAmount || ''} onChange={(e) => setPaidAmount(parseFloat(e.target.value) || 0)} className="w-16 h-5 px-1 text-[9px] font-mono border border-slate-400 rounded bg-white outline-none text-right" placeholder="0.00" /></div>
+   342→              <div className="text-right"><label className="text-[8px] font-bold text-slate-600 block">WSale %</label><input type="number" placeholder="0" className="w-10 h-5 px-1 text-[9px] font-mono border border-slate-300 rounded bg-white outline-none text-right" /></div>
+   343→              <div className="text-right"><label className="text-[8px] font-bold text-slate-600 block">Due GHC</label><input value={totals.due.toFixed(2)} readOnly className={cn("w-16 h-5 px-1 text-[9px] font-mono font-bold border border-slate-400 rounded outline-none text-right", totals.due > 0 ? "text-rose-600" : "text-emerald-600")} style={{ backgroundColor: '#FFF8E1' }} /></div>
+   344→            </div>
+   345→          </div>
+   346→
+   347→          {/* Action Buttons */}
+   348→          <div className="flex-shrink-0 px-3 py-1.5 flex items-center gap-1.5 border-t border-slate-300" style={{ backgroundColor: '#F0F0F0' }}>
+   349→            <button onClick={handleSave} className="h-7 px-3 rounded text-white text-[9px] font-semibold flex items-center gap-1 transition shadow-sm" style={{ backgroundColor: GREEN }}> <Save className="h-3 w-3" /> Save <kbd className="text-[7px] bg-white/20 px-0.5 rounded">F2</kbd></button>
+   350→            <button onClick={handlePrint} className="h-7 px-3 rounded text-white text-[9px] font-semibold flex items-center gap-1 transition shadow-sm" style={{ backgroundColor: GREEN }}> <Printer className="h-3 w-3" /> Print <kbd className="text-[7px] bg-white/20 px-0.5 rounded">F3</kbd></button>
+   351→            <button onClick={handleEmail} className="h-7 px-3 rounded text-white text-[9px] font-semibold flex items-center gap-1 transition shadow-sm" style={{ backgroundColor: GREEN }}> <Mail className="h-3 w-3" /> Email</button>
+   352→            <button onClick={handleDelete} className="h-7 px-3 rounded text-white text-[9px] font-semibold flex items-center gap-1 transition shadow-sm" style={{ backgroundColor: GREEN }}> <Trash2 className="h-3 w-3" /> Delete <kbd className="text-[7px] bg-white/20 px-0.5 rounded">F4</kbd></button>
+   353→            <button onClick={handlePayment} className="h-7 px-3 rounded text-white text-[9px] font-semibold flex items-center gap-1 transition shadow-sm" style={{ backgroundColor: GREEN }}> <CreditCard className="h-3 w-3" /> Payment <kbd className="text-[7px] bg-white/20 px-0.5 rounded">F5</kbd></button>
+   354→            <div className="flex-1" />
+   355→            {selectedLine !== null && <button onClick={() => removeLine(selectedLine)} className="h-7 px-2 rounded bg-rose-100 hover:bg-rose-200 text-rose-700 text-[9px] font-semibold flex items-center gap-1 transition"><Trash2 className="h-3 w-3" /> Remove Line</button>}
+   356→          </div>
+   357→
+   358→          {/* Status Bar */}
+   359→          <div className="flex-shrink-0 px-3 py-0.5 text-[8px] text-white flex items-center gap-3" style={{ backgroundColor: '#808080' }}>
+   360→            <span><kbd className="bg-white/20 px-0.5 rounded mr-0.5">F7</kbd>Purchases List</span>
+   361→            <span><kbd className="bg-white/20 px-0.5 rounded mr-0.5">F9</kbd>Part No.</span>
+   362→            <span><kbd className="bg-white/20 px-0.5 rounded mr-0.5">F10</kbd>Details</span>
+   363→            <span><kbd className="bg-white/20 px-0.5 rounded mr-0.5">Shift+F12</kbd>Print Labels</span>
+   364→            <div className="flex-1" />
+   365→            <span>{lines.length} items · {formatGHS(totals.grandTotal)}</span>
+   366→          </div>
+   367→        </div>
+   368→
+   369→        {/* Stock List Popup */}
+   370→        <AnimatePresence>
+   371→          {showStockList && (
+   372→            <StockListMiniPopup products={products} searchText={findPartNo} onSelect={addProductToLine} onClose={() => setShowStockList(false)} />
+   373→          )}
+   374→        </AnimatePresence>
+   375→      </PopupWindow>
+   376→    </div>
+   377→  );
+   378→}
+   379→
+   380→// ===== Mini Stock List Popup =====
+   381→function StockListMiniPopup({ products, searchText, onSelect, onClose }: {
+   382→  products: Product[]; searchText: string; onSelect: (product: Product) => void; onClose: () => void;
+   383→}) {
+   384→  const { toast } = useToast();
+   385→  const [query, setQuery] = useState(searchText);
+   386→  const [selectedIndex, setSelectedIndex] = useState(0);
+   387→  const inputRef = useRef<HTMLInputElement>(null);
+   388→
+   389→  useEffect(() => {
+   390→    const t = setTimeout(() => inputRef.current?.focus(), 50);
+   391→    return () => clearTimeout(t);
+   392→  }, []);
+   393→
+   394→  const filtered = useMemo(() => {
+   395→    const q = (query || searchText).toLowerCase().trim();
+   396→    if (!q) return products;
+   397→    return products.filter(p => p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q) || p.barcode.includes(q));
+   398→  }, [products, query, searchText]);
+   399→
+   400→  const handleSelect = () => { if (filtered[selectedIndex]) onSelect(filtered[selectedIndex]); };
+   401→
+   402→  return (
+   403→    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+   404→      className="fixed inset-0 bg-black/40 flex items-start justify-center pt-20 z-50" onClick={onClose}>
+   405→      <motion.div initial={{ scale: 0.95, y: -20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: -20 }}
+   406→        transition={{ type: "spring", damping: 25, stiffness: 300 }} onClick={(e) => e.stopPropagation()}
+   407→        className="bg-white rounded-lg shadow-2xl overflow-hidden flex flex-col" style={{ width: '650px', maxHeight: '400px', fontFamily: 'Arial, Helvetica, sans-serif' }}>
+   408→        <div className="flex-shrink-0 flex items-center justify-between px-3 h-7 text-white" style={{ backgroundColor: '#5B9BD5' }}>
+   409→          <span className="text-xs font-bold">Stock List</span>
+   410→          <button onClick={onClose} className="h-5 w-5 rounded hover:bg-white/25 flex items-center justify-center transition"><X className="h-3.5 w-3.5" /></button>
+   411→        </div>
+   412→        <div className="flex-shrink-0 px-3 py-1.5 bg-white border-b border-slate-300 flex items-center gap-2">
+   413→          <label className="text-[10px] font-bold text-slate-700">Search:</label>
+   414→          <input ref={inputRef} value={query} onChange={(e) => { setQuery(e.target.value); setSelectedIndex(0); }}
+   415→            onKeyDown={(e) => { if (e.key === 'Enter') handleSelect(); if (e.key === 'Escape') onClose(); if (e.key === 'ArrowDown') { e.preventDefault(); setSelectedIndex(i => Math.min(filtered.length - 1, i + 1)); } if (e.key === 'ArrowUp') { e.preventDefault(); setSelectedIndex(i => Math.max(0, i - 1)); } }}
+   416→            placeholder="Type to search..." className="flex-1 h-7 px-2 text-xs border border-slate-400 rounded outline-none focus:ring-2 focus:ring-blue-400" />
+   417→          <button onClick={() => setSelectedIndex(0)} className="h-7 px-3 rounded border border-slate-400 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold">Search</button>
+   418→        </div>
+   419→        <div className="flex-shrink-0 px-3 py-1 bg-slate-50 border-b border-slate-200 flex items-center gap-2">
+   420→          <label className="text-[10px] font-bold text-slate-700">Filter By:</label>
+   421→          <select className="h-6 px-1 text-[10px] border border-slate-300 rounded bg-white outline-none"><option>All Groups</option><option>Groceries</option><option>Confectionery</option><option>Soft Drinks</option><option>Hard Liquor</option><option>Households</option></select>
+   422→          <span className="text-[10px] text-slate-500 ml-auto font-mono">{filtered.length} of {products.length}</span>
+   423→        </div>
+   424→        <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+   425→          <div className="flex-shrink-0 grid grid-cols-[120px_1fr_45px_80px_80px_80px] gap-1 px-2 py-1 text-[10px] font-bold text-white" style={{ backgroundColor: '#4A90E2' }}>
+   426→            <div>Part No</div><div>Item Details</div><div className="text-right">Qty</div><div className="text-right">Retail GHC</div><div className="text-right">Trade GHC</div><div className="text-right">Cost GHC</div>
+   427→          </div>
+   428→          <ScrollArea className="flex-1 min-h-0">
+   429→            <div>
+   430→              {filtered.length === 0 ? <div className="text-center py-6 text-slate-400 text-xs">No products found</div> : (
+   431→                filtered.map((p, idx) => {
+   432→                  const isSelected = idx === selectedIndex;
+   433→                  return (
+   434→                    <div key={p.id} onClick={() => setSelectedIndex(idx)} onDoubleClick={() => onSelect(p)}
+   435→                      className="grid grid-cols-[120px_1fr_45px_80px_80px_80px] gap-1 px-2 py-1 text-[10px] cursor-pointer border-b border-slate-100"
+   436→                      style={{ backgroundColor: isSelected ? '#D6E8FF' : (idx % 2 === 1 ? '#F8F8F8' : '#FFFFFF') }}>
+   437→                      <div className="font-mono truncate">{p.barcode}</div><div className="truncate">{p.emoji} {p.name}</div>
+   438→                      <div className="text-right font-mono">{p.stock}</div><div className="text-right font-mono">{p.price.toFixed(2)}</div>
+   439→                      <div className="text-right font-mono">{p.costPrice.toFixed(2)}</div><div className="text-right font-mono">{p.costPrice.toFixed(2)}</div>
+   440→                    </div>
+   441→                  );
+   442→                })
+   443→              )}
+   444→            </div>
+   445→          </ScrollArea>
+   446→        </div>
+   447→        <div className="flex-shrink-0 px-3 py-1.5 flex items-center gap-1.5 border-t border-slate-300" style={{ backgroundColor: '#E0F0E8' }}>
+   448→          <button onClick={handleSelect} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1" style={{ backgroundColor: '#4CAF50' }}><Check className="h-3 w-3" /> Select (Enter)</button>
+   449→          <button onClick={() => toast({ title: "New Product", description: "Use Stock File to add new products" })} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1" style={{ backgroundColor: '#2196F3' }}><Plus className="h-3 w-3" /> New</button>
+   450→          <button onClick={() => { if (!filtered[selectedIndex]) { toast({ title: "Select a product first", variant: "destructive" }); return; } toast({ title: "Product Picture", description: `${filtered[selectedIndex].emoji} ${filtered[selectedIndex].name}` }); }} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1" style={{ backgroundColor: '#9E9E9E' }}><Package className="h-3 w-3" /> Picture</button>
+   451→          <button onClick={() => { if (!filtered[selectedIndex]) { toast({ title: "Select a product first", variant: "destructive" }); return; } toast({ title: "Product History", description: `${filtered[selectedIndex].name} (${filtered[selectedIndex].sku})` }); }} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1" style={{ backgroundColor: '#FF9800' }}><Search className="h-3 w-3" /> History</button>
+   452→          <button onClick={() => { if (!filtered[selectedIndex]) { toast({ title: "Select a product first", variant: "destructive" }); return; } toast({ title: "Printing (F3)", description: `Printing label for ${filtered[selectedIndex].name}` }); }} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1" style={{ backgroundColor: '#9C27B0' }}><Printer className="h-3 w-3" /> Print (F3)</button>
+   453→          <div className="flex-1" />
+   454→          <button onClick={onClose} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1" style={{ backgroundColor: '#F44336' }}><X className="h-3 w-3" /> Close (Esc)</button>
+   455→        </div>
+   456→        <div className="flex-shrink-0 px-3 py-0.5 text-[9px] text-slate-600 flex items-center gap-3" style={{ backgroundColor: '#E0E0E0' }}>
+   457→          <span className="font-mono">{filtered.length} of {products.length}</span><span>Source: Main Store</span>
+   458→        </div>
+   459→      </motion.div>
+   460→    </motion.div>
+   461→  );
+   462→}
+   463→

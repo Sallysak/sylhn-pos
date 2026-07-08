@@ -1,0 +1,1263 @@
+     1→"use client";
+     2→
+     3→import { useState } from "react";
+     4→import { motion, AnimatePresence } from "framer-motion";
+     5→import {
+     6→  ArrowLeft, Package, Truck, Users, History, DollarSign, Plus, X, Save,
+     7→  Archive, ShoppingCart, CheckCircle2, Clock, Phone, MapPin, Search,
+     8→  TrendingUp, Filter, ChevronRight, Edit2, Trash2, Eye,
+     9→  FileBarChart2, Calendar, Printer, Download, FileText,
+    10→} from "lucide-react";
+    11→import { Button } from "@/components/ui/button";
+    12→import { Badge } from "@/components/ui/badge";
+    13→import { ScrollArea } from "@/components/ui/scroll-area";
+    14→import { useToast } from "@/hooks/use-toast";
+    15→import { cn } from "@/lib/utils";
+    16→import { COMPANY, CURRENCY, formatGHS, type Product } from "@/lib/pos-data";
+    17→
+    18→type PurchaseTab = "orders" | "receive" | "suppliers" | "history" | "payments" | "report";
+    19→
+    20→interface PurchaseTransaction {
+    21→  id: string;
+    22→  date: string; // ISO date (YYYY-MM-DD)
+    23→  qty: number;
+    24→  tax: number;
+    25→  amount: number;
+    26→  paid: number;
+    27→  due: number;
+    28→  supplier: string;
+    29→  invoiceNo: string;
+    30→}
+    31→
+    32→// Sample purchase transactions spanning Jan-Mar 2026
+    33→const initialTransactions: PurchaseTransaction[] = [
+    34→  { id: "t1", date: "2026-01-02", qty: 1, tax: 0, amount: 540.00, paid: 540.00, due: 0, supplier: "AgriCorp Ghana", invoiceNo: "INV-001" },
+    35→  { id: "t2", date: "2026-01-06", qty: 1, tax: 0, amount: 2436.00, paid: 2436.00, due: 0, supplier: "Global Foods GH", invoiceNo: "INV-002" },
+    36→  { id: "t3", date: "2026-01-08", qty: 3, tax: 0, amount: 17415.00, paid: 16965.00, due: 450.00, supplier: "Fan Milk Ghana", invoiceNo: "INV-003" },
+    37→  { id: "t4", date: "2026-01-09", qty: 1, tax: 0, amount: 210.00, paid: 0, due: 210.00, supplier: "Darko Farms", invoiceNo: "INV-004" },
+    38→  { id: "t5", date: "2026-01-12", qty: 2, tax: 0, amount: 1988.60, paid: 420.00, due: 1568.60, supplier: "Global Foods GH", invoiceNo: "INV-005" },
+    39→  { id: "t6", date: "2026-01-13", qty: 1, tax: 0, amount: 100.00, paid: 0, due: 100.00, supplier: "AgriCorp Ghana", invoiceNo: "INV-006" },
+    40→  { id: "t7", date: "2026-01-14", qty: 1, tax: 0, amount: 24500.00, paid: 24500.00, due: 0, supplier: "Unilever Ghana", invoiceNo: "INV-007" },
+    41→  { id: "t8", date: "2026-01-19", qty: 1, tax: 0, amount: 2300.00, paid: 0, due: 2300.00, supplier: "Global Foods GH", invoiceNo: "INV-008" },
+    42→  { id: "t9", date: "2026-01-20", qty: 3, tax: 0, amount: 642.40, paid: 0, due: 642.40, supplier: "Darko Farms", invoiceNo: "INV-009" },
+    43→  { id: "t10", date: "2026-01-22", qty: 2, tax: 0, amount: 3295.80, paid: 0, due: 3295.80, supplier: "AgriCorp Ghana", invoiceNo: "INV-010" },
+    44→  { id: "t11", date: "2026-01-27", qty: 5, tax: 0, amount: 12519.10, paid: 11723.10, due: 796.00, supplier: "Fan Milk Ghana", invoiceNo: "INV-011" },
+    45→  { id: "t12", date: "2026-01-28", qty: 2, tax: 275.68, amount: 1654.08, paid: 1555.20, due: 98.88, supplier: "Global Foods GH", invoiceNo: "INV-012" },
+    46→  { id: "t13", date: "2026-01-29", qty: 1, tax: 340.32, amount: 2041.92, paid: 0, due: 2041.92, supplier: "Unilever Ghana", invoiceNo: "INV-013" },
+    47→  { id: "t14", date: "2026-01-30", qty: 2, tax: 0, amount: 2598.00, paid: 1128.00, due: 1470.00, supplier: "AgriCorp Ghana", invoiceNo: "INV-014" },
+    48→  { id: "t15", date: "2026-02-02", qty: 1, tax: 0, amount: 100.00, paid: 0, due: 100.00, supplier: "Darko Farms", invoiceNo: "INV-015" },
+    49→  { id: "t16", date: "2026-02-03", qty: 2, tax: 0, amount: 1710.00, paid: 0, due: 1710.00, supplier: "Global Foods GH", invoiceNo: "INV-016" },
+    50→  { id: "t17", date: "2026-02-09", qty: 2, tax: 773.15, amount: 4638.90, paid: 240.00, due: 4398.90, supplier: "Fan Milk Ghana", invoiceNo: "INV-017" },
+    51→  { id: "t18", date: "2026-02-10", qty: 1, tax: 0, amount: 2268.00, paid: 0, due: 2268.00, supplier: "Unilever Ghana", invoiceNo: "INV-018" },
+    52→  { id: "t19", date: "2026-02-11", qty: 1, tax: 0, amount: 3470.00, paid: 3470.00, due: 0, supplier: "Global Foods GH", invoiceNo: "INV-019" },
+    53→  { id: "t20", date: "2026-02-16", qty: 3, tax: 29.00, amount: 531.00, paid: 0, due: 531.00, supplier: "AgriCorp Ghana", invoiceNo: "INV-020" },
+    54→  { id: "t21", date: "2026-02-23", qty: 2, tax: 654.81, amount: 4028.86, paid: 3928.86, due: 100.00, supplier: "Darko Farms", invoiceNo: "INV-021" },
+    55→  { id: "t22", date: "2026-02-24", qty: 1, tax: 0, amount: 11520.00, paid: 0, due: 11520.00, supplier: "Unilever Ghana", invoiceNo: "INV-022" },
+    56→  { id: "t23", date: "2026-02-25", qty: 3, tax: 555.83, amount: 4015.00, paid: 0, due: 4015.00, supplier: "Global Foods GH", invoiceNo: "INV-023" },
+    57→  { id: "t24", date: "2026-02-26", qty: 1, tax: 32.00, amount: 192.00, paid: 0, due: 192.00, supplier: "Fan Milk Ghana", invoiceNo: "INV-024" },
+    58→  { id: "t25", date: "2026-02-27", qty: 3, tax: 139.17, amount: 1075.00, paid: 0, due: 1075.00, supplier: "AgriCorp Ghana", invoiceNo: "INV-025" },
+    59→  { id: "t26", date: "2026-02-28", qty: 2, tax: 92.43, amount: 654.58, paid: 0, due: 654.58, supplier: "Darko Farms", invoiceNo: "INV-026" },
+    60→  { id: "t27", date: "2026-03-02", qty: 1, tax: 382.10, amount: 2292.60, paid: 0, due: 2292.60, supplier: "Global Foods GH", invoiceNo: "INV-027" },
+    61→  { id: "t28", date: "2026-03-04", qty: 3, tax: 0, amount: 17956.84, paid: 15736.84, due: 2220.00, supplier: "Unilever Ghana", invoiceNo: "INV-028" },
+    62→  { id: "t29", date: "2026-03-05", qty: 1, tax: 86.80, amount: 520.80, paid: 0, due: 520.80, supplier: "Fan Milk Ghana", invoiceNo: "INV-029" },
+    63→  { id: "t30", date: "2026-03-07", qty: 1, tax: 0, amount: 240.00, paid: 0, due: 240.00, supplier: "AgriCorp Ghana", invoiceNo: "INV-030" },
+    64→  { id: "t31", date: "2026-03-10", qty: 1, tax: 0, amount: 100.00, paid: 0, due: 100.00, supplier: "Global Foods GH", invoiceNo: "INV-031" },
+    65→];
+    66→
+    67→interface PurchaseOrder {
+    68→  id: string;
+    69→  poNumber: string;
+    70→  supplier: string;
+    71→  date: string;
+    72→  expectedDate: string;
+    73→  status: "draft" | "sent" | "partial" | "received" | "cancelled";
+    74→  items: { productId: string; name: string; qty: number; cost: number; received: number }[];
+    75→  total: number;
+    76→}
+    77→
+    78→interface Supplier {
+    79→  id: string;
+    80→  name: string;
+    81→  contact: string;
+    82→  email: string;
+    83→  address: string;
+    84→  balance: number;
+    85→  productsSupplied: number;
+    86→}
+    87→
+    88→const initialSuppliers: Supplier[] = [
+    89→  { id: "s1", name: "AgriCorp Ghana", contact: "+233 24 111 2222", email: "sales@agricorp.gh", address: "Kumasi, Ashanti Region", balance: 1250.00, productsSupplied: 8 },
+    90→  { id: "s2", name: "Fan Milk Ghana", contact: "+233 24 333 4444", email: "orders@fanmilk.gh", address: "Tema, Greater Accra", balance: 850.50, productsSupplied: 4 },
+    91→  { id: "s3", name: "Darko Farms", contact: "+233 24 555 6666", email: "info@darkofarms.gh", address: "Dodowa, Eastern Region", balance: 0, productsSupplied: 3 },
+    92→  { id: "s4", name: "Global Foods GH", contact: "+233 24 777 8888", email: "sales@globalfoods.gh", address: "Tema Industrial Area, Accra", balance: 3200.00, productsSupplied: 15 },
+    93→  { id: "s5", name: "Unilever Ghana", contact: "+233 24 999 0000", email: "orders@unilever.gh", address: "Spintex Road, Accra", balance: 1800.75, productsSupplied: 6 },
+    94→];
+    95→
+    96→const initialOrders: PurchaseOrder[] = [
+    97→  {
+    98→    id: "po1", poNumber: "PO-2026-001", supplier: "AgriCorp Ghana", date: "2026-07-01", expectedDate: "2026-07-08",
+    99→    status: "received", total: 1250.00,
+   100→    items: [
+   101→      { productId: "p1", name: "Red Apples", qty: 50, cost: 24.00, received: 50 },
+   102→      { productId: "p2", name: "Bananas", qty: 30, cost: 11.00, received: 30 },
+   103→    ],
+   104→  },
+   105→  {
+   106→    id: "po2", poNumber: "PO-2026-002", supplier: "Global Foods GH", date: "2026-07-03", expectedDate: "2026-07-10",
+   107→    status: "partial", total: 3200.00,
+   108→    items: [
+   109→      { productId: "p73", name: "Rice 5kg", qty: 40, cost: 72.00, received: 40 },
+   110→      { productId: "p74", name: "Pasta 500g", qty: 100, cost: 11.00, received: 50 },
+   111→    ],
+   112→  },
+   113→  {
+   114→    id: "po3", poNumber: "PO-2026-003", supplier: "Fan Milk Ghana", date: "2026-07-05", expectedDate: "2026-07-07",
+   115→    status: "sent", total: 850.50,
+   116→    items: [
+   117→      { productId: "p25", name: "Whole Milk 1L", qty: 100, cost: 13.00, received: 0 },
+   118→    ],
+   119→  },
+   120→];
+   121→
+   122→interface PurchaseProps {
+   123→  onBack: () => void;
+   124→  products: Product[];
+   125→}
+   126→
+   127→export function PurchaseModule({ onBack, products }: PurchaseProps) {
+   128→  const [tab, setTab] = useState<PurchaseTab>("orders");
+   129→  const [suppliers, setSuppliers] = useState<Supplier[]>(initialSuppliers);
+   130→  const [orders, setOrders] = useState<PurchaseOrder[]>(initialOrders);
+   131→  const [transactions] = useState<PurchaseTransaction[]>(initialTransactions);
+   132→  const [showNewOrder, setShowNewOrder] = useState(false);
+   133→  const [showNewSupplier, setShowNewSupplier] = useState(false);
+   134→  const [viewOrder, setViewOrder] = useState<PurchaseOrder | null>(null);
+   135→
+   136→  const tabs = [
+   137→    { id: "orders" as const, label: "Purchase Orders", icon: Archive },
+   138→    { id: "receive" as const, label: "Receive Stock", icon: Package },
+   139→    { id: "suppliers" as const, label: "Suppliers", icon: Users },
+   140→    { id: "history" as const, label: "Purchase History", icon: History },
+   141→    { id: "payments" as const, label: "Supplier Payments", icon: DollarSign },
+   142→    { id: "report" as const, label: "Purchase Report", icon: FileBarChart2 },
+   143→  ];
+   144→
+   145→  return (
+   146→    <div className="h-screen flex flex-col bg-gradient-to-br from-slate-50 to-amber-50/30">
+   147→      {/* Header */}
+   148→      <header className="flex-shrink-0 bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 text-white shadow-lg">
+   149→        <div className="flex items-center justify-between px-6 py-3">
+   150→          <div className="flex items-center gap-4">
+   151→            <button onClick={onBack} className="h-9 w-9 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center transition">
+   152→              <ArrowLeft className="h-4 w-4" />
+   153→            </button>
+   154→            <div className="flex items-center gap-2.5">
+   155→              <div className="h-9 w-9 rounded-xl bg-white/15 backdrop-blur flex items-center justify-center ring-1 ring-white/20">
+   156→                <Truck className="h-5 w-5" />
+   157→              </div>
+   158→              <div>
+   159→                <div className="font-bold text-base leading-tight">Purchase Management</div>
+   160→                <div className="text-[10px] text-amber-100/90">{COMPANY.name}</div>
+   161→              </div>
+   162→            </div>
+   163→          </div>
+   164→          <div className="text-right">
+   165→            <div className="text-xs text-amber-100/80">{COMPANY.address}</div>
+   166→            <div className="text-xs font-mono text-amber-100">{COMPANY.contact}</div>
+   167→          </div>
+   168→        </div>
+   169→      </header>
+   170→
+   171→      {/* Sub Navigation */}
+   172→      <nav className="flex-shrink-0 bg-white border-b border-slate-200 shadow-sm">
+   173→        <div className="flex items-center gap-1 px-6 py-2">
+   174→          {tabs.map(t => (
+   175→            <button
+   176→              key={t.id}
+   177→              onClick={() => setTab(t.id)}
+   178→              className={cn(
+   179→                "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all",
+   180→                tab === t.id ? "bg-gradient-to-r from-amber-600 to-orange-600 text-white shadow-md" : "text-slate-600 hover:bg-slate-100"
+   181→              )}
+   182→            >
+   183→              <t.icon className="h-4 w-4" />
+   184→              {t.label}
+   185→            </button>
+   186→          ))}
+   187→        </div>
+   188→      </nav>
+   189→
+   190→      {/* Content */}
+   191→      <main className="flex-1 overflow-hidden p-6">
+   192→        <AnimatePresence mode="wait">
+   193→          <motion.div
+   194→            key={tab}
+   195→            initial={{ opacity: 0, y: 10 }}
+   196→            animate={{ opacity: 1, y: 0 }}
+   197→            exit={{ opacity: 0, y: -10 }}
+   198→            transition={{ duration: 0.2 }}
+   199→            className="h-full"
+   200→          >
+   201→            {tab === "orders" && <PurchaseOrders orders={orders} setOrders={setOrders} suppliers={suppliers} />}
+   202→            {tab === "receive" && <ReceiveStock orders={orders} setOrders={setOrders} products={products} />}
+   203→            {tab === "suppliers" && <Suppliers suppliers={suppliers} setSuppliers={setSuppliers} products={products} />}
+   204→            {tab === "history" && <PurchaseHistory orders={orders} onView={setViewOrder} />}
+   205→            {tab === "payments" && <SupplierPayments suppliers={suppliers} onPay={(id, amount) => {
+   206→              setSuppliers(prev => prev.map(s => s.id === id ? { ...s, balance: Math.max(0, s.balance - amount) } : s));
+   207→            }} />}
+   208→            {tab === "report" && <PurchaseReport transactions={transactions} />}
+   209→          </motion.div>
+   210→        </AnimatePresence>
+   211→      </main>
+   212→
+   213→      {/* Modals would go here - simplified for now */}
+   214→    </div>
+   215→  );
+   216→}
+   217→
+   218→// ===== Purchase Orders Tab =====
+   219→function PurchaseOrders({ orders, setOrders, suppliers }: {
+   220→  orders: PurchaseOrder[];
+   221→  setOrders: React.Dispatch<React.SetStateAction<PurchaseOrder[]>>;
+   222→  suppliers: Supplier[];
+   223→}) {
+   224→  const [searchSupplier, setSearchSupplier] = useState("");
+   225→  const [viewOrder, setViewOrder] = useState<PurchaseOrder | null>(null);
+   226→  const [editOrder, setEditOrder] = useState<PurchaseOrder | null>(null);
+   227→  const [showNewPOForm, setShowNewPOForm] = useState(false);
+   228→  const { toast } = useToast();
+   229→  const statusColors: Record<string, string> = {
+   230→    draft: "bg-slate-100 text-slate-700",
+   231→    sent: "bg-blue-100 text-blue-700",
+   232→    partial: "bg-amber-100 text-amber-700",
+   233→    received: "bg-emerald-100 text-emerald-700",
+   234→    cancelled: "bg-rose-100 text-rose-700",
+   235→  };
+   236→
+   237→  const filtered = orders.filter(o =>
+   238→    o.supplier.toLowerCase().includes(searchSupplier.toLowerCase()) ||
+   239→    o.poNumber.toLowerCase().includes(searchSupplier.toLowerCase())
+   240→  );
+   241→
+   242→  return (
+   243→    <div className="h-full bg-white rounded-2xl shadow-lg ring-1 ring-slate-200/60 overflow-hidden flex flex-col">
+   244→      <div className="flex-shrink-0 flex items-center justify-between px-5 py-3 bg-gradient-to-r from-slate-50 to-white border-b border-slate-200">
+   245→        <div className="flex items-center gap-3">
+   246→          <Archive className="h-5 w-5 text-amber-600" />
+   247→          <h2 className="text-base font-bold text-slate-800">Purchase Orders</h2>
+   248→          <Badge variant="outline" className="font-mono text-xs">{filtered.length} of {orders.length} orders</Badge>
+   249→        </div>
+   250→        <div className="flex items-center gap-2">
+   251→          <div className="relative">
+   252→            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+   253→            <input
+   254→              value={searchSupplier}
+   255→              onChange={(e) => setSearchSupplier(e.target.value)}
+   256→              placeholder="Search supplier or PO..."
+   257→              className="h-9 pl-8 pr-3 rounded-lg bg-slate-100 text-sm outline-none focus:ring-2 focus:ring-amber-400 w-56"
+   258→            />
+   259→          </div>
+   260→          <Button onClick={() => setShowNewPOForm(true)} className="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700">
+   261→            <Plus className="h-4 w-4" /> New PO
+   262→          </Button>
+   263→        </div>
+   264→      </div>
+   265→
+   266→      <ScrollArea className="flex-1">
+   267→        <table className="w-full text-sm">
+   268→          <thead className="sticky top-0 bg-slate-800 text-white text-[11px] uppercase tracking-wide z-10">
+   269→            <tr>
+   270→              <th className="text-left px-4 py-2.5 font-semibold">PO Number</th>
+   271→              <th className="text-left px-3 py-2.5 font-semibold">Supplier</th>
+   272→              <th className="text-left px-3 py-2.5 font-semibold">Date</th>
+   273→              <th className="text-left px-3 py-2.5 font-semibold">Expected</th>
+   274→              <th className="text-center px-3 py-2.5 font-semibold">Items</th>
+   275→              <th className="text-right px-3 py-2.5 font-semibold">Total</th>
+   276→              <th className="text-center px-3 py-2.5 font-semibold">Status</th>
+   277→              <th className="text-center px-3 py-2.5 font-semibold">Actions</th>
+   278→            </tr>
+   279→          </thead>
+   280→          <tbody className="divide-y divide-slate-100">
+   281→            {filtered.length === 0 ? (
+   282→              <tr>
+   283→                <td colSpan={8} className="px-4 py-8 text-center text-slate-400">
+   284→                  {searchSupplier ? `No orders found matching "${searchSupplier}"` : "No purchase orders"}
+   285→                </td>
+   286→              </tr>
+   287→            ) : (
+   288→              filtered.map(o => (
+   289→                <tr key={o.id} className="hover:bg-amber-50/50 transition">
+   290→                  <td className="px-4 py-2.5 font-mono font-semibold text-slate-800">{o.poNumber}</td>
+   291→                  <td className="px-3 py-2.5 text-slate-700">{o.supplier}</td>
+   292→                  <td className="px-3 py-2.5 text-slate-500 text-xs">{o.date}</td>
+   293→                  <td className="px-3 py-2.5 text-slate-500 text-xs">{o.expectedDate}</td>
+   294→                  <td className="px-3 py-2.5 text-center font-mono text-slate-700">{o.items.length}</td>
+   295→                  <td className="px-3 py-2.5 text-right font-mono font-semibold text-slate-800">{formatGHS(o.total)}</td>
+   296→                  <td className="px-3 py-2.5 text-center">
+   297→                    <span className={cn("px-2 py-1 rounded-md text-[10px] font-bold uppercase", statusColors[o.status])}>{o.status}</span>
+   298→                  </td>
+   299→                  <td className="px-3 py-2.5">
+   300→                    <div className="flex items-center justify-center gap-1">
+   301→                      <button onClick={() => setViewOrder(o)} className="h-7 w-7 rounded-md bg-blue-100 text-blue-600 hover:bg-blue-200 flex items-center justify-center transition" title="View">
+   302→                        <Eye className="h-3.5 w-3.5" />
+   303→                      </button>
+   304→                      <button onClick={() => setEditOrder(o)} className="h-7 w-7 rounded-md bg-amber-100 text-amber-600 hover:bg-amber-200 flex items-center justify-center transition" title="Edit">
+   305→                        <Edit2 className="h-3.5 w-3.5" />
+   306→                      </button>
+   307→                    </div>
+   308→                  </td>
+   309→                </tr>
+   310→              ))
+   311→            )}
+   312→          </tbody>
+   313→        </table>
+   314→      </ScrollArea>
+   315→
+   316→      {/* View PO Modal */}
+   317→      <AnimatePresence>
+   318→        {viewOrder && (
+   319→          <POViewModal order={viewOrder} onClose={() => setViewOrder(null)} />
+   320→        )}
+   321→      </AnimatePresence>
+   322→
+   323→      {/* Edit PO Modal */}
+   324→      <AnimatePresence>
+   325→        {editOrder && (
+   326→          <POEditModal order={editOrder} suppliers={suppliers} onClose={() => setEditOrder(null)} onSave={(updated) => {
+   327→            setOrders(prev => prev.map(o => o.id === updated.id ? updated : o));
+   328→            toast({ title: "PO updated", description: updated.poNumber });
+   329→            setEditOrder(null);
+   330→          }} />
+   331→        )}
+   332→      </AnimatePresence>
+   333→
+   334→      {/* New PO Form Modal */}
+   335→      <AnimatePresence>
+   336→        {showNewPOForm && (
+   337→          <POEditModal order={null} suppliers={suppliers} onClose={() => setShowNewPOForm(false)} onSave={(newOrder) => {
+   338→            setOrders(prev => [...prev, newOrder]);
+   339→            toast({ title: "Purchase Order created", description: newOrder.poNumber });
+   340→            setShowNewPOForm(false);
+   341→          }} />
+   342→        )}
+   343→      </AnimatePresence>
+   344→    </div>
+   345→  );
+   346→}
+   347→
+   348→// ===== PO View Modal =====
+   349→function POViewModal({ order, onClose }: { order: PurchaseOrder; onClose: () => void }) {
+   350→  return (
+   351→    <motion.div
+   352→      initial={{ opacity: 0 }}
+   353→      animate={{ opacity: 1 }}
+   354→      exit={{ opacity: 0 }}
+   355→      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+   356→      onClick={onClose}
+   357→    >
+   358→      <motion.div
+   359→        initial={{ scale: 0.95, y: 20 }}
+   360→        animate={{ scale: 1, y: 0 }}
+   361→        exit={{ scale: 0.95, y: 20 }}
+   362→        onClick={(e) => e.stopPropagation()}
+   363→        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col"
+   364→      >
+   365→        <div className="flex-shrink-0 px-5 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex items-center justify-between">
+   366→          <div className="flex items-center gap-2">
+   367→            <Eye className="h-5 w-5" />
+   368→            <h3 className="font-bold">Purchase Order Details</h3>
+   369→          </div>
+   370→          <button onClick={onClose} className="h-8 w-8 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center"><X className="h-4 w-4" /></button>
+   371→        </div>
+   372→        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+   373→          <div className="grid grid-cols-2 gap-3">
+   374→            <div className="bg-slate-50 rounded-lg p-3">
+   375→              <div className="text-[10px] text-slate-500 uppercase font-semibold">PO Number</div>
+   376→              <div className="text-sm font-bold text-slate-800 font-mono">{order.poNumber}</div>
+   377→            </div>
+   378→            <div className="bg-slate-50 rounded-lg p-3">
+   379→              <div className="text-[10px] text-slate-500 uppercase font-semibold">Supplier</div>
+   380→              <div className="text-sm font-bold text-slate-800">{order.supplier}</div>
+   381→            </div>
+   382→            <div className="bg-slate-50 rounded-lg p-3">
+   383→              <div className="text-[10px] text-slate-500 uppercase font-semibold">Order Date</div>
+   384→              <div className="text-sm font-bold text-slate-800">{order.date}</div>
+   385→            </div>
+   386→            <div className="bg-slate-50 rounded-lg p-3">
+   387→              <div className="text-[10px] text-slate-500 uppercase font-semibold">Expected Date</div>
+   388→              <div className="text-sm font-bold text-slate-800">{order.expectedDate}</div>
+   389→            </div>
+   390→            <div className="bg-slate-50 rounded-lg p-3">
+   391→              <div className="text-[10px] text-slate-500 uppercase font-semibold">Status</div>
+   392→              <div className="text-sm font-bold text-slate-800 capitalize">{order.status}</div>
+   393→            </div>
+   394→            <div className="bg-slate-50 rounded-lg p-3">
+   395→              <div className="text-[10px] text-slate-500 uppercase font-semibold">Total Amount</div>
+   396→              <div className="text-sm font-bold text-blue-600 font-mono">{formatGHS(order.total)}</div>
+   397→            </div>
+   398→          </div>
+   399→          <div>
+   400→            <div className="text-xs font-bold text-slate-600 uppercase mb-2">Order Items ({order.items.length})</div>
+   401→            <table className="w-full text-xs">
+   402→              <thead className="bg-slate-100">
+   403→                <tr>
+   404→                  <th className="text-left px-3 py-2 font-semibold text-slate-700">Product</th>
+   405→                  <th className="text-right px-3 py-2 font-semibold text-slate-700">Qty Ordered</th>
+   406→                  <th className="text-right px-3 py-2 font-semibold text-slate-700">Cost</th>
+   407→                  <th className="text-right px-3 py-2 font-semibold text-slate-700">Received</th>
+   408→                  <th className="text-right px-3 py-2 font-semibold text-slate-700">Line Total</th>
+   409→                </tr>
+   410→              </thead>
+   411→              <tbody className="divide-y divide-slate-100">
+   412→                {order.items.map((it, i) => (
+   413→                  <tr key={i} className="hover:bg-slate-50">
+   414→                    <td className="px-3 py-2 text-slate-800">{it.name}</td>
+   415→                    <td className="px-3 py-2 text-right font-mono text-slate-700">{it.qty}</td>
+   416→                    <td className="px-3 py-2 text-right font-mono text-slate-700">{formatGHS(it.cost)}</td>
+   417→                    <td className="px-3 py-2 text-right font-mono text-slate-700">{it.received}</td>
+   418→                    <td className="px-3 py-2 text-right font-mono font-semibold text-slate-800">{formatGHS(it.qty * it.cost)}</td>
+   419→                  </tr>
+   420→                ))}
+   421→              </tbody>
+   422→            </table>
+   423→          </div>
+   424→        </div>
+   425→        <div className="flex-shrink-0 px-5 py-3 border-t border-slate-200 bg-slate-50 flex justify-end">
+   426→          <Button variant="outline" onClick={onClose}>Close</Button>
+   427→        </div>
+   428→      </motion.div>
+   429→    </motion.div>
+   430→  );
+   431→}
+   432→
+   433→// ===== PO Edit/New Modal =====
+   434→function POEditModal({ order, suppliers, onClose, onSave }: {
+   435→  order: PurchaseOrder | null;
+   436→  suppliers: Supplier[];
+   437→  onClose: () => void;
+   438→  onSave: (order: PurchaseOrder) => void;
+   439→}) {
+   440→  const isNew = !order;
+   441→  const [form, setForm] = useState<PurchaseOrder>(order || {
+   442→    id: `po-${Date.now()}`,
+   443→    poNumber: `PO-2026-${String(Math.floor(Math.random() * 9000) + 1000)}`,
+   444→    supplier: "",
+   445→    date: new Date().toISOString().split('T')[0],
+   446→    expectedDate: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
+   447→    status: "draft",
+   448→    items: [],
+   449→    total: 0,
+   450→  });
+   451→  const [newItemName, setNewItemName] = useState("");
+   452→  const [newItemQty, setNewItemQty] = useState(1);
+   453→  const [newItemCost, setNewItemCost] = useState(0);
+   454→
+   455→  const addItem = () => {
+   456→    if (!newItemName || newItemQty <= 0) return;
+   457→    setForm({
+   458→      ...form,
+   459→      items: [...form.items, { productId: `p-${Date.now()}`, name: newItemName, qty: newItemQty, cost: newItemCost, received: 0 }],
+   460→      total: form.total + newItemQty * newItemCost,
+   461→    });
+   462→    setNewItemName(""); setNewItemQty(1); setNewItemCost(0);
+   463→  };
+   464→
+   465→  const removeItem = (i: number) => {
+   466→    const item = form.items[i];
+   467→    setForm({
+   468→      ...form,
+   469→      items: form.items.filter((_, idx) => idx !== i),
+   470→      total: form.total - item.qty * item.cost,
+   471→    });
+   472→  };
+   473→
+   474→  return (
+   475→    <motion.div
+   476→      initial={{ opacity: 0 }}
+   477→      animate={{ opacity: 1 }}
+   478→      exit={{ opacity: 0 }}
+   479→      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+   480→      onClick={onClose}
+   481→    >
+   482→      <motion.div
+   483→        initial={{ scale: 0.95, y: 20 }}
+   484→        animate={{ scale: 1, y: 0 }}
+   485→        exit={{ scale: 0.95, y: 20 }}
+   486→        onClick={(e) => e.stopPropagation()}
+   487→        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col"
+   488→      >
+   489→        <div className="flex-shrink-0 px-5 py-3 bg-gradient-to-r from-amber-600 to-orange-600 text-white flex items-center justify-between">
+   490→          <div className="flex items-center gap-2">
+   491→            {isNew ? <Plus className="h-5 w-5" /> : <Edit2 className="h-5 w-5" />}
+   492→            <h3 className="font-bold">{isNew ? "New Purchase Order" : "Edit Purchase Order"}</h3>
+   493→          </div>
+   494→          <button onClick={onClose} className="h-8 w-8 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center"><X className="h-4 w-4" /></button>
+   495→        </div>
+   496→
+   497→        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+   498→          <div className="grid grid-cols-2 gap-3">
+   499→            <div>
+   500→              <label className="text-xs font-semibold text-slate-600 mb-1 block">PO Number</label>
+   501→              <input value={form.poNumber} onChange={(e) => setForm({ ...form, poNumber: e.target.value })} className="w-full h-10 px-3 rounded-lg border border-slate-200 focus:border-amber-500 outline-none text-sm font-mono" />
+   502→            </div>
+   503→            <div>
+   504→              <label className="text-xs font-semibold text-slate-600 mb-1 block">Supplier</label>
+   505→              <select value={form.supplier} onChange={(e) => setForm({ ...form, supplier: e.target.value })} className="w-full h-10 px-3 rounded-lg border border-slate-200 focus:border-amber-500 outline-none text-sm">
+   506→                <option value="">Select supplier...</option>
+   507→                {suppliers.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+   508→              </select>
+   509→            </div>
+   510→            <div>
+   511→              <label className="text-xs font-semibold text-slate-600 mb-1 block">Order Date</label>
+   512→              <input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} className="w-full h-10 px-3 rounded-lg border border-slate-200 focus:border-amber-500 outline-none text-sm" />
+   513→            </div>
+   514→            <div>
+   515→              <label className="text-xs font-semibold text-slate-600 mb-1 block">Expected Date</label>
+   516→              <input type="date" value={form.expectedDate} onChange={(e) => setForm({ ...form, expectedDate: e.target.value })} className="w-full h-10 px-3 rounded-lg border border-slate-200 focus:border-amber-500 outline-none text-sm" />
+   517→            </div>
+   518→            <div>
+   519→              <label className="text-xs font-semibold text-slate-600 mb-1 block">Status</label>
+   520→              <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as PurchaseOrder["status"] })} className="w-full h-10 px-3 rounded-lg border border-slate-200 focus:border-amber-500 outline-none text-sm">
+   521→                <option value="draft">Draft</option>
+   522→                <option value="sent">Sent</option>
+   523→                <option value="partial">Partial</option>
+   524→                <option value="received">Received</option>
+   525→                <option value="cancelled">Cancelled</option>
+   526→              </select>
+   527→            </div>
+   528→            <div>
+   529→              <label className="text-xs font-semibold text-slate-600 mb-1 block">Total Amount (GHC)</label>
+   530→              <input value={form.total.toFixed(2)} readOnly className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-slate-50 outline-none text-sm font-mono font-bold text-amber-700" />
+   531→            </div>
+   532→          </div>
+   533→
+   534→          {/* Items section */}
+   535→          <div>
+   536→            <label className="text-xs font-bold text-slate-600 uppercase mb-2 block">Order Items</label>
+   537→            <div className="flex items-center gap-2 mb-2 p-2 bg-slate-50 rounded-lg">
+   538→              <input value={newItemName} onChange={(e) => setNewItemName(e.target.value)} placeholder="Product name" className="flex-1 h-9 px-3 rounded-lg border border-slate-200 outline-none text-sm" />
+   539→              <input type="number" value={newItemQty || ""} onChange={(e) => setNewItemQty(parseInt(e.target.value) || 0)} placeholder="Qty" className="w-16 h-9 px-2 rounded-lg border border-slate-200 outline-none text-sm text-center" />
+   540→              <input type="number" value={newItemCost || ""} onChange={(e) => setNewItemCost(parseFloat(e.target.value) || 0)} placeholder="Cost" className="w-24 h-9 px-2 rounded-lg border border-slate-200 outline-none text-sm text-right" />
+   541→              <button onClick={addItem} className="h-9 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1">
+   542→                <Plus className="h-3.5 w-3.5" /> Add
+   543→              </button>
+   544→            </div>
+   545→            <table className="w-full text-xs">
+   546→              <thead className="bg-slate-100">
+   547→                <tr>
+   548→                  <th className="text-left px-3 py-2 font-semibold text-slate-700">Product</th>
+   549→                  <th className="text-right px-3 py-2 font-semibold text-slate-700">Qty</th>
+   550→                  <th className="text-right px-3 py-2 font-semibold text-slate-700">Cost</th>
+   551→                  <th className="text-right px-3 py-2 font-semibold text-slate-700">Total</th>
+   552→                  <th className="px-3 py-2"></th>
+   553→                </tr>
+   554→              </thead>
+   555→              <tbody className="divide-y divide-slate-100">
+   556→                {form.items.length === 0 ? (
+   557→                  <tr><td colSpan={5} className="px-3 py-4 text-center text-slate-400">No items added yet</td></tr>
+   558→                ) : (
+   559→                  form.items.map((it, i) => (
+   560→                    <tr key={i}>
+   561→                      <td className="px-3 py-2 text-slate-800">{it.name}</td>
+   562→                      <td className="px-3 py-2 text-right font-mono text-slate-700">{it.qty}</td>
+   563→                      <td className="px-3 py-2 text-right font-mono text-slate-700">{formatGHS(it.cost)}</td>
+   564→                      <td className="px-3 py-2 text-right font-mono font-semibold text-slate-800">{formatGHS(it.qty * it.cost)}</td>
+   565→                      <td className="px-3 py-2 text-center">
+   566→                        <button onClick={() => removeItem(i)} className="h-6 w-6 rounded bg-rose-100 text-rose-600 hover:bg-rose-200 flex items-center justify-center mx-auto">
+   567→                          <Trash2 className="h-3 w-3" />
+   568→                        </button>
+   569→                      </td>
+   570→                    </tr>
+   571→                  ))
+   572→                )}
+   573→              </tbody>
+   574→            </table>
+   575→          </div>
+   576→        </div>
+   577→
+   578→        <div className="flex-shrink-0 px-5 py-3 border-t border-slate-200 bg-slate-50 flex justify-end gap-2">
+   579→          <Button variant="outline" onClick={onClose}>Cancel</Button>
+   580→          <button
+   581→            onClick={() => onSave(form)}
+   582→            disabled={!form.supplier}
+   583→            className="h-10 px-5 rounded-lg bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white font-semibold text-sm transition disabled:opacity-50"
+   584→          >
+   585→            <Save className="h-4 w-4 inline mr-1" />
+   586→            {isNew ? "Create PO" : "Save Changes"}
+   587→          </button>
+   588→        </div>
+   589→      </motion.div>
+   590→    </motion.div>
+   591→  );
+   592→}
+   593→
+   594→// ===== Receive Stock Tab =====
+   595→function ReceiveStock({ orders, setOrders, products }: {
+   596→  orders: PurchaseOrder[];
+   597→  setOrders: React.Dispatch<React.SetStateAction<PurchaseOrder[]>>;
+   598→  products: Product[];
+   599→}) {
+   600→  const { toast } = useToast();
+   601→  const pendingOrders = orders.filter(o => o.status === "sent" || o.status === "partial");
+   602→
+   603→  const handleReceive = (orderId: string, itemIndex: number, qty: number) => {
+   604→    setOrders(prev => prev.map(o => {
+   605→      if (o.id !== orderId) return o;
+   606→      const newItems = o.items.map((it, i) => i === itemIndex ? { ...it, received: Math.min(it.qty, it.received + qty) } : it);
+   607→      const allReceived = newItems.every(it => it.received >= it.qty);
+   608→      return { ...o, items: newItems, status: allReceived ? "received" : "partial" };
+   609→    }));
+   610→    toast({ title: "Stock received", description: `${qty} units added to inventory` });
+   611→  };
+   612→
+   613→  return (
+   614→    <div className="h-full bg-white rounded-2xl shadow-lg ring-1 ring-slate-200/60 overflow-hidden flex flex-col">
+   615→      <div className="flex-shrink-0 flex items-center gap-3 px-5 py-3 bg-gradient-to-r from-slate-50 to-white border-b border-slate-200">
+   616→        <Package className="h-5 w-5 text-amber-600" />
+   617→        <h2 className="text-base font-bold text-slate-800">Receive Stock</h2>
+   618→        <Badge variant="outline" className="font-mono text-xs">{pendingOrders.length} pending</Badge>
+   619→      </div>
+   620→
+   621→      <ScrollArea className="flex-1">
+   622→        <div className="p-4 space-y-3">
+   623→          {pendingOrders.length === 0 ? (
+   624→            <div className="flex flex-col items-center justify-center py-16 text-slate-400">
+   625→              <Package className="h-10 w-10 mb-2 opacity-40" />
+   626→              <div className="text-sm font-medium">No pending deliveries</div>
+   627→              <div className="text-xs mt-1">All purchase orders have been fully received</div>
+   628→            </div>
+   629→          ) : (
+   630→            pendingOrders.map(o => (
+   631→              <div key={o.id} className="bg-slate-50 rounded-xl p-4 ring-1 ring-slate-200">
+   632→                <div className="flex items-center justify-between mb-3">
+   633→                  <div>
+   634→                    <div className="font-bold text-slate-800">{o.poNumber}</div>
+   635→                    <div className="text-xs text-slate-500">{o.supplier} · Expected: {o.expectedDate}</div>
+   636→                  </div>
+   637→                  <Badge variant="secondary" className={cn("text-xs", o.status === "partial" ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700")}>
+   638→                    {o.status}
+   639→                  </Badge>
+   640→                </div>
+   641→                <div className="space-y-2">
+   642→                  {o.items.map((item, i) => (
+   643→                    <div key={i} className="flex items-center gap-3 bg-white rounded-lg p-2.5 ring-1 ring-slate-100">
+   644→                      <div className="flex-1">
+   645→                        <div className="text-sm font-semibold text-slate-800">{item.name}</div>
+   646→                        <div className="text-xs text-slate-500">
+   647→                          Ordered: {item.qty} · Received: {item.received} · Pending: {item.qty - item.received}
+   648→                        </div>
+   649→                      </div>
+   650→                      <div className="w-32 bg-slate-100 rounded-full h-2 overflow-hidden">
+   651→                        <div
+   652→                          className="h-full bg-gradient-to-r from-amber-500 to-orange-500 transition-all"
+   653→                          style={{ width: `${(item.received / item.qty) * 100}%` }}
+   654→                        />
+   655→                      </div>
+   656→                      {item.received < item.qty && (
+   657→                        <Button
+   658→                          size="sm"
+   659→                          onClick={() => handleReceive(o.id, i, item.qty - item.received)}
+   660→                          className="bg-emerald-600 hover:bg-emerald-700 h-8 text-xs"
+   661→                        >
+   662→                          <CheckCircle2 className="h-3.5 w-3.5" /> Receive All
+   663→                        </Button>
+   664→                      )}
+   665→                    </div>
+   666→                  ))}
+   667→                </div>
+   668→              </div>
+   669→            ))
+   670→          )}
+   671→        </div>
+   672→      </ScrollArea>
+   673→    </div>
+   674→  );
+   675→}
+   676→
+   677→// ===== Suppliers Tab =====
+   678→function Suppliers({ suppliers, setSuppliers, products }: {
+   679→  suppliers: Supplier[];
+   680→  setSuppliers: React.Dispatch<React.SetStateAction<Supplier[]>>;
+   681→  products: Product[];
+   682→}) {
+   683→  const { toast } = useToast();
+   684→  const [search, setSearch] = useState("");
+   685→  const [editSupplier, setEditSupplier] = useState<Supplier | null>(null);
+   686→  const [showAddForm, setShowAddForm] = useState(false);
+   687→  const [viewSupplier, setViewSupplier] = useState<Supplier | null>(null);
+   688→
+   689→  const handleDelete = (id: string) => {
+   690→    setSuppliers(prev => prev.filter(s => s.id !== id));
+   691→    toast({ title: "Supplier deleted" });
+   692→  };
+   693→
+   694→  const filtered = suppliers.filter(s =>
+   695→    s.name.toLowerCase().includes(search.toLowerCase()) ||
+   696→    s.contact.includes(search) ||
+   697→    s.email.toLowerCase().includes(search.toLowerCase()) ||
+   698→    s.address.toLowerCase().includes(search.toLowerCase())
+   699→  );
+   700→
+   701→  return (
+   702→    <div className="h-full bg-white rounded-2xl shadow-lg ring-1 ring-slate-200/60 overflow-hidden flex flex-col">
+   703→      <div className="flex-shrink-0 flex items-center justify-between px-5 py-3 bg-gradient-to-r from-slate-50 to-white border-b border-slate-200">
+   704→        <div className="flex items-center gap-3">
+   705→          <Users className="h-5 w-5 text-amber-600" />
+   706→          <h2 className="text-base font-bold text-slate-800">Suppliers</h2>
+   707→          <Badge variant="outline" className="font-mono text-xs">{filtered.length} of {suppliers.length} suppliers</Badge>
+   708→        </div>
+   709→        <div className="flex items-center gap-2">
+   710→          <div className="relative">
+   711→            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+   712→            <input
+   713→              value={search}
+   714→              onChange={(e) => setSearch(e.target.value)}
+   715→              placeholder="Search suppliers..."
+   716→              className="h-9 pl-8 pr-3 rounded-lg bg-slate-100 text-sm outline-none focus:ring-2 focus:ring-amber-400 w-56"
+   717→            />
+   718→          </div>
+   719→          <Button onClick={() => setShowAddForm(true)} className="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700">
+   720→            <Plus className="h-4 w-4" /> Add Supplier
+   721→          </Button>
+   722→        </div>
+   723→      </div>
+   724→
+   725→      <ScrollArea className="flex-1">
+   726→        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-5">
+   727→          {filtered.length === 0 ? (
+   728→            <div className="col-span-full flex flex-col items-center justify-center py-16 text-slate-400">
+   729→              <Users className="h-10 w-10 mb-2 opacity-40" />
+   730→              <div className="text-sm font-medium">No suppliers found</div>
+   731→              <div className="text-xs mt-1">{search ? `No match for "${search}"` : "Add a supplier to get started"}</div>
+   732→            </div>
+   733→          ) : (
+   734→            filtered.map(s => (
+   735→              <motion.div
+   736→                key={s.id}
+   737→                whileHover={{ y: -3 }}
+   738→                className="bg-white rounded-xl ring-1 ring-slate-200 p-4 shadow-sm hover:shadow-md transition"
+   739→              >
+   740→                <div className="flex items-start justify-between mb-2">
+   741→                  <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-amber-100 to-orange-100 flex items-center justify-center">
+   742→                    <Truck className="h-6 w-6 text-amber-600" />
+   743→                  </div>
+   744→                  <div className="flex gap-1">
+   745→                    <button onClick={() => setViewSupplier(s)} className="h-7 w-7 rounded-md bg-emerald-100 text-emerald-600 hover:bg-emerald-200 flex items-center justify-center" title="View Products">
+   746→                      <Eye className="h-3.5 w-3.5" />
+   747→                    </button>
+   748→                    <button onClick={() => setEditSupplier(s)} className="h-7 w-7 rounded-md bg-blue-100 text-blue-600 hover:bg-blue-200 flex items-center justify-center" title="Edit">
+   749→                      <Edit2 className="h-3.5 w-3.5" />
+   750→                    </button>
+   751→                    <button onClick={() => handleDelete(s.id)} className="h-7 w-7 rounded-md bg-rose-100 text-rose-600 hover:bg-rose-200 flex items-center justify-center" title="Delete">
+   752→                      <Trash2 className="h-3.5 w-3.5" />
+   753→                    </button>
+   754→                  </div>
+   755→                </div>
+   756→                <div className="font-bold text-slate-800">{s.name}</div>
+   757→                <div className="text-xs text-slate-500 space-y-1 mt-2">
+   758→                  <div className="flex items-center gap-1.5"><Phone className="h-3 w-3" /> {s.contact}</div>
+   759→                  <div className="flex items-center gap-1.5"><MapPin className="h-3 w-3" /> {s.address}</div>
+   760→                </div>
+   761→                <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
+   762→                  <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-700">{s.productsSupplied} products</Badge>
+   763→                  <div className="text-right">
+   764→                    <div className="text-[10px] text-slate-500">Balance</div>
+   765→                    <div className={cn("text-sm font-bold font-mono", s.balance > 0 ? "text-rose-600" : "text-emerald-600")}>{formatGHS(s.balance)}</div>
+   766→                  </div>
+   767→                </div>
+   768→              </motion.div>
+   769→            ))
+   770→          )}
+   771→        </div>
+   772→      </ScrollArea>
+   773→
+   774→      {/* View Supplier Products Modal */}
+   775→      <AnimatePresence>
+   776→        {viewSupplier && (
+   777→          <SupplierViewModal supplier={viewSupplier} products={products} onClose={() => setViewSupplier(null)} />
+   778→        )}
+   779→      </AnimatePresence>
+   780→
+   781→      {/* Edit Supplier Modal */}
+   782→      <AnimatePresence>
+   783→        {editSupplier && (
+   784→          <SupplierFormModal supplier={editSupplier} onClose={() => setEditSupplier(null)} onSave={(updated) => {
+   785→            setSuppliers(prev => prev.map(s => s.id === updated.id ? updated : s));
+   786→            toast({ title: "Supplier updated", description: updated.name });
+   787→            setEditSupplier(null);
+   788→          }} />
+   789→        )}
+   790→      </AnimatePresence>
+   791→
+   792→      {/* Add Supplier Modal */}
+   793→      <AnimatePresence>
+   794→        {showAddForm && (
+   795→          <SupplierFormModal supplier={null} onClose={() => setShowAddForm(false)} onSave={(newSupplier) => {
+   796→            setSuppliers(prev => [...prev, newSupplier]);
+   797→            toast({ title: "Supplier added", description: newSupplier.name });
+   798→            setShowAddForm(false);
+   799→          }} />
+   800→        )}
+   801→      </AnimatePresence>
+   802→    </div>
+   803→  );
+   804→}
+   805→
+   806→// ===== Supplier View Modal (shows actual products supplied) =====
+   807→function SupplierViewModal({ supplier, products, onClose }: { supplier: Supplier; products: Product[]; onClose: () => void }) {
+   808→  // Filter actual products from this supplier
+   809→  const supplierProducts = products.filter(p => p.supplier === supplier.name);
+   810→
+   811→  return (
+   812→    <motion.div
+   813→      initial={{ opacity: 0 }}
+   814→      animate={{ opacity: 1 }}
+   815→      exit={{ opacity: 0 }}
+   816→      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+   817→      onClick={onClose}
+   818→    >
+   819→      <motion.div
+   820→        initial={{ scale: 0.95, y: 20 }}
+   821→        animate={{ scale: 1, y: 0 }}
+   822→        exit={{ scale: 0.95, y: 20 }}
+   823→        onClick={(e) => e.stopPropagation()}
+   824→        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col"
+   825→      >
+   826→        <div className="flex-shrink-0 px-5 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white flex items-center justify-between">
+   827→          <div className="flex items-center gap-2">
+   828→            <Eye className="h-5 w-5" />
+   829→            <h3 className="font-bold">Products Supplied</h3>
+   830→          </div>
+   831→          <button onClick={onClose} className="h-8 w-8 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center"><X className="h-4 w-4" /></button>
+   832→        </div>
+   833→        <div className="flex-shrink-0 p-4 bg-slate-50 border-b border-slate-200 flex items-center gap-3">
+   834→          <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-amber-100 to-orange-100 flex items-center justify-center">
+   835→            <Truck className="h-6 w-6 text-amber-600" />
+   836→          </div>
+   837→          <div>
+   838→            <div className="font-bold text-slate-800">{supplier.name}</div>
+   839→            <div className="text-xs text-slate-500">{supplier.contact} · {supplier.address}</div>
+   840→          </div>
+   841→          <Badge variant="secondary" className="ml-auto bg-emerald-100 text-emerald-700">{supplierProducts.length} products</Badge>
+   842→        </div>
+   843→        <div className="flex-1 overflow-y-auto">
+   844→          {supplierProducts.length === 0 ? (
+   845→            <div className="flex flex-col items-center justify-center py-16 text-slate-400">
+   846→              <Package className="h-10 w-10 mb-2 opacity-40" />
+   847→              <div className="text-sm font-medium">No products found</div>
+   848→              <div className="text-xs mt-1">No products in inventory are supplied by {supplier.name}</div>
+   849→            </div>
+   850→          ) : (
+   851→            <table className="w-full text-sm">
+   852→              <thead className="sticky top-0 bg-slate-800 text-white text-[11px] uppercase tracking-wide z-10">
+   853→                <tr>
+   854→                  <th className="text-left px-4 py-2.5 font-semibold">Product Name</th>
+   855→                  <th className="text-left px-3 py-2.5 font-semibold">SKU</th>
+   856→                  <th className="text-center px-3 py-2.5 font-semibold">Stock</th>
+   857→                  <th className="text-right px-3 py-2.5 font-semibold">Price (GHC)</th>
+   858→                  <th className="text-right px-3 py-2.5 font-semibold">Cost (GHC)</th>
+   859→                </tr>
+   860→              </thead>
+   861→              <tbody className="divide-y divide-slate-100">
+   862→                {supplierProducts.map((p) => (
+   863→                  <tr key={p.id} className="hover:bg-emerald-50/50">
+   864→                    <td className="px-4 py-2.5 text-slate-800">{p.emoji} {p.name}</td>
+   865→                    <td className="px-3 py-2.5 font-mono text-xs text-slate-600">{p.sku}</td>
+   866→                    <td className="px-3 py-2.5 text-center font-mono text-slate-700">{p.stock}</td>
+   867→                    <td className="px-3 py-2.5 text-right font-mono font-semibold text-emerald-600">{formatGHS(p.price)}</td>
+   868→                    <td className="px-3 py-2.5 text-right font-mono text-slate-600">{formatGHS(p.costPrice)}</td>
+   869→                  </tr>
+   870→                ))}
+   871→              </tbody>
+   872→            </table>
+   873→          )}
+   874→        </div>
+   875→        <div className="flex-shrink-0 px-5 py-3 border-t border-slate-200 bg-slate-50 flex justify-end">
+   876→          <Button variant="outline" onClick={onClose}>Close</Button>
+   877→        </div>
+   878→      </motion.div>
+   879→    </motion.div>
+   880→  );
+   881→}
+   882→
+   883→// ===== Supplier Form Modal (Edit/Add) =====
+   884→function SupplierFormModal({ supplier, onClose, onSave }: {
+   885→  supplier: Supplier | null;
+   886→  onClose: () => void;
+   887→  onSave: (supplier: Supplier) => void;
+   888→}) {
+   889→  const isNew = !supplier;
+   890→  const [form, setForm] = useState<Supplier>(supplier || {
+   891→    id: `s-${Date.now()}`,
+   892→    name: "",
+   893→    contact: "",
+   894→    email: "",
+   895→    address: "",
+   896→    balance: 0,
+   897→    productsSupplied: 0,
+   898→  });
+   899→
+   900→  return (
+   901→    <motion.div
+   902→      initial={{ opacity: 0 }}
+   903→      animate={{ opacity: 1 }}
+   904→      exit={{ opacity: 0 }}
+   905→      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+   906→      onClick={onClose}
+   907→    >
+   908→      <motion.div
+   909→        initial={{ scale: 0.95, y: 20 }}
+   910→        animate={{ scale: 1, y: 0 }}
+   911→        exit={{ scale: 0.95, y: 20 }}
+   912→        onClick={(e) => e.stopPropagation()}
+   913→        className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+   914→      >
+   915→        <div className="flex-shrink-0 px-5 py-3 bg-gradient-to-r from-amber-600 to-orange-600 text-white flex items-center justify-between">
+   916→          <div className="flex items-center gap-2">
+   917→            {isNew ? <Plus className="h-5 w-5" /> : <Edit2 className="h-5 w-5" />}
+   918→            <h3 className="font-bold">{isNew ? "Add Supplier" : "Edit Supplier"}</h3>
+   919→          </div>
+   920→          <button onClick={onClose} className="h-8 w-8 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center"><X className="h-4 w-4" /></button>
+   921→        </div>
+   922→        <div className="p-5 space-y-3">
+   923→          <div>
+   924→            <label className="text-xs font-semibold text-slate-600 mb-1 block">Supplier Name</label>
+   925→            <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. AgriCorp Ghana" className="w-full h-10 px-3 rounded-lg border border-slate-200 focus:border-amber-500 outline-none text-sm" />
+   926→          </div>
+   927→          <div>
+   928→            <label className="text-xs font-semibold text-slate-600 mb-1 block">Contact Phone</label>
+   929→            <input value={form.contact} onChange={(e) => setForm({ ...form, contact: e.target.value })} placeholder="+233 24 111 2222" className="w-full h-10 px-3 rounded-lg border border-slate-200 focus:border-amber-500 outline-none text-sm" />
+   930→          </div>
+   931→          <div>
+   932→            <label className="text-xs font-semibold text-slate-600 mb-1 block">Email</label>
+   933→            <input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="supplier@email.com" className="w-full h-10 px-3 rounded-lg border border-slate-200 focus:border-amber-500 outline-none text-sm" />
+   934→          </div>
+   935→          <div>
+   936→            <label className="text-xs font-semibold text-slate-600 mb-1 block">Address</label>
+   937→            <input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Location, City" className="w-full h-10 px-3 rounded-lg border border-slate-200 focus:border-amber-500 outline-none text-sm" />
+   938→          </div>
+   939→          <div className="grid grid-cols-2 gap-3">
+   940→            <div>
+   941→              <label className="text-xs font-semibold text-slate-600 mb-1 block">Balance (GHC)</label>
+   942→              <input type="number" step="0.01" value={form.balance || ""} onChange={(e) => setForm({ ...form, balance: parseFloat(e.target.value) || 0 })} className="w-full h-10 px-3 rounded-lg border border-slate-200 focus:border-amber-500 outline-none text-sm font-mono" />
+   943→            </div>
+   944→            <div>
+   945→              <label className="text-xs font-semibold text-slate-600 mb-1 block">Products Supplied</label>
+   946→              <input type="number" value={form.productsSupplied || ""} onChange={(e) => setForm({ ...form, productsSupplied: parseInt(e.target.value) || 0 })} className="w-full h-10 px-3 rounded-lg border border-slate-200 focus:border-amber-500 outline-none text-sm" />
+   947→            </div>
+   948→          </div>
+   949→        </div>
+   950→        <div className="flex-shrink-0 px-5 py-3 border-t border-slate-200 bg-slate-50 flex justify-end gap-2">
+   951→          <Button variant="outline" onClick={onClose}>Cancel</Button>
+   952→          <button
+   953→            onClick={() => form.name && onSave(form)}
+   954→            disabled={!form.name}
+   955→            className="h-10 px-5 rounded-lg bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white font-semibold text-sm transition disabled:opacity-50"
+   956→          >
+   957→            <Save className="h-4 w-4 inline mr-1" />
+   958→            {isNew ? "Add Supplier" : "Save Changes"}
+   959→          </button>
+   960→        </div>
+   961→      </motion.div>
+   962→    </motion.div>
+   963→  );
+   964→}
+   965→
+   966→// ===== Purchase History Tab =====
+   967→function PurchaseHistory({ orders, onView }: {
+   968→  orders: PurchaseOrder[];
+   969→  onView: (order: PurchaseOrder) => void;
+   970→}) {
+   971→  const totalSpent = orders.reduce((s, o) => s + o.total, 0);
+   972→  const received = orders.filter(o => o.status === "received").length;
+   973→
+   974→  return (
+   975→    <div className="h-full bg-white rounded-2xl shadow-lg ring-1 ring-slate-200/60 overflow-hidden flex flex-col">
+   976→      <div className="flex-shrink-0 flex items-center gap-3 px-5 py-3 bg-gradient-to-r from-slate-50 to-white border-b border-slate-200">
+   977→        <History className="h-5 w-5 text-amber-600" />
+   978→        <h2 className="text-base font-bold text-slate-800">Purchase History</h2>
+   979→      </div>
+   980→
+   981→      {/* Stats */}
+   982→      <div className="flex-shrink-0 px-5 py-3 bg-amber-50/50 border-b border-amber-100 grid grid-cols-3 gap-3">
+   983→        <div className="bg-white rounded-lg p-3 ring-1 ring-amber-100">
+   984→          <div className="text-[10px] text-slate-500 uppercase">Total Orders</div>
+   985→          <div className="text-xl font-bold text-slate-800">{orders.length}</div>
+   986→        </div>
+   987→        <div className="bg-white rounded-lg p-3 ring-1 ring-amber-100">
+   988→          <div className="text-[10px] text-slate-500 uppercase">Total Spent</div>
+   989→          <div className="text-xl font-bold text-amber-600 font-mono">{formatGHS(totalSpent)}</div>
+   990→        </div>
+   991→        <div className="bg-white rounded-lg p-3 ring-1 ring-amber-100">
+   992→          <div className="text-[10px] text-slate-500 uppercase">Received</div>
+   993→          <div className="text-xl font-bold text-emerald-600">{received}/{orders.length}</div>
+   994→        </div>
+   995→      </div>
+   996→
+   997→      <ScrollArea className="flex-1">
+   998→        <div className="p-4 space-y-2">
+   999→          {orders.map(o => (
+  1000→            <div key={o.id} className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 hover:bg-slate-100 transition cursor-pointer" onClick={() => onView(o)}>
+  1001→              <div className="h-10 w-10 rounded-lg bg-amber-100 flex items-center justify-center">
+  1002→                <Archive className="h-5 w-5 text-amber-600" />
+  1003→              </div>
+  1004→              <div className="flex-1">
+  1005→                <div className="font-semibold text-slate-800 text-sm">{o.poNumber} · {o.supplier}</div>
+  1006→                <div className="text-xs text-slate-500">{o.date} · {o.items.length} items</div>
+  1007→              </div>
+  1008→              <div className="text-right">
+  1009→                <div className="font-mono font-bold text-slate-800">{formatGHS(o.total)}</div>
+  1010→                <div className="text-[10px] text-slate-400 uppercase">{o.status}</div>
+  1011→              </div>
+  1012→              <ChevronRight className="h-4 w-4 text-slate-300" />
+  1013→            </div>
+  1014→          ))}
+  1015→        </div>
+  1016→      </ScrollArea>
+  1017→    </div>
+  1018→  );
+  1019→}
+  1020→
+  1021→// ===== Supplier Payments Tab =====
+  1022→function SupplierPayments({ suppliers, onPay }: {
+  1023→  suppliers: Supplier[];
+  1024→  onPay: (id: string, amount: number) => void;
+  1025→}) {
+  1026→  const { toast } = useToast();
+  1027→  const debtors = suppliers.filter(s => s.balance > 0);
+  1028→  const totalDue = debtors.reduce((s, sup) => s + sup.balance, 0);
+  1029→
+  1030→  return (
+  1031→    <div className="h-full bg-white rounded-2xl shadow-lg ring-1 ring-slate-200/60 overflow-hidden flex flex-col">
+  1032→      <div className="flex-shrink-0 flex items-center gap-3 px-5 py-3 bg-gradient-to-r from-slate-50 to-white border-b border-slate-200">
+  1033→        <DollarSign className="h-5 w-5 text-amber-600" />
+  1034→        <h2 className="text-base font-bold text-slate-800">Supplier Payments</h2>
+  1035→      </div>
+  1036→
+  1037→      <div className="flex-shrink-0 px-5 py-3 bg-rose-50/50 border-b border-rose-100">
+  1038→        <div className="flex items-center justify-between">
+  1039→          <div>
+  1040→            <div className="text-xs text-slate-500 uppercase font-semibold">Total Outstanding</div>
+  1041→            <div className="text-2xl font-bold text-rose-600 font-mono">{formatGHS(totalDue)}</div>
+  1042→          </div>
+  1043→          <Badge variant="secondary" className="bg-rose-100 text-rose-700">{debtors.length} suppliers with balance</Badge>
+  1044→        </div>
+  1045→      </div>
+  1046→
+  1047→      <ScrollArea className="flex-1">
+  1048→        <div className="p-4 space-y-2">
+  1049→          {debtors.length === 0 ? (
+  1050→            <div className="flex flex-col items-center justify-center py-16 text-slate-400">
+  1051→              <CheckCircle2 className="h-10 w-10 mb-2 opacity-40 text-emerald-500" />
+  1052→              <div className="text-sm font-medium">All suppliers paid up</div>
+  1053→              <div className="text-xs mt-1">No outstanding balances</div>
+  1054→            </div>
+  1055→          ) : (
+  1056→            debtors.map(s => (
+  1057→              <div key={s.id} className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 hover:bg-slate-100 transition">
+  1058→                <div className="h-10 w-10 rounded-lg bg-amber-100 flex items-center justify-center">
+  1059→                  <Truck className="h-5 w-5 text-amber-600" />
+  1060→                </div>
+  1061→                <div className="flex-1">
+  1062→                  <div className="font-semibold text-slate-800 text-sm">{s.name}</div>
+  1063→                  <div className="text-xs text-slate-500">{s.contact}</div>
+  1064→                </div>
+  1065→                <div className="text-right">
+  1066→                  <div className="text-[10px] text-slate-500 uppercase">Balance</div>
+  1067→                  <div className="font-mono font-bold text-rose-600">{formatGHS(s.balance)}</div>
+  1068→                </div>
+  1069→                <Button
+  1070→                  size="sm"
+  1071→                  onClick={() => {
+  1072→                    onPay(s.id, s.balance);
+  1073→                    toast({ title: "Payment recorded", description: `${formatGHS(s.balance)} paid to ${s.name}` });
+  1074→                  }}
+  1075→                  className="bg-emerald-600 hover:bg-emerald-700 h-8 text-xs"
+  1076→                >
+  1077→                  <DollarSign className="h-3.5 w-3.5" /> Pay Full
+  1078→                </Button>
+  1079→              </div>
+  1080→            ))
+  1081→          )}
+  1082→        </div>
+  1083→      </ScrollArea>
+  1084→    </div>
+  1085→  );
+  1086→}
+  1087→
+  1088→// ===== Purchase Report Tab =====
+  1089→function PurchaseReport({ transactions }: { transactions: PurchaseTransaction[] }) {
+  1090→  const [fromDate, setFromDate] = useState("2026-01-01");
+  1091→  const [toDate, setToDate] = useState("2026-12-31");
+  1092→  const { toast } = useToast();
+  1093→
+  1094→  // Filter transactions by date range
+  1095→  const filtered = transactions.filter(t => t.date >= fromDate && t.date <= toDate);
+  1096→
+  1097→  // Calculate totals
+  1098→  const totals = filtered.reduce((acc, t) => ({
+  1099→    qty: acc.qty + t.qty, tax: acc.tax + t.tax, amount: acc.amount + t.amount,
+  1100→    paid: acc.paid + t.paid, due: acc.due + t.due,
+  1101→  }), { qty: 0, tax: 0, amount: 0, paid: 0, due: 0 });
+  1102→
+  1103→  const formatDate = (iso: string) => {
+  1104→    const [y, m, d] = iso.split('-');
+  1105→    return `${parseInt(m)}/${parseInt(d)}/${y}`;
+  1106→  };
+  1107→  const formatNum = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  1108→
+  1109→  const now = new Date();
+  1110→  const dateStr = `${now.getMonth() + 1}/${now.getDate()}/${now.getFullYear()}`;
+  1111→  const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+  1112→
+  1113→  // PDF Export
+  1114→  const handleExportPDF = () => {
+  1115→    if (filtered.length === 0) { toast({ title: "No data to export", variant: "destructive" }); return; }
+  1116→    import("jspdf").then(({ default: jsPDF }) => {
+  1117→      import("jspdf-autotable").then(({ default: autoTable }) => {
+  1118→        const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  1119→        const pw = doc.internal.pageSize.getWidth();
+  1120→        doc.setFontSize(16); doc.setFont("helvetica", "bold"); doc.setTextColor(30, 41, 59);
+  1121→        doc.text(COMPANY.name, 14, 18);
+  1122→        doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.setTextColor(100, 100, 100);
+  1123→        doc.text("Accra Warehouse", 14, 24); doc.text(COMPANY.address, 14, 29);
+  1124→        doc.setFontSize(9); doc.text(`${dateStr}`, pw - 14, 18, { align: "right" });
+  1125→        doc.text(`${timeStr}`, pw - 14, 23, { align: "right" }); doc.text("Page 1", pw - 14, 28, { align: "right" });
+  1126→        doc.setFontSize(14); doc.setFont("helvetica", "bold"); doc.setTextColor(0, 0, 0);
+  1127→        doc.text("Totals Purchase Report", pw / 2, 42, { align: "center" });
+  1128→        doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.setTextColor(80, 80, 80);
+  1129→        doc.text(`For The Period ${formatDate(fromDate)} - ${formatDate(toDate)}`, pw / 2, 48, { align: "center" });
+  1130→        const head = [["Date", "Qty", "TAX GHC", "Amount", "Paid GHC", "Due GHC"]];
+  1131→        const body = filtered.map(t => [formatDate(t.date), String(t.qty), formatNum(t.tax), formatNum(t.amount), formatNum(t.paid), formatNum(t.due)]);
+  1132→        body.push(["TOTAL", String(totals.qty), formatNum(totals.tax), formatNum(totals.amount), formatNum(totals.paid), formatNum(totals.due)]);
+  1133→        autoTable(doc, { head, body, startY: 54, styles: { fontSize: 9, cellPadding: 2, lineColor: [0, 0, 0], lineWidth: 0.3 },
+  1134→          headStyles: { fillColor: [240, 240, 240], textColor: 0, fontStyle: "bold" },
+  1135→          alternateRowStyles: { fillColor: [250, 250, 250] },
+  1136→          columnStyles: { 0: { cellWidth: 30 }, 1: { cellWidth: 20, halign: "right" }, 2: { cellWidth: 30, halign: "right" }, 3: { cellWidth: 35, halign: "right" }, 4: { cellWidth: 35, halign: "right" }, 5: { cellWidth: 35, halign: "right" } },
+  1137→          margin: { left: 14, right: 14 } });
+  1138→        const ph = doc.internal.pageSize.getHeight();
+  1139→        doc.setFontSize(8); doc.setTextColor(150, 150, 150);
+  1140→        doc.text(`${COMPANY.name} · ${COMPANY.address} · ${COMPANY.contact}`, pw / 2, ph - 8, { align: "center" });
+  1141→        doc.save(`purchase-report-${new Date().toISOString().split('T')[0]}.pdf`);
+  1142→        toast({ title: "PDF exported successfully" });
+  1143→      });
+  1144→    });
+  1145→  };
+  1146→
+  1147→  // Excel Export
+  1148→  const handleExportExcel = () => {
+  1149→    if (filtered.length === 0) { toast({ title: "No data to export", variant: "destructive" }); return; }
+  1150→    import("xlsx").then((XLSX) => {
+  1151→      const data: (string | number)[][] = [];
+  1152→      data.push([COMPANY.name]); data.push(["Accra Warehouse"]); data.push([COMPANY.address]); data.push([]);
+  1153→      data.push(["Totals Purchase Report"]); data.push([`For The Period ${formatDate(fromDate)} - ${formatDate(toDate)}`]);
+  1154→      data.push([`Generated: ${dateStr} ${timeStr}`]); data.push([]);
+  1155→      data.push(["Date", "Qty", "TAX GHC", "Amount", "Paid GHC", "Due GHC"]);
+  1156→      filtered.forEach(t => data.push([formatDate(t.date), t.qty, formatNum(t.tax), formatNum(t.amount), formatNum(t.paid), formatNum(t.due)]));
+  1157→      data.push(["TOTAL", totals.qty, formatNum(totals.tax), formatNum(totals.amount), formatNum(totals.paid), formatNum(totals.due)]);
+  1158→      const ws = XLSX.utils.aoa_to_sheet(data);
+  1159→      ws['!cols'] = [{ wch: 14 }, { wch: 8 }, { wch: 14 }, { wch: 16 }, { wch: 14 }, { wch: 14 }];
+  1160→      const wb = XLSX.utils.book_new();
+  1161→      XLSX.utils.book_append_sheet(wb, ws, "Purchase Report");
+  1162→      XLSX.writeFile(wb, `purchase-report-${new Date().toISOString().split('T')[0]}.xlsx`);
+  1163→      toast({ title: "Excel exported successfully" });
+  1164→    });
+  1165→  };
+  1166→
+  1167→  return (
+  1168→    <div className="h-full overflow-y-auto bg-slate-200/50 p-4">
+  1169→      {/* Minimal Date Filter + Export Bar */}
+  1170→      <div className="max-w-3xl mx-auto mb-3 flex items-center justify-between gap-2 flex-wrap print:hidden">
+  1171→        <div className="flex items-center gap-2">
+  1172→          <Calendar className="h-4 w-4 text-amber-600" />
+  1173→          <span className="text-xs font-semibold text-slate-600">From:</span>
+  1174→          <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="h-9 px-2 rounded-lg border border-slate-300 text-xs outline-none focus:ring-2 focus:ring-amber-400" />
+  1175→          <span className="text-xs font-semibold text-slate-600">To:</span>
+  1176→          <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="h-9 px-2 rounded-lg border border-slate-300 text-xs outline-none focus:ring-2 focus:ring-amber-400" />
+  1177→        </div>
+  1178→        <div className="flex items-center gap-2">
+  1179→          <button onClick={() => window.print()} className="h-9 px-3 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition">
+  1180→            <Printer className="h-3.5 w-3.5" /> Print
+  1181→          </button>
+  1182→          <button onClick={handleExportPDF} className="h-9 px-3 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-700 text-xs font-semibold flex items-center gap-1.5 transition">
+  1183→            <FileText className="h-3.5 w-3.5" /> PDF
+  1184→          </button>
+  1185→          <button onClick={handleExportExcel} className="h-9 px-3 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-700 text-xs font-semibold flex items-center gap-1.5 transition">
+  1186→            <Download className="h-3.5 w-3.5" /> Excel
+  1187→          </button>
+  1188→        </div>
+  1189→      </div>
+  1190→
+  1191→      {/* The Report — ONLY company header + title + table */}
+  1192→      <div className="max-w-3xl mx-auto bg-white shadow-xl" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
+  1193→        {/* Company Header */}
+  1194→        <div className="px-8 pt-6 pb-3 flex items-start justify-between border-b-2 border-slate-800">
+  1195→          <div className="flex items-center gap-3">
+  1196→            <div className="h-10 w-10 rounded-full bg-slate-100 ring-1 ring-slate-300 flex items-center justify-center text-slate-700 font-bold text-lg">S</div>
+  1197→            <div>
+  1198→              <div className="text-base font-bold text-slate-900 uppercase leading-tight">{COMPANY.name}</div>
+  1199→              <div className="text-xs text-slate-600">Accra Warehouse</div>
+  1200→              <div className="text-xs text-slate-600">{COMPANY.address}</div>
+  1201→            </div>
+  1202→          </div>
+  1203→          <div className="text-right text-xs text-slate-600">
+  1204→            <div>{dateStr}</div>
+  1205→            <div>{timeStr}</div>
+  1206→            <div className="mt-1 font-semibold text-slate-700">Page 1</div>
+  1207→          </div>
+  1208→        </div>
+  1209→
+  1210→        {/* Report Title */}
+  1211→        <div className="px-8 py-4 text-center">
+  1212→          <h1 className="text-lg font-bold text-slate-900">Totals Purchase Report</h1>
+  1213→          <p className="text-sm text-slate-600 mt-1">For The Period {formatDate(fromDate)} - {formatDate(toDate)}</p>
+  1214→        </div>
+  1215→
+  1216→        {/* Report Table */}
+  1217→        <div className="px-8 pb-6">
+  1218→          <table className="w-full text-xs" style={{ borderCollapse: 'collapse' }}>
+  1219→            <thead>
+  1220→              <tr style={{ backgroundColor: '#F0F0F0' }}>
+  1221→                <th className="px-3 py-2 text-left font-bold text-slate-800 border border-slate-700">Date</th>
+  1222→                <th className="px-3 py-2 text-right font-bold text-slate-800 border border-slate-700">Qty</th>
+  1223→                <th className="px-3 py-2 text-right font-bold text-slate-800 border border-slate-700">TAX GHC</th>
+  1224→                <th className="px-3 py-2 text-right font-bold text-slate-800 border border-slate-700">Amount</th>
+  1225→                <th className="px-3 py-2 text-right font-bold text-slate-800 border border-slate-700">Paid GHC</th>
+  1226→                <th className="px-3 py-2 text-right font-bold text-slate-800 border border-slate-700">Due GHC</th>
+  1227→              </tr>
+  1228→            </thead>
+  1229→            <tbody>
+  1230→              {filtered.length === 0 ? (
+  1231→                <tr><td colSpan={6} className="px-3 py-8 text-center text-slate-400 border border-slate-700">No transactions found in the selected date range</td></tr>
+  1232→              ) : (
+  1233→                filtered.map((t, i) => (
+  1234→                  <tr key={t.id} style={{ backgroundColor: i % 2 === 0 ? '#FFFFFF' : '#FAFAFA' }}>
+  1235→                    <td className="px-3 py-1.5 text-slate-800 border border-slate-700">{formatDate(t.date)}</td>
+  1236→                    <td className="px-3 py-1.5 text-right text-slate-800 border border-slate-700">{t.qty}</td>
+  1237→                    <td className="px-3 py-1.5 text-right text-slate-800 border border-slate-700">{formatNum(t.tax)}</td>
+  1238→                    <td className="px-3 py-1.5 text-right text-slate-800 border border-slate-700">{formatNum(t.amount)}</td>
+  1239→                    <td className="px-3 py-1.5 text-right text-slate-800 border border-slate-700">{formatNum(t.paid)}</td>
+  1240→                    <td className="px-3 py-1.5 text-right font-semibold border border-slate-700" style={{ color: t.due > 0 ? '#DC2626' : '#16A34A' }}>{formatNum(t.due)}</td>
+  1241→                  </tr>
+  1242→                ))
+  1243→              )}
+  1244→            </tbody>
+  1245→            {filtered.length > 0 && (
+  1246→              <tfoot>
+  1247→                <tr style={{ backgroundColor: '#F0F0F0' }}>
+  1248→                  <td className="px-3 py-2 font-bold text-slate-900 border border-slate-700">TOTAL</td>
+  1249→                  <td className="px-3 py-2 text-right font-bold text-slate-900 border border-slate-700">{totals.qty}</td>
+  1250→                  <td className="px-3 py-2 text-right font-bold text-slate-900 border border-slate-700">{formatNum(totals.tax)}</td>
+  1251→                  <td className="px-3 py-2 text-right font-bold text-slate-900 border border-slate-700">{formatNum(totals.amount)}</td>
+  1252→                  <td className="px-3 py-2 text-right font-bold text-slate-900 border border-slate-700">{formatNum(totals.paid)}</td>
+  1253→                  <td className="px-3 py-2 text-right font-bold border border-slate-700" style={{ color: totals.due > 0 ? '#DC2626' : '#16A34A' }}>{formatNum(totals.due)}</td>
+  1254→                </tr>
+  1255→              </tfoot>
+  1256→            )}
+  1257→          </table>
+  1258→        </div>
+  1259→      </div>
+  1260→    </div>
+  1261→  );
+  1262→}
+  1263→

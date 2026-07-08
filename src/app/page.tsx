@@ -30,11 +30,15 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { StockManagement } from "@/components/stock-management";
 import { Reports } from "@/components/reports";
-import { PurchaseModule } from "@/components/purchase-module";
+import { PurchaseMenu } from "@/components/purchase-menu";
 import { TelephoneModule } from "@/components/telephone-module";
+import { TelephoneDirectory } from "@/components/telephone-directory";
 import { MaintenanceModule } from "@/components/maintenance-module";
 import { SoldItemsReport } from "@/components/sold-items-report";
 import { PurchaseForm } from "@/components/purchase-form";
+import { SalesMenu } from "@/components/sales-menu";
+import { DailySalesReport, SalesHistory } from "@/components/sales-reports";
+import { SupplierForm } from "@/components/supplier-form";
 
 export default function POSPage() {
   // ===== Top-level View State =====
@@ -74,6 +78,7 @@ export default function POSPage() {
   const [openStockQtyReport, setOpenStockQtyReport] = useState(false);
   const [showStockList, setShowStockList] = useState(false);
   const [partNoInput, setPartNoInput] = useState("");
+  const [productSearch, setProductSearch] = useState("");
 
   const { toast } = useToast();
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -121,8 +126,17 @@ export default function POSPage() {
         p.barcode.includes(q)
       );
     }
+    if (productSearch.trim()) {
+      const q = productSearch.toLowerCase();
+      result = result.filter(p =>
+        p.name.toLowerCase().includes(q) ||
+        p.sku.toLowerCase().includes(q) ||
+        p.barcode.includes(q) ||
+        p.supplier.toLowerCase().includes(q)
+      );
+    }
     return result;
-  }, [activeCategory, searchQuery, products]);
+  }, [activeCategory, searchQuery, productSearch, products]);
 
   const subtotal = useMemo(() =>
     cart.reduce((sum, item) => {
@@ -412,12 +426,13 @@ export default function POSPage() {
         { label: "New Sale", icon: Plus, action: () => { clearCart(); setView("pos"); }, shortcut: "Ctrl+N" },
         { label: "Save / Hold Order", icon: Pause, action: handleSave, shortcut: "F2" },
         { label: "Print Receipt", icon: Printer, action: handlePrint, shortcut: "F3" },
-        { label: "Void Transaction", icon: RotateCcw, action: handleVoid, shortcut: "F4" },
-        { label: "Pay Now", icon: CreditCard, action: handlePay, shortcut: "F5" },
+        { label: "Void Transaction", icon: RotateCcw, action: () => { if (cart.length === 0) { toast({ title: "Cart is already empty", variant: "destructive" }); return; } clearCart(); toast({ title: "Transaction voided (F4)" }); }, shortcut: "F4" },
+        { label: "Pay Now", icon: CreditCard, action: () => { if (cart.length === 0) { toast({ title: "Cart is empty", variant: "destructive" }); return; } setShowPayment(true); }, shortcut: "F5" },
         { separator: true },
+        { label: "Sales Menu", icon: FileText, action: () => setView("sales-menu") },
         { label: "Sold Items Report", icon: FileBarChart, action: () => setView("sold-items") },
-        { label: "Sales History", icon: History, action: () => toast({ title: "Sales History", description: "View past transactions" }) },
-        { label: "Daily Sales Report", icon: TrendingUp, action: () => toast({ title: "Daily Sales", description: `Today's total: ${formatGHS(dailyTotal)} (${transactionCount} transactions)` }) },
+        { label: "Sales History", icon: History, action: () => setView("sales-history") },
+        { label: "Daily Sales Report", icon: TrendingUp, action: () => setView("daily-sales") },
       ],
     },
     {
@@ -444,9 +459,9 @@ export default function POSPage() {
       label: "Purchase",
       items: [
         { label: "Purchase", icon: FileText, action: () => setView("purchase-form") },
+        { label: "Supplier", icon: Users, action: () => setView("supplier-form") },
         { label: "Purchase Orders", icon: Archive, action: () => setView("purchase") },
         { label: "Receive Stock", icon: Package, action: () => setView("purchase") },
-        { label: "Suppliers", icon: Users, action: () => setView("purchase") },
         { separator: true },
         { label: "Purchase History", icon: History, action: () => setView("purchase") },
         { label: "Supplier Payments", icon: DollarSign, action: () => setView("purchase") },
@@ -478,6 +493,8 @@ export default function POSPage() {
         { label: "Delivery Tracking", icon: Truck, action: () => setView("telephone") },
         { label: "Customer Database", icon: Users, action: () => setView("telephone") },
         { separator: true },
+        { label: "Phone Directory", icon: BookOpen, action: () => setView("telephone-directory") },
+        { separator: true },
         { label: "Call Log", icon: Phone, action: () => setView("telephone") },
       ],
     },
@@ -506,7 +523,14 @@ export default function POSPage() {
     return <Reports onBack={() => setView("pos")} products={products} groups={groups} history={history} />;
   }
   if (view === "purchase") {
-    return <PurchaseModule onBack={() => setView("pos")} products={products} />;
+    return (
+      <PurchaseMenu
+        onBack={() => setView("pos")}
+        products={products}
+        onOpenPurchasingForm={() => setView("purchase-form")}
+        onOpenSupplierForm={() => setView("supplier-form")}
+      />
+    );
   }
   if (view === "purchase-form") {
     return <PurchaseForm onBack={() => setView("pos")} products={products} groups={groups} suppliers={groups.map(g => ({ id: g.id, name: g.name }))} />;
@@ -514,11 +538,30 @@ export default function POSPage() {
   if (view === "telephone") {
     return <TelephoneModule onBack={() => setView("pos")} products={products} />;
   }
+  if (view === "telephone-directory") {
+    return (
+      <div className="h-screen bg-slate-100">
+        <TelephoneDirectory onClose={() => setView("pos")} />
+      </div>
+    );
+  }
   if (view === "maintenance") {
     return <MaintenanceModule onBack={() => setView("pos")} cashier={cashier} dailyTotal={dailyTotal} transactionCount={transactionCount} />;
   }
   if (view === "sold-items") {
     return <SoldItemsReport onBack={() => setView("pos")} />;
+  }
+  if (view === "sales-menu") {
+    return <SalesMenu onBack={() => setView("pos")} />;
+  }
+  if (view === "daily-sales") {
+    return <DailySalesReport onBack={() => setView("pos")} dailyTotal={dailyTotal} transactionCount={transactionCount} />;
+  }
+  if (view === "sales-history") {
+    return <SalesHistory onBack={() => setView("pos")} />;
+  }
+  if (view === "supplier-form") {
+    return <SupplierForm onBack={() => setView("pos")} products={products} />;
   }
 
   // ===== Render POS =====
@@ -665,7 +708,7 @@ export default function POSPage() {
       <main className="flex-1 flex overflow-hidden p-3 gap-3">
         {/* ===== Left Panel: Product Grid (60%) ===== */}
         <section className="flex-1 flex flex-col bg-white rounded-2xl shadow-lg ring-1 ring-slate-200/60 overflow-hidden min-w-0">
-          <div className="flex-shrink-0 flex items-center justify-between px-5 py-3 bg-gradient-to-r from-slate-50 to-white border-b border-slate-200">
+          <div className="flex-shrink-0 flex items-center justify-between px-5 py-2 bg-gradient-to-r from-slate-50 to-white border-b border-slate-200">
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2">
                 <Package className="h-5 w-5 text-emerald-600" />
@@ -684,6 +727,27 @@ export default function POSPage() {
               </span>
               <span className="text-slate-300">·</span>
               <span>Prices in {CURRENCY_CODE}</span>
+            </div>
+          </div>
+
+          {/* Product Search Bar */}
+          <div className="flex-shrink-0 px-4 py-2 bg-white border-b border-slate-200">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <input
+                value={productSearch}
+                onChange={(e) => setProductSearch(e.target.value)}
+                placeholder="Search inventory by name, SKU, barcode, or supplier..."
+                className="w-full h-9 pl-9 pr-9 rounded-lg bg-slate-50 border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-400 focus:bg-white transition"
+              />
+              {productSearch && (
+                <button
+                  onClick={() => setProductSearch("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 rounded-full bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition"
+                >
+                  <X className="h-3.5 w-3.5 text-slate-600" />
+                </button>
+              )}
             </div>
           </div>
 

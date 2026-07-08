@@ -1,0 +1,28 @@
+{
+  "choices": [
+    {
+      "finish_reason": "stop",
+      "index": 0,
+      "message": {
+        "content": "1) **Is it ONLY the report (company header + title + table) with NO surrounding form/filter UI?**  \nYes. The image shows *only* the report content (company header, title, and table) with no surrounding form elements, filters, or UI controls (e.g., dropdowns, buttons, input fields) visible.  \n\n2) **Company header exact text and layout**  \n- **Left side**: A circular logo with the letter \"S\" inside.  \n- **Text**:  \n  - Top line: \"SYLHN COMPANY LTD\" (bold, uppercase).  \n  - Middle line: \"Accra Warehouse\".  \n  - Bottom line: \"East Legon, Accra\".  \n- **Right side**:  \n  - Top line: \"7/7/2026\" (date).  \n  - Middle line: \"17:05\" (time).  \n  - Bottom line: \"Page 1\" (page number).  \n- **Layout**: The company name/address is left-aligned, while the date/time/page number is right-aligned, separated by a thin horizontal line below the header.  \n\n3) **Table columns and borders**  \n- **Columns**: 6 columns with the following headers (left to right):  \n  1. Date  \n  2. Qty  \n  3. TAX GHC  \n  4. Amount  \n  5. Paid GHC  \n  6. Due GHC  \n- **Borders**: The table has a thin, solid border around the entire table. Each row (including the header row) is separated by thin horizontal lines, and columns are separated by thin vertical lines.  \n\n4) **Is there a TOTAL row?**  \nNo. There is no \"TOTAL\" row (e.g., a row summarizing totals for columns like Qty, Amount, Paid GHC, or Due GHC) visible in the table.  \n\n5) **Any action buttons visible?**  \nNo. There are no action buttons (e.g., \"Print\", \"Export\", \"Save\") or interactive UI elements visible in the image.",
+        "role": "assistant"
+      }
+    }
+  ],
+  "created": 1783445797,
+  "id": "2026070801362517d1b36ad88143bc",
+  "model": "glm-4.6v",
+  "object": "chat.completion",
+  "request_id": "2026070801362517d1b36ad88143bc",
+  "usage": {
+    "completion_tokens": 430,
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    },
+    "prompt_tokens": 992,
+    "prompt_tokens_details": {
+      "cached_tokens": 6
+    },
+    "total_tokens": 1422
+  }
+}

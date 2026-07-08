@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, Phone, Truck, Users, Clock, Plus, X, PhoneCall,
   MapPin, Search, CheckCircle2, Package, User, Calendar,
-  ChevronRight, Edit2, Trash2, Eye, Filter,
+  ChevronRight, Edit2, Trash2, Eye, Filter, BookOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,8 +13,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { COMPANY, formatGHS, type Product } from "@/lib/pos-data";
+import { TelephoneDirectory, type PhoneDirectoryEntry } from "@/components/telephone-directory";
 
-type TelephoneTab = "phone-orders" | "delivery" | "customers" | "call-log";
+type TelephoneTab = "phone-orders" | "delivery" | "customers" | "call-log" | "directory";
 
 interface PhoneOrder {
   id: string;
@@ -92,12 +93,15 @@ export function TelephoneModule({ onBack }: TelephoneProps) {
   const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
   const [phoneOrders, setPhoneOrders] = useState<PhoneOrder[]>(initialPhoneOrders);
   const [callLog, setCallLog] = useState<CallLogEntry[]>(initialCallLog);
+  const [showDirectory, setShowDirectory] = useState(false);
+  const [directoryEntries, setDirectoryEntries] = useState<PhoneDirectoryEntry[]>([]);
 
   const tabs = [
     { id: "phone-orders" as const, label: "Phone Orders", icon: PhoneCall },
     { id: "delivery" as const, label: "Delivery Tracking", icon: Truck },
     { id: "customers" as const, label: "Customers", icon: Users },
     { id: "call-log" as const, label: "Call Log", icon: Clock },
+    { id: "directory" as const, label: "Phone Directory", icon: BookOpen },
   ];
 
   return (
@@ -130,7 +134,13 @@ export function TelephoneModule({ onBack }: TelephoneProps) {
           {tabs.map(t => (
             <button
               key={t.id}
-              onClick={() => setTab(t.id)}
+              onClick={() => {
+                if (t.id === "directory") {
+                  setShowDirectory(true);
+                } else {
+                  setTab(t.id);
+                }
+              }}
               className={cn(
                 "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all",
                 tab === t.id ? "bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-md" : "text-slate-600 hover:bg-slate-100"
@@ -160,6 +170,17 @@ export function TelephoneModule({ onBack }: TelephoneProps) {
           </motion.div>
         </AnimatePresence>
       </main>
+
+      {/* ===== Telephone Directory Popup ===== */}
+      <AnimatePresence>
+        {showDirectory && (
+          <TelephoneDirectory
+            entries={directoryEntries.length > 0 ? directoryEntries : undefined}
+            onEntriesChange={setDirectoryEntries}
+            onClose={() => setShowDirectory(false)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

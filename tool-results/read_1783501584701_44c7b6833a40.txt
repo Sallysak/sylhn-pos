@@ -1,0 +1,2002 @@
+     1→'use client';
+     2→
+     3→import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+     4→import { motion, AnimatePresence } from "framer-motion";
+     5→import {
+     6→  Search, ShoppingCart, Trash2, Plus, Minus, X, Printer, CreditCard,
+     7→  Banknote, Wallet, Check, Package, Percent, User, Clock, Calendar,
+     8→  ChevronRight, ScanLine, Pause, Play, RotateCcw, DollarSign, Receipt,
+     9→  ShoppingCart as Cart, Settings, Bell, LogOut, Menu as MenuIcon,
+    10→  TrendingUp, BarChart3, Tag, AlertCircle, CheckCircle2, ArrowLeft,
+    11→  Zap, Store, Hash, Boxes, FileBarChart, ChevronDown, FileText, Eye,
+    12→  Layers, ArrowUpDown, History, FileSpreadsheet, Home, Power,
+    13→  Phone, Truck, Users, Database, Wrench, Shield,
+    14→  FileBarChart2, BookOpen, PhoneCall, Archive, Settings2, Lock,
+    15→  FileSearch, Copy, Image as ImageIcon, Tags,
+    16→} from "lucide-react";
+    17→import {
+    18→  products as INITIAL_PRODUCTS, categories, paymentMethods, quickCashAmounts,
+    19→  TAX_RATE, TAX_NAME, COMPANY, CURRENCY, CURRENCY_CODE, formatGHS,
+    20→  stockGroups as INITIAL_GROUPS, initialStockHistory,
+    21→  type Product, type StockGroup, type StockHistoryEntry,
+    22→} from "@/lib/pos-data";
+    23→import type { CartItem, PaymentResult, ViewMode } from "@/lib/pos-types";
+    24→import { Button } from "@/components/ui/button";
+    25→import { Input } from "@/components/ui/input";
+    26→import { Badge } from "@/components/ui/badge";
+    27→import { ScrollArea } from "@/components/ui/scroll-area";
+    28→import { Separator } from "@/components/ui/separator";
+    29→import { useToast } from "@/hooks/use-toast";
+    30→import { cn } from "@/lib/utils";
+    31→import { StockManagement } from "@/components/stock-management";
+    32→import { Reports } from "@/components/reports";
+    33→import { PurchaseModule } from "@/components/purchase-module";
+    34→import { TelephoneModule } from "@/components/telephone-module";
+    35→import { MaintenanceModule } from "@/components/maintenance-module";
+    36→import { SoldItemsReport } from "@/components/sold-items-report";
+    37→import { PurchaseForm } from "@/components/purchase-form";
+    38→import { SalesMenu } from "@/components/sales-menu";
+    39→import { DailySalesReport, SalesHistory } from "@/components/sales-reports";
+    40→import { SupplierForm } from "@/components/supplier-form";
+    41→
+    42→export default function POSPage() {
+    43→  // ===== Top-level View State =====
+    44→  const [view, setView] = useState<ViewMode>("pos");
+    45→  const [openMenu, setOpenMenu] = useState<string | null>(null);
+    46→
+    47→  // ===== Shared Data State =====
+    48→  const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
+    49→  const [groups, setGroups] = useState<StockGroup[]>(INITIAL_GROUPS);
+    50→  const [history, setHistory] = useState<StockHistoryEntry[]>(initialStockHistory);
+    51→
+    52→  // ===== POS State =====
+    53→  const [activeCategory, setActiveCategory] = useState<string>("all");
+    54→  const [searchQuery, setSearchQuery] = useState("");
+    55→  const [cart, setCart] = useState<CartItem[]>([]);
+    56→  const [selectedCartIndex, setSelectedCartIndex] = useState<number | null>(null);
+    57→  const [keypadInput, setKeypadInput] = useState("");
+    58→  const [customerName, setCustomerName] = useState("");
+    59→  const [invoiceNumber, setInvoiceNumber] = useState<string | null>(null);
+    60→  const [cashier] = useState("Sarah Johnson");
+    61→  const [now, setNow] = useState<Date | null>(null);
+    62→  const [heldOrders, setHeldOrders] = useState<{ items: CartItem[]; customer: string; invoice: string }[]>([]);
+    63→  const [showPayment, setShowPayment] = useState(false);
+    64→  const [showReceipt, setShowReceipt] = useState(false);
+    65→  const [lastPayment, setLastPayment] = useState<PaymentResult | null>(null);
+    66→  const [globalDiscount, setGlobalDiscount] = useState(0);
+    67→  const [showCashDrawer, setShowCashDrawer] = useState(false);
+    68→  const [lowStockNotified, setLowStockNotified] = useState<Set<string>>(new Set());
+    69→  const [scannerMode, setScannerMode] = useState(false);
+    70→  const [dailyTotal, setDailyTotal] = useState(0);
+    71→  const [transactionCount, setTransactionCount] = useState(0);
+    72→  const [activeKeypadMode, setActiveKeypadMode] = useState<"qty" | "price" | "barcode">("qty");
+    73→  const [showSidebar, setShowSidebar] = useState(true);
+    74→  const [showFindProduct, setShowFindProduct] = useState(false);
+    75→  const [showCartPreview, setShowCartPreview] = useState(false);
+    76→  const [initialStockView, setInitialStockView] = useState<"stock-file" | "stock-search" | "add-modify" | "group-maintenance" | "quantity-adjustment" | "history">("stock-file");
+    77→  const [openStockQtyReport, setOpenStockQtyReport] = useState(false);
+    78→  const [showStockList, setShowStockList] = useState(false);
+    79→  const [partNoInput, setPartNoInput] = useState("");
+    80→  const [productSearch, setProductSearch] = useState("");
+    81→
+    82→  const { toast } = useToast();
+    83→  const searchInputRef = useRef<HTMLInputElement>(null);
+    84→  const menuRef = useRef<HTMLDivElement>(null);
+    85→
+    86→  // ===== Effects =====
+    87→  // Initialize client-only values to avoid hydration mismatch.
+    88→  // Math.random() and new Date() produce different values on server vs client,
+    89→  // so we must defer their initialization to the client side.
+    90→  /* eslint-disable react-hooks/set-state-in-effect */
+    91→  useEffect(() => {
+    92→    setInvoiceNumber(generateInvoice());
+    93→    setNow(new Date());
+    94→  }, []);
+    95→  /* eslint-enable react-hooks/set-state-in-effect */
+    96→
+    97→  useEffect(() => {
+    98→    if (!now) return;
+    99→    const interval = setInterval(() => setNow(new Date()), 1000);
+   100→    return () => clearInterval(interval);
+   101→  }, [now]);
+   102→
+   103→  // Close menu on outside click
+   104→  useEffect(() => {
+   105→    const handler = (e: MouseEvent) => {
+   106→      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+   107→        setOpenMenu(null);
+   108→      }
+   109→    };
+   110→    document.addEventListener('mousedown', handler);
+   111→    return () => document.removeEventListener('mousedown', handler);
+   112→  }, []);
+   113→
+   114→  // ===== Computed =====
+   115→  const filteredProducts = useMemo(() => {
+   116→    let result = products;
+   117→    if (activeCategory !== "all") {
+   118→      result = result.filter(p => p.category === activeCategory);
+   119→    }
+   120→    if (searchQuery.trim()) {
+   121→      const q = searchQuery.toLowerCase();
+   122→      result = result.filter(p =>
+   123→        p.name.toLowerCase().includes(q) ||
+   124→        p.sku.toLowerCase().includes(q) ||
+   125→        p.barcode.includes(q)
+   126→      );
+   127→    }
+   128→    if (productSearch.trim()) {
+   129→      const q = productSearch.toLowerCase();
+   130→      result = result.filter(p =>
+   131→        p.name.toLowerCase().includes(q) ||
+   132→        p.sku.toLowerCase().includes(q) ||
+   133→        p.barcode.includes(q) ||
+   134→        p.supplier.toLowerCase().includes(q)
+   135→      );
+   136→    }
+   137→    return result;
+   138→  }, [activeCategory, searchQuery, productSearch, products]);
+   139→
+   140→  const subtotal = useMemo(() =>
+   141→    cart.reduce((sum, item) => {
+   142→      const lineTotal = item.price * item.quantity;
+   143→      const lineDiscount = lineTotal * (item.discount / 100);
+   144→      return sum + (lineTotal - lineDiscount);
+   145→    }, 0), [cart]);
+   146→
+   147→  const discountAmount = useMemo(() =>
+   148→    cart.reduce((sum, item) => sum + (item.price * item.quantity * (item.discount / 100)), 0) +
+   149→    (subtotal * (globalDiscount / 100)), [cart, subtotal, globalDiscount]);
+   150→
+   151→  const taxableAmount = useMemo(() =>
+   152→    cart.reduce((sum, item) => {
+   153→      if (!item.taxable) return sum;
+   154→      const lineTotal = item.price * item.quantity;
+   155→      const lineDiscount = lineTotal * (item.discount / 100);
+   156→      return sum + (lineTotal - lineDiscount);
+   157→    }, 0) - (subtotal * (globalDiscount / 100)), [cart, subtotal, globalDiscount]);
+   158→
+   159→  const taxAmount = taxableAmount * TAX_RATE;
+   160→  const totalAfterDiscount = subtotal - (subtotal * (globalDiscount / 100));
+   161→  const total = totalAfterDiscount + taxAmount;
+   162→  const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+   163→
+   164→  // ===== Cart Actions =====
+   165→  const addToCart = useCallback((product: Product) => {
+   166→    setCart(prev => {
+   167→      const existing = prev.find(item => item.productId === product.id);
+   168→      if (existing) {
+   169→        if (existing.quantity >= product.stock) {
+   170→          toast({ title: "Stock limit reached", description: `Only ${product.stock} ${product.unit} of ${product.name} available`, variant: "destructive" });
+   171→          return prev;
+   172→        }
+   173→        return prev.map(item =>
+   174→          item.productId === product.id
+   175→            ? { ...item, quantity: item.quantity + 1 }
+   176→            : item
+   177→        );
+   178→      }
+   179→      if (product.stock <= 0) {
+   180→        toast({ title: "Out of stock", description: `${product.name} is unavailable`, variant: "destructive" });
+   181→        return prev;
+   182→      }
+   183→      if (product.stock <= product.reorderLevel && !lowStockNotified.has(product.id)) {
+   184→        toast({ title: "Low stock alert", description: `${product.name} has only ${product.stock} units left`, variant: "default" });
+   185→        setLowStockNotified(prev => new Set(prev).add(product.id));
+   186→      }
+   187→      return [...prev, {
+   188→        id: `${product.id}-${Date.now()}`,
+   189→        productId: product.id,
+   190→        sku: product.sku,
+   191→        name: product.name,
+   192→        price: product.price,
+   193→        quantity: 1,
+   194→        unit: product.unit,
+   195→        emoji: product.emoji,
+   196→        discount: 0,
+   197→        taxable: product.taxable,
+   198→        stock: product.stock,
+   199→      }];
+   200→    });
+   201→    toast({ title: "Added to cart", description: `${product.emoji} ${product.name}`, duration: 1500 });
+   202→  }, [lowStockNotified, toast]);
+   203→
+   204→  const updateQuantity = (index: number, delta: number) => {
+   205→    setCart(prev => prev.map((item, i) => {
+   206→      if (i !== index) return item;
+   207→      const newQty = item.quantity + delta;
+   208→      if (newQty <= 0) return item;
+   209→      if (newQty > item.stock) {
+   210→        toast({ title: "Stock limit reached", variant: "destructive" });
+   211→        return item;
+   212→      }
+   213→      return { ...item, quantity: newQty };
+   214→    }));
+   215→  };
+   216→
+   217→  const setQuantity = (index: number, qty: number) => {
+   218→    setCart(prev => prev.map((item, i) => {
+   219→      if (i !== index) return item;
+   220→      if (qty <= 0) return item;
+   221→      if (qty > item.stock) {
+   222→        toast({ title: "Stock limit reached", variant: "destructive" });
+   223→        return item;
+   224→      }
+   225→      return { ...item, quantity: qty };
+   226→    }));
+   227→  };
+   228→
+   229→  const removeLine = (index: number) => {
+   230→    setCart(prev => prev.filter((_, i) => i !== index));
+   231→    setSelectedCartIndex(null);
+   232→    toast({ title: "Line removed", variant: "default" });
+   233→  };
+   234→
+   235→  const applyDiscount = (index: number, discount: number) => {
+   236→    setCart(prev => prev.map((item, i) =>
+   237→      i === index ? { ...item, discount: Math.min(100, Math.max(0, discount)) } : item
+   238→    ));
+   239→  };
+   240→
+   241→  const clearCart = () => {
+   242→    setCart([]);
+   243→    setSelectedCartIndex(null);
+   244→    setGlobalDiscount(0);
+   245→    setCustomerName("");
+   246→    setInvoiceNumber(generateInvoice());
+   247→  };
+   248→
+   249→  // ===== Keypad =====
+   250→  const handleKeypadPress = (key: string) => {
+   251→    if (key === "C") { setKeypadInput(""); return; }
+   252→    if (key === "⌫") { setKeypadInput(prev => prev.slice(0, -1)); return; }
+   253→    if (key === "Enter") { handleKeypadEnter(); return; }
+   254→    if (key === "." && keypadInput.includes(".")) return;
+   255→    setKeypadInput(prev => prev + key);
+   256→  };
+   257→
+   258→  const handleKeypadEnter = () => {
+   259→    const value = parseFloat(keypadInput);
+   260→    if (isNaN(value) && activeKeypadMode !== "barcode") {
+   261→      toast({ title: "Invalid input", variant: "destructive" });
+   262→      return;
+   263→    }
+   264→    if (activeKeypadMode === "qty" && selectedCartIndex !== null) {
+   265→      setQuantity(selectedCartIndex, value);
+   266→      toast({ title: `Quantity updated to ${value}` });
+   267→    } else if (activeKeypadMode === "price" && selectedCartIndex !== null) {
+   268→      setCart(prev => prev.map((item, i) =>
+   269→        i === selectedCartIndex ? { ...item, price: value } : item
+   270→      ));
+   271→      toast({ title: `Price updated to ${formatGHS(value)}` });
+   272→    } else if (activeKeypadMode === "barcode") {
+   273→      const product = products.find(p => p.barcode === keypadInput || p.sku === keypadInput);
+   274→      if (product) {
+   275→        addToCart(product);
+   276→      } else {
+   277→        toast({ title: "Product not found", description: `No item with code ${keypadInput}`, variant: "destructive" });
+   278→      }
+   279→    }
+   280→    setKeypadInput("");
+   281→  };
+   282→
+   283→  // ===== Function Buttons =====
+   284→  const handleSave = () => {
+   285→    if (cart.length === 0) {
+   286→      toast({ title: "Cart is empty", variant: "destructive" });
+   287→      return;
+   288→    }
+   289→    setHeldOrders(prev => [...prev, { items: cart, customer: customerName, invoice: invoiceNumber }]);
+   290→    clearCart();
+   291→    toast({ title: "Order saved (F2)", description: `${heldOrders.length + 1} order(s) on hold` });
+   292→  };
+   293→
+   294→  const handlePrint = () => {
+   295→    if (cart.length === 0) {
+   296→      toast({ title: "Nothing to print", variant: "destructive" });
+   297→      return;
+   298→    }
+   299→    toast({ title: "Printing receipt (F3)", description: `Invoice ${invoiceNumber}` });
+   300→  };
+   301→
+   302→  const handleVoid = () => {
+   303→    if (cart.length === 0) {
+   304→      toast({ title: "Cart already empty", variant: "destructive" });
+   305→      return;
+   306→    }
+   307→    clearCart();
+   308→    toast({ title: "Transaction voided (F4)", variant: "default" });
+   309→  };
+   310→
+   311→  const handlePay = () => {
+   312→    if (cart.length === 0) {
+   313→      toast({ title: "Cart is empty", variant: "destructive" });
+   314→      return;
+   315→    }
+   316→    setShowPayment(true);
+   317→  };
+   318→
+   319→  const handleOpenCash = () => {
+   320→    setShowCashDrawer(true);
+   321→    setTimeout(() => setShowCashDrawer(false), 2000);
+   322→    toast({ title: "Cash drawer opened", description: "Register #1 - Drawer 01" });
+   323→  };
+   324→
+   325→  // Keyboard shortcuts
+   326→  useEffect(() => {
+   327→    const handler = (e: KeyboardEvent) => {
+   328→      if ((e.target as HTMLElement).tagName === 'INPUT') return;
+   329→      if (e.key === 'F1') { e.preventDefault(); setShowFindProduct(true); }
+   330→      if (e.key === 'F2') { e.preventDefault(); handleSave(); }
+   331→      if (e.key === 'F3') { e.preventDefault(); handlePrint(); }
+   332→      if (e.key === 'F4') { e.preventDefault(); handleVoid(); }
+   333→      if (e.key === 'F5') { e.preventDefault(); handlePay(); }
+   334→      if (e.key === 'F6') { e.preventDefault(); setShowCartPreview(true); }
+   335→      if (e.key === 'F10') { e.preventDefault(); setShowStockList(true); }
+   336→      if (e.key === 'Escape') {
+   337→        if (showPayment) setShowPayment(false);
+   338→        else if (showReceipt) setShowReceipt(false);
+   339→        else if (showFindProduct) setShowFindProduct(false);
+   340→        else if (showStockList) setShowStockList(false);
+   341→        else if (showCartPreview) setShowCartPreview(false);
+   342→        else setSelectedCartIndex(null);
+   343→      }
+   344→    };
+   345→    window.addEventListener('keydown', handler);
+   346→    return () => window.removeEventListener('keydown', handler);
+   347→  });
+   348→
+   349→  const completePayment = (method: string, amountPaid: number) => {
+   350→    const change = amountPaid - total;
+   351→    const result: PaymentResult = {
+   352→      method,
+   353→      amountPaid,
+   354→      change: Math.max(0, change),
+   355→      total,
+   356→      subtotal,
+   357→      tax: taxAmount,
+   358→      discount: discountAmount,
+   359→      timestamp: new Date(),
+   360→      invoiceNumber,
+   361→      items: [...cart],
+   362→      cashier,
+   363→      customer: customerName || undefined,
+   364→    };
+   365→    // Reduce stock levels
+   366→    setProducts(prev => prev.map(p => {
+   367→      const cartItem = cart.find(c => c.productId === p.id);
+   368→      if (!cartItem) return p;
+   369→      return { ...p, stock: Math.max(0, p.stock - cartItem.quantity) };
+   370→    }));
+   371→    // Add history entries
+   372→    const newHistory = cart.map(item => ({
+   373→      id: `h-${Date.now()}-${item.productId}`,
+   374→      productId: item.productId,
+   375→      productName: item.name,
+   376→      sku: item.sku,
+   377→      action: 'sold' as const,
+   378→      quantityChange: -item.quantity,
+   379→      newQuantity: (products.find(p => p.id === item.productId)?.stock || 0) - item.quantity,
+   380→      timestamp: new Date().toISOString(),
+   381→      user: cashier,
+   382→      reason: `Sold via ${method} - Invoice ${invoiceNumber}`,
+   383→      reference: invoiceNumber,
+   384→    }));
+   385→    setHistory(prev => [...prev, ...newHistory]);
+   386→    setLastPayment(result);
+   387→    setDailyTotal(prev => prev + total);
+   388→    setTransactionCount(prev => prev + 1);
+   389→    setShowPayment(false);
+   390→    setShowReceipt(true);
+   391→  };
+   392→
+   393→  const finishReceipt = () => {
+   394→    setShowReceipt(false);
+   395→    clearCart();
+   396→    setLastPayment(null);
+   397→  };
+   398→
+   399→  const recallOrder = (index: number) => {
+   400→    const order = heldOrders[index];
+   401→    setCart(order.items);
+   402→    setCustomerName(order.customer);
+   403→    setInvoiceNumber(order.invoice);
+   404→    setHeldOrders(prev => prev.filter((_, i) => i !== index));
+   405→    toast({ title: "Order recalled", description: `${order.items.length} items restored` });
+   406→  };
+   407→
+   408→  // ===== Menu Items =====
+   409→  const menus = [
+   410→    {
+   411→      id: "pos",
+   412→      label: "POS",
+   413→      items: [
+   414→        { label: "Go to POS Screen", icon: Home, action: () => { setView("pos"); }, shortcut: "Ctrl+P" },
+   415→        { label: "New Sale", icon: Plus, action: () => { clearCart(); setView("pos"); }, shortcut: "Ctrl+N" },
+   416→        { separator: true },
+   417→        { label: "Open Cash Drawer", icon: DollarSign, action: handleOpenCash },
+   418→        { label: "Switch Register", icon: Store, action: () => toast({ title: "Switch Register", description: "Select another register to switch to" }) },
+   419→      ],
+   420→    },
+   421→    {
+   422→      id: "sale",
+   423→      label: "Sale",
+   424→      items: [
+   425→        { label: "New Sale", icon: Plus, action: () => { clearCart(); setView("pos"); }, shortcut: "Ctrl+N" },
+   426→        { label: "Save / Hold Order", icon: Pause, action: handleSave, shortcut: "F2" },
+   427→        { label: "Print Receipt", icon: Printer, action: handlePrint, shortcut: "F3" },
+   428→        { label: "Void Transaction", icon: RotateCcw, action: () => { if (cart.length === 0) { toast({ title: "Cart is already empty", variant: "destructive" }); return; } clearCart(); toast({ title: "Transaction voided (F4)" }); }, shortcut: "F4" },
+   429→        { label: "Pay Now", icon: CreditCard, action: () => { if (cart.length === 0) { toast({ title: "Cart is empty", variant: "destructive" }); return; } setShowPayment(true); }, shortcut: "F5" },
+   430→        { separator: true },
+   431→        { label: "Sales Menu", icon: FileText, action: () => setView("sales-menu") },
+   432→        { label: "Sold Items Report", icon: FileBarChart, action: () => setView("sold-items") },
+   433→        { label: "Sales History", icon: History, action: () => setView("sales-history") },
+   434→        { label: "Daily Sales Report", icon: TrendingUp, action: () => setView("daily-sales") },
+   435→      ],
+   436→    },
+   437→    {
+   438→      id: "stock",
+   439→      label: "Stock",
+   440→      items: [
+   441→        { label: "Stock File", icon: FileText, action: () => { setInitialStockView("stock-file"); setView("stock"); } },
+   442→        { label: "Stock Search", icon: FileSearch, action: () => { setInitialStockView("stock-search"); setView("stock"); } },
+   443→        { label: "Add / Modify Stock", icon: Package, action: () => { setInitialStockView("add-modify"); setView("stock"); } },
+   444→        { label: "Group Maintenance", icon: Layers, action: () => { setInitialStockView("group-maintenance"); setView("stock"); } },
+   445→        { label: "Quantity Adjustment", icon: ArrowUpDown, action: () => { setInitialStockView("quantity-adjustment"); setView("stock"); } },
+   446→        { label: "Stock History", icon: History, action: () => { setInitialStockView("history"); setView("stock"); } },
+   447→        { separator: true },
+   448→        { label: "Stock Qty Report", icon: FileBarChart, action: () => { setOpenStockQtyReport(true); setInitialStockView("add-modify"); setView("stock"); } },
+   449→        { label: "Stock Reports", icon: FileBarChart, action: () => setView("reports") },
+   450→        { label: "Quantities Report", icon: FileText, action: () => setView("reports") },
+   451→        { label: "Stock Value Report", icon: BarChart3, action: () => setView("reports") },
+   452→        { label: "Reorder Report", icon: RotateCcw, action: () => setView("reports") },
+   453→        { label: "Expiry Date Report", icon: Calendar, action: () => setView("reports") },
+   454→      ],
+   455→    },
+   456→    {
+   457→      id: "purchase",
+   458→      label: "Purchase",
+   459→      items: [
+   460→        { label: "Purchase", icon: FileText, action: () => setView("purchase-form") },
+   461→        { label: "Supplier", icon: Users, action: () => setView("supplier-form") },
+   462→        { label: "Purchase Orders", icon: Archive, action: () => setView("purchase") },
+   463→        { label: "Receive Stock", icon: Package, action: () => setView("purchase") },
+   464→        { separator: true },
+   465→        { label: "Purchase History", icon: History, action: () => setView("purchase") },
+   466→        { label: "Supplier Payments", icon: DollarSign, action: () => setView("purchase") },
+   467→        { separator: true },
+   468→        { label: "Purchase Report", icon: FileBarChart2, action: () => setView("purchase") },
+   469→      ],
+   470→    },
+   471→    {
+   472→      id: "accounts",
+   473→      label: "Accounts",
+   474→      items: [
+   475→        { label: "Daily Sales", icon: TrendingUp, action: () => toast({ title: "Daily Sales", description: `Total: ${formatGHS(dailyTotal)} (${transactionCount} txns)` }) },
+   476→        { label: "Profit & Loss", icon: BarChart3, action: () => toast({ title: "Profit & Loss", description: "View profit and loss statement" }) },
+   477→        { label: "VAT Tax Report", icon: Percent, action: () => toast({ title: "VAT Report", description: "Tax collected report (15% VAT)" }) },
+   478→        { separator: true },
+   479→        { label: "Stock Value Report", icon: DollarSign, action: () => setView("reports") },
+   480→        { label: "Cost Price Report", icon: FileText, action: () => setView("reports") },
+   481→        { label: "Stock Performance", icon: TrendingUp, action: () => setView("reports") },
+   482→        { separator: true },
+   483→        { label: "General Ledger", icon: BookOpen, action: () => toast({ title: "General Ledger", description: "Accounting ledger entries" }) },
+   484→        { label: "Trial Balance", icon: FileBarChart2, action: () => toast({ title: "Trial Balance", description: "View trial balance report" }) },
+   485→      ],
+   486→    },
+   487→    {
+   488→      id: "telephone",
+   489→      label: "Telephone",
+   490→      items: [
+   491→        { label: "Phone Orders", icon: PhoneCall, action: () => setView("telephone") },
+   492→        { label: "Delivery Tracking", icon: Truck, action: () => setView("telephone") },
+   493→        { label: "Customer Database", icon: Users, action: () => setView("telephone") },
+   494→        { separator: true },
+   495→        { label: "Call Log", icon: Phone, action: () => setView("telephone") },
+   496→      ],
+   497→    },
+   498→    {
+   499→      id: "maintenance",
+   500→      label: "Maintenance",
+   501→      items: [
+   502→        { label: "System Settings", icon: Settings2, action: () => setView("maintenance") },
+   503→        { label: "User Management", icon: Users, action: () => setView("maintenance") },
+   504→        { label: "Backup Database", icon: Database, action: () => setView("maintenance") },
+   505→        { separator: true },
+   506→        { label: "Cashier Shift", icon: Clock, action: () => setView("maintenance") },
+   507→        { label: "Security & Permissions", icon: Lock, action: () => setView("maintenance") },
+   508→        { separator: true },
+   509→        { label: "About SYLHN POS", icon: Store, action: () => setView("maintenance") },
+   510→        { label: "Exit", icon: Power, action: () => toast({ title: "Goodbye!", description: "Shift ended" }) },
+   511→      ],
+   512→    },
+   513→  ];
+   514→
+   515→  // ===== Render Other Views =====
+   516→  if (view === "stock") {
+   517→    return <StockManagement onBack={() => { setView("pos"); setOpenStockQtyReport(false); }} products={products} setProducts={setProducts} groups={groups} setGroups={setGroups} history={history} setHistory={setHistory} initialView={initialStockView} openQtyReport={openStockQtyReport} />;
+   518→  }
+   519→  if (view === "reports") {
+   520→    return <Reports onBack={() => setView("pos")} products={products} groups={groups} history={history} />;
+   521→  }
+   522→  if (view === "purchase") {
+   523→    return <PurchaseModule onBack={() => setView("pos")} products={products} />;
+   524→  }
+   525→  if (view === "purchase-form") {
+   526→    return <PurchaseForm onBack={() => setView("pos")} products={products} groups={groups} suppliers={groups.map(g => ({ id: g.id, name: g.name }))} />;
+   527→  }
+   528→  if (view === "telephone") {
+   529→    return <TelephoneModule onBack={() => setView("pos")} products={products} />;
+   530→  }
+   531→  if (view === "maintenance") {
+   532→    return <MaintenanceModule onBack={() => setView("pos")} cashier={cashier} dailyTotal={dailyTotal} transactionCount={transactionCount} />;
+   533→  }
+   534→  if (view === "sold-items") {
+   535→    return <SoldItemsReport onBack={() => setView("pos")} />;
+   536→  }
+   537→  if (view === "sales-menu") {
+   538→    return <SalesMenu onBack={() => setView("pos")} />;
+   539→  }
+   540→  if (view === "daily-sales") {
+   541→    return <DailySalesReport onBack={() => setView("pos")} dailyTotal={dailyTotal} transactionCount={transactionCount} />;
+   542→  }
+   543→  if (view === "sales-history") {
+   544→    return <SalesHistory onBack={() => setView("pos")} />;
+   545→  }
+   546→  if (view === "supplier-form") {
+   547→    return <SupplierForm onBack={() => setView("pos")} products={products} />;
+   548→  }
+   549→
+   550→  // ===== Render POS =====
+   551→  return (
+   552→    <div className="h-screen w-screen overflow-hidden bg-gradient-to-br from-slate-100 via-emerald-50 to-slate-100 flex flex-col font-sans">
+   553→      {/* ===== Header Bar with Menu ===== */}
+   554→      <header className="flex-shrink-0 bg-gradient-to-r from-emerald-700 via-emerald-600 to-teal-600 text-white shadow-lg z-30">
+   555→        <div className="flex items-center px-4 py-2 gap-4">
+   556→          {/* Logo */}
+   557→          <div className="flex items-center gap-2.5 flex-shrink-0">
+   558→            <div className="h-10 w-10 rounded-xl bg-white/15 backdrop-blur flex items-center justify-center ring-1 ring-white/20 font-bold text-lg">
+   559→              S
+   560→            </div>
+   561→            <div>
+   562→              <div className="font-bold text-base leading-tight tracking-tight">{COMPANY.name}</div>
+   563→              <div className="text-[10px] text-emerald-100/90 leading-tight">{COMPANY.address} · {COMPANY.contact}</div>
+   564→            </div>
+   565→          </div>
+   566→
+   567→          {/* Menu Bar */}
+   568→          <div ref={menuRef} className="flex items-center gap-0.5 flex-shrink-0">
+   569→            {menus.map(menu => (
+   570→              <div key={menu.id} className="relative">
+   571→                <button
+   572→                  onClick={() => setOpenMenu(openMenu === menu.id ? null : menu.id)}
+   573→                  onMouseEnter={() => setOpenMenu(menu.id)}
+   574→                  className={cn(
+   575→                    "px-3 py-1.5 rounded-md text-xs font-semibold transition flex items-center gap-1",
+   576→                    openMenu === menu.id ? "bg-white/20" : "hover:bg-white/10"
+   577→                  )}
+   578→                >
+   579→                  {menu.label}
+   580→                  <ChevronDown className="h-3 w-3 opacity-70" />
+   581→                </button>
+   582→                <AnimatePresence>
+   583→                  {openMenu === menu.id && (
+   584→                    <motion.div
+   585→                      initial={{ opacity: 0, y: -5 }}
+   586→                      animate={{ opacity: 1, y: 0 }}
+   587→                      exit={{ opacity: 0, y: -5 }}
+   588→                      transition={{ duration: 0.15 }}
+   589→                      className="absolute top-full left-0 mt-1 w-60 bg-white rounded-xl shadow-2xl ring-1 ring-slate-200 overflow-hidden z-50 py-1"
+   590→                    >
+   591→                      {menu.items.map((item, i) => {
+   592→                        if ('separator' in item) {
+   593→                          return <div key={i} className="h-px bg-slate-100 my-1" />;
+   594→                        }
+   595→                        return (
+   596→                          <button
+   597→                            key={i}
+   598→                            onClick={() => { item.action(); setOpenMenu(null); }}
+   599→                            className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-emerald-50 text-slate-700 hover:text-emerald-700 text-xs font-medium transition text-left group"
+   600→                          >
+   601→                            <item.icon className="h-3.5 w-3.5 text-slate-400 group-hover:text-emerald-600" />
+   602→                            <span className="flex-1">{item.label}</span>
+   603→                            {'shortcut' in item && item.shortcut && (
+   604→                              <kbd className="text-[9px] font-mono text-slate-400 bg-slate-100 px-1 py-0.5 rounded">{item.shortcut}</kbd>
+   605→                            )}
+   606→                          </button>
+   607→                        );
+   608→                      })}
+   609→                    </motion.div>
+   610→                  )}
+   611→                </AnimatePresence>
+   612→              </div>
+   613→            ))}
+   614→          </div>
+   615→
+   616→          {/* Search */}
+   617→          <div className="flex-1 max-w-xl relative">
+   618→            <div className="relative">
+   619→              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+   620→              <input
+   621→                ref={searchInputRef}
+   622→                value={searchQuery}
+   623→                onChange={(e) => setSearchQuery(e.target.value)}
+   624→                placeholder="Search products, scan barcode, or enter SKU..."
+   625→                className="w-full h-9 pl-10 pr-20 rounded-xl bg-white text-slate-800 text-sm shadow-md outline-none ring-2 ring-transparent focus:ring-emerald-300 transition"
+   626→              />
+   627→              <button
+   628→                onClick={() => setScannerMode(!scannerMode)}
+   629→                className={cn("absolute right-2 top-1/2 -translate-y-1/2 h-6 px-2 rounded-lg flex items-center gap-1 text-[11px] font-medium transition",
+   630→                  scannerMode ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500 hover:bg-slate-200")}
+   631→              >
+   632→                <ScanLine className="h-3.5 w-3.5" />
+   633→                Scan
+   634→              </button>
+   635→            </div>
+   636→          </div>
+   637→
+   638→          {/* Right: Date, Stats, Cashier */}
+   639→          <div className="flex items-center gap-2 flex-shrink-0">
+   640→            <div className="hidden lg:flex items-center gap-2 text-right">
+   641→              <div className="px-2.5 py-1 rounded-lg bg-white/10 backdrop-blur ring-1 ring-white/15">
+   642→                <div className="text-[9px] text-emerald-100/80 font-medium">{now ? now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : '--'}</div>
+   643→                <div className="text-xs font-mono font-bold">{now ? now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '--:--:--'}</div>
+   644→              </div>
+   645→              <div className="px-2.5 py-1 rounded-lg bg-white/10 backdrop-blur ring-1 ring-white/15">
+   646→                <div className="text-[9px] text-emerald-100/80 font-medium">Daily Sales</div>
+   647→                <div className="text-xs font-mono font-bold">{formatGHS(dailyTotal)}</div>
+   648→              </div>
+   649→              <div className="px-2.5 py-1 rounded-lg bg-white/10 backdrop-blur ring-1 ring-white/15">
+   650→                <div className="text-[9px] text-emerald-100/80 font-medium">Txns</div>
+   651→                <div className="text-xs font-mono font-bold">{transactionCount}</div>
+   652→              </div>
+   653→            </div>
+   654→            <div className="h-9 w-9 rounded-full bg-white/20 ring-2 ring-white/30 flex items-center justify-center text-xs font-bold">
+   655→              SJ
+   656→            </div>
+   657→            <button className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center transition">
+   658→              <LogOut className="h-4 w-4" />
+   659→            </button>
+   660→          </div>
+   661→        </div>
+   662→      </header>
+   663→
+   664→      {/* ===== Category Navigation ===== */}
+   665→      <nav className="flex-shrink-0 bg-white border-b border-slate-200 shadow-sm z-20">
+   666→        <div className="flex items-center gap-1.5 px-4 py-2 overflow-x-auto scrollbar-hide">
+   667→          {categories.map(cat => (
+   668→            <button
+   669→              key={cat.id}
+   670→              onClick={() => setActiveCategory(cat.id)}
+   671→              className={cn(
+   672→                "flex-shrink-0 flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200",
+   673→                activeCategory === cat.id
+   674→                  ? `bg-gradient-to-r ${cat.gradient} text-white shadow-md scale-105`
+   675→                  : "bg-slate-100 text-slate-600 hover:bg-slate-200 hover:scale-105"
+   676→              )}
+   677→            >
+   678→              <span className="text-base">{cat.icon}</span>
+   679→              {cat.name}
+   680→              {activeCategory === cat.id && cat.id !== "all" && (
+   681→                <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px] bg-white/25 text-white">
+   682→                  {products.filter(p => p.category === cat.id).length}
+   683→                </Badge>
+   684→              )}
+   685→            </button>
+   686→          ))}
+   687→        </div>
+   688→      </nav>
+   689→
+   690→      {/* ===== Main Content ===== */}
+   691→      <main className="flex-1 flex overflow-hidden p-3 gap-3">
+   692→        {/* ===== Left Panel: Product Grid (60%) ===== */}
+   693→        <section className="flex-1 flex flex-col bg-white rounded-2xl shadow-lg ring-1 ring-slate-200/60 overflow-hidden min-w-0">
+   694→          <div className="flex-shrink-0 flex items-center justify-between px-5 py-2 bg-gradient-to-r from-slate-50 to-white border-b border-slate-200">
+   695→            <div className="flex items-center gap-3">
+   696→              <div className="flex items-center gap-2">
+   697→                <Package className="h-5 w-5 text-emerald-600" />
+   698→                <h2 className="text-base font-bold text-slate-800">
+   699→                  {categories.find(c => c.id === activeCategory)?.name || "All Products"}
+   700→                </h2>
+   701→              </div>
+   702→              <Badge variant="outline" className="font-mono text-[11px]">
+   703→                {filteredProducts.length} items
+   704→              </Badge>
+   705→            </div>
+   706→            <div className="flex items-center gap-2 text-[11px] text-slate-500">
+   707→              <span className="flex items-center gap-1">
+   708→                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+   709→                Live Inventory
+   710→              </span>
+   711→              <span className="text-slate-300">·</span>
+   712→              <span>Prices in {CURRENCY_CODE}</span>
+   713→            </div>
+   714→          </div>
+   715→
+   716→          {/* Product Search Bar */}
+   717→          <div className="flex-shrink-0 px-4 py-2 bg-white border-b border-slate-200">
+   718→            <div className="relative">
+   719→              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+   720→              <input
+   721→                value={productSearch}
+   722→                onChange={(e) => setProductSearch(e.target.value)}
+   723→                placeholder="Search inventory by name, SKU, barcode, or supplier..."
+   724→                className="w-full h-9 pl-9 pr-9 rounded-lg bg-slate-50 border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-400 focus:bg-white transition"
+   725→              />
+   726→              {productSearch && (
+   727→                <button
+   728→                  onClick={() => setProductSearch("")}
+   729→                  className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 rounded-full bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition"
+   730→                >
+   731→                  <X className="h-3.5 w-3.5 text-slate-600" />
+   732→                </button>
+   733→              )}
+   734→            </div>
+   735→          </div>
+   736→
+   737→          <ScrollArea className="flex-1">
+   738→            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 p-4">
+   739→              {filteredProducts.map((product, idx) => {
+   740→                const inCart = cart.find(item => item.productId === product.id);
+   741→                const lowStock = product.stock <= product.reorderLevel;
+   742→                return (
+   743→                  <motion.button
+   744→                    key={product.id}
+   745→                    layout
+   746→                    initial={{ opacity: 0, scale: 0.9 }}
+   747→                    animate={{ opacity: 1, scale: 1 }}
+   748→                    transition={{ duration: 0.2, delay: Math.min(idx * 0.015, 0.3) }}
+   749→                    whileHover={{ y: -3, scale: 1.02 }}
+   750→                    whileTap={{ scale: 0.97 }}
+   751→                    onClick={() => addToCart(product)}
+   752→                    className="group relative flex flex-col items-center text-center bg-white rounded-xl p-3 ring-1 ring-slate-200 hover:ring-emerald-400 hover:shadow-lg transition-all duration-200"
+   753→                  >
+   754→                    {inCart && (
+   755→                      <div className="absolute top-1.5 right-1.5 z-10 h-6 w-6 rounded-full bg-emerald-500 text-white text-[11px] font-bold flex items-center justify-center shadow-md">
+   756→                        {inCart.quantity}
+   757→                      </div>
+   758→                    )}
+   759→                    {product.taxable && (
+   760→                      <div className="absolute top-1.5 left-1.5 z-10 px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700 text-[9px] font-bold">
+   761→                        VAT
+   762→                      </div>
+   763→                    )}
+   764→                    {lowStock && (
+   765→                      <div className="absolute bottom-1.5 left-1.5 z-10 px-1.5 py-0.5 rounded-md bg-rose-100 text-rose-700 text-[9px] font-bold">
+   766→                        LOW
+   767→                      </div>
+   768→                    )}
+   769→                    <div className="h-16 w-16 rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center text-4xl mb-2 group-hover:scale-110 transition-transform duration-200">
+   770→                      {product.emoji}
+   771→                    </div>
+   772→                    <div className="w-full">
+   773→                      <div className="text-xs font-semibold text-slate-800 leading-tight line-clamp-2 min-h-[2rem]">
+   774→                        {product.name}
+   775→                      </div>
+   776→                      <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+   777→                        {product.sku}
+   778→                      </div>
+   779→                      <div className="flex items-center justify-between mt-1.5">
+   780→                        <div className="text-sm font-bold text-emerald-600">
+   781→                          {formatGHS(product.price)}
+   782→                        </div>
+   783→                        <div className="text-[10px] text-slate-400">/{product.unit}</div>
+   784→                      </div>
+   785→                      <div className="text-[10px] text-slate-400 mt-0.5">
+   786→                        Stock: {product.stock}
+   787→                      </div>
+   788→                    </div>
+   789→                  </motion.button>
+   790→                );
+   791→              })}
+   792→            </div>
+   793→            {filteredProducts.length === 0 && (
+   794→              <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+   795→                <Package className="h-12 w-12 mb-3 opacity-40" />
+   796→                <div className="text-sm font-medium">No products found</div>
+   797→                <div className="text-xs mt-1">Try a different category or search term</div>
+   798→              </div>
+   799→            )}
+   800→          </ScrollArea>
+   801→        </section>
+   802→
+   803→        {/* ===== Right Panel: Cart + Keypad + Functions (40%) ===== */}
+   804→        <section className={cn(
+   805→          "flex flex-col bg-white rounded-2xl shadow-lg ring-1 ring-slate-200/60 overflow-hidden transition-all duration-300",
+   806→          showSidebar ? "w-[38%] min-w-[380px]" : "w-0 min-w-0"
+   807→        )}>
+   808→          <AnimatePresence>
+   809→            {showSidebar && (
+   810→              <motion.div
+   811→                initial={{ opacity: 0 }}
+   812→                animate={{ opacity: 1 }}
+   813→                exit={{ opacity: 0 }}
+   814→                className="flex flex-col h-full w-full"
+   815→              >
+   816→                {/* Cart Header */}
+   817→                <div className="flex-shrink-0 flex items-center justify-between px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-500 text-white">
+   818→                  <div className="flex items-center gap-2">
+   819→                    <Cart className="h-4 w-4" />
+   820→                    <span className="text-xs font-bold">Invoice #{invoiceNumber || '------'}</span>
+   821→                  </div>
+   822→                  <button onClick={() => setShowSidebar(false)} className="h-6 w-6 rounded hover:bg-white/20 flex items-center justify-center transition">
+   823→                    <X className="h-3.5 w-3.5" />
+   824→                  </button>
+   825→                </div>
+   826→
+   827→                {/* Invoice Info Bar */}
+   828→                <div className="flex-shrink-0 px-3 py-1.5 bg-slate-100 border-b border-slate-300 flex items-center gap-3 text-[10px]">
+   829→                  <div className="flex items-center gap-1">
+   830→                    <span className="font-semibold text-slate-600">Client:</span>
+   831→                    <input
+   832→                      value={customerName}
+   833→                      onChange={(e) => setCustomerName(e.target.value)}
+   834→                      placeholder="Walk-in customer"
+   835→                      className="w-32 h-6 px-1.5 border border-slate-300 rounded text-[10px] bg-white outline-none focus:ring-1 focus:ring-blue-400"
+   836→                    />
+   837→                  </div>
+   838→                  <div className="flex items-center gap-1">
+   839→                    <span className="font-semibold text-slate-600">Balance:</span>
+   840→                    <span className="font-mono font-bold text-slate-800">{formatGHS(0)}</span>
+   841→                  </div>
+   842→                  <div className="flex items-center gap-1">
+   843→                    <span className="font-semibold text-slate-600">Points:</span>
+   844→                    <span className="font-mono text-slate-700">0</span>
+   845→                  </div>
+   846→                  {heldOrders.length > 0 && (
+   847→                    <button className="ml-auto px-2 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-semibold flex items-center gap-1 hover:bg-amber-200 transition">
+   848→                      <Pause className="h-2.5 w-2.5" />
+   849→                      {heldOrders.length} Held
+   850→                    </button>
+   851→                  )}
+   852→                </div>
+   853→
+   854→                {/* Part No. Input — typing here opens Stock List popup */}
+   855→                <div className="flex-shrink-0 px-3 py-1.5 bg-white border-b border-slate-200 flex items-center gap-2">
+   856→                  <label className="text-[10px] font-bold text-slate-600 whitespace-nowrap">Part No.:</label>
+   857→                  <input
+   858→                    value={partNoInput}
+   859→                    onChange={(e) => {
+   860→                      setPartNoInput(e.target.value);
+   861→                      if (e.target.value.length > 0) {
+   862→                        setShowStockList(true);
+   863→                      }
+   864→                    }}
+   865→                    onKeyDown={(e) => {
+   866→                      if (e.key === 'Enter') {
+   867→                        const product = products.find(p => p.barcode === partNoInput || p.sku.toLowerCase() === partNoInput.toLowerCase());
+   868→                        if (product) {
+   869→                          addToCart(product);
+   870→                          setPartNoInput("");
+   871→                          setShowStockList(false);
+   872→                        } else {
+   873→                          setShowStockList(true);
+   874→                        }
+   875→                      }
+   876→                      if (e.key === 'Escape') setShowStockList(false);
+   877→                    }}
+   878→                    onFocus={() => { if (partNoInput) setShowStockList(true); }}
+   879→                    placeholder="Type part number or scan barcode..."
+   880→                    className="flex-1 h-7 px-2 text-xs font-mono border border-slate-400 rounded outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+   881→                  />
+   882→                  <button
+   883→                    onClick={() => setShowStockList(true)}
+   884→                    className="h-7 px-2 rounded bg-blue-100 hover:bg-blue-200 text-blue-700 text-[10px] font-semibold flex items-center gap-1"
+   885→                  >
+   886→                    <Search className="h-3 w-3" /> F10
+   887→                  </button>
+   888→                </div>
+   889→
+   890→                {/* Cart Items Table */}
+   891→                <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+   892→                  {/* Table Header — light blue matching reference */}
+   893→                  <div className="flex-shrink-0 grid grid-cols-[120px_1fr_50px_80px_45px_80px] gap-1 px-2 py-1 text-[10px] font-bold text-slate-700 border-b border-slate-400" style={{ backgroundColor: '#ADD8E6' }}>
+   894→                    <div>Part No.</div>
+   895→                    <div>Part Details</div>
+   896→                    <div className="text-right">Qty</div>
+   897→                    <div className="text-right">Amount GHC</div>
+   898→                    <div className="text-center">Disc%</div>
+   899→                    <div className="text-right">Total GHC</div>
+   900→                  </div>
+   901→
+   902→                  <ScrollArea className="flex-1 min-h-0">
+   903→                    <div className="divide-y divide-slate-100">
+   904→                      <AnimatePresence mode="popLayout">
+   905→                        {cart.map((item, index) => {
+   906→                          const lineTotal = item.price * item.quantity;
+   907→                          const lineDiscount = lineTotal * (item.discount / 100);
+   908→                          const lineFinal = lineTotal - lineDiscount;
+   909→                          const isSelected = selectedCartIndex === index;
+   910→                          return (
+   911→                            <motion.div
+   912→                              key={item.id}
+   913→                              layout
+   914→                              initial={{ opacity: 0, x: 20 }}
+   915→                              animate={{ opacity: 1, x: 0 }}
+   916→                              exit={{ opacity: 0, x: -20 }}
+   917→                              transition={{ duration: 0.2 }}
+   918→                              onClick={() => setSelectedCartIndex(index)}
+   919→                              className={cn(
+   920→                                "grid grid-cols-[120px_1fr_50px_80px_45px_80px] gap-1 px-2 py-1.5 cursor-pointer transition-colors text-[11px]",
+   921→                              )}
+   922→                              style={{
+   923→                                backgroundColor: isSelected ? '#E3F2FD' : (index % 2 === 1 ? '#FAFAFA' : '#FFFFFF'),
+   924→                                color: isSelected ? '#1565C0' : '#424242',
+   925→                              }}
+   926→                            >
+   927→                              <div className="font-mono truncate">{item.sku}</div>
+   928→                              <div className="truncate">{item.emoji} {item.name}</div>
+   929→                              <div className="text-right font-mono">{item.quantity.toFixed(item.unit === 'kg' ? 2 : 0)}</div>
+   930→                              <div className="text-right font-mono">{formatGHS(item.price)}</div>
+   931→                              <div className="text-center">
+   932→                                <input
+   933→                                  type="number"
+   934→                                  value={item.discount || ''}
+   935→                                  onClick={(e) => { e.stopPropagation(); setSelectedCartIndex(index); }}
+   936→                                  onChange={(e) => applyDiscount(index, parseFloat(e.target.value) || 0)}
+   937→                                  className="w-9 text-center text-[10px] bg-transparent border-b border-slate-200 focus:border-blue-400 outline-none font-mono"
+   938→                                  placeholder="0"
+   939→                                />
+   940→                              </div>
+   941→                              <div className="text-right font-mono font-semibold">{formatGHS(lineFinal)}</div>
+   942→                            </motion.div>
+   943→                          );
+   944→                        })}
+   945→                      </AnimatePresence>
+   946→
+   947→                      {cart.length === 0 && (
+   948→                        <div className="flex flex-col items-center justify-center py-16 text-slate-400">
+   949→                          <ShoppingCart className="h-10 w-10 mb-2 opacity-40" />
+   950→                          <div className="text-sm font-medium">Cart is empty</div>
+   951→                          <div className="text-xs mt-1">Type a Part No. above or click products</div>
+   952→                        </div>
+   953→                      )}
+   954→                    </div>
+   955→                  </ScrollArea>
+   956→                </div>
+   957→
+   958→                {/* Held Orders */}
+   959→                {heldOrders.length > 0 && (
+   960→                  <div className="flex-shrink-0 px-3 py-2 bg-amber-50 border-t border-amber-200 max-h-24 overflow-y-auto">
+   961→                    <div className="text-[10px] font-bold text-amber-800 mb-1">HELD ORDERS (click to recall)</div>
+   962→                    <div className="flex flex-wrap gap-1">
+   963→                      {heldOrders.map((order, i) => (
+   964→                        <button key={i} onClick={() => recallOrder(i)} className="px-2 py-1 rounded-md bg-white ring-1 ring-amber-300 text-[10px] text-amber-700 hover:bg-amber-100 transition">
+   965→                          #{order.invoice} · {order.items.length} items
+   966→                        </button>
+   967→                      ))}
+   968→                    </div>
+   969→                  </div>
+   970→                )}
+   971→
+   972→                {/* Totals */}
+   973→                <div className="flex-shrink-0 border-t border-slate-200 bg-gradient-to-b from-slate-50 to-white">
+   974→                  <div className="px-4 py-1 space-y-0.5">
+   975→                    <div className="flex justify-between text-xs text-slate-600">
+   976→                      <span>Subtotal ({totalItems} items)</span>
+   977→                      <span className="font-mono">{formatGHS(subtotal)}</span>
+   978→                    </div>
+   979→                    <div className="flex justify-between text-xs text-slate-600">
+   980→                      <span className="flex items-center gap-1">
+   981→                        <Percent className="h-3 w-3" /> Discount
+   982→                        <input
+   983→                          type="number"
+   984→                          value={globalDiscount || ''}
+   985→                          onChange={(e) => setGlobalDiscount(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))}
+   986→                          className="w-10 text-center bg-transparent border-b border-slate-200 focus:border-emerald-400 outline-none font-mono"
+   987→                          placeholder="0"
+   988→                        />%
+   989→                      </span>
+   990→                      <span className="font-mono text-rose-600">-{formatGHS(discountAmount)}</span>
+   991→                    </div>
+   992→                    <div className="flex justify-between text-xs text-slate-600">
+   993→                      <span>{TAX_NAME} ({(TAX_RATE * 100).toFixed(0)}%)</span>
+   994→                      <span className="font-mono">{formatGHS(taxAmount)}</span>
+   995→                    </div>
+   996→                  </div>
+   997→                  <div className="px-4 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white">
+   998→                    <div className="flex justify-between items-baseline">
+   999→                      <span className="text-xs font-semibold uppercase tracking-wider opacity-90">Total Due</span>
+  1000→                      <span className="text-2xl font-bold font-mono">{formatGHS(total)}</span>
+  1001→                    </div>
+  1002→                  </div>
+  1003→                </div>
+  1004→
+  1005→                {/* Function Buttons */}
+  1006→                <div className="flex-shrink-0 grid grid-cols-4 gap-1 p-1.5 bg-slate-100">
+  1007→                  <button
+  1008→                    onClick={() => setShowFindProduct(true)}
+  1009→                    className="col-span-4 h-9 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold text-xs flex items-center justify-center gap-1.5 hover:from-blue-700 hover:to-indigo-700 transition shadow-sm"
+  1010→                  >
+  1011→                    <Search className="h-3.5 w-3.5" />
+  1012→                    FIND PRODUCT
+  1013→                    <kbd className="ml-1 px-1 py-0.5 rounded bg-white/20 text-[9px] font-mono">F1</kbd>
+  1014→                  </button>
+  1015→                  <FuncBtn icon={<Pause className="h-3 w-3" />} label="Save" sub="F2" onClick={handleSave} variant="amber" />
+  1016→                  <FuncBtn icon={<Printer className="h-3 w-3" />} label="Print" sub="F3" onClick={handlePrint} variant="slate" />
+  1017→                  <FuncBtn icon={<RotateCcw className="h-3 w-3" />} label="Void" sub="F4" onClick={handleVoid} variant="rose" />
+  1018→                  <FuncBtn icon={<DollarSign className="h-3 w-3" />} label="Cash" sub="" onClick={handleOpenCash} variant="slate" />
+  1019→                  <FuncBtn icon={<Trash2 className="h-3 w-3" />} label="Del Line" sub="Del" onClick={() => selectedCartIndex !== null ? removeLine(selectedCartIndex) : toast({ title: "Select a line first", variant: "destructive" })} variant="slate" />
+  1020→                  <FuncBtn icon={<Check className="h-3 w-3" />} label="Enter" sub="↵" onClick={handleKeypadEnter} variant="emerald" />
+  1021→                  <button
+  1022→                    onClick={() => setShowCartPreview(true)}
+  1023→                    className="col-span-1 h-9 rounded-lg bg-gradient-to-r from-violet-600 to-purple-600 text-white font-bold text-[10px] flex items-center justify-center gap-0.5 hover:from-violet-700 hover:to-purple-700 transition shadow-sm"
+  1024→                  >
+  1025→                    <Eye className="h-3 w-3" />
+  1026→                    PREVIEW
+  1027→                    <kbd className="ml-0.5 px-0.5 py-0.5 rounded bg-white/20 text-[8px] font-mono">F6</kbd>
+  1028→                  </button>
+  1029→                  <button
+  1030→                    onClick={handlePay}
+  1031→                    className="col-span-3 h-9 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold text-xs flex items-center justify-center gap-1.5 hover:from-emerald-700 hover:to-teal-700 transition shadow-sm"
+  1032→                  >
+  1033→                    <CreditCard className="h-3.5 w-3.5" />
+  1034→                    PAY NOW
+  1035→                    <kbd className="ml-1 px-1 py-0.5 rounded bg-white/20 text-[9px] font-mono">F5</kbd>
+  1036→                  </button>
+  1037→                </div>
+  1038→
+  1039→                {/* Numeric Keypad */}
+  1040→                <div className="flex-shrink-0 p-1.5 bg-slate-800">
+  1041→                  <div className="flex gap-1 mb-1">
+  1042→                    {(["qty", "price", "barcode"] as const).map(mode => (
+  1043→                      <button
+  1044→                        key={mode}
+  1045→                        onClick={() => setActiveKeypadMode(mode)}
+  1046→                        className={cn(
+  1047→                          "flex-1 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wide transition",
+  1048→                          activeKeypadMode === mode ? "bg-emerald-500 text-white" : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+  1049→                        )}
+  1050→                      >
+  1051→                        {mode === "qty" ? "Qty" : mode === "price" ? "Price" : "Barcode"}
+  1052→                      </button>
+  1053→                    ))}
+  1054→                  </div>
+  1055→                  <div className="mb-1 px-2 py-1 bg-slate-900 rounded-lg flex items-center justify-between">
+  1056→                    <span className="text-[9px] text-slate-400 uppercase font-semibold">
+  1057→                      {activeKeypadMode === "qty" ? "Quantity" : activeKeypadMode === "price" ? `Price (${CURRENCY_CODE})` : "Scan Code"}
+  1058→                    </span>
+  1059→                    <span className="font-mono text-sm font-bold text-emerald-400">
+  1060→                      {keypadInput || (activeKeypadMode === "price" ? `${CURRENCY}0.00` : "—")}
+  1061→                    </span>
+  1062→                  </div>
+  1063→                  <div className="grid grid-cols-4 gap-1">
+  1064→                    <KeypadBtn label="7" onClick={() => handleKeypadPress("7")} />
+  1065→                    <KeypadBtn label="8" onClick={() => handleKeypadPress("8")} />
+  1066→                    <KeypadBtn label="9" onClick={() => handleKeypadPress("9")} />
+  1067→                    <KeypadBtn label="C" onClick={() => handleKeypadPress("C")} variant="rose" />
+  1068→                    <KeypadBtn label="4" onClick={() => handleKeypadPress("4")} />
+  1069→                    <KeypadBtn label="5" onClick={() => handleKeypadPress("5")} />
+  1070→                    <KeypadBtn label="6" onClick={() => handleKeypadPress("6")} />
+  1071→                    <KeypadBtn label="⌫" onClick={() => handleKeypadPress("⌫")} variant="amber" />
+  1072→                    <KeypadBtn label="1" onClick={() => handleKeypadPress("1")} />
+  1073→                    <KeypadBtn label="2" onClick={() => handleKeypadPress("2")} />
+  1074→                    <KeypadBtn label="3" onClick={() => handleKeypadPress("3")} />
+  1075→                    <KeypadBtn label="Enter" onClick={() => handleKeypadPress("Enter")} variant="emerald" rowSpan />
+  1076→                    <KeypadBtn label="0" onClick={() => handleKeypadPress("0")} wide />
+  1077→                    <KeypadBtn label="." onClick={() => handleKeypadPress(".")} />
+  1078→                  </div>
+  1079→                </div>
+  1080→              </motion.div>
+  1081→            )}
+  1082→          </AnimatePresence>
+  1083→        </section>
+  1084→
+  1085→        {!showSidebar && (
+  1086→          <button
+  1087→            onClick={() => setShowSidebar(true)}
+  1088→            className="absolute right-3 top-32 z-20 h-12 w-12 rounded-full bg-emerald-600 text-white shadow-lg flex items-center justify-center hover:bg-emerald-700 transition"
+  1089→          >
+  1090→            <Cart className="h-5 w-5" />
+  1091→            {cart.length > 0 && (
+  1092→              <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center">
+  1093→                {totalItems}
+  1094→              </span>
+  1095→            )}
+  1096→          </button>
+  1097→        )}
+  1098→      </main>
+  1099→
+  1100→      {/* ===== Payment Modal ===== */}
+  1101→      <AnimatePresence>
+  1102→        {showPayment && (
+  1103→          <PaymentModal
+  1104→            total={total}
+  1105→            subtotal={subtotal}
+  1106→            tax={taxAmount}
+  1107→            discount={discountAmount}
+  1108→            itemCount={totalItems}
+  1109→            invoiceNumber={invoiceNumber || '------'}
+  1110→            customerName={customerName}
+  1111→            onClose={() => setShowPayment(false)}
+  1112→            onComplete={completePayment}
+  1113→          />
+  1114→        )}
+  1115→      </AnimatePresence>
+  1116→
+  1117→      {/* ===== Find Product Modal ===== */}
+  1118→      <AnimatePresence>
+  1119→        {showFindProduct && (
+  1120→          <FindProductModal
+  1121→            products={products}
+  1122→            onAdd={(product) => { addToCart(product); }}
+  1123→            onClose={() => setShowFindProduct(false)}
+  1124→          />
+  1125→        )}
+  1126→      </AnimatePresence>
+  1127→
+  1128→      {/* ===== Stock List Popup (triggered by Part No. input) ===== */}
+  1129→      <AnimatePresence>
+  1130→        {showStockList && (
+  1131→          <StockListPopup
+  1132→            products={products}
+  1133→            searchText={partNoInput}
+  1134→            onSelect={(product) => {
+  1135→              addToCart(product);
+  1136→              setPartNoInput("");
+  1137→              setShowStockList(false);
+  1138→            }}
+  1139→            onClose={() => setShowStockList(false)}
+  1140→            onNew={() => { setShowStockList(false); setShowFindProduct(true); }}
+  1141→          />
+  1142→        )}
+  1143→      </AnimatePresence>
+  1144→
+  1145→      {/* ===== Cart Preview Modal ===== */}
+  1146→      <AnimatePresence>
+  1147→        {showCartPreview && (
+  1148→          <CartPreviewModal
+  1149→            cart={cart}
+  1150→            subtotal={subtotal}
+  1151→            discountAmount={discountAmount}
+  1152→            globalDiscount={globalDiscount}
+  1153→            taxAmount={taxAmount}
+  1154→            total={total}
+  1155→            totalItems={totalItems}
+  1156→            invoiceNumber={invoiceNumber || '------'}
+  1157→            customerName={customerName}
+  1158→            cashier={cashier}
+  1159→            onUpdateQuantity={setQuantity}
+  1160→            onRemoveLine={removeLine}
+  1161→            onApplyDiscount={applyDiscount}
+  1162→            onSetGlobalDiscount={(v) => setGlobalDiscount(Math.min(100, Math.max(0, v)))}
+  1163→            onClearDiscount={() => setGlobalDiscount(0)}
+  1164→            onClose={() => setShowCartPreview(false)}
+  1165→            onProceedToPayment={() => {
+  1166→              setShowCartPreview(false);
+  1167→              setShowPayment(true);
+  1168→            }}
+  1169→            onContinueShopping={() => setShowCartPreview(false)}
+  1170→            onClearCart={() => {
+  1171→              clearCart();
+  1172→              setShowCartPreview(false);
+  1173→            }}
+  1174→          />
+  1175→        )}
+  1176→      </AnimatePresence>
+  1177→
+  1178→      {/* ===== Receipt Modal ===== */}
+  1179→      <AnimatePresence>
+  1180→        {showReceipt && lastPayment && (
+  1181→          <ReceiptModal payment={lastPayment} onClose={finishReceipt} />
+  1182→        )}
+  1183→      </AnimatePresence>
+  1184→
+  1185→      {/* ===== Cash Drawer Animation ===== */}
+  1186→      <AnimatePresence>
+  1187→        {showCashDrawer && (
+  1188→          <motion.div
+  1189→            initial={{ opacity: 0 }}
+  1190→            animate={{ opacity: 1 }}
+  1191→            exit={{ opacity: 0 }}
+  1192→            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center"
+  1193→          >
+  1194→            <motion.div
+  1195→              initial={{ scale: 0.8, y: 20 }}
+  1196→              animate={{ scale: 1, y: 0 }}
+  1197→              exit={{ scale: 0.8, y: 20 }}
+  1198→              className="bg-white rounded-2xl p-8 shadow-2xl flex flex-col items-center"
+  1199→            >
+  1200→              <div className="h-16 w-16 rounded-full bg-emerald-100 flex items-center justify-center mb-3">
+  1201→                <DollarSign className="h-8 w-8 text-emerald-600" />
+  1202→              </div>
+  1203→              <div className="text-lg font-bold text-slate-800">Cash Drawer Opening</div>
+  1204→              <div className="text-sm text-slate-500 mt-1">Register #1 · Drawer 01</div>
+  1205→            </motion.div>
+  1206→          </motion.div>
+  1207→        )}
+  1208→      </AnimatePresence>
+  1209→    </div>
+  1210→  );
+  1211→}
+  1212→
+  1213→// ===== Helper Components =====
+  1214→
+  1215→function FuncBtn({ icon, label, sub, onClick, variant }: {
+  1216→  icon: React.ReactNode;
+  1217→  label: string;
+  1218→  sub: string;
+  1219→  onClick: () => void;
+  1220→  variant: "emerald" | "amber" | "rose" | "slate";
+  1221→}) {
+  1222→  const variants = {
+  1223→    emerald: "bg-emerald-100 text-emerald-700 hover:bg-emerald-200 ring-emerald-200",
+  1224→    amber: "bg-amber-100 text-amber-700 hover:bg-amber-200 ring-amber-200",
+  1225→    rose: "bg-rose-100 text-rose-700 hover:bg-rose-200 ring-rose-200",
+  1226→    slate: "bg-white text-slate-700 hover:bg-slate-100 ring-slate-200",
+  1227→  };
+  1228→  return (
+  1229→    <button
+  1230→      onClick={onClick}
+  1231→      className={cn("h-9 rounded-lg flex flex-col items-center justify-center gap-0.5 ring-1 transition", variants[variant])}
+  1232→    >
+  1233→      {icon}
+  1234→      <span className="text-[10px] font-bold leading-none">{label}</span>
+  1235→      {sub && <span className="text-[8px] opacity-60 leading-none font-mono">{sub}</span>}
+  1236→    </button>
+  1237→  );
+  1238→}
+  1239→
+  1240→function KeypadBtn({ label, onClick, variant, wide, rowSpan }: {
+  1241→  label: string;
+  1242→  onClick: () => void;
+  1243→  variant?: "emerald" | "amber" | "rose";
+  1244→  wide?: boolean;
+  1245→  rowSpan?: boolean;
+  1246→}) {
+  1247→  const variants = {
+  1248→    emerald: "bg-emerald-600 text-white hover:bg-emerald-500",
+  1249→    amber: "bg-amber-600 text-white hover:bg-amber-500",
+  1250→    rose: "bg-rose-600 text-white hover:bg-rose-500",
+  1251→  };
+  1252→  const defaultClass = "bg-slate-700 text-white hover:bg-slate-600";
+  1253→  return (
+  1254→    <button
+  1255→      onClick={onClick}
+  1256→      className={cn(
+  1257→        "h-8 rounded-lg font-bold text-sm flex items-center justify-center transition active:scale-95",
+  1258→        variant ? variants[variant] : defaultClass,
+  1259→        wide && "col-span-2",
+  1260→        rowSpan && "row-span-2 h-[4.25rem]"
+  1261→      )}
+  1262→    >
+  1263→      {label}
+  1264→    </button>
+  1265→  );
+  1266→}
+  1267→
+  1268→// ===== Payment Modal =====
+  1269→function PaymentModal({ total, subtotal, tax, discount, itemCount, invoiceNumber, customerName, onClose, onComplete }: {
+  1270→  total: number;
+  1271→  subtotal: number;
+  1272→  tax: number;
+  1273→  discount: number;
+  1274→  itemCount: number;
+  1275→  invoiceNumber: string;
+  1276→  customerName: string;
+  1277→  onClose: () => void;
+  1278→  onComplete: (method: string, amountPaid: number) => void;
+  1279→}) {
+  1280→  const [method, setMethod] = useState("cash");
+  1281→  const [amountInput, setAmountInput] = useState("");
+  1282→  const { toast } = useToast();
+  1283→
+  1284→  const amountPaid = parseFloat(amountInput) || 0;
+  1285→  const change = amountPaid - total;
+  1286→  const canComplete = method === "cash" ? amountPaid >= total : true;
+  1287→
+  1288→  const handleComplete = () => {
+  1289→    const paid = method === "cash" ? amountPaid : total;
+  1290→    if (method === "cash" && amountPaid < total) {
+  1291→      toast({ title: "Insufficient cash", description: `Need ${formatGHS(total - amountPaid)} more`, variant: "destructive" });
+  1292→      return;
+  1293→    }
+  1294→    onComplete(method, paid);
+  1295→  };
+  1296→
+  1297→  return (
+  1298→    <motion.div
+  1299→      initial={{ opacity: 0 }}
+  1300→      animate={{ opacity: 1 }}
+  1301→      exit={{ opacity: 0 }}
+  1302→      className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+  1303→      onClick={onClose}
+  1304→    >
+  1305→      <motion.div
+  1306→        initial={{ scale: 0.9, y: 30 }}
+  1307→        animate={{ scale: 1, y: 0 }}
+  1308→        exit={{ scale: 0.9, y: 30 }}
+  1309→        onClick={(e) => e.stopPropagation()}
+  1310→        className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+  1311→      >
+  1312→        <div className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-6 py-4 flex items-center justify-between">
+  1313→          <div>
+  1314→            <div className="text-xs opacity-80 font-semibold">PAYMENT · Invoice #{invoiceNumber || '------'}</div>
+  1315→            <div className="text-lg font-bold">{itemCount} items</div>
+  1316→          </div>
+  1317→          <button onClick={onClose} className="h-8 w-8 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center">
+  1318→            <X className="h-4 w-4" />
+  1319→          </button>
+  1320→        </div>
+  1321→
+  1322→        <div className="px-6 py-5 bg-slate-50 border-b border-slate-200 text-center">
+  1323→          <div className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Total Due</div>
+  1324→          <div className="text-5xl font-bold font-mono text-emerald-600 mt-1">{formatGHS(total)}</div>
+  1325→          {customerName && <div className="text-xs text-slate-500 mt-1">Customer: {customerName}</div>}
+  1326→          <div className="flex justify-center gap-4 mt-2 text-[11px] text-slate-500">
+  1327→            <span>Sub: {formatGHS(subtotal)}</span>
+  1328→            <span>{TAX_NAME}: {formatGHS(tax)}</span>
+  1329→            {discount > 0 && <span className="text-rose-500">Disc: -{formatGHS(discount)}</span>}
+  1330→          </div>
+  1331→        </div>
+  1332→
+  1333→        <div className="px-6 py-4">
+  1334→          <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Payment Method</div>
+  1335→          <div className="grid grid-cols-3 gap-2">
+  1336→            {paymentMethods.map(pm => (
+  1337→              <button
+  1338→                key={pm.id}
+  1339→                onClick={() => setMethod(pm.id)}
+  1340→                className={cn(
+  1341→                  "flex flex-col items-center gap-1 py-3 rounded-xl ring-2 transition",
+  1342→                  method === pm.id ? "ring-emerald-500 bg-emerald-50" : "ring-slate-200 hover:ring-slate-300 bg-white"
+  1343→                )}
+  1344→              >
+  1345→                <span className="text-2xl">{pm.icon}</span>
+  1346→                <span className="text-[11px] font-semibold text-slate-700">{pm.name}</span>
+  1347→              </button>
+  1348→            ))}
+  1349→          </div>
+  1350→        </div>
+  1351→
+  1352→        {method === "cash" && (
+  1353→          <div className="px-6 pb-4">
+  1354→            <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Cash Received</div>
+  1355→            <input
+  1356→              type="number"
+  1357→              value={amountInput}
+  1358→              onChange={(e) => setAmountInput(e.target.value)}
+  1359→              autoFocus
+  1360→              placeholder="0.00"
+  1361→              className="w-full h-12 px-4 rounded-xl border-2 border-slate-200 focus:border-emerald-500 outline-none text-2xl font-mono font-bold text-right text-slate-800"
+  1362→            />
+  1363→            <div className="grid grid-cols-6 gap-1.5 mt-2">
+  1364→              {quickCashAmounts.map(amt => (
+  1365→                <button
+  1366→                  key={amt}
+  1367→                  onClick={() => setAmountInput(amt.toString())}
+  1368→                  className="py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-700 transition"
+  1369→                >
+  1370→                  {CURRENCY}{amt}
+  1371→                </button>
+  1372→              ))}
+  1373→            </div>
+  1374→            <button
+  1375→              onClick={() => setAmountInput(total.toFixed(2))}
+  1376→              className="w-full mt-1.5 py-1.5 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-xs font-bold text-emerald-700 transition"
+  1377→            >
+  1378→              Exact Amount {formatGHS(total)}
+  1379→            </button>
+  1380→
+  1381→            {amountPaid > 0 && (
+  1382→              <div className="mt-3 p-3 rounded-xl bg-slate-800 text-white flex justify-between items-center">
+  1383→                <span className="text-xs font-semibold uppercase opacity-80">Change Due</span>
+  1384→                <span className={cn("text-2xl font-bold font-mono", change >= 0 ? "text-emerald-400" : "text-rose-400")}>
+  1385→                  {formatGHS(Math.abs(change))}
+  1386→                </span>
+  1387→              </div>
+  1388→            )}
+  1389→          </div>
+  1390→        )}
+  1391→
+  1392→        {method !== "cash" && (
+  1393→          <div className="px-6 pb-4">
+  1394→            <div className="p-4 rounded-xl bg-blue-50 text-center">
+  1395→              <div className="text-3xl mb-2">{paymentMethods.find(p => p.id === method)?.icon}</div>
+  1396→              <div className="text-sm font-semibold text-slate-700">
+  1397→                {method === "card" ? "Insert/tap card on terminal" : "Awaiting Mobile Money confirmation..."}
+  1398→              </div>
+  1399→              <div className="text-xs text-slate-500 mt-1">Confirm on payment terminal</div>
+  1400→            </div>
+  1401→          </div>
+  1402→        )}
+  1403→
+  1404→        <div className="px-6 pb-6">
+  1405→          <button
+  1406→            onClick={handleComplete}
+  1407→            disabled={!canComplete}
+  1408→            className={cn(
+  1409→              "w-full h-14 rounded-xl font-bold text-base flex items-center justify-center gap-2 transition shadow-md",
+  1410→              canComplete ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white hover:shadow-lg" : "bg-slate-200 text-slate-400 cursor-not-allowed"
+  1411→            )}
+  1412→          >
+  1413→            <Check className="h-5 w-5" />
+  1414→            COMPLETE PAYMENT · {formatGHS(total)}
+  1415→          </button>
+  1416→        </div>
+  1417→      </motion.div>
+  1418→    </motion.div>
+  1419→  );
+  1420→}
+  1421→
+  1422→// ===== Find Product Modal =====
+  1423→function FindProductModal({ products, onAdd, onClose }: {
+  1424→  products: Product[];
+  1425→  onAdd: (product: Product) => void;
+  1426→  onClose: () => void;
+  1427→}) {
+  1428→  const [query, setQuery] = useState("");
+  1429→  const [groupFilter, setGroupFilter] = useState<string>("all");
+  1430→  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  1431→  const [quantity, setQuantity] = useState(1);
+  1432→  const [recentlyAdded, setRecentlyAdded] = useState<string | null>(null);
+  1433→  const inputRef = useRef<HTMLInputElement>(null);
+  1434→
+  1435→  // Autofocus on input when modal opens
+  1436→  useEffect(() => {
+  1437→    const t = setTimeout(() => inputRef.current?.focus(), 100);
+  1438→    return () => clearTimeout(t);
+  1439→  }, []);
+  1440→
+  1441→  const selectProduct = (id: string | null) => {
+  1442→    setSelectedProductId(id);
+  1443→    setQuantity(1);
+  1444→  };
+  1445→
+  1446→  const stockGroups = [
+  1447→    { id: "all", name: "All Groups", icon: "🛒" },
+  1448→    { id: "groceries", name: "Groceries", icon: "🛒" },
+  1449→    { id: "confectionery", name: "Confectionery", icon: "🍫" },
+  1450→    { id: "soft-drinks", name: "Soft Drinks", icon: "🥤" },
+  1451→    { id: "hard-liquor", name: "Hard Liquor", icon: "🍷" },
+  1452→    { id: "households", name: "Households", icon: "🧴" },
+  1453→  ];
+  1454→
+  1455→  const filtered = useMemo(() => {
+  1456→    let result = products;
+  1457→    if (groupFilter !== "all") {
+  1458→      result = result.filter(p => p.groupId === groupFilter);
+  1459→    }
+  1460→    if (query.trim()) {
+  1461→      const q = query.toLowerCase();
+  1462→      result = result.filter(p =>
+  1463→        p.name.toLowerCase().includes(q) ||
+  1464→        p.sku.toLowerCase().includes(q) ||
+  1465→        p.barcode.includes(q) ||
+  1466→        p.supplier.toLowerCase().includes(q)
+  1467→      );
+  1468→    }
+  1469→    return result;
+  1470→  }, [products, query, groupFilter]);
+  1471→
+  1472→  const selectedProduct = selectedProductId
+  1473→    ? products.find(p => p.id === selectedProductId) || null
+  1474→    : null;
+  1475→
+  1476→  const handleAddToCart = () => {
+  1477→    if (!selectedProduct) return;
+  1478→    for (let i = 0; i < quantity; i++) {
+  1479→      onAdd(selectedProduct);
+  1480→    }
+  1481→    setRecentlyAdded(selectedProduct.id);
+  1482→    setTimeout(() => setRecentlyAdded(null), 1200);
+  1483→    // Keep modal open for adding more products, but clear selection
+  1484→    selectProduct(null);
+  1485→    inputRef.current?.focus();
+  1486→  };
+  1487→
+  1488→  const handleQuickAdd = (product: Product) => {
+  1489→    onAdd(product);
+  1490→    setRecentlyAdded(product.id);
+  1491→    setTimeout(() => setRecentlyAdded(null), 1200);
+  1492→    inputRef.current?.focus();
+  1493→  };
+  1494→
+  1495→  return (
+  1496→    <motion.div
+  1497→      initial={{ opacity: 0 }}
+  1498→      animate={{ opacity: 1 }}
+  1499→      exit={{ opacity: 0 }}
+  1500→      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+  1501→      onClick={onClose}
+  1502→    >
+  1503→      <motion.div
+  1504→        initial={{ scale: 0.95, y: 30 }}
+  1505→        animate={{ scale: 1, y: 0 }}
+  1506→        exit={{ scale: 0.95, y: 30 }}
+  1507→        transition={{ type: "spring", damping: 25, stiffness: 300 }}
+  1508→        onClick={(e) => e.stopPropagation()}
+  1509→        className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[92vh] overflow-hidden flex flex-col"
+  1510→      >
+  1511→        {/* Header */}
+  1512→        <div className="flex-shrink-0 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white px-6 py-4 flex items-center justify-between">
+  1513→          <div className="flex items-center gap-3">
+  1514→            <div className="h-11 w-11 rounded-xl bg-white/15 backdrop-blur flex items-center justify-center ring-1 ring-white/20">
+  1515→              <Search className="h-6 w-6" />
+  1516→            </div>
+  1517→            <div>
+  1518→              <div className="text-lg font-bold">Find Product</div>
+  1519→              <div className="text-xs text-blue-100/90">Search by name, SKU, barcode, or supplier</div>
+  1520→            </div>
+  1521→          </div>
+  1522→          <div className="flex items-center gap-2">
+  1523→            <kbd className="px-2 py-1 rounded-md bg-white/15 text-[10px] font-mono">F1 to open</kbd>
+  1524→            <button onClick={onClose} className="h-9 w-9 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center transition">
+  1525→              <X className="h-5 w-5" />
+  1526→            </button>
+  1527→          </div>
+  1528→        </div>
+  1529→
+  1530→        {/* Search Bar + Group Filters */}
+  1531→        <div className="flex-shrink-0 px-6 py-3 bg-slate-50 border-b border-slate-200 space-y-2.5">
+  1532→          <div className="relative">
+  1533→            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+  1534→            <input
+  1535→              ref={inputRef}
+  1536→              value={query}
+  1537→              onChange={(e) => setQuery(e.target.value)}
+  1538→              onKeyDown={(e) => {
+  1539→                if (e.key === 'Enter' && filtered.length > 0) {
+  1540→                  selectProduct(filtered[0].id);
+  1541→                }
+  1542→              }}
+  1543→              placeholder="Type to search products... (Enter to select first result)"
+  1544→              className="w-full h-12 pl-11 pr-4 rounded-xl bg-white text-slate-800 text-base shadow-sm outline-none ring-2 ring-transparent focus:ring-blue-400 border border-slate-200 transition"
+  1545→            />
+  1546→            {query && (
+  1547→              <button
+  1548→                onClick={() => { setQuery(""); inputRef.current?.focus(); }}
+  1549→                className="absolute right-3 top-1/2 -translate-y-1/2 h-6 w-6 rounded-full bg-slate-200 hover:bg-slate-300 flex items-center justify-center"
+  1550→              >
+  1551→                <X className="h-3.5 w-3.5 text-slate-600" />
+  1552→              </button>
+  1553→            )}
+  1554→          </div>
+  1555→          <div className="flex items-center gap-1.5 flex-wrap">
+  1556→            {stockGroups.map(g => (
+  1557→              <button
+  1558→                key={g.id}
+  1559→                onClick={() => setGroupFilter(g.id)}
+  1560→                className={cn(
+  1561→                  "flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition",
+  1562→                  groupFilter === g.id
+  1563→                    ? "bg-blue-600 text-white shadow-sm"
+  1564→                    : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-100"
+  1565→                )}
+  1566→              >
+  1567→                <span>{g.icon}</span>
+  1568→                {g.name}
+  1569→              </button>
+  1570→            ))}
+  1571→            <div className="ml-auto text-xs text-slate-500 font-medium">
+  1572→              {filtered.length} of {products.length} products
+  1573→            </div>
+  1574→          </div>
+  1575→        </div>
+  1576→
+  1577→        {/* Body: Product List + Detail Panel */}
+  1578→        <div className="flex-1 overflow-hidden grid grid-cols-3 gap-0">
+  1579→          {/* Left: Product List (2 cols) */}
+  1580→          <div className="col-span-2 overflow-y-auto border-r border-slate-200">
+  1581→            {filtered.length === 0 ? (
+  1582→              <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+  1583→                <Search className="h-12 w-12 mb-3 opacity-40" />
+  1584→                <div className="text-sm font-medium">No products found</div>
+  1585→                <div className="text-xs mt-1">Try a different search term or group filter</div>
+  1586→              </div>
+  1587→            ) : (
+  1588→              <div className="divide-y divide-slate-100">
+  1589→                {filtered.map((product, idx) => {
+  1590→                  const isSelected = selectedProductId === product.id;
+  1591→                  const justAdded = recentlyAdded === product.id;
+  1592→                  const lowStock = product.stock <= product.reorderLevel;
+  1593→                  return (
+  1594→                    <motion.div
+  1595→                      key={product.id}
+  1596→                      layout
+  1597→                      initial={{ opacity: 0 }}
+  1598→                      animate={{ opacity: 1, backgroundColor: justAdded ? "#ecfdf5" : isSelected ? "#eff6ff" : "#ffffff" }}
+  1599→                      transition={{ duration: 0.15, delay: Math.min(idx * 0.01, 0.2) }}
+  1600→                      onClick={() => selectProduct(product.id)}
+  1601→                      onDoubleClick={() => handleQuickAdd(product)}
+  1602→                      role="button"
+  1603→                      tabIndex={0}
+  1604→                      onKeyDown={(e) => {
+  1605→                        if (e.key === 'Enter' || e.key === ' ') {
+  1606→                          e.preventDefault();
+  1607→                          selectProduct(product.id);
+  1608→                        }
+  1609→                      }}
+  1610→                      className={cn(
+  1611→                        "w-full flex items-center gap-3 px-4 py-2.5 text-left transition cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-blue-400",
+  1612→                        isSelected ? "ring-2 ring-blue-400 ring-inset" : "hover:bg-slate-50"
+  1613→                      )}
+  1614→                    >
+  1615→                      {/* Emoji */}
+  1616→                      <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center text-2xl flex-shrink-0">
+  1617→                        {product.emoji}
+  1618→                      </div>
+  1619→                      {/* Info */}
+  1620→                      <div className="flex-1 min-w-0">
+  1621→                        <div className="flex items-center gap-2">
+  1622→                          <span className="font-semibold text-slate-800 text-sm truncate">{product.name}</span>
+  1623→                          {product.taxable && (
+  1624→                            <span className="px-1 py-0.5 rounded bg-amber-100 text-amber-700 text-[9px] font-bold">VAT</span>
+  1625→                          )}
+  1626→                          {lowStock && (
+  1627→                            <span className="px-1 py-0.5 rounded bg-rose-100 text-rose-700 text-[9px] font-bold">LOW</span>
+  1628→                          )}
+  1629→                        </div>
+  1630→                        <div className="text-[11px] text-slate-400 font-mono flex items-center gap-2">
+  1631→                          <span>{product.sku}</span>
+  1632→                          <span>·</span>
+  1633→                          <span>{product.barcode}</span>
+  1634→                        </div>
+  1635→                      </div>
+  1636→                      {/* Price + Stock */}
+  1637→                      <div className="text-right flex-shrink-0">
+  1638→                        <div className="font-bold text-blue-600 text-sm">{formatGHS(product.price)}</div>
+  1639→                        <div className="text-[10px] text-slate-400">/{product.unit} · Stock: {product.stock}</div>
+  1640→                      </div>
+  1641→                      {/* Quick Add Button */}
+  1642→                      <button
+  1643→                        onClick={(e) => { e.stopPropagation(); handleQuickAdd(product); }}
+  1644→                        className="h-8 w-8 rounded-lg bg-emerald-100 text-emerald-600 hover:bg-emerald-200 flex items-center justify-center transition flex-shrink-0"
+  1645→                        title="Quick add (1 unit)"
+  1646→                      >
+  1647→                        {justAdded ? <Check className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+  1648→                      </button>
+  1649→                    </motion.div>
+  1650→                  );
+  1651→                })}
+  1652→              </div>
+  1653→            )}
+  1654→          </div>
+  1655→
+  1656→          {/* Right: Product Detail Panel (1 col) */}
+  1657→          <div className="overflow-y-auto bg-slate-50">
+  1658→            {selectedProduct ? (
+  1659→              <motion.div
+  1660→                key={selectedProduct.id}
+  1661→                initial={{ opacity: 0, x: 20 }}
+  1662→                animate={{ opacity: 1, x: 0 }}
+  1663→                className="p-5 space-y-4"
+  1664→              >
+  1665→                {/* Product Card */}
+  1666→                <div className="bg-white rounded-xl p-4 shadow-sm ring-1 ring-slate-200 text-center">
+  1667→                  <div className="h-24 w-24 mx-auto rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center text-6xl mb-3">
+  1668→                    {selectedProduct.emoji}
+  1669→                  </div>
+  1670→                  <div className="font-bold text-slate-800 text-base">{selectedProduct.name}</div>
+  1671→                  <div className="text-xs text-slate-400 font-mono mt-0.5">{selectedProduct.sku}</div>
+  1672→                  <div className="text-2xl font-bold text-blue-600 mt-2">{formatGHS(selectedProduct.price)}</div>
+  1673→                  <div className="text-xs text-slate-500">per {selectedProduct.unit}</div>
+  1674→                </div>
+  1675→
+  1676→                {/* Product Details */}
+  1677→                <div className="bg-white rounded-xl p-4 shadow-sm ring-1 ring-slate-200 space-y-2 text-xs">
+  1678→                  <div className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Product Details</div>
+  1679→                  <div className="flex justify-between">
+  1680→                    <span className="text-slate-500">Group</span>
+  1681→                    <span className="font-semibold text-slate-800">{stockGroups.find(g => g.id === selectedProduct.groupId)?.name}</span>
+  1682→                  </div>
+  1683→                  <div className="flex justify-between">
+  1684→                    <span className="text-slate-500">Barcode</span>
+  1685→                    <span className="font-mono text-slate-700">{selectedProduct.barcode}</span>
+  1686→                  </div>
+  1687→                  <div className="flex justify-between">
+  1688→                    <span className="text-slate-500">Supplier</span>
+  1689→                    <span className="font-semibold text-slate-800">{selectedProduct.supplier}</span>
+  1690→                  </div>
+  1691→                  <div className="flex justify-between">
+  1692→                    <span className="text-slate-500">Batch</span>
+  1693→                    <span className="font-mono text-slate-700">{selectedProduct.batchNumber}</span>
+  1694→                  </div>
+  1695→                  <div className="flex justify-between">
+  1696→                    <span className="text-slate-500">Cost Price</span>
+  1697→                    <span className="font-mono text-slate-700">{formatGHS(selectedProduct.costPrice)}</span>
+  1698→                  </div>
+  1699→                  <div className="flex justify-between">
+  1700→                    <span className="text-slate-500">In Stock</span>
+  1701→                    <span className={cn("font-bold", selectedProduct.stock === 0 ? "text-rose-600" : selectedProduct.stock <= selectedProduct.reorderLevel ? "text-amber-600" : "text-emerald-600")}>
+  1702→                      {selectedProduct.stock} {selectedProduct.unit}
+  1703→                    </span>
+  1704→                  </div>
+  1705→                  <div className="flex justify-between">
+  1706→                    <span className="text-slate-500">Reorder Level</span>
+  1707→                    <span className="font-mono text-slate-700">{selectedProduct.reorderLevel}</span>
+  1708→                  </div>
+  1709→                  <div className="flex justify-between">
+  1710→                    <span className="text-slate-500">Expiry Date</span>
+  1711→                    <span className="font-mono text-slate-700">{selectedProduct.expiryDate}</span>
+  1712→                  </div>
+  1713→                  <div className="flex justify-between">
+  1714→                    <span className="text-slate-500">Taxable (VAT)</span>
+  1715→                    <span className="font-semibold text-slate-800">{selectedProduct.taxable ? "Yes" : "No"}</span>
+  1716→                  </div>
+  1717→                </div>
+  1718→
+  1719→                {/* Quantity Selector */}
+  1720→                <div className="bg-white rounded-xl p-4 shadow-sm ring-1 ring-slate-200">
+  1721→                  <div className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Quantity to Add</div>
+  1722→                  <div className="flex items-center gap-2">
+  1723→                    <button
+  1724→                      onClick={() => setQuantity(q => Math.max(1, q - 1))}
+  1725→                      className="h-10 w-10 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition"
+  1726→                    >
+  1727→                      <Minus className="h-4 w-4" />
+  1728→                    </button>
+  1729→                    <input
+  1730→                      type="number"
+  1731→                      value={quantity}
+  1732→                      onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+  1733→                      min={1}
+  1734→                      max={selectedProduct.stock}
+  1735→                      className="flex-1 h-10 text-center text-lg font-bold font-mono border-2 border-slate-200 focus:border-blue-400 rounded-lg outline-none"
+  1736→                    />
+  1737→                    <button
+  1738→                      onClick={() => setQuantity(q => Math.min(selectedProduct.stock, q + 1))}
+  1739→                      className="h-10 w-10 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition"
+  1740→                    >
+  1741→                      <Plus className="h-4 w-4" />
+  1742→                    </button>
+  1743→                  </div>
+  1744→                  <div className="grid grid-cols-4 gap-1 mt-2">
+  1745→                    {[1, 5, 10, 20].map(n => (
+  1746→                      <button
+  1747→                        key={n}
+  1748→                        onClick={() => setQuantity(n)}
+  1749→                        className="py-1 rounded-md bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-700 transition"
+  1750→                      >
+  1751→                        {n}
+  1752→                      </button>
+  1753→                    ))}
+  1754→                  </div>
+  1755→                  <div className="mt-2 p-2 rounded-lg bg-blue-50 flex justify-between items-center">
+  1756→                    <span className="text-xs font-semibold text-slate-600">Subtotal</span>
+  1757→                    <span className="text-lg font-bold font-mono text-blue-600">{formatGHS(selectedProduct.price * quantity)}</span>
+  1758→                  </div>
+  1759→                </div>
+  1760→
+  1761→                {/* Add to Cart Button */}
+  1762→                <button
+  1763→                  onClick={handleAddToCart}
+  1764→                  disabled={selectedProduct.stock === 0}
+  1765→                  className={cn(
+  1766→                    "w-full h-12 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition shadow-md",
+  1767→                    selectedProduct.stock === 0
+  1768→                      ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+  1769→                      : "bg-gradient-to-r from-emerald-600 to-teal-600 text-white hover:shadow-lg"
+  1770→                  )}
+  1771→                >
+  1772→                  <ShoppingCart className="h-5 w-5" />
+  1773→                  ADD {quantity} TO CART
+  1774→                  <span className="ml-1 px-2 py-0.5 rounded bg-white/20 text-xs font-mono">{formatGHS(selectedProduct.price * quantity)}</span>
+  1775→                </button>
+  1776→                <div className="text-center text-[10px] text-slate-400">
+  1777→                  Tip: Double-click any product for quick add (1 unit)
+  1778→                </div>
+  1779→              </motion.div>
+  1780→            ) : (
+  1781→              <div className="flex flex-col items-center justify-center h-full text-slate-400 p-6 text-center">
+  1782→                <Search className="h-12 w-12 mb-3 opacity-30" />
+  1783→                <div className="text-sm font-medium">Select a product</div>
+  1784→                <div className="text-xs mt-1">Click any product from the list to view details and add a custom quantity to the cart</div>
+  1785→              </div>
+  1786→            )}
+  1787→          </div>
+  1788→        </div>
+  1789→
+  1790→        {/* Footer */}
+  1791→        <div className="flex-shrink-0 px-6 py-2.5 bg-white border-t border-slate-200 flex items-center justify-between">
+  1792→          <div className="flex items-center gap-3 text-xs text-slate-500">
+  1793→            <span className="flex items-center gap-1">
+  1794→              <kbd className="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 font-mono text-[10px]">↑↓</kbd>
+  1795→              Navigate
+  1796→            </span>
+  1797→            <span className="flex items-center gap-1">
+  1798→              <kbd className="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 font-mono text-[10px]">Enter</kbd>
+  1799→              Select first
+  1800→            </span>
+  1801→            <span className="flex items-center gap-1">
+  1802→              <kbd className="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 font-mono text-[10px]">Esc</kbd>
+  1803→              Close
+  1804→            </span>
+  1805→          </div>
+  1806→          <Button variant="outline" size="sm" onClick={onClose}>
+  1807→            Close (Esc)
+  1808→          </Button>
+  1809→        </div>
+  1810→      </motion.div>
+  1811→    </motion.div>
+  1812→  );
+  1813→}
+  1814→
+  1815→// ===== Stock List Popup (smaller window, triggered by Part No. input) =====
+  1816→function StockListPopup({ products, searchText, onSelect, onClose, onNew }: {
+  1817→  products: Product[];
+  1818→  searchText: string;
+  1819→  onSelect: (product: Product) => void;
+  1820→  onClose: () => void;
+  1821→  onNew: () => void;
+  1822→}) {
+  1823→  const { toast } = useToast();
+  1824→  const [query, setQuery] = useState(searchText);
+  1825→  const [selectedIndex, setSelectedIndex] = useState(0);
+  1826→  const inputRef = useRef<HTMLInputElement>(null);
+  1827→
+  1828→  useEffect(() => {
+  1829→    const t = setTimeout(() => inputRef.current?.focus(), 50);
+  1830→    return () => clearTimeout(t);
+  1831→  }, []);
+  1832→
+  1833→  // Filter products based on query
+  1834→  const filtered = useMemo(() => {
+  1835→    const q = (query || searchText).toLowerCase().trim();
+  1836→    if (!q) return products;
+  1837→    return products.filter(p =>
+  1838→      p.name.toLowerCase().includes(q) ||
+  1839→      p.sku.toLowerCase().includes(q) ||
+  1840→      p.barcode.includes(q)
+  1841→    );
+  1842→  }, [products, query, searchText]);
+  1843→
+  1844→  const handleSelect = () => {
+  1845→    if (filtered[selectedIndex]) {
+  1846→      onSelect(filtered[selectedIndex]);
+  1847→    }
+  1848→  };
+  1849→
+  1850→  return (
+  1851→    <motion.div
+  1852→      initial={{ opacity: 0 }}
+  1853→      animate={{ opacity: 1 }}
+  1854→      exit={{ opacity: 0 }}
+  1855→      className="fixed inset-0 bg-black/40 flex items-start justify-center pt-16 z-50"
+  1856→      onClick={onClose}
+  1857→    >
+  1858→      <motion.div
+  1859→        initial={{ scale: 0.95, y: -20 }}
+  1860→        animate={{ scale: 1, y: 0 }}
+  1861→        exit={{ scale: 0.95, y: -20 }}
+  1862→        transition={{ type: "spring", damping: 25, stiffness: 300 }}
+  1863→        onClick={(e) => e.stopPropagation()}
+  1864→        className="bg-white rounded-lg shadow-2xl overflow-hidden flex flex-col"
+  1865→        style={{ width: '700px', maxHeight: '450px', fontFamily: 'Arial, Helvetica, sans-serif' }}
+  1866→      >
+  1867→        {/* Title Bar */}
+  1868→        <div className="flex-shrink-0 flex items-center justify-between px-3 h-7 text-white" style={{ backgroundColor: '#5B9BD5' }}>
+  1869→          <span className="text-xs font-bold">Stock List</span>
+  1870→          <button onClick={onClose} className="h-5 w-5 rounded hover:bg-white/25 flex items-center justify-center transition">
+  1871→            <X className="h-3.5 w-3.5" />
+  1872→          </button>
+  1873→        </div>
+  1874→
+  1875→        {/* Search Section */}
+  1876→        <div className="flex-shrink-0 px-3 py-1.5 bg-white border-b border-slate-300 flex items-center gap-2">
+  1877→          <label className="text-[10px] font-bold text-slate-700">Search:</label>
+  1878→          <input
+  1879→            ref={inputRef}
+  1880→            value={query}
+  1881→            onChange={(e) => { setQuery(e.target.value); setSelectedIndex(0); }}
+  1882→            onKeyDown={(e) => {
+  1883→              if (e.key === 'Enter') handleSelect();
+  1884→              if (e.key === 'Escape') onClose();
+  1885→              if (e.key === 'ArrowDown') { e.preventDefault(); setSelectedIndex(i => Math.min(filtered.length - 1, i + 1)); }
+  1886→              if (e.key === 'ArrowUp') { e.preventDefault(); setSelectedIndex(i => Math.max(0, i - 1)); }
+  1887→            }}
+  1888→            placeholder="Type to search..."
+  1889→            className="flex-1 h-7 px-2 text-xs border border-slate-400 rounded outline-none focus:ring-2 focus:ring-blue-400"
+  1890→          />
+  1891→          <button
+  1892→            onClick={() => setSelectedIndex(0)}
+  1893→            className="h-7 px-3 rounded border border-slate-400 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold"
+  1894→          >
+  1895→            Search
+  1896→          </button>
+  1897→        </div>
+  1898→
+  1899→        {/* Filter Section */}
+  1900→        <div className="flex-shrink-0 px-3 py-1 bg-slate-50 border-b border-slate-200 flex items-center gap-2">
+  1901→          <label className="text-[10px] font-bold text-slate-700">Filter By:</label>
+  1902→          <select className="h-6 px-1 text-[10px] border border-slate-300 rounded bg-white outline-none">
+  1903→            <option>All Groups</option>
+  1904→            <option>Groceries</option>
+  1905→            <option>Confectionery</option>
+  1906→            <option>Soft Drinks</option>
+  1907→            <option>Hard Liquor</option>
+  1908→            <option>Households</option>
+  1909→          </select>
+  1910→          <span className="text-[10px] text-slate-500 ml-auto font-mono">{filtered.length} of {products.length} products</span>
+  1911→        </div>
+  1912→
+  1913→        {/* Data Table */}
+  1914→        <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+  1915→          {/* Table Header — blue */}
+  1916→          <div className="flex-shrink-0 grid grid-cols-[130px_1fr_45px_80px_80px_80px] gap-1 px-2 py-1 text-[10px] font-bold text-white" style={{ backgroundColor: '#4A90E2' }}>
+  1917→            <div>Part No</div>
+  1918→            <div>Item Details</div>
+  1919→            <div className="text-right">Qty</div>
+  1920→            <div className="text-right">Retail GHC</div>
+  1921→            <div className="text-right">Trade GHC</div>
+  1922→            <div className="text-right">Cost GHC</div>
+  1923→          </div>
+  1924→
+  1925→          {/* Table Body */}
+  1926→          <ScrollArea className="flex-1 min-h-0">
+  1927→            <div>
+  1928→              {filtered.length === 0 ? (
+  1929→                <div className="text-center py-8 text-slate-400 text-xs">No products found</div>
+  1930→              ) : (
+  1931→                filtered.map((p, idx) => {
+  1932→                  const isSelected = idx === selectedIndex;
+  1933→                  return (
+  1934→                    <div
+  1935→                      key={p.id}
+  1936→                      onClick={() => setSelectedIndex(idx)}
+  1937→                      onDoubleClick={() => onSelect(p)}
+  1938→                      className="grid grid-cols-[130px_1fr_45px_80px_80px_80px] gap-1 px-2 py-1 text-[10px] cursor-pointer border-b border-slate-100"
+  1939→                      style={{
+  1940→                        backgroundColor: isSelected ? '#D6E8FF' : (idx % 2 === 1 ? '#F8F8F8' : '#FFFFFF'),
+  1941→                        color: '#000000',
+  1942→                      }}
+  1943→                    >
+  1944→                      <div className="font-mono truncate">{p.barcode}</div>
+  1945→                      <div className="truncate">{p.emoji} {p.name}</div>
+  1946→                      <div className="text-right font-mono">{p.stock}</div>
+  1947→                      <div className="text-right font-mono">{p.price.toFixed(2)}</div>
+  1948→                      <div className="text-right font-mono">{p.costPrice.toFixed(2)}</div>
+  1949→                      <div className="text-right font-mono">{p.costPrice.toFixed(2)}</div>
+  1950→                    </div>
+  1951→                  );
+  1952→                })
+  1953→              )}
+  1954→            </div>
+  1955→          </ScrollArea>
+  1956→        </div>
+  1957→
+  1958→        {/* Action Buttons */}
+  1959→        <div className="flex-shrink-0 px-3 py-1.5 flex items-center gap-1.5 border-t border-slate-300" style={{ backgroundColor: '#E0F0E8' }}>
+  1960→          <button onClick={handleSelect} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1" style={{ backgroundColor: '#4CAF50' }}>
+  1961→            <Check className="h-3 w-3" /> Select (Enter)
+  1962→          </button>
+  1963→          <button onClick={onNew} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1" style={{ backgroundColor: '#2196F3' }}>
+  1964→            <Plus className="h-3 w-3" /> New
+  1965→          </button>
+  1966→          <button onClick={() => { if (!filtered[selectedIndex]) { toast({ title: "Select a product first", variant: "destructive" }); return; } toast({ title: "Product Picture", description: `${filtered[selectedIndex].emoji} ${filtered[selectedIndex].name}` }); }} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1" style={{ backgroundColor: '#9E9E9E' }}>
+  1967→            <ImageIcon className="h-3 w-3" /> Picture
+  1968→          </button>
+  1969→          <button onClick={() => { if (!filtered[selectedIndex]) { toast({ title: "Select a product first", variant: "destructive" }); return; } toast({ title: "Product History", description: `${filtered[selectedIndex].name} (${filtered[selectedIndex].sku})` }); }} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1" style={{ backgroundColor: '#FF9800' }}>
+  1970→            <History className="h-3 w-3" /> History
+  1971→          </button>
+  1972→          <button onClick={() => { if (!filtered[selectedIndex]) { toast({ title: "Select a product first", variant: "destructive" }); return; } toast({ title: "Printing (F3)", description: `Printing label for ${filtered[selectedIndex].name}` }); }} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1" style={{ backgroundColor: '#9C27B0' }}>
+  1973→            <Printer className="h-3 w-3" /> Print (F3)
+  1974→          </button>
+  1975→          <div className="flex-1" />
+  1976→          <button onClick={onClose} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1" style={{ backgroundColor: '#F44336' }}>
+  1977→            <X className="h-3 w-3" /> Close (Esc)
+  1978→          </button>
+  1979→        </div>
+  1980→
+  1981→        {/* Status Bar */}
+  1982→        <div className="flex-shrink-0 px-3 py-0.5 text-[9px] text-slate-600 flex items-center gap-3" style={{ backgroundColor: '#E0E0E0' }}>
+  1983→          <span className="font-mono">{filtered.length} of {products.length}</span>
+  1984→          <span>Source: Main Store</span>
+  1985→        </div>
+  1986→      </motion.div>
+  1987→    </motion.div>
+  1988→  );
+  1989→}
+  1990→
+  1991→// ===== Cart Preview Modal =====
+  1992→function CartPreviewModal({
+  1993→  cart, subtotal, discountAmount, globalDiscount, taxAmount, total, totalItems,
+  1994→  invoiceNumber, customerName, cashier,
+  1995→  onUpdateQuantity, onRemoveLine, onApplyDiscount, onSetGlobalDiscount, onClearDiscount,
+  1996→  onClose, onProceedToPayment, onContinueShopping, onClearCart,
+  1997→}: {
+  1998→  cart: CartItem[];
+  1999→  subtotal: number;
+  2000→  discountAmount: number;
+
+[showing lines 1-2000 of 2459; use offset=2001 with limit to continue reading]
