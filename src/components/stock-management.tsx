@@ -344,7 +344,7 @@ export function StockManagement({ onBack, products, setProducts, groups, setGrou
             transition={{ duration: 0.2 }}
             className="h-full"
           >
-            {view === "add-modify" && <AddModifyStock products={products} setProducts={setProducts} groups={groups} setHistory={setHistory} />}
+            {view === "add-modify" && <AddModifyStock products={products} setProducts={setProducts} groups={groups} setHistory={setHistory} onQuickAdjust={(productId) => { setQuickAdjustProductId(productId); setShowQuickAdjustPopup(true); }} />}
             {view === "group-maintenance" && <GroupMaintenance groups={groups} setGroups={setGroups} products={products} />}
             {view === "history" && <StockHistoryView history={history} products={products} />}
           </motion.div>
@@ -445,11 +445,12 @@ export function StockManagement({ onBack, products, setProducts, groups, setGrou
 }
 
 // ===== Add / Modify Stock =====
-function AddModifyStock({ products, setProducts, groups, setHistory }: {
+function AddModifyStock({ products, setProducts, groups, setHistory, onQuickAdjust }: {
   products: Product[];
   setProducts: React.Dispatch<React.SetStateAction<Product[]>>;
   groups: StockGroup[];
   setHistory: React.Dispatch<React.SetStateAction<StockHistoryEntry[]>>;
+  onQuickAdjust?: (productId: string) => void;
 }) {
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<Product | null>(null);
@@ -522,14 +523,33 @@ function AddModifyStock({ products, setProducts, groups, setHistory }: {
     toast({ title: "Product deleted", variant: "default" });
   };
 
+  // Vibrant color scheme for group badges (matching Group Maintenance)
+  const groupColors: Record<string, { bg: string; text: string; border: string }> = {
+    emerald: { bg: '#D1FAE5', text: '#065F46', border: '#10B981' },
+    purple: { bg: '#EDE9FE', text: '#5B21B6', border: '#8B5CF6' },
+    cyan: { bg: '#CFFAFE', text: '#155E75', border: '#06B6D4' },
+    red: { bg: '#FEE2E2', text: '#991B1B', border: '#EF4444' },
+    teal: { bg: '#CCFBF1', text: '#115E59', border: '#14B8A6' },
+    blue: { bg: '#DBEAFE', text: '#1E40AF', border: '#3B82F6' },
+    amber: { bg: '#FEF3C7', text: '#92400E', border: '#F59E0B' },
+    rose: { bg: '#FFE4E6', text: '#9F1239', border: '#F43F5E' },
+    indigo: { bg: '#E0E7FF', text: '#3730A3', border: '#6366F1' },
+  };
+  const getGroupColor = (color: string) => groupColors[color] || groupColors.emerald;
+
   return (
-    <div className="h-full bg-white rounded-2xl shadow-lg ring-1 ring-slate-200/60 overflow-hidden flex flex-col">
-      {/* Toolbar */}
-      <div className="flex-shrink-0 flex items-center justify-between px-5 py-3 bg-gradient-to-r from-slate-50 to-white border-b border-slate-200">
+    <div className="h-full bg-white rounded-2xl shadow-lg ring-1 ring-emerald-200/60 overflow-hidden flex flex-col">
+      {/* Toolbar — emerald gradient header matching Group Maintenance */}
+      <div className="flex-shrink-0 flex items-center justify-between px-5 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 border-b border-emerald-700">
         <div className="flex items-center gap-3">
-          <Package className="h-5 w-5 text-emerald-600" />
-          <h2 className="text-base font-bold text-slate-800">Product Catalog</h2>
-          <Badge variant="outline" className="font-mono text-xs">{products.length} items</Badge>
+          <div className="h-9 w-9 rounded-lg bg-white/20 backdrop-blur flex items-center justify-center ring-1 ring-white/30 shadow-sm">
+            <Package className="h-5 w-5 text-white" />
+          </div>
+          <div>
+            <h2 className="text-base font-bold text-white">Product Catalog</h2>
+            <div className="text-[10px] text-emerald-50/90">Add, modify, and adjust stock levels</div>
+          </div>
+          <Badge variant="outline" className="font-mono text-xs ml-1 bg-white/15 text-white border-white/30">{products.length} items</Badge>
         </div>
         <div className="flex items-center gap-2">
           <div className="relative">
@@ -538,23 +558,47 @@ function AddModifyStock({ products, setProducts, groups, setHistory }: {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search products..."
-              className="h-9 pl-8 pr-3 rounded-lg bg-slate-100 text-sm outline-none ring-2 ring-transparent focus:ring-emerald-300 focus:bg-white transition w-64"
+              className="h-9 pl-8 pr-3 rounded-lg bg-white text-sm outline-none ring-2 ring-transparent focus:ring-emerald-300 focus:bg-white transition w-56 text-slate-700"
             />
           </div>
-          <Button
+          {onQuickAdjust && (
+            <button
+              onClick={() => onQuickAdjust('')}
+              className="h-9 px-3 rounded-lg bg-white/20 hover:bg-white/30 text-white text-sm font-semibold flex items-center gap-1.5 transition ring-1 ring-white/30"
+              title="Quick stock adjustment (add, remove, or set quantity for a single product)"
+            >
+              <ArrowUpDown className="h-4 w-4" />
+              Adjust Stock
+            </button>
+          )}
+          <button
             onClick={() => { setEditing(null); setShowForm(true); }}
-            className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700"
+            className="h-9 px-4 rounded-lg bg-white text-emerald-700 text-sm font-bold flex items-center gap-1.5 transition hover:bg-emerald-50 shadow-sm"
           >
             <Plus className="h-4 w-4" />
             Add Product
-          </Button>
+          </button>
         </div>
+      </div>
+
+      {/* Summary bar */}
+      <div className="flex-shrink-0 px-5 py-2 bg-emerald-50 border-b border-emerald-100 flex items-center gap-4 text-[11px]">
+        <span className="text-slate-600">Total inventory value:</span>
+        <span className="font-bold font-mono text-emerald-700">
+          {formatGHS(products.reduce((s, p) => s + p.price * p.stock, 0))}
+        </span>
+        <span className="text-slate-300">·</span>
+        <span className="text-slate-600">{products.filter(p => p.stock <= p.reorderLevel).length} low-stock items</span>
+        <span className="text-slate-300">·</span>
+        <span className="text-slate-600">{products.filter(p => p.stock === 0).length} out of stock</span>
+        <div className="flex-1" />
+        <span className="text-emerald-600 font-semibold">Click "Adjust Stock" on any row to quickly change quantity</span>
       </div>
 
       {/* Table */}
       <ScrollArea className="flex-1">
         <table className="w-full text-sm">
-          <thead className="sticky top-0 bg-slate-800 text-white text-xs uppercase tracking-wide z-10">
+          <thead className="sticky top-0 bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs uppercase tracking-wide z-10 shadow-md">
             <tr>
               <th className="text-left px-4 py-2.5 font-semibold">Product</th>
               <th className="text-left px-3 py-2.5 font-semibold">SKU</th>
@@ -566,12 +610,13 @@ function AddModifyStock({ products, setProducts, groups, setHistory }: {
               <th className="text-center px-3 py-2.5 font-semibold">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
-            {filtered.map(p => {
+          <tbody className="divide-y divide-emerald-50">
+            {filtered.map((p, idx) => {
               const group = groups.find(g => g.id === p.groupId);
               const expDays = Math.ceil((new Date(p.expiryDate).getTime() - Date.now()) / 86400000);
+              const gc = group ? getGroupColor(group.color) : null;
               return (
-                <tr key={p.id} className="hover:bg-emerald-50/50 transition">
+                <tr key={p.id} className={cn("transition", idx % 2 === 0 ? "bg-white hover:bg-emerald-50/40" : "bg-emerald-50/20 hover:bg-emerald-50/50")}>
                   <td className="px-4 py-2.5">
                     <div className="flex items-center gap-2">
                       <span className="text-xl">{p.emoji}</span>
@@ -583,16 +628,23 @@ function AddModifyStock({ products, setProducts, groups, setHistory }: {
                   </td>
                   <td className="px-3 py-2.5 font-mono text-xs text-slate-600">{p.sku}</td>
                   <td className="px-3 py-2.5">
-                    <Badge variant="outline" className="text-[10px]">{group?.icon} {group?.name}</Badge>
+                    {group && gc && (
+                      <span
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold border"
+                        style={{ backgroundColor: gc.bg, color: gc.text, borderColor: gc.border }}
+                      >
+                        {group.icon} {group.name}
+                      </span>
+                    )}
                   </td>
                   <td className="px-3 py-2.5 text-center">
-                    <span className={cn("font-mono font-semibold", p.stock === 0 ? "text-rose-600" : p.stock <= p.reorderLevel ? "text-amber-600" : "text-slate-700")}>
+                    <span className={cn("font-mono font-bold", p.stock === 0 ? "text-rose-600" : p.stock <= p.reorderLevel ? "text-amber-600" : "text-emerald-700")}>
                       {p.stock}
                     </span>
                     <span className="text-[10px] text-slate-400 ml-1">/{p.unit}</span>
                   </td>
                   <td className="px-3 py-2.5 text-right font-mono text-slate-600">{formatGHS(p.costPrice)}</td>
-                  <td className="px-3 py-2.5 text-right font-mono font-semibold text-emerald-600">{formatGHS(p.price)}</td>
+                  <td className="px-3 py-2.5 text-right font-mono font-semibold text-emerald-700">{formatGHS(p.price)}</td>
                   <td className="px-3 py-2.5 text-center">
                     <span className={cn("text-[11px] font-medium", expDays < 0 ? "text-rose-600" : expDays <= 7 ? "text-amber-600" : "text-slate-500")}>
                       {p.expiryDate}
@@ -600,15 +652,28 @@ function AddModifyStock({ products, setProducts, groups, setHistory }: {
                   </td>
                   <td className="px-3 py-2.5">
                     <div className="flex items-center justify-center gap-1">
+                      {/* Adjust Stock button — emerald, prominent */}
+                      {onQuickAdjust && (
+                        <button
+                          onClick={() => onQuickAdjust(p.id)}
+                          className="h-7 px-2 rounded-md bg-emerald-100 text-emerald-700 hover:bg-emerald-200 flex items-center gap-1 transition shadow-sm text-[10px] font-bold border border-emerald-300"
+                          title="Quick stock adjustment for this product"
+                        >
+                          <ArrowUpDown className="h-3.5 w-3.5" />
+                          Adjust
+                        </button>
+                      )}
                       <button
                         onClick={() => { setEditing(p); setShowForm(true); }}
-                        className="h-7 w-7 rounded-md bg-blue-100 text-blue-600 hover:bg-blue-200 flex items-center justify-center transition"
+                        className="h-7 w-7 rounded-md bg-blue-100 text-blue-600 hover:bg-blue-200 flex items-center justify-center transition shadow-sm"
+                        title="Edit product details"
                       >
                         <Edit2 className="h-3.5 w-3.5" />
                       </button>
                       <button
                         onClick={() => handleDelete(p.id)}
-                        className="h-7 w-7 rounded-md bg-rose-100 text-rose-600 hover:bg-rose-200 flex items-center justify-center transition"
+                        className="h-7 w-7 rounded-md bg-rose-100 text-rose-600 hover:bg-rose-200 flex items-center justify-center transition shadow-sm"
+                        title="Delete product"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
