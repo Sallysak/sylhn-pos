@@ -1856,3 +1856,46 @@ Stage Summary:
   - Export to XLSX
   - Grey gradient popup with summary bar, color-coded entries, old→new display
 - Build compiles cleanly (next build ✓) and dev server responds HTTP 200 with no runtime errors
+
+---
+Task ID: quick-stock-adjustment
+Agent: main
+Task: User reported no easy way to perform stock adjustments on the Stock Quantity Adjustment form (which is stocktake-focused). Add a Quick Adjust feature — a streamlined single-product adjustment popup — alongside the existing stocktake form. Keep the existing form intact.
+
+Work Log:
+- Created /home/z/my-project/src/components/quick-stock-adjustment.tsx (~450 lines):
+  - PopupWindow with emerald-green title bar "Quick Stock Adjustment" (680×620, min 560×520)
+  - Product search bar at top: type SKU/barcode/name, Enter to direct-match, or click "Browse" to open a compact Stock Search popup
+  - Product info card (emerald gradient): emoji, name, SKU, barcode, supplier, large current stock display, 3 mini-stats (Reorder Level, Cost, Status with OK/Low/Out color-coding)
+  - 3 adjustment mode buttons (Add / Remove / Set) with icons + descriptions:
+    - Add Stock (emerald): increase quantity (received, found, corrected up)
+    - Remove Stock (rose): decrease quantity (damaged, lost, expired)
+    - Set Quantity (blue): set exact quantity (stocktake correction)
+  - Amount input with +/- buttons + quick-amount buttons (+1, +5, +10, +25, +50)
+  - Live preview bar: "Current: 50 → New: 45 (Change: -5)" with color-coded background (green for increase, red for decrease, grey for no change)
+  - Warning when remove amount exceeds current stock
+  - Reason dropdown with 9 common reasons (Damaged, Expired, Theft/Loss, Found, Received, Initial Count, Sample/Display, Staff Error, Other)
+  - Custom reason text field (shown when "Other" is selected)
+  - Reference number (auto-generated ADJ-XXXXXX, editable)
+  - Recent adjustments mini-list: shows last 5 adjustments for the selected product with date, reason, change, and new quantity
+  - Save button (F2): updates product stock + logs to history with reason + reference
+  - Close button (Esc)
+  - Status bar: reference, product name, current → new, company
+  - Compact Stock Search popup (emerald theme) with keyboard navigation (Arrows, Enter, Esc)
+  - Keyboard shortcuts: F2 Save, Esc Close (suppressed when typing or search popup is open)
+
+- Modified /home/z/my-project/src/components/stock-management.tsx:
+  - Imported QuickStockAdjustment component
+  - Added showQuickAdjustPopup + quickAdjustProductId state
+  - Added "Quick Adjust" button (emerald-teal gradient, ArrowUpDown icon) to the nav bar — prominent placement before "Stock Qty Report"
+  - Added AnimatePresence block rendering <QuickStockAdjustment /> when showQuickAdjustPopup is true
+  - Passes initialProductId when launched from a product-specific context (for future per-product buttons)
+
+Stage Summary:
+- 1 new file: quick-stock-adjustment.tsx (~450 lines)
+- 1 modified file: stock-management.tsx (import + state + nav button + popup render)
+- The existing Stock Quantity Adjustment form (stocktake) is preserved unchanged
+- Two complementary adjustment workflows now exist:
+  1. **Quick Adjust** (new): Single-product, instant adjustments — for day-to-day corrections (damaged, expired, found, etc.). Streamlined UI with product search, mode buttons, quick-amount buttons, live preview, and reason tracking.
+  2. **Quantity Adjustment** (existing): Full stocktake events — for periodic inventory counts with multiple products, barcode scanning, draft persistence, audit trail, and variance comparison.
+- Build compiles cleanly (next build ✓) and dev server responds HTTP 200 with no runtime errors

@@ -24,6 +24,7 @@ import { generateReport, exportReportToPDF, exportReportToExcel, exportReportToC
 import type { StockView, ReportData } from "@/lib/pos-types";
 import { PopupWindow } from "@/components/popup-window";
 import { StockQuantityAdjustment } from "@/components/stock-quantity-adjustment";
+import { QuickStockAdjustment } from "@/components/quick-stock-adjustment";
 
 interface StockManagementProps {
   onBack: () => void;
@@ -46,6 +47,8 @@ export function StockManagement({ onBack, products, setProducts, groups, setGrou
   const [showStockSearchPopup, setShowStockSearchPopup] = useState(initialView === "stock-search");
   const [showQtyAdjustmentPopup, setShowQtyAdjustmentPopup] = useState(initialView === "quantity-adjustment");
   const [showDashboard, setShowDashboard] = useState(false);
+  const [showQuickAdjustPopup, setShowQuickAdjustPopup] = useState(false);
+  const [quickAdjustProductId, setQuickAdjustProductId] = useState<string | undefined>(undefined);
   const { toast } = useToast();
 
   // ===== Stocktake schedule settings (persisted to localStorage) =====
@@ -189,6 +192,14 @@ export function StockManagement({ onBack, products, setProducts, groups, setGrou
             );
           })}
           <div className="flex-1" />
+          <button
+            onClick={() => { setQuickAdjustProductId(undefined); setShowQuickAdjustPopup(true); }}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md hover:from-emerald-600 hover:to-teal-600"
+            title="Quick single-product stock adjustment (add, remove, or set quantity)"
+          >
+            <ArrowUpDown className="h-4 w-4" />
+            Quick Adjust
+          </button>
           <button
             onClick={() => setShowQtyReport(true)}
             className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md hover:from-blue-700 hover:to-indigo-700"
@@ -411,6 +422,21 @@ export function StockManagement({ onBack, products, setProducts, groups, setGrou
               setShowQtyAdjustmentPopup(true);
             }}
             onNavigateToPurchase={onNavigateToPurchase}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ===== Quick Stock Adjustment Popup ===== */}
+      <AnimatePresence>
+        {showQuickAdjustPopup && (
+          <QuickStockAdjustment
+            products={products}
+            setProducts={setProducts}
+            setHistory={setHistory}
+            history={history}
+            groups={groups}
+            onClose={() => { setShowQuickAdjustPopup(false); setQuickAdjustProductId(undefined); }}
+            initialProductId={quickAdjustProductId}
           />
         )}
       </AnimatePresence>
