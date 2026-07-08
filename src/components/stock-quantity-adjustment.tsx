@@ -97,6 +97,13 @@ export function StockQuantityAdjustment({
   const [saved, setSaved] = useState(false);
   const [draftRestored, setDraftRestored] = useState(false);
 
+  // ===== Stock Adjustment mode: reason + quick-adjust integration =====
+  // When adjType === 'adjustment', the form shows a Reason dropdown and
+  // a "Quick Adjust" button that opens the QuickStockAdjustment popup.
+  // This makes "Stock Adjustment" a distinct workflow from "Stocktake".
+  const [adjustReason, setAdjustReason] = useState('Damaged goods');
+  const [showQuickAdjust, setShowQuickAdjust] = useState(false);
+
   // ===== Audit trail: records every mutation to the draft before it's saved =====
   // Each entry captures: timestamp, action type, product affected, old/new values, user.
   // Persisted alongside the draft in localStorage so it survives refresh.
@@ -153,6 +160,7 @@ export function StockQuantityAdjustment({
       if (draft.date) setDate(draft.date);
       if (draft.details !== undefined) setDetails(draft.details);
       if (draft.postToAC !== undefined) setPostToAC(draft.postToAC);
+      if (draft.adjustReason) setAdjustReason(draft.adjustReason);
       if (draft.fromPartNo !== undefined) setFromPartNo(draft.fromPartNo);
       if (draft.toPartNo !== undefined) setToPartNo(draft.toPartNo);
       if (draft.groupFilter !== undefined) setGroupFilter(draft.groupFilter);
@@ -208,12 +216,13 @@ export function StockQuantityAdjustment({
     const draft = {
       adjNumber, adjType, date, details, postToAC,
       fromPartNo, toPartNo, groupFilter, bin,
+      adjustReason,
       lines, savedAt: Date.now(),
     };
     try {
       window.localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
     } catch { /* storage full or unavailable */ }
-  }, [adjNumber, adjType, date, details, postToAC, fromPartNo, toPartNo, groupFilter, bin, lines, saved, draftRestored]);
+  }, [adjNumber, adjType, date, details, postToAC, fromPartNo, toPartNo, groupFilter, bin, adjustReason, lines, saved, draftRestored]);
 
   // ===== Persist audit trail alongside the draft =====
   const AUDIT_KEY = 'sylhn-stock-adjustment-audit';
@@ -512,7 +521,9 @@ export function StockQuantityAdjustment({
       newQuantity: l.counted,
       timestamp: new Date().toISOString(),
       user: 'Sarah Johnson',
-      reason: details || `${adjType === 'stocktake' ? 'Stocktake' : 'Stock adjustment'} — variance ${l.qty > 0 ? '+' : ''}${l.qty}`,
+      reason: adjType === 'adjustment'
+        ? `${adjustReason} — variance ${l.qty > 0 ? '+' : ''}${l.qty}${details ? ' · ' + details : ''}`
+        : (details || `${adjType === 'stocktake' ? 'Stocktake' : 'Stock adjustment'} — variance ${l.qty > 0 ? '+' : ''}${l.qty}`),
       reference: adjNumber,
     }));
     setHistory(prev => [...prev, ...newHistory]);
@@ -915,6 +926,44 @@ export function StockQuantityAdjustment({
         </div>
       </div>
 
+      {/* ===== Stock Adjustment mode: Reason dropdown + Quick Adjust button ===== */}
+      {/* This bar only appears when "Stock Adjustment" is selected from the dropdown,
+          making it a distinct workflow from Stocktake. */}
+      {adjType === 'adjustment' && (
+        <div className="flex-shrink-0 px-3 py-2 bg-amber-50 border-b border-amber-200 flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-1.5">
+            <AlertTriangle className="h-4 w-4 text-amber-600" />
+            <label className="text-[10px] font-bold text-amber-800 uppercase">Adjustment Reason:</label>
+            <select
+              value={adjustReason}
+              onChange={(e) => setAdjustReason(e.target.value)}
+              className="h-7 px-2 text-[11px] font-semibold border border-amber-400 rounded bg-white outline-none focus:ring-2 focus:ring-amber-400 min-w-[160px]"
+            >
+              <option value="Damaged goods">Damaged goods</option>
+              <option value="Expired stock">Expired stock</option>
+              <option value="Theft / Loss">Theft / Loss</option>
+              <option value="Found stock">Found stock</option>
+              <option value="Received stock (no PO)">Received stock (no PO)</option>
+              <option value="Initial count correction">Initial count correction</option>
+              <option value="Sample / Display">Sample / Display</option>
+              <option value="Staff error">Staff error</option>
+              <option value="Other">Other (specify in Details)</option>
+            </select>
+          </div>
+          <div className="flex-1" />
+          <button
+            onClick={() => setShowStockSearch(true)}
+            className="h-7 px-3 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold flex items-center gap-1.5 transition shadow-sm"
+            title="Search for a product to add to this adjustment"
+          >
+            <Plus className="h-3.5 w-3.5" /> Add Product to Adjust
+          </button>
+          <span className="text-[9px] text-amber-700 italic">
+            Reason will be applied to all adjusted items when saved
+          </span>
+        </div>
+      )}
+
       {/* ===== Find Part No bar ===== */}
       <div className="flex-shrink-0 px-3 py-1.5 flex items-center gap-2 bg-slate-50 border-b border-slate-300">
         <label className="text-[10px] font-bold text-slate-700">Find Part no:</label>
@@ -990,7 +1039,7 @@ export function StockQuantityAdjustment({
           <div>Part Number</div>
           <div>Details</div>
           <div className="text-right" style={{ backgroundColor: ON_HAND_BG }}>On Hand</div>
-          <div className="text-right">Counted</div>
+          <div className="text-right">{adjType === 'adjustment' ? 'New Qty' : 'Counted'}</div>
           <div className="text-right">Qty</div>
           <div className="text-right">Cost GHC</div>
           <div className="text-right">Total GHC</div>
@@ -1001,7 +1050,11 @@ export function StockQuantityAdjustment({
             <div className="flex flex-col items-center justify-center py-10 text-slate-400">
               <Package className="h-8 w-8 mb-2 opacity-40" />
               <div className="text-[11px] font-medium">No items added yet</div>
-              <div className="text-[9px] mt-0.5">Type a Part No. above or click "Load Range" to begin</div>
+              <div className="text-[9px] mt-0.5">
+                {adjType === 'adjustment'
+                  ? 'Type a Part No. above, click "Add Product to Adjust", or click "Load Range" to begin'
+                  : 'Type a Part No. above or click "Load Range" to begin'}
+              </div>
             </div>
           ) : (
             lines.map((l, idx) => {
