@@ -8,7 +8,7 @@ import {
   Filter, ChevronRight, Calendar, User, Tag, DollarSign, Barcode,
   ArrowUpDown, ArrowUp, ArrowDown, RotateCcw,
   FileText, Copy, Image as ImageIcon, Tags, FileSearch, FolderTree, SlidersHorizontal,
-  Monitor, Printer, Folder, FileBarChart,
+  Monitor, Printer, Folder, FileBarChart, Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,7 +43,80 @@ export function StockManagement({ onBack, products, setProducts, groups, setGrou
   const [showStockFilePopup, setShowStockFilePopup] = useState(initialView === "stock-file");
   const [showStockSearchPopup, setShowStockSearchPopup] = useState(initialView === "stock-search");
   const [showQtyAdjustmentPopup, setShowQtyAdjustmentPopup] = useState(initialView === "quantity-adjustment");
+  const [showDashboard, setShowDashboard] = useState(false);
   const { toast } = useToast();
+
+  // ===== Stocktake schedule settings (persisted to localStorage) =====
+  const SCHEDULE_KEY = 'sylhn-stocktake-schedule';
+  type ScheduleFreq = 'weekly' | 'biweekly' | 'monthly' | 'quarterly';
+  const [scheduleFreq, setScheduleFreq] = useState<ScheduleFreq>('weekly');
+  const [scheduleDismissed, setScheduleDismissed] = useState<string>(''); // tracks which overdue date was dismissed
+
+  // Load schedule settings from localStorage on mount
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const cached = window.localStorage.getItem(SCHEDULE_KEY);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed.freq) setScheduleFreq(parsed.freq);
+        if (parsed.dismissed) setScheduleDismissed(parsed.dismissed);
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  // Persist schedule settings
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(SCHEDULE_KEY, JSON.stringify({ freq: scheduleFreq, dismissed: scheduleDismissed }));
+    } catch { /* ignore */ }
+  }, [scheduleFreq, scheduleDismissed]);
+
+  // ===== Compute last stocktake date + overdue status =====
+  const stocktakeStatus = useMemo(() => {
+    // Find the most recent 'adjusted' history entry (which represents a stocktake/adjustment)
+    const adjustedEntries = history.filter(h => h.action === 'adjusted');
+    if (adjustedEntries.length === 0) {
+      // No previous stocktake — check if the schedule says one is overdue
+      const daysSinceEpoch = Math.floor((Date.now() - new Date('2026-01-01').getTime()) / (1000 * 60 * 60 * 24));
+      return {
+        lastDate: null,
+        lastReference: null,
+        isOverdue: true,
+        daysOverdue: daysSinceEpoch,
+        nextDueDate: new Date().toISOString().split('T')[0],
+        message: 'No stocktake has been performed yet. Start your first stocktake now.',
+      };
+    }
+    // Find the most recent timestamp
+    const sorted = adjustedEntries.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+    const lastEntry = sorted[0];
+    const lastDate = new Date(lastEntry.timestamp);
+    const now = new Date();
+    const diffMs = now.getTime() - lastDate.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    // Determine the threshold based on schedule frequency
+    const thresholdDays = scheduleFreq === 'weekly' ? 7 : scheduleFreq === 'biweekly' ? 14 : scheduleFreq === 'monthly' ? 30 : 90;
+    const nextDueDate = new Date(lastDate.getTime() + thresholdDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const isOverdue = diffDays >= thresholdDays;
+    const daysOverdue = diffDays - thresholdDays;
+
+    return {
+      lastDate: lastEntry.timestamp,
+      lastReference: lastEntry.reference,
+      isOverdue,
+      daysOverdue: Math.max(0, daysOverdue),
+      nextDueDate,
+      message: isOverdue
+        ? `Stocktake is ${daysOverdue} day(s) overdue. Last stocktake was on ${lastDate.toLocaleDateString('en-GB')}.`
+        : `Next stocktake due by ${nextDueDate} (${thresholdDays - diffDays} day(s) remaining).`,
+    };
+  }, [history, scheduleFreq]);
+
+  // ===== Check if the overdue banner should be shown (not dismissed for this specific due date) =====
+  const showOverdueBanner = stocktakeStatus.isOverdue && scheduleDismissed !== stocktakeStatus.nextDueDate;
 
   // Open Qty Report modal on mount if requested via menu.
   // This is a legitimate use: the parent passes a prop to request the modal open.
@@ -121,8 +194,131 @@ export function StockManagement({ onBack, products, setProducts, groups, setGrou
             <FileBarChart className="h-4 w-4" />
             Stock Qty Report
           </button>
+          <button
+            onClick={() => setShowDashboard(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md hover:from-purple-700 hover:to-pink-700"
+            title="View stocktake dashboard with recent variances"
+          >
+            <TrendingUp className="h-4 w-4" />
+            Stocktake Dashboard
+          </button>
         </div>
       </nav>
+
+      {/* ===== Stocktake Schedule Reminder Banner ===== */}
+      <AnimatePresence>
+        {showOverdueBanner && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2 }}
+            className="flex-shrink-0 overflow-hidden"
+          >
+            <div className={cn(
+              "px-6 py-2.5 flex items-center gap-3 border-b",
+              stocktakeStatus.isOverdue
+                ? "bg-rose-50 border-rose-200"
+                : "bg-amber-50 border-amber-200"
+            )}>
+              <div className={cn(
+                "h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0",
+                stocktakeStatus.isOverdue ? "bg-rose-100" : "bg-amber-100"
+              )}>
+                <AlertTriangle className={cn("h-4 w-4", stocktakeStatus.isOverdue ? "text-rose-600" : "text-amber-600")} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className={cn(
+                  "text-sm font-bold",
+                  stocktakeStatus.isOverdue ? "text-rose-800" : "text-amber-800"
+                )}>
+                  {stocktakeStatus.isOverdue ? 'Stocktake Overdue' : 'Stocktake Due Soon'}
+                </div>
+                <div className={cn(
+                  "text-xs",
+                  stocktakeStatus.isOverdue ? "text-rose-700" : "text-amber-700"
+                )}>
+                  {stocktakeStatus.message}
+                  {stocktakeStatus.lastReference && (
+                    <span className="font-mono ml-1">· Last: {stocktakeStatus.lastReference}</span>
+                  )}
+                </div>
+              </div>
+              {/* Schedule frequency selector */}
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                <label className="text-[10px] font-bold text-slate-600 uppercase">Schedule:</label>
+                <select
+                  value={scheduleFreq}
+                  onChange={(e) => {
+                    setScheduleFreq(e.target.value as ScheduleFreq);
+                    setScheduleDismissed(''); // reset dismissal when frequency changes
+                    toast({ title: 'Schedule updated', description: `Stocktake frequency set to ${e.target.value}` });
+                  }}
+                  className="h-7 px-2 text-[11px] rounded-md border border-slate-300 bg-white text-slate-700 outline-none focus:ring-2 focus:ring-emerald-400 cursor-pointer"
+                >
+                  <option value="weekly">Weekly (7 days)</option>
+                  <option value="biweekly">Bi-weekly (14 days)</option>
+                  <option value="monthly">Monthly (30 days)</option>
+                  <option value="quarterly">Quarterly (90 days)</option>
+                </select>
+              </div>
+              <button
+                onClick={() => setShowQtyAdjustmentPopup(true)}
+                className={cn(
+                  "h-7 px-3 rounded-md text-xs font-bold text-white transition flex items-center gap-1 flex-shrink-0",
+                  stocktakeStatus.isOverdue ? "bg-rose-600 hover:bg-rose-700" : "bg-amber-600 hover:bg-amber-700"
+                )}
+              >
+                <ArrowUpDown className="h-3 w-3" />
+                Start Stocktake
+              </button>
+              <button
+                onClick={() => {
+                  setScheduleDismissed(stocktakeStatus.nextDueDate);
+                  toast({ title: 'Reminder dismissed', description: 'Will reappear when the next stocktake becomes due' });
+                }}
+                className="h-7 w-7 rounded-md bg-white/60 hover:bg-white text-slate-500 hover:text-slate-700 flex items-center justify-center flex-shrink-0 transition"
+                title="Dismiss until next due date"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ===== Compact schedule status (always visible when banner is dismissed) ===== */}
+      {!showOverdueBanner && (
+        <div className="flex-shrink-0 px-6 py-1 bg-slate-50 border-b border-slate-200 flex items-center gap-3 text-[10px]">
+          <span className="flex items-center gap-1 text-slate-500">
+            <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+            Stocktake schedule:
+          </span>
+          <select
+            value={scheduleFreq}
+            onChange={(e) => {
+              setScheduleFreq(e.target.value as ScheduleFreq);
+              setScheduleDismissed('');
+              toast({ title: 'Schedule updated', description: `Stocktake frequency set to ${e.target.value}` });
+            }}
+            className="h-5 px-1 text-[10px] rounded border border-slate-300 bg-white text-slate-600 outline-none cursor-pointer"
+          >
+            <option value="weekly">Weekly</option>
+            <option value="biweekly">Bi-weekly</option>
+            <option value="monthly">Monthly</option>
+            <option value="quarterly">Quarterly</option>
+          </select>
+          <span className={cn("font-medium", stocktakeStatus.isOverdue ? "text-rose-600" : "text-slate-500")}>
+            {stocktakeStatus.message}
+          </span>
+          <button
+            onClick={() => setScheduleDismissed('')}
+            className="ml-auto text-blue-600 hover:underline font-semibold"
+          >
+            Show reminder
+          </button>
+        </div>
+      )}
 
       {/* Content */}
       <main className="flex-1 overflow-hidden p-6">
@@ -195,6 +391,20 @@ export function StockManagement({ onBack, products, setProducts, groups, setGrou
             history={history}
             groups={groups}
             onClose={() => setShowQtyAdjustmentPopup(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ===== Stocktake Dashboard Popup ===== */}
+      <AnimatePresence>
+        {showDashboard && (
+          <StocktakeDashboard
+            history={history}
+            onClose={() => setShowDashboard(false)}
+            onStartStocktake={() => {
+              setShowDashboard(false);
+              setShowQtyAdjustmentPopup(true);
+            }}
           />
         )}
       </AnimatePresence>
@@ -2351,6 +2561,251 @@ function QtyReportViewer({ report, onClose }: { report: ReportData; onClose: () 
           <div className="flex-1" />
           <button onClick={onClose} className="h-8 px-4 rounded-lg bg-slate-700 hover:bg-slate-800 text-white text-xs font-semibold">
             Close
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ===== Stocktake Dashboard Popup =====
+// Shows the 5 most recent stocktake/adjustment events with their variances,
+// providing management oversight at a glance.
+function StocktakeDashboard({
+  history,
+  onClose,
+  onStartStocktake,
+}: {
+  history: StockHistoryEntry[];
+  onClose: () => void;
+  onStartStocktake: () => void;
+}) {
+  const { toast } = useToast();
+
+  // ===== Group history entries by reference (only adjusted entries) =====
+  const stocktakeEvents = useMemo(() => {
+    const groups = new Map<string, {
+      reference: string;
+      timestamp: string;
+      entries: StockHistoryEntry[];
+      totalVariance: number;
+      itemCount: number;
+      surplusItems: number;
+      shortageItems: number;
+    }>();
+    history.forEach(h => {
+      if (h.action !== 'adjusted' || !h.reference) return;
+      const existing = groups.get(h.reference);
+      if (existing) {
+        existing.entries.push(h);
+        existing.totalVariance += h.quantityChange;
+        existing.itemCount += 1;
+        if (h.quantityChange > 0) existing.surplusItems += 1;
+        else if (h.quantityChange < 0) existing.shortageItems += 1;
+        if (h.timestamp > existing.timestamp) existing.timestamp = h.timestamp;
+      } else {
+        groups.set(h.reference, {
+          reference: h.reference,
+          timestamp: h.timestamp,
+          entries: [h],
+          totalVariance: h.quantityChange,
+          itemCount: 1,
+          surplusItems: h.quantityChange > 0 ? 1 : 0,
+          shortageItems: h.quantityChange < 0 ? 1 : 0,
+        });
+      }
+    });
+    return Array.from(groups.values()).sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+  }, [history]);
+
+  // Top 5 most recent
+  const recentEvents = stocktakeEvents.slice(0, 5);
+
+  // ===== Compute aggregate stats =====
+  const aggregateStats = useMemo(() => {
+    if (stocktakeEvents.length === 0) return { totalEvents: 0, avgVariance: 0, totalSurplus: 0, totalShortage: 0 };
+    const totalVariance = stocktakeEvents.reduce((s, e) => s + e.totalVariance, 0);
+    const totalSurplus = stocktakeEvents.reduce((s, e) => s + e.surplusItems, 0);
+    const totalShortage = stocktakeEvents.reduce((s, e) => s + e.shortageItems, 0);
+    return {
+      totalEvents: stocktakeEvents.length,
+      avgVariance: Math.round(totalVariance / stocktakeEvents.length),
+      totalSurplus,
+      totalShortage,
+    };
+  }, [stocktakeEvents]);
+
+  const fmtDate = (ts: string) => {
+    try {
+      const d = new Date(ts);
+      return d.toLocaleDateString('en-GB') + ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    } catch { return ts; }
+  };
+
+  const handleExport = () => {
+    if (stocktakeEvents.length === 0) { toast({ title: 'No data to export', variant: 'destructive' }); return; }
+    import('xlsx').then((XLSX) => {
+      type Row = Record<string, string | number>;
+      const data: Row[] = stocktakeEvents.map((e, i) => ({
+        '#': i + 1,
+        'Reference': e.reference,
+        'Date': fmtDate(e.timestamp),
+        'Items Adjusted': e.itemCount,
+        'Surplus Items': e.surplusItems,
+        'Shortage Items': e.shortageItems,
+        'Total Variance': e.totalVariance,
+      }));
+      const ws = XLSX.utils.json_to_sheet(data);
+      ws['!cols'] = [{ wch: 5 }, { wch: 16 }, { wch: 18 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Stocktake History');
+      XLSX.writeFile(wb, `stocktake-dashboard-${new Date().toISOString().split('T')[0]}.xlsx`);
+      toast({ title: 'Exported successfully', description: `${stocktakeEvents.length} events` });
+    });
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.95, y: 20 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.95, y: 20 }}
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-lg shadow-2xl overflow-hidden flex flex-col"
+        style={{ width: '720px', maxHeight: '85vh', fontFamily: 'Arial, Helvetica, sans-serif' }}
+      >
+        {/* Title bar */}
+        <div className="flex-shrink-0 flex items-center justify-between px-4 h-9 text-white" style={{ background: 'linear-gradient(to right, #7C3AED, #DB2777)' }}>
+          <div className="flex items-center gap-2">
+            <TrendingUp className="h-4 w-4" />
+            <span className="text-sm font-bold">Stocktake Dashboard — Management Overview</span>
+          </div>
+          <button onClick={onClose} className="h-6 w-6 rounded bg-red-600 hover:bg-red-700 flex items-center justify-center transition"><X className="h-3.5 w-3.5 text-white" /></button>
+        </div>
+
+        {/* Aggregate stats */}
+        <div className="flex-shrink-0 px-4 py-3 bg-slate-50 border-b border-slate-200 grid grid-cols-4 gap-3">
+          <div className="bg-white rounded-lg p-2.5 ring-1 ring-slate-200">
+            <div className="text-[9px] text-slate-500 uppercase font-semibold">Total Events</div>
+            <div className="text-lg font-bold text-slate-800">{aggregateStats.totalEvents}</div>
+          </div>
+          <div className="bg-white rounded-lg p-2.5 ring-1 ring-slate-200">
+            <div className="text-[9px] text-slate-500 uppercase font-semibold">Avg Variance</div>
+            <div className={cn("text-lg font-bold font-mono", aggregateStats.avgVariance > 0 ? "text-emerald-600" : aggregateStats.avgVariance < 0 ? "text-rose-600" : "text-slate-600")}>
+              {aggregateStats.avgVariance > 0 ? '+' : ''}{aggregateStats.avgVariance}
+            </div>
+          </div>
+          <div className="bg-white rounded-lg p-2.5 ring-1 ring-slate-200">
+            <div className="text-[9px] text-slate-500 uppercase font-semibold">Surplus Items</div>
+            <div className="text-lg font-bold text-emerald-600">{aggregateStats.totalSurplus}</div>
+          </div>
+          <div className="bg-white rounded-lg p-2.5 ring-1 ring-slate-200">
+            <div className="text-[9px] text-slate-500 uppercase font-semibold">Shortage Items</div>
+            <div className="text-lg font-bold text-rose-600">{aggregateStats.totalShortage}</div>
+          </div>
+        </div>
+
+        {/* Header for recent events list */}
+        <div className="flex-shrink-0 px-4 py-2 bg-purple-50 border-b border-purple-100 flex items-center justify-between">
+          <span className="text-xs font-bold text-slate-700">5 Most Recent Stocktake Events</span>
+          <span className="text-[10px] text-slate-500">Click an event to see details in Stock History</span>
+        </div>
+
+        {/* Recent events list */}
+        <div className="flex-1 overflow-y-auto p-3 space-y-2" style={{ scrollbarWidth: 'thin' }}>
+          {recentEvents.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+              <TrendingUp className="h-10 w-10 mb-2 opacity-40" />
+              <div className="text-sm font-medium">No stocktake events yet</div>
+              <div className="text-xs mt-1">Perform your first stocktake to see variance trends here</div>
+            </div>
+          ) : (
+            recentEvents.map((event, idx) => (
+              <motion.div
+                key={event.reference}
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: idx * 0.05 }}
+                className="bg-white rounded-lg ring-1 ring-slate-200 p-3 hover:ring-purple-300 hover:shadow-md transition cursor-pointer"
+                onClick={() => {
+                  toast({
+                    title: event.reference,
+                    description: `${event.itemCount} items · Variance: ${event.totalVariance > 0 ? '+' : ''}${event.totalVariance} · ${fmtDate(event.timestamp)}`,
+                  });
+                }}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <div className={cn(
+                      "h-8 w-8 rounded-lg flex items-center justify-center text-xs font-bold",
+                      event.totalVariance > 0 ? "bg-emerald-100 text-emerald-700" :
+                      event.totalVariance < 0 ? "bg-rose-100 text-rose-700" :
+                      "bg-slate-100 text-slate-600"
+                    )}>
+                      {event.totalVariance > 0 ? '↑' : event.totalVariance < 0 ? '↓' : '='}
+                    </div>
+                    <div>
+                      <div className="font-bold text-slate-800 text-sm font-mono">{event.reference}</div>
+                      <div className="text-[10px] text-slate-500">{fmtDate(event.timestamp)}</div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className={cn("text-base font-bold font-mono", event.totalVariance > 0 ? "text-emerald-600" : event.totalVariance < 0 ? "text-rose-600" : "text-slate-600")}>
+                      {event.totalVariance > 0 ? '+' : ''}{event.totalVariance}
+                    </div>
+                    <div className="text-[10px] text-slate-500">net variance</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 text-[10px]">
+                  <span className="flex items-center gap-1 text-slate-600">
+                    <Package className="h-3 w-3" /> {event.itemCount} items
+                  </span>
+                  <span className="flex items-center gap-1 text-emerald-700">
+                    <ArrowUp className="h-3 w-3" /> {event.surplusItems} surplus
+                  </span>
+                  <span className="flex items-center gap-1 text-rose-700">
+                    <ArrowDown className="h-3 w-3" /> {event.shortageItems} shortage
+                  </span>
+                  {/* Mini variance bar */}
+                  <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden flex">
+                    {event.surplusItems > 0 && (
+                      <div className="bg-emerald-500 h-full" style={{ width: `${(event.surplusItems / event.itemCount) * 100}%` }} />
+                    )}
+                    {event.shortageItems > 0 && (
+                      <div className="bg-rose-500 h-full" style={{ width: `${(event.shortageItems / event.itemCount) * 100}%` }} />
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            ))
+          )}
+        </div>
+
+        {/* Action buttons */}
+        <div className="flex-shrink-0 px-4 py-2 flex items-center gap-2 border-t border-slate-200 bg-slate-50">
+          <button
+            onClick={onStartStocktake}
+            className="h-8 px-4 rounded-md bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-bold flex items-center gap-1.5 transition shadow-sm"
+          >
+            <ArrowUpDown className="h-3.5 w-3.5" /> Start New Stocktake
+          </button>
+          <button
+            onClick={handleExport}
+            disabled={stocktakeEvents.length === 0}
+            className="h-8 px-4 rounded-md bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold flex items-center gap-1.5 transition disabled:opacity-50"
+          >
+            <Download className="h-3.5 w-3.5" /> Export All Events
+          </button>
+          <div className="flex-1" />
+          <span className="text-[10px] text-slate-500">{stocktakeEvents.length} total events on record</span>
+          <button onClick={onClose} className="h-8 px-4 rounded-md bg-rose-100 hover:bg-rose-200 text-rose-700 text-xs font-bold flex items-center gap-1.5 transition">
+            <X className="h-3.5 w-3.5" /> Close
           </button>
         </div>
       </motion.div>

@@ -1500,3 +1500,80 @@ Stage Summary:
   - Sorted by abs(delta) — biggest variances float to the top
   - Summary stats: matched count, new count, current total, previous total, net delta
   - Print and Export buttons for the comparison report
+
+---
+Task ID: stocktake-schedule-scanner-dashboard
+Agent: main
+Task: Implement three suggested enhancements:
+  1) Stocktake schedule reminder (weekly/bi-weekly/monthly) with overdue banner
+  2) Barcode scanner bulk-import via a Scan mode on the Stock Quantity Adjustment form
+  3) Dashboard widget showing the 5 most recent stocktake variances for management oversight
+
+Work Log:
+- Modified /home/z/my-project/src/components/stock-management.tsx:
+  - Added stocktake schedule state (scheduleFreq: weekly/biweekly/monthly/quarterly, scheduleDismissed)
+  - Added SCHEDULE_KEY = 'sylhn-stocktake-schedule' localStorage persistence (load on mount, save on change)
+  - Added stocktakeStatus useMemo: scans history for action='adjusted' entries, finds the most recent timestamp, computes days since, determines if overdue based on schedule frequency (7/14/30/90 days), returns { lastDate, lastReference, isOverdue, daysOverdue, nextDueDate, message }
+  - Added showOverdueBanner derived state (overdue AND not dismissed for this specific due date)
+  - Added showDashboard state for the new dashboard popup
+  - Added "Stocktake Dashboard" button (purple-pink gradient, TrendingUp icon) to the nav bar next to "Stock Qty Report"
+  - Added overdue/due-soon reminder banner between nav and content:
+    - Rose background when overdue, amber when due soon
+    - AlertTriangle icon, message showing days overdue + last stocktake date + reference
+    - Schedule frequency selector dropdown (Weekly/Bi-weekly/Monthly/Quarterly) — persisted to localStorage
+    - "Start Stocktake" button (opens the Stock Quantity Adjustment popup)
+    - "Dismiss" button (X icon) — records the dismissed due date so it won't reappear until the next cycle
+  - Added compact schedule status bar (always visible when banner is dismissed) — shows the frequency dropdown + status message + "Show reminder" link to un-dismiss
+  - Added Download icon to lucide-react imports
+  - Added StocktakeDashboard popup component at the end of the file:
+    - Purple-pink gradient title bar "Stocktake Dashboard — Management Overview"
+    - 4 aggregate stat cards: Total Events, Avg Variance (color-coded), Surplus Items (green), Shortage Items (red)
+    - "5 Most Recent Stocktake Events" header
+    - Recent events list: each event card shows reference (mono), date, net variance (color-coded: green/red/grey), item count, surplus count, shortage count, mini variance bar (green+red proportional segments)
+    - Sorted most-recent first, limited to 5 events
+    - "Start New Stocktake" button (closes dashboard + opens the adjustment popup)
+    - "Export All Events" button (XLSX with all stocktake events, not just the top 5)
+    - Empty state with helpful message when no stocktakes exist
+  - Added AnimatePresence block rendering <StocktakeDashboard /> when showDashboard is true
+
+- Modified /home/z/my-project/src/components/stock-quantity-adjustment.tsx:
+  - Added ScanLine icon to lucide-react imports
+  - Added barcode scanner state: scanMode, scanBuffer, scanStats {scanned, added, notFound, duplicates}, lastScanFeedback, scanBufferRef, scanTimerRef, lastKeyTimeRef
+  - Added processScannedBarcode function: looks up product by barcode/SKU (with EAN-13 zero-padding fallback); if found and not in table → adds new line with counted=onHand+1; if found and already in table → increments counted by 1; if not found → increments notFound counter + shows error toast
+  - Added barcode scanner useEffect (only active when scanMode=true): global keydown listener that detects rapid input characteristic of barcode scanners (keys within 100ms of each other, ending with Enter or auto-flush after 150ms timeout); ignores keys from input fields so the user can still type in form fields; calls processScannedBarcode on each completed scan
+  - Added toggleScanMode function: turns scan mode on/off, resets stats, shows toast
+  - Updated keyboard shortcuts useEffect to skip all F2/F3/F4/Esc shortcuts when scanMode is active (prevents conflicts)
+  - Added "Scan" toggle button to the action bar (between Import and Export): dark blue when off, red + animate-pulse when on; ScanLine icon
+  - Added Barcode Scanner Mode Overlay (fixed bottom-right, z-80):
+    - Red gradient header "Scanner Active" with pulsing ScanLine icon + close button
+    - Live buffer display with blinking cursor (shows characters as they arrive from the scanner)
+    - Last scan feedback: shows "Added: [product]" (green), "+1: [product]" (blue, for increments), or "Not found" (red)
+    - 3-column stats grid: Scanned / Added+Incremented / Not Found
+    - Instructions: "Each scan adds 1 unit to the counted quantity"
+
+Stage Summary:
+- 2 modified files: stock-management.tsx (+~330 lines: schedule reminder + dashboard component), stock-quantity-adjustment.tsx (+~180 lines: barcode scanner mode + overlay)
+- Feature 1 — Stocktake schedule reminder:
+  - 4 frequencies: Weekly (7d), Bi-weekly (14d), Monthly (30d), Quarterly (90d)
+  - Persisted to localStorage key 'sylhn-stocktake-schedule'
+  - Overdue banner (rose) with days overdue, last stocktake date + reference, Start Stocktake button, Dismiss button
+  - Due-soon banner (amber) shown when within the schedule window
+  - Dismissal is per-due-date — reappears when the next cycle becomes due
+  - Compact status bar always visible when banner is dismissed
+- Feature 2 — Barcode scanner bulk-import:
+  - Scan mode toggle button in the action bar (ScanLine icon)
+  - Global keydown listener detects rapid input (<100ms between keys) ending with Enter or auto-flush after 150ms
+  - Each scan adds 1 unit to the counted quantity (first scan creates the line with counted=onHand+1, subsequent scans increment counted by 1)
+  - Live overlay shows: current buffer (with blinking cursor), last scan feedback (color-coded), 3-column stats (scanned/added/not found)
+  - Ignores keys from input fields so form fields remain usable
+  - F2/F3/F4/Esc shortcuts disabled during scan mode to prevent conflicts
+- Feature 3 — Stocktake Dashboard:
+  - Purple-pink gradient popup (720px wide)
+  - 4 aggregate stat cards at top: Total Events, Avg Variance, Surplus Items, Shortage Items
+  - Top 5 most recent stocktake events with: reference, date, net variance (color-coded), item count, surplus/shortage breakdown, mini proportional variance bar
+  - Start New Stocktake button (closes dashboard + opens adjustment form)
+  - Export All Events button (XLSX with all events)
+  - Accessible from the Stock Management nav bar
+- Verified npx tsc --noEmit produces no errors
+- Verified npx next build compiles successfully
+- Verified dev server responds with HTTP 200 with no runtime errors

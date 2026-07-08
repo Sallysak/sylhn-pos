@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Save, Printer, Trash2, Upload, Download, X, Search as SearchIcon,
-  Package, AlertTriangle, TrendingUp,
+  Package, AlertTriangle, TrendingUp, ScanLine,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -90,6 +90,18 @@ export function StockQuantityAdjustment({
 
   // ===== Compare-with-last-Stocktake report state =====
   const [showCompareReport, setShowCompareReport] = useState(false);
+
+  // ===== Barcode scanner mode state =====
+  // Barcode scanners act as HID keyboards — they type characters rapidly (within ~50ms)
+  // and end with Enter. We capture this via a global keydown listener that detects
+  // rapid input patterns and auto-adds matching products to the adjustment table.
+  const [scanMode, setScanMode] = useState(false);
+  const [scanBuffer, setScanBuffer] = useState('');
+  const [scanStats, setScanStats] = useState({ scanned: 0, added: 0, notFound: 0, duplicates: 0 });
+  const [lastScanFeedback, setLastScanFeedback] = useState<{ barcode: string; status: 'added' | 'duplicate' | 'notfound' | 'incremented'; productName?: string } | null>(null);
+  const scanBufferRef = useRef('');
+  const scanTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastKeyTimeRef = useRef(0);
 
   // ===== Restore draft from localStorage on first mount =====
   // Only restore if there's a draft AND no initialProductId was passed in
@@ -584,9 +596,151 @@ export function StockQuantityAdjustment({
     input.click();
   };
 
+  // ===== Barcode scanner: process a scanned barcode =====
+  // Looks up the product by barcode/SKU. If found:
+  //   - If not in the table → add it with counted=onHand+1 (first scan = 1 unit counted)
+  //   - If already in the table → increment counted by 1 (each scan = 1 more unit)
+  // If not found → increment notFound counter and show feedback
+  const processScannedBarcode = (barcode: string) => {
+    const trimmed = barcode.trim();
+    if (!trimmed) return;
+    setScanStats(prev => ({ ...prev, scanned: prev.scanned + 1 }));
+
+    const product = products.find(p =>
+      p.barcode === trimmed ||
+      p.sku.toLowerCase() === trimmed.toLowerCase() ||
+      p.barcode === trimmed.padStart(13, '0') || // EAN-13 zero-padding
+      p.sku.toLowerCase() === trimmed.toLowerCase().padStart(13, '0')
+    );
+
+    if (!product) {
+      setScanStats(prev => ({ ...prev, notFound: prev.notFound + 1 }));
+      setLastScanFeedback({ barcode: trimmed, status: 'notfound' });
+      toast({ title: 'Barcode not found', description: `"${trimmed}" — add this product to stock first`, variant: 'destructive' });
+      return;
+    }
+
+    // Check if the product is already in the lines
+    const existingIdx = lines.findIndex(l => l.productId === product.id);
+    if (existingIdx >= 0) {
+      // Increment counted by 1
+      const newCounted = lines[existingIdx].counted + 1;
+      const newQty = newCounted - lines[existingIdx].onHand;
+      setLines(prev => prev.map((l, i) => i === existingIdx ? {
+        ...l, counted: newCounted, qty: newQty, total: newQty * l.cost,
+      } : l));
+      setScanStats(prev => ({ ...prev, added: prev.added + 1 }));
+      setLastScanFeedback({ barcode: trimmed, status: 'incremented', productName: `${product.emoji} ${product.name}` });
+    } else {
+      // Add new line with counted = onHand + 1 (first physical count = 1 unit scanned)
+      const counted = product.stock + 1;
+      const qty = counted - product.stock; // = 1
+      const newLine: AdjustmentLine = {
+        id: `line-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        partNo: product.sku,
+        details: `${product.emoji} ${product.name}`,
+        onHand: product.stock,
+        counted,
+        qty,
+        cost: product.costPrice,
+        total: qty * product.costPrice,
+        productId: product.id,
+        emoji: product.emoji,
+      };
+      setLines(prev => [...prev, newLine]);
+      setScanStats(prev => ({ ...prev, added: prev.added + 1 }));
+      setLastScanFeedback({ barcode: trimmed, status: 'added', productName: `${product.emoji} ${product.name}` });
+    }
+    setSaved(false);
+  };
+
+  // ===== Barcode scanner: global keydown listener (only active in scan mode) =====
+  // Detects rapid key input characteristic of barcode scanners:
+  //   - Characters arrive within ~50ms of each other
+  //   - Scan ends with Enter
+  //   - Total scan takes < 200ms
+  // Human typing is much slower (>100ms between keys), so we can distinguish.
+  useEffect(() => {
+    if (!scanMode) return;
+
+    const handler = (e: KeyboardEvent) => {
+      // Ignore key events from input fields (let the user type normally in form fields)
+      const target = e.target as HTMLElement;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT')) {
+        return;
+      }
+
+      const now = Date.now();
+
+      // Enter = end of scan
+      if (e.key === 'Enter') {
+        if (scanBufferRef.current.length > 0) {
+          const barcode = scanBufferRef.current;
+          scanBufferRef.current = '';
+          setScanBuffer('');
+          if (scanTimerRef.current) { clearTimeout(scanTimerRef.current); scanTimerRef.current = null; }
+          processScannedBarcode(barcode);
+        }
+        e.preventDefault();
+        return;
+      }
+
+      // Only accept printable characters
+      if (e.key.length !== 1) return;
+
+      // If the gap between keys is too long (>100ms), this is probably a new scan starting
+      // (or human typing that we should ignore). Reset the buffer.
+      if (now - lastKeyTimeRef.current > 100 && scanBufferRef.current.length > 0) {
+        scanBufferRef.current = '';
+      }
+      lastKeyTimeRef.current = now;
+
+      scanBufferRef.current += e.key;
+      setScanBuffer(scanBufferRef.current);
+
+      // Set a timeout to auto-flush if Enter doesn't come (some scanners don't send Enter)
+      if (scanTimerRef.current) clearTimeout(scanTimerRef.current);
+      scanTimerRef.current = setTimeout(() => {
+        if (scanBufferRef.current.length >= 4) { // minimum barcode length
+          const barcode = scanBufferRef.current;
+          scanBufferRef.current = '';
+          setScanBuffer('');
+          processScannedBarcode(barcode);
+        }
+      }, 150);
+    };
+
+    window.addEventListener('keydown', handler);
+    return () => {
+      window.removeEventListener('keydown', handler);
+      if (scanTimerRef.current) clearTimeout(scanTimerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scanMode, lines, products]);
+
+  // ===== Toggle scan mode =====
+  const toggleScanMode = () => {
+    if (!scanMode) {
+      setScanMode(true);
+      setScanStats({ scanned: 0, added: 0, notFound: 0, duplicates: 0 });
+      setLastScanFeedback(null);
+      scanBufferRef.current = '';
+      setScanBuffer('');
+      toast({ title: 'Scan mode ON', description: 'Scan barcodes with your scanner — each scan adds 1 unit to the counted quantity' });
+    } else {
+      setScanMode(false);
+      scanBufferRef.current = '';
+      setScanBuffer('');
+      if (scanTimerRef.current) { clearTimeout(scanTimerRef.current); scanTimerRef.current = null; }
+      toast({ title: 'Scan mode OFF', description: `${scanStats.scanned} scans · ${scanStats.added} added` });
+    }
+  };
+
   // ===== Keyboard shortcuts (F2/F3/F4/Esc) =====
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      // Skip all shortcuts when scan mode is active (scanner drives the input)
+      if (scanMode) return;
       const target = e.target as HTMLElement;
       const isTyping = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT');
       if (e.key === 'F2') { e.preventDefault(); handleSave(); }
@@ -597,7 +751,7 @@ export function StockQuantityAdjustment({
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lines, adjType, details, postToAC, date, adjNumber, showStockSearch]);
+  }, [lines, adjType, details, postToAC, date, adjNumber, showStockSearch, scanMode]);
 
   // ===== Form body =====
   const body = (
@@ -836,6 +990,18 @@ export function StockQuantityAdjustment({
         <button onClick={handleImport} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1 transition shadow-sm" style={{ backgroundColor: HEADER_DARK_BLUE }}>
           <Upload className="h-3 w-3" style={{ color: '#4CAF50' }} /> Import
         </button>
+        <button
+          onClick={toggleScanMode}
+          className={cn(
+            "h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1 transition shadow-sm",
+            scanMode && "animate-pulse"
+          )}
+          style={{ backgroundColor: scanMode ? '#F44336' : HEADER_DARK_BLUE }}
+          title={scanMode ? 'Scan mode is ON — click to stop' : 'Turn on barcode scanner mode (each scan adds 1 unit to counted qty)'}
+        >
+          <ScanLine className="h-3 w-3" style={{ color: scanMode ? '#FFC107' : '#4CAF50' }} />
+          {scanMode ? 'Scanning…' : 'Scan'}
+        </button>
         <button onClick={handleExport} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1 transition shadow-sm" style={{ backgroundColor: HEADER_DARK_BLUE }}>
           <Download className="h-3 w-3" style={{ color: '#4CAF50' }} /> Export
         </button>
@@ -908,6 +1074,100 @@ export function StockQuantityAdjustment({
             totals={comparisonTotals}
             onClose={() => setShowCompareReport(false)}
           />
+        )}
+      </AnimatePresence>
+
+      {/* ===== Barcode Scanner Mode Overlay (fixed bottom-right) ===== */}
+      <AnimatePresence>
+        {scanMode && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 50, scale: 0.9 }}
+            transition={{ type: 'spring', damping: 20, stiffness: 300 }}
+            className="fixed bottom-4 right-4 z-[80] bg-white rounded-xl shadow-2xl ring-2 ring-rose-400 overflow-hidden"
+            style={{ width: '340px', fontFamily: 'Arial, Helvetica, sans-serif' }}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-3 py-2 bg-gradient-to-r from-rose-600 to-rose-500 text-white">
+              <div className="flex items-center gap-2">
+                <ScanLine className="h-4 w-4 animate-pulse" />
+                <span className="text-xs font-bold">Scanner Active</span>
+              </div>
+              <button
+                onClick={toggleScanMode}
+                className="h-5 w-5 rounded bg-white/20 hover:bg-white/30 flex items-center justify-center transition"
+                title="Stop scanning"
+              >
+                <X className="h-3 w-3 text-white" />
+              </button>
+            </div>
+
+            {/* Live buffer display */}
+            <div className="px-3 py-2 bg-slate-50 border-b border-slate-200">
+              <div className="text-[9px] font-bold text-slate-500 uppercase mb-0.5">Current buffer</div>
+              <div className="h-7 px-2 flex items-center bg-white border border-slate-300 rounded font-mono text-sm text-slate-800">
+                {scanBuffer || <span className="text-slate-300">Waiting for scan…</span>}
+                <span className="ml-0.5 inline-block w-0.5 h-4 bg-rose-500 animate-pulse" />
+              </div>
+            </div>
+
+            {/* Last scan feedback */}
+            <div className="px-3 py-2 border-b border-slate-200">
+              <div className="text-[9px] font-bold text-slate-500 uppercase mb-0.5">Last scan</div>
+              {lastScanFeedback ? (
+                <div className="flex items-center gap-2">
+                  {lastScanFeedback.status === 'added' && (
+                    <><Package className="h-4 w-4 text-emerald-600 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[11px] font-bold text-emerald-700 truncate">+ Added: {lastScanFeedback.productName}</div>
+                      <div className="text-[9px] text-slate-500 font-mono truncate">{lastScanFeedback.barcode}</div>
+                    </div></>
+                  )}
+                  {lastScanFeedback.status === 'incremented' && (
+                    <><TrendingUp className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[11px] font-bold text-blue-700 truncate">+1: {lastScanFeedback.productName}</div>
+                      <div className="text-[9px] text-slate-500 font-mono truncate">{lastScanFeedback.barcode}</div>
+                    </div></>
+                  )}
+                  {lastScanFeedback.status === 'notfound' && (
+                    <><AlertTriangle className="h-4 w-4 text-rose-600 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[11px] font-bold text-rose-700 truncate">Not found</div>
+                      <div className="text-[9px] text-slate-500 font-mono truncate">{lastScanFeedback.barcode}</div>
+                    </div></>
+                  )}
+                </div>
+              ) : (
+                <div className="text-[10px] text-slate-400 italic">No scans yet — scan a barcode to begin</div>
+              )}
+            </div>
+
+            {/* Stats */}
+            <div className="px-3 py-2 grid grid-cols-3 gap-2 bg-slate-50">
+              <div className="text-center">
+                <div className="text-base font-bold text-slate-800 font-mono">{scanStats.scanned}</div>
+                <div className="text-[8px] text-slate-500 uppercase">Scanned</div>
+              </div>
+              <div className="text-center">
+                <div className="text-base font-bold text-emerald-600 font-mono">{scanStats.added}</div>
+                <div className="text-[8px] text-slate-500 uppercase">Added/Inc</div>
+              </div>
+              <div className="text-center">
+                <div className="text-base font-bold text-rose-600 font-mono">{scanStats.notFound}</div>
+                <div className="text-[8px] text-slate-500 uppercase">Not Found</div>
+              </div>
+            </div>
+
+            {/* Instructions */}
+            <div className="px-3 py-1.5 bg-rose-50 border-t border-rose-100">
+              <div className="text-[9px] text-rose-700">
+                Each scan adds <strong>1 unit</strong> to the counted quantity.
+                Click anywhere outside form fields and scan with your barcode scanner.
+              </div>
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>
