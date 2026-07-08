@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Save, Printer, Trash2, Upload, Download, X, Search as SearchIcon,
-  Package, AlertTriangle, TrendingUp, ScanLine, FileText, Plus,
+  Package, AlertTriangle, TrendingUp, ScanLine, FileText,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -97,12 +97,10 @@ export function StockQuantityAdjustment({
   const [saved, setSaved] = useState(false);
   const [draftRestored, setDraftRestored] = useState(false);
 
-  // ===== Stock Adjustment mode: reason + quick-adjust integration =====
-  // When adjType === 'adjustment', the form shows a Reason dropdown and
-  // a "Quick Adjust" button that opens the QuickStockAdjustment popup.
-  // This makes "Stock Adjustment" a distinct workflow from "Stocktake".
+  // ===== Stock Adjustment mode: reason integration =====
+  // When adjType === 'adjustment', the form shows a Reason dropdown
+  // that is applied to all adjusted items when saved.
   const [adjustReason, setAdjustReason] = useState('Damaged goods');
-  const [showQuickAdjust, setShowQuickAdjust] = useState(false);
 
   // ===== Audit trail: records every mutation to the draft before it's saved =====
   // Each entry captures: timestamp, action type, product affected, old/new values, user.
@@ -951,13 +949,6 @@ export function StockQuantityAdjustment({
             </select>
           </div>
           <div className="flex-1" />
-          <button
-            onClick={() => setShowStockSearch(true)}
-            className="h-7 px-3 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold flex items-center gap-1.5 transition shadow-sm"
-            title="Search for a product to add to this adjustment"
-          >
-            <Plus className="h-3.5 w-3.5" /> Add Product to Adjust
-          </button>
           <span className="text-[9px] text-amber-700 italic">
             Reason will be applied to all adjusted items when saved
           </span>
@@ -1052,7 +1043,7 @@ export function StockQuantityAdjustment({
               <div className="text-[11px] font-medium">No items added yet</div>
               <div className="text-[9px] mt-0.5">
                 {adjType === 'adjustment'
-                  ? 'Type a Part No. above, click "Add Product to Adjust", or click "Load Range" to begin'
+                  ? 'Type a Part No. above or click "Load Range" to begin'
                   : 'Type a Part No. above or click "Load Range" to begin'}
               </div>
             </div>
