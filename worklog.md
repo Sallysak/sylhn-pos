@@ -1325,3 +1325,41 @@ Stage Summary:
   - Add Telephone: light green (#D6EBD0) bg, green (#4CAF50) title bar, white buttons with blue (Save) / red (Close) icons
 - Window sizes: Directory ~900×560, Add Form ~620×560
 - Two entry points: (1) Phone Directory tab inside TelephoneModule, (2) Phone Directory menu item in Telephone dropdown
+
+---
+Task ID: telephone-directory-enhancements
+Agent: main
+Task: Apply suggested next steps to telephone directory: (1) persist directory changes to localStorage, (2) connect Email/Bulk Email to actual mailto: composer, (3) sync directory entries with the Customers tab, (4) add 'Add to Directory' button on customer cards.
+
+Work Log:
+- Modified /home/z/my-project/src/components/telephone-directory.tsx:
+  - Added localStorage persistence: directory state is initialized from localStorage ('sylhn-telephone-directory' key), falling back to bundled sample data
+  - Added useEffect that writes directory to localStorage on every change and notifies parent via onEntriesChange
+  - Replaced handleEmail toast-only behavior with a real mailto: link that opens the user's email client with prefilled subject (Hello from <Title> <Name>) and body (greeting + notes + signature)
+  - Replaced handleBulkEmail toast-only behavior with mailto:?bcc=... that opens email client with all filtered emails in BCC, prefilled subject (Announcement from SYLHN COMPANY LTD) and body
+  - Both handlers wrap window.location.href in try/catch and show toast on failure
+- Modified /home/z/my-project/src/components/telephone-module.tsx:
+  - Added useMemo and UserPlus to imports
+  - In TelephoneModule component, added useToast hook (was previously missing — needed for sync feedback)
+  - Added mergedCustomers memo that combines the bundled customers with directory entries (avoiding duplicates by normalized phone number) — directory entries appear as Customer cards with id prefixed 'dir-'
+  - Added addCustomerToDirectory handler that converts a Customer into a PhoneDirectoryEntry and appends it to directoryEntries (with duplicate check by phone)
+  - Updated Customers tab to use mergedCustomers instead of bare customers, and pass onAddToDirectory and onOpenDirectory callbacks
+  - Updated Customers function signature to accept onAddToDirectory and onOpenDirectory props
+  - Added 'Directory' outline button (BookOpen icon) next to the 'Add' button in Customers tab header — opens the Phone Directory popup directly
+  - Added 'Add to Directory' button (UserPlus icon, amber color) on each customer card (only for non-directory customers)
+  - Directory-originated customer cards are visually distinct: amber ring + light amber background + 'from Directory' badge
+  - Removed unused useEffect import after refactoring
+- Verified npx tsc --noEmit produces no errors in telephone files
+- Verified npx next build compiles successfully
+- Verified dev server responds with HTTP 200 and no runtime errors
+
+Stage Summary:
+- localStorage persistence: directory survives page refresh; key = 'sylhn-telephone-directory'
+- Email composer: mailto: links open the user's default email client (Outlook, Gmail desktop, Apple Mail, etc.) with prefilled subject and body for both single and bulk email
+- Bidirectional sync between Customers tab and Phone Directory:
+  - Directory entries (those with a mobile phone not already in customers) appear as Customer cards in the Customers tab
+  - 'Add to Directory' button on each Customer card pushes it into the Phone Directory (with 'Customers' group)
+  - Duplicate detection by normalized phone number prevents the same contact from appearing twice
+  - Directory-originated customer cards are visually marked (amber) so the user knows the source
+- 'Directory' button in the Customers tab header provides a one-click shortcut to open the Phone Directory popup without leaving the tab
+- All previously-working features (New, Modify, Delete F4, Envelop F3, keyboard nav) remain functional

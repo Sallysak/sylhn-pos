@@ -101,15 +101,37 @@ export function TelephoneDirectory({
   title = 'My Phone Directory',
 }: TelephoneDirectoryProps) {
   const { toast } = useToast();
-  const [directory, setDirectory] = useState<PhoneDirectoryEntry[]>(entries ?? initialDirectory);
+  // ===== Persistence: load from localStorage on first mount =====
+  // If the parent provides entries (controlled mode), use those.
+  // Otherwise, fall back to localStorage cache, then to the bundled sample data.
+  const STORAGE_KEY = 'sylhn-telephone-directory';
+  const [directory, setDirectory] = useState<PhoneDirectoryEntry[]>(() => {
+    if (entries && entries.length > 0) return entries;
+    // Try localStorage first (client-side only)
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = window.localStorage.getItem(STORAGE_KEY);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed as PhoneDirectoryEntry[];
+        }
+      } catch { /* ignore corrupt cache */ }
+    }
+    return initialDirectory;
+  });
   const [search, setSearch] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingEntry, setEditingEntry] = useState<PhoneDirectoryEntry | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
-  // Sync to parent
+  // ===== Persist directory changes to localStorage and notify parent =====
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(directory));
+      } catch { /* storage full or unavailable */ }
+    }
     if (onEntriesChange) onEntriesChange(directory);
   }, [directory, onEntriesChange]);
 
@@ -161,14 +183,40 @@ export function TelephoneDirectory({
     const entry = filtered[selectedIndex];
     if (!entry) { toast({ title: 'Select an entry first', variant: 'destructive' }); return; }
     if (!entry.email) { toast({ title: 'No email for this entry', variant: 'destructive' }); return; }
-    toast({ title: 'Email opened', description: `Composing email to ${entry.name} <${entry.email}>` });
+    // Open the user's email client via mailto:
+    const subject = encodeURIComponent(`Hello from ${entry.title} ${entry.name}`.replace(/\s+/g, ' ').trim());
+    const body = encodeURIComponent(
+      `Dear ${entry.title} ${entry.name},\n\n` +
+      (entry.notes ? `${entry.notes}\n\n` : '') +
+      `Best regards,\nSYLHN COMPANY LTD\n${'+233592766044'}\n${'East Legon, Accra'}`
+    );
+    try {
+      window.location.href = `mailto:${entry.email}?subject=${subject}&body=${body}`;
+      toast({ title: 'Email composer opened', description: `Composing email to ${entry.name} <${entry.email}>` });
+    } catch {
+      toast({ title: 'Could not open email client', variant: 'destructive' });
+    }
   };
 
   const handleBulkEmail = () => {
     if (filtered.length === 0) { toast({ title: 'No entries to email', variant: 'destructive' }); return; }
     const emails = filtered.filter(e => e.email).map(e => e.email);
     if (emails.length === 0) { toast({ title: 'No emails found', variant: 'destructive' }); return; }
-    toast({ title: 'Bulk email (BCC)', description: `Composing bulk email to ${emails.length} contacts` });
+    // Use BCC so recipients don't see each other
+    const bcc = emails.join(',');
+    const subject = encodeURIComponent('Announcement from SYLHN COMPANY LTD');
+    const body = encodeURIComponent(
+      `Dear Valued Contact,\n\n` +
+      `We hope this message finds you well.\n\n` +
+      `This is a bulk communication from SYLHN COMPANY LTD.\n\n` +
+      `Best regards,\nSYLHN COMPANY LTD\n+233592766044\nEast Legon, Accra`
+    );
+    try {
+      window.location.href = `mailto:?bcc=${bcc}&subject=${subject}&body=${body}`;
+      toast({ title: 'Bulk email composer opened', description: `Composing bulk email to ${emails.length} contacts (BCC)` });
+    } catch {
+      toast({ title: 'Could not open email client', variant: 'destructive' });
+    }
   };
 
   const handleEnvelope = () => {
