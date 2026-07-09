@@ -14,6 +14,7 @@ import {
   Phone, Truck, Users, Database, Wrench, Shield,
   FileBarChart2, BookOpen, PhoneCall, Archive, Settings2, Lock,
   FileSearch, Copy, Image as ImageIcon, Tags,
+  Smartphone,
 } from "lucide-react";
 import {
   products as INITIAL_PRODUCTS, categories, paymentMethods, quickCashAmounts,
@@ -54,6 +55,7 @@ const DailySalesReport = dynamic(() => import("@/components/sales-reports").then
 const SalesHistory = dynamic(() => import("@/components/sales-reports").then(m => ({ default: m.SalesHistory })), { ssr: false, loading: loadingFallback });
 const SupplierForm = dynamic(() => import("@/components/supplier-form").then(m => ({ default: m.SupplierForm })), { ssr: false, loading: loadingFallback });
 const AccountsReports = dynamic(() => import("@/components/accounts-reports").then(m => ({ default: m.AccountsReports })), { ssr: false, loading: loadingFallback });
+const FinancialOperations = dynamic(() => import("@/components/financial-operations").then(m => ({ default: m.FinancialOperations })), { ssr: false, loading: loadingFallback });
 
 export default function POSPage() {
   // ===== Top-level View State =====
@@ -95,6 +97,7 @@ export default function POSPage() {
   const [partNoInput, setPartNoInput] = useState("");
   const [productSearch, setProductSearch] = useState("");
   const [accountsReport, setAccountsReport] = useState<"daily-sales" | "profit-loss" | "vat-tax" | "stock-value" | "cost-price" | "stock-performance" | "stock-group" | "general-ledger" | "trial-balance">("daily-sales");
+  const [financeTab, setFinanceTab] = useState<"expenses" | "cash-recon" | "mobile-money">("expenses");
 
   const { toast } = useToast();
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -823,6 +826,10 @@ export default function POSPage() {
         { label: "Profit & Loss", icon: BarChart3, action: () => { setAccountsReport("profit-loss"); setView("accounts-reports"); } },
         { label: "VAT Tax Report", icon: Percent, action: () => { setAccountsReport("vat-tax"); setView("accounts-reports"); } },
         { separator: true },
+        { label: "Expense Management", icon: Receipt, action: () => { setFinanceTab("expenses"); setView("finance-ops"); } },
+        { label: "Cash Reconciliation", icon: Wallet, action: () => { setFinanceTab("cash-recon"); setView("finance-ops"); } },
+        { label: "Mobile Money", icon: Smartphone, action: () => { setFinanceTab("mobile-money"); setView("finance-ops"); } },
+        { separator: true },
         { label: "Stock Value Report", icon: DollarSign, action: () => { setAccountsReport("stock-value"); setView("accounts-reports"); } },
         { label: "Cost Price Report", icon: FileText, action: () => { setAccountsReport("cost-price"); setView("accounts-reports"); } },
         { label: "Stock Performance", icon: TrendingUp, action: () => { setAccountsReport("stock-performance"); setView("accounts-reports"); } },
@@ -911,6 +918,9 @@ export default function POSPage() {
   }
   if (view === "accounts-reports") {
     return <AccountsReports onBack={() => setView("pos")} products={products} groups={groups} history={history} dailyTotal={dailyTotal} transactionCount={transactionCount} initialReport={accountsReport} />;
+  }
+  if (view === "finance-ops") {
+    return <FinancialOperations onBack={() => setView("pos")} dailyTotal={dailyTotal} initialTab={financeTab} />;
   }
 
   // ===== Render POS =====
