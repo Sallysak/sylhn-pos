@@ -1113,14 +1113,60 @@ function GroupForm({ group, onSave, onClose }: {
   onClose: () => void;
 }) {
   const [form, setForm] = useState<StockGroup>(group || { id: "", name: "", description: "", color: "emerald", icon: "📦" });
+
+  // ===== Emoji icon library for stock groups =====
+  const ICON_CATEGORIES: { label: string; icons: string[] }[] = [
+    {
+      label: 'Shopping & Products',
+      icons: ['🛒', '📦', '🛍️', '🏪', '🏷️', '💰', '🧾', '💳', '🛒', '📦', '🛍️', '🏪', '🏷️', '💰', '🧾', '💳'],
+    },
+    {
+      label: 'Food & Groceries',
+      icons: ['🍎', '🍌', '🍊', '🍓', '🍇', '🥕', '🥬', '🍅', '🥔', '🧅', '🧄', '🌽', '🍞', '🥖', '🧀', '🥛', '🥚', '🍖', '🍗', '🐟', '🍤', '🍚', '🥘', '🍜', '🍝', '🍕', '🍔', '🍟', '🌭', '🥪', '🌮', '🌯', '🍣', '🍿', '🥫', '🍯', '🧈', '🧂', '🥜', '🌰', '🥥', '🍍', '🥭', '🍑', '🍒', '🍈', '🍉', '🥝', '🥑', '🫐'],
+    },
+    {
+      label: 'Beverages',
+      icons: ['🥤', '☕', '🍵', '🧃', '🥛', '🍷', '🍺', '🍻', '🥃', '🍸', '🍹', '🍾', '🧊', '💧', '🧋'],
+    },
+    {
+      label: 'Snacks & Sweets',
+      icons: ['🍫', '🍬', '🍭', '🍩', '🍪', '🎂', '🍰', '🧁', '🍦', '🍧', '🍨', '🥧', '🥨', '🥐', '🧇', '🥞', '🍿', '🥜', '🍯'],
+    },
+    {
+      label: 'Household & Cleaning',
+      icons: ['🧴', '🧼', '🧽', '🧹', '🧺', '🪣', '🧻', '🪟', '🚿', '🛁', '🧷', '✂️', '🪒', '🧴', '🧼', '🧽'],
+    },
+    {
+      label: 'Health & Beauty',
+      icons: ['💊', '🧴', '💄', '🪥', '🧖', '💆', '🧼', '🧴', '💊', '🩹', '🩺', '💉', '🧬', '🔬'],
+    },
+    {
+      label: 'Miscellaneous',
+      icons: ['📚', '✏️', '🖊️', '📎', '📌', '📋', '📁', '🗂️', '🗳️', '✂️', '📐', '📏', '💡', '🔋', '🔌', '🔑', '🔒', '🛡️', '⚙️', '🔧', '🔨', '🛠️', '🧰', '📦', '🎁', '🎈', '🎉', '🎊', '🛒', '💳', '💰', '🏷️'],
+    },
+  ];
+
+  const [showIconPicker, setShowIconPicker] = useState(false);
+  const [iconCategory, setIconCategory] = useState(0);
+  const [iconSearch, setIconSearch] = useState('');
+
+  // Filter icons by search
+  const filteredIcons = useMemo(() => {
+    if (!iconSearch.trim()) return ICON_CATEGORIES[iconCategory].icons;
+    // If searching, search across all categories
+    const allIcons = ICON_CATEGORIES.flatMap(c => c.icons);
+    return allIcons.filter((icon, idx) => allIcons.indexOf(icon) === idx); // dedupe
+  }, [iconSearch, iconCategory]);
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-emerald-600 to-teal-600 text-white">
+      <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col" style={{ maxHeight: '90vh' }}>
+        <div className="flex-shrink-0 flex items-center justify-between px-6 py-4 bg-gradient-to-r from-emerald-600 to-teal-600 text-white">
           <h3 className="text-lg font-bold">{group ? "Edit Group" : "Add Stock Group"}</h3>
           <button onClick={onClose} className="h-8 w-8 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center"><X className="h-4 w-4" /></button>
         </div>
-        <div className="p-6 space-y-4">
+
+        <div className="flex-1 overflow-y-auto p-6 space-y-4" style={{ scrollbarWidth: 'thin' }}>
           <div>
             <label className="text-xs font-semibold text-slate-600 mb-1 block">Group Name</label>
             <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full h-10 px-3 rounded-lg border border-slate-200 focus:border-emerald-500 outline-none text-sm" placeholder="e.g. Fresh Produce" />
@@ -1132,17 +1178,96 @@ function GroupForm({ group, onSave, onClose }: {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-semibold text-slate-600 mb-1 block">Icon (emoji)</label>
-              <input value={form.icon} onChange={(e) => setForm({ ...form, icon: e.target.value })} className="w-full h-10 px-3 rounded-lg border border-slate-200 focus:border-emerald-500 outline-none text-sm text-center text-xl" maxLength={2} />
+              {/* Selected icon display + toggle picker */}
+              <button
+                onClick={() => setShowIconPicker(!showIconPicker)}
+                className={cn(
+                  "w-full h-10 px-3 rounded-lg border outline-none text-sm flex items-center justify-center gap-2 transition",
+                  showIconPicker ? "border-emerald-500 ring-2 ring-emerald-200 bg-emerald-50" : "border-slate-200 hover:border-emerald-300"
+                )}
+              >
+                <span className="text-xl">{form.icon}</span>
+                <span className="text-[10px] text-slate-400">click to change</span>
+              </button>
             </div>
             <div>
               <label className="text-xs font-semibold text-slate-600 mb-1 block">Color</label>
               <select value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} className="w-full h-10 px-3 rounded-lg border border-slate-200 focus:border-emerald-500 outline-none text-sm">
-                {["emerald", "blue", "red", "amber", "cyan", "purple", "sky", "orange", "teal", "pink"].map(c => <option key={c} value={c}>{c}</option>)}
+                {["emerald", "blue", "red", "amber", "cyan", "purple", "sky", "orange", "teal", "pink", "indigo", "rose"].map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
           </div>
+
+          {/* ===== Icon Picker Grid ===== */}
+          <AnimatePresence>
+            {showIconPicker && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="overflow-hidden"
+              >
+                <div className="border border-slate-200 rounded-lg overflow-hidden">
+                  {/* Category tabs */}
+                  <div className="flex items-center gap-1 px-2 py-1.5 bg-slate-50 border-b border-slate-200 overflow-x-auto" style={{ scrollbarWidth: 'thin' }}>
+                    {ICON_CATEGORIES.map((cat, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => { setIconCategory(idx); setIconSearch(''); }}
+                        className={cn(
+                          "px-2.5 py-1 rounded text-[10px] font-semibold whitespace-nowrap transition",
+                          iconCategory === idx && !iconSearch
+                            ? "bg-emerald-600 text-white"
+                            : "bg-white text-slate-500 hover:bg-slate-100"
+                        )}
+                      >
+                        {cat.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Icon grid */}
+                  <div className="p-2 max-h-40 overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
+                    <div className="grid grid-cols-8 gap-1">
+                      {(iconSearch.trim() ? filteredIcons : ICON_CATEGORIES[iconCategory].icons).map((icon, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => {
+                            setForm({ ...form, icon });
+                            setShowIconPicker(false);
+                          }}
+                          className={cn(
+                            "h-9 w-9 rounded-md flex items-center justify-center text-xl transition",
+                            form.icon === icon
+                              ? "bg-emerald-100 ring-2 ring-emerald-400"
+                              : "hover:bg-slate-100"
+                          )}
+                          title={icon}
+                        >
+                          {icon}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Custom icon input (for typing an emoji not in the grid) */}
+          <div>
+            <label className="text-[10px] font-semibold text-slate-500 mb-0.5 block">Or type a custom emoji:</label>
+            <input
+              value={form.icon}
+              onChange={(e) => setForm({ ...form, icon: e.target.value })}
+              className="w-full h-8 px-3 rounded-lg border border-slate-200 focus:border-emerald-500 outline-none text-sm text-center text-lg"
+              maxLength={4}
+              placeholder="Paste any emoji here…"
+            />
+          </div>
         </div>
-        <div className="px-6 py-3 border-t border-slate-200 bg-slate-50 flex justify-end gap-2">
+
+        <div className="flex-shrink-0 px-6 py-3 border-t border-slate-200 bg-slate-50 flex justify-end gap-2">
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button onClick={() => form.name && onSave(form)} disabled={!form.name} className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700"><Save className="h-4 w-4" />{group ? "Update" : "Add Group"}</Button>
         </div>
