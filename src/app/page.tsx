@@ -64,10 +64,25 @@ export default function POSPage() {
   const [view, setView] = useState<ViewMode>("login");
   const [openMenu, setOpenMenu] = useState<string | null>(null);
 
-  // ===== Shared Data State =====
-  const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
-  const [groups, setGroups] = useState<StockGroup[]>(INITIAL_GROUPS);
-  const [history, setHistory] = useState<StockHistoryEntry[]>(initialStockHistory);
+  // ===== Shared Data State (persisted to localStorage) =====
+  const [products, setProducts] = useState<Product[]>(() => {
+    if (typeof window !== 'undefined') {
+      try { const cached = localStorage.getItem('sylhn-products'); if (cached) return JSON.parse(cached); } catch {}
+    }
+    return INITIAL_PRODUCTS;
+  });
+  const [groups, setGroups] = useState<StockGroup[]>(() => {
+    if (typeof window !== 'undefined') {
+      try { const cached = localStorage.getItem('sylhn-groups'); if (cached) return JSON.parse(cached); } catch {}
+    }
+    return INITIAL_GROUPS;
+  });
+  const [history, setHistory] = useState<StockHistoryEntry[]>(() => {
+    if (typeof window !== 'undefined') {
+      try { const cached = localStorage.getItem('sylhn-history'); if (cached) return JSON.parse(cached); } catch {}
+    }
+    return initialStockHistory;
+  });
 
   // ===== POS State =====
   const [activeCategory, setActiveCategory] = useState<string>("all");
@@ -79,7 +94,10 @@ export default function POSPage() {
   const [invoiceNumber, setInvoiceNumber] = useState<string | null>(null);
   const [cashier] = useState("Sarah Johnson");
   const [now, setNow] = useState<Date | null>(null);
-  const [heldOrders, setHeldOrders] = useState<{ items: CartItem[]; customer: string; invoice: string }[]>([]);
+  const [heldOrders, setHeldOrders] = useState<{ items: CartItem[]; customer: string; invoice: string }[]>(() => {
+    if (typeof window !== 'undefined') { try { const c = localStorage.getItem('sylhn-held-orders'); if (c) return JSON.parse(c); } catch {} }
+    return [];
+  });
   const [showPayment, setShowPayment] = useState(false);
   const [showReceipt, setShowReceipt] = useState(false);
   const [lastPayment, setLastPayment] = useState<PaymentResult | null>(null);
@@ -87,8 +105,14 @@ export default function POSPage() {
   const [showCashDrawer, setShowCashDrawer] = useState(false);
   const [lowStockNotified, setLowStockNotified] = useState<Set<string>>(new Set());
   const [scannerMode, setScannerMode] = useState(false);
-  const [dailyTotal, setDailyTotal] = useState(0);
-  const [transactionCount, setTransactionCount] = useState(0);
+  const [dailyTotal, setDailyTotal] = useState(() => {
+    if (typeof window !== 'undefined') { try { return parseFloat(localStorage.getItem('sylhn-daily-total') || '0') || 0; } catch {} }
+    return 0;
+  });
+  const [transactionCount, setTransactionCount] = useState(() => {
+    if (typeof window !== 'undefined') { try { return parseInt(localStorage.getItem('sylhn-txn-count') || '0') || 0; } catch {} }
+    return 0;
+  });
   const [activeKeypadMode, setActiveKeypadMode] = useState<"qty" | "price" | "barcode">("qty");
   const [showSidebar, setShowSidebar] = useState(true);
   const [showFindProduct, setShowFindProduct] = useState(false);
@@ -106,6 +130,14 @@ export default function POSPage() {
   const { toast } = useToast();
   const searchInputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  // ===== Persist all critical state to localStorage =====
+  useEffect(() => { try { localStorage.setItem('sylhn-products', JSON.stringify(products)); } catch {} }, [products]);
+  useEffect(() => { try { localStorage.setItem('sylhn-groups', JSON.stringify(groups)); } catch {} }, [groups]);
+  useEffect(() => { try { localStorage.setItem('sylhn-history', JSON.stringify(history)); } catch {} }, [history]);
+  useEffect(() => { try { localStorage.setItem('sylhn-held-orders', JSON.stringify(heldOrders)); } catch {} }, [heldOrders]);
+  useEffect(() => { try { localStorage.setItem('sylhn-daily-total', String(dailyTotal)); } catch {} }, [dailyTotal]);
+  useEffect(() => { try { localStorage.setItem('sylhn-txn-count', String(transactionCount)); } catch {} }, [transactionCount]);
 
   // ===== Effects =====
   // Initialize client-only values to avoid hydration mismatch.

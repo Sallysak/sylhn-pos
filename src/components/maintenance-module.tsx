@@ -361,7 +361,7 @@ function BackupRestore() {
     setBacking(true);
     try {
       const systemData: Record<string, any> = { _meta: { company: COMPANY.name, version: "2.0.0", backupDate: new Date().toISOString(), software: "SYLHN POS" } };
-      const keys = ["sylhn_products", "sylhn_groups", "sylhn_history", "sylhn_suppliers", "sylhn_orders", "sylhn_transactions", "sylhn_daily_total", "sylhn_txn_count", "sylhn_users", "sylhn_settings", "sylhn_security"];
+      const keys = ["sylhn-products", "sylhn-groups", "sylhn-history", "sylhn-held-orders", "sylhn-daily-total", "sylhn-txn-count", "sylhn-suppliers", "sylhn-stocktake-schedule", "sylhn-stocktake-notifications", "sylhn-variance-thresholds", "sylhn-stock-adjustment-draft", "sylhn-stock-adjustment-audit", "sylhn-stocktake-audit-committed", "sylhn-system-users", "sylhn-system-settings", "sylhn-audit-log", "sylhn-expenses", "sylhn-cash-recon", "sylhn-momo-transactions", "sylhn-telephone-directory", "sylhn-po-draft-from-reorder", "sylhn-stocktake-last-notified", "sylhn-critical-alerts-last-notified"];
       keys.forEach(k => { const val = localStorage.getItem(k); if (val) { try { systemData[k] = JSON.parse(val); } catch { systemData[k] = val; } } });
       const jsonStr = JSON.stringify(systemData, null, 2);
       const blob = new Blob([jsonStr], { type: "application/json" });
@@ -382,7 +382,7 @@ function BackupRestore() {
     reader.onload = (ev) => { try { const jsonStr = ev.target?.result as string; const data = JSON.parse(jsonStr);
       if (!data._meta || !data._meta.company) { toast({ title: "Invalid backup file", variant: "destructive" }); setRestoring(false); return; }
       pendingRestoreDataRef.current = jsonStr;
-      setRestorePreview({ products: data.sylhn_products?.length || 0, groups: data.sylhn_groups?.length || 0, transactions: data.sylhn_transactions?.length || 0, date: data._meta.backupDate ? new Date(data._meta.backupDate).toLocaleString('en-GB') : "Unknown" });
+      setRestorePreview({ products: data['sylhn-products']?.length || 0, groups: data['sylhn-groups']?.length || 0, transactions: data['sylhn-history']?.length || 0, date: data._meta.backupDate ? new Date(data._meta.backupDate).toLocaleString('en-GB') : "Unknown" });
       toast({ title: "Backup file loaded", description: file.name });
     } catch (err: any) { toast({ title: "Invalid file", description: err.message, variant: "destructive" }); } finally { setRestoring(false); } };
     reader.readAsText(file);
