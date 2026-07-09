@@ -51,39 +51,67 @@ export function AccountsReports({ onBack, products, history, dailyTotal, transac
   const potentialProfit = stockValue - stockCost;
   const lowStockItems = products.filter(p => p.stock <= p.reorderLevel);
 
+  // ===== Filter history by date range =====
+  const filteredSoldItems = useMemo(() => {
+    return soldItems.filter(h => {
+      const d = h.timestamp.split('T')[0];
+      return d >= fromDate && d <= toDate;
+    });
+  }, [soldItems, fromDate, toDate]);
+
+  const filteredReceivedItems = useMemo(() => {
+    return receivedItems.filter(h => {
+      const d = h.timestamp.split('T')[0];
+      return d >= fromDate && d <= toDate;
+    });
+  }, [receivedItems, fromDate, toDate]);
+
+  const filteredAdjustedItems = useMemo(() => {
+    return adjustedItems.filter(h => {
+      const d = h.timestamp.split('T')[0];
+      return d >= fromDate && d <= toDate;
+    });
+  }, [adjustedItems, fromDate, toDate]);
+
   // ===== Daily Sales data =====
   const dailySalesData = useMemo(() => {
-    const totalRevenue = dailyTotal;
-    const totalCost = soldItems.reduce((s, h) => {
+    const totalRevenue = filteredSoldItems.reduce((s, h) => {
+      const p = products.find(p => p.id === h.productId);
+      return s + (p ? p.price * Math.abs(h.quantityChange) : 0);
+    }, 0);
+    const totalCost = filteredSoldItems.reduce((s, h) => {
       const product = products.find(p => p.id === h.productId);
       return s + (product ? product.costPrice * Math.abs(h.quantityChange) : 0);
     }, 0);
     const grossProfit = totalRevenue - totalCost;
     const vatCollected = totalRevenue * 0.15;
-    return { totalRevenue, totalCost, grossProfit, vatCollected, transactionCount };
-  }, [dailyTotal, soldItems, products, transactionCount]);
+    return { totalRevenue, totalCost, grossProfit, vatCollected, transactionCount: filteredSoldItems.length };
+  }, [filteredSoldItems, products]);
 
   // ===== P&L data =====
   const pnlData = useMemo(() => {
-    const revenue = dailyTotal;
-    const cogs = soldItems.reduce((s, h) => {
+    const revenue = filteredSoldItems.reduce((s, h) => {
+      const p = products.find(p => p.id === h.productId);
+      return s + (p ? p.price * Math.abs(h.quantityChange) : 0);
+    }, 0);
+    const cogs = filteredSoldItems.reduce((s, h) => {
       const product = products.find(p => p.id === h.productId);
       return s + (product ? product.costPrice * Math.abs(h.quantityChange) : 0);
     }, 0);
     const grossProfit = revenue - cogs;
-    const operatingExpenses = stockCost * 0.02; // estimated 2% of inventory as overhead
+    const operatingExpenses = stockCost * 0.02;
     const netProfit = grossProfit - operatingExpenses;
     const vatOutput = revenue * 0.15;
     return { revenue, cogs, grossProfit, operatingExpenses, netProfit, vatOutput, margin: revenue > 0 ? (netProfit / revenue) * 100 : 0 };
-  }, [dailyTotal, soldItems, products, stockCost]);
+  }, [filteredSoldItems, products, stockCost]);
 
   // ===== VAT data =====
   const vatData = useMemo(() => {
-    const taxableItems = soldItems.filter(h => {
+    const taxableItems = filteredSoldItems.filter(h => {
       const p = products.find(p => p.id === h.productId);
       return p?.taxable;
     });
-    const nonTaxableItems = soldItems.filter(h => {
+    const nonTaxableItems = filteredSoldItems.filter(h => {
       const p = products.find(p => p.id === h.productId);
       return !p?.taxable;
     });
@@ -98,24 +126,24 @@ export function AccountsReports({ onBack, products, history, dailyTotal, transac
     const vatRate = 0.15;
     const vatCollected = taxableRevenue * vatRate;
     return { taxableRevenue, nonTaxableRevenue, vatCollected, vatRate, taxableCount: taxableItems.length, nonTaxableCount: nonTaxableItems.length };
-  }, [soldItems, products]);
+  }, [filteredSoldItems, products]);
 
   // ===== Stock Performance data =====
   const stockPerfData = useMemo(() => {
     return products.map(p => {
-      const sold = soldItems.filter(h => h.productId === p.id).reduce((s, h) => s + Math.abs(h.quantityChange), 0);
+      const sold = filteredSoldItems.filter(h => h.productId === p.id).reduce((s, h) => s + Math.abs(h.quantityChange), 0);
       const revenue = sold * p.price;
       const cost = sold * p.costPrice;
       const profit = revenue - cost;
       const turnover = p.stock > 0 ? sold / p.stock : 0;
       return { product: p, sold, revenue, cost, profit, turnover };
     }).sort((a, b) => b.revenue - a.revenue).slice(0, 20);
-  }, [products, soldItems]);
+  }, [products, filteredSoldItems]);
 
   // ===== General Ledger entries =====
   const ledgerEntries = useMemo(() => {
     const entries: { date: string; account: string; debit: number; credit: number; description: string; ref: string }[] = [];
-    soldItems.forEach(h => {
+    filteredSoldItems.forEach(h => {
       const p = products.find(p => p.id === h.productId);
       const amount = p ? p.price * Math.abs(h.quantityChange) : 0;
       entries.push({ date: h.timestamp, account: 'Cash', debit: amount, credit: 0, description: `Sale: ${h.productName}`, ref: h.reference || '' });
@@ -123,19 +151,19 @@ export function AccountsReports({ onBack, products, history, dailyTotal, transac
       entries.push({ date: h.timestamp, account: 'COGS', debit: p ? p.costPrice * Math.abs(h.quantityChange) : 0, credit: 0, description: `Cost: ${h.productName}`, ref: h.reference || '' });
       entries.push({ date: h.timestamp, account: 'Inventory', debit: 0, credit: p ? p.costPrice * Math.abs(h.quantityChange) : 0, description: `Stock out: ${h.productName}`, ref: h.reference || '' });
     });
-    receivedItems.forEach(h => {
+    filteredReceivedItems.forEach(h => {
       const p = products.find(p => p.id === h.productId);
       const amount = p ? p.costPrice * h.quantityChange : 0;
       entries.push({ date: h.timestamp, account: 'Inventory', debit: amount, credit: 0, description: `Received: ${h.productName}`, ref: h.reference || '' });
       entries.push({ date: h.timestamp, account: 'Accounts Payable', debit: 0, credit: amount, description: `Received: ${h.productName}`, ref: h.reference || '' });
     });
-    adjustedItems.forEach(h => {
+    filteredAdjustedItems.forEach(h => {
       const p = products.find(p => p.id === h.productId);
       const amount = p ? p.costPrice * Math.abs(h.quantityChange) : 0;
       entries.push({ date: h.timestamp, account: 'Inventory Adjustment', debit: h.quantityChange < 0 ? amount : 0, credit: h.quantityChange > 0 ? amount : 0, description: `${h.reason}`, ref: h.reference || '' });
     });
     return entries.sort((a, b) => b.date.localeCompare(a.date));
-  }, [soldItems, receivedItems, adjustedItems, products]);
+  }, [filteredSoldItems, filteredReceivedItems, filteredAdjustedItems, products]);
 
   // ===== Trial Balance =====
   const trialBalance = useMemo(() => {
@@ -156,7 +184,80 @@ export function AccountsReports({ onBack, products, history, dailyTotal, transac
     const printWin = window.open('', '_blank', 'width=900,height=600');
     if (!printWin) { toast({ title: 'Popup blocked', variant: 'destructive' }); return; }
     const reportLabel = reports.find(r => r.id === activeReport)?.label || 'Report';
-    printWin.document.write(`<!DOCTYPE html><html><head><title>${reportLabel}</title><style>body{font-family:Arial,sans-serif;margin:20px}.header{text-align:center;border-bottom:2px solid #333;padding-bottom:10px;margin-bottom:15px}.header h1{margin:0;font-size:18px}.header div{font-size:12px;color:#666}table{width:100%;border-collapse:collapse;font-size:11px}th{background:#1E5A8E;color:white;border:1px solid #999;padding:5px}td{border:1px solid #ccc;padding:4px}.total{font-weight:bold;background:#f0f0f0}</style></head><body><div class="header"><h1>${COMPANY.name}</h1><div>${COMPANY.address} · ${COMPANY.contact}</div></div><h2 style="text-align:center">${reportLabel}</h2><p>Date: ${fromDate} to ${toDate}</p></body></html>`);
+
+    // Build the report body HTML based on active report
+    let bodyHtml = '';
+    const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    if (activeReport === 'daily-sales') {
+      bodyHtml = `<table><thead><tr><th>Metric</th><th style="text-align:right">Amount (GHC)</th></tr></thead><tbody>
+        <tr><td>Gross Revenue</td><td style="text-align:right;color:#16a34a">${fmt(dailySalesData.totalRevenue)}</td></tr>
+        <tr><td>Cost of Goods Sold</td><td style="text-align:right;color:#dc2626">${fmt(dailySalesData.totalCost)}</td></tr>
+        <tr><td>VAT Collected (15%)</td><td style="text-align:right;color:#d97706">${fmt(dailySalesData.vatCollected)}</td></tr>
+        <tr class="total"><td>Net Profit</td><td style="text-align:right;color:#2563eb">${fmt(dailySalesData.grossProfit)}</td></tr>
+        <tr><td>Transactions</td><td style="text-align:right">${dailySalesData.transactionCount}</td></tr>
+        </tbody></table>`;
+    } else if (activeReport === 'profit-loss') {
+      bodyHtml = `<table><tbody>
+        <tr class="total"><td colspan="2">Revenue</td></tr>
+        <tr><td style="padding-left:20px">Sales Revenue</td><td style="text-align:right;color:#16a34a">${fmt(pnlData.revenue)}</td></tr>
+        <tr class="total"><td colspan="2">Cost of Goods Sold</td></tr>
+        <tr><td style="padding-left:20px">COGS</td><td style="text-align:right;color:#dc2626">(${fmt(pnlData.cogs)})</td></tr>
+        <tr class="total" style="background:#dbeafe"><td>Gross Profit</td><td style="text-align:right;color:#2563eb">${fmt(pnlData.grossProfit)}</td></tr>
+        <tr class="total"><td colspan="2">Operating Expenses</td></tr>
+        <tr><td style="padding-left:20px">Estimated Overhead</td><td style="text-align:right;color:#dc2626">(${fmt(pnlData.operatingExpenses)})</td></tr>
+        <tr class="total" style="background:#d1fae5"><td>Net Profit</td><td style="text-align:right;color:#059669">${fmt(pnlData.netProfit)}</td></tr>
+        <tr><td style="font-style:italic;color:#999">Profit Margin</td><td style="text-align:right;color:#999">${pnlData.margin.toFixed(1)}%</td></tr>
+        </tbody></table>`;
+    } else if (activeReport === 'vat-tax') {
+      bodyHtml = `<table><thead><tr><th>Category</th><th>Items</th><th style="text-align:right">Revenue</th><th style="text-align:right">VAT Rate</th><th style="text-align:right">VAT Amount</th></tr></thead><tbody>
+        <tr><td>Taxable Items</td><td style="text-align:center">${vatData.taxableCount}</td><td style="text-align:right;color:#16a34a">${fmt(vatData.taxableRevenue)}</td><td style="text-align:right">15%</td><td style="text-align:right;color:#d97706;font-weight:bold">${fmt(vatData.vatCollected)}</td></tr>
+        <tr><td>Non-Taxable Items</td><td style="text-align:center">${vatData.nonTaxableCount}</td><td style="text-align:right;color:#999">${fmt(vatData.nonTaxableRevenue)}</td><td style="text-align:right">0%</td><td style="text-align:right;color:#ccc">—</td></tr>
+        <tr class="total"><td>Total</td><td style="text-align:center">${vatData.taxableCount + vatData.nonTaxableCount}</td><td style="text-align:right">${fmt(vatData.taxableRevenue + vatData.nonTaxableRevenue)}</td><td></td><td style="text-align:right;color:#d97706">${fmt(vatData.vatCollected)}</td></tr>
+        </tbody></table>`;
+    } else if (activeReport === 'stock-value') {
+      bodyHtml = `<table><thead><tr><th>Product</th><th style="text-align:center">Stock</th><th style="text-align:right">Cost</th><th style="text-align:right">Price</th><th style="text-align:right">Stock Value</th></tr></thead><tbody>`;
+      products.forEach(p => { bodyHtml += `<tr><td>${p.emoji} ${p.name}</td><td style="text-align:center">${p.stock}</td><td style="text-align:right">${fmt(p.costPrice)}</td><td style="text-align:right;color:#16a34a">${fmt(p.price)}</td><td style="text-align:right;font-weight:bold">${fmt(p.price * p.stock)}</td></tr>`; });
+      bodyHtml += `<tr class="total"><td colspan="4">Total Stock Value</td><td style="text-align:right;color:#0891b2;font-size:13px">${fmt(stockValue)}</td></tr></tbody></table>`;
+    } else if (activeReport === 'cost-price') {
+      bodyHtml = `<table><thead><tr><th>Product</th><th style="text-align:right">Cost</th><th style="text-align:right">Price</th><th style="text-align:right">Markup</th><th style="text-align:right">Margin %</th><th style="text-align:right">Profit/Unit</th></tr></thead><tbody>`;
+      products.forEach(p => { const mk = p.costPrice > 0 ? ((p.price - p.costPrice) / p.costPrice) * 100 : 0; const mg = p.price > 0 ? ((p.price - p.costPrice) / p.price) * 100 : 0; bodyHtml += `<tr><td>${p.emoji} ${p.name}</td><td style="text-align:right;color:#dc2626">${fmt(p.costPrice)}</td><td style="text-align:right;color:#16a34a">${fmt(p.price)}</td><td style="text-align:right">${mk.toFixed(1)}%</td><td style="text-align:right">${mg.toFixed(1)}%</td><td style="text-align:right;color:#2563eb">${fmt(p.price - p.costPrice)}</td></tr>`; });
+      bodyHtml += `</tbody></table>`;
+    } else if (activeReport === 'stock-performance') {
+      bodyHtml = `<table><thead><tr><th>#</th><th>Product</th><th style="text-align:center">Sold</th><th style="text-align:right">Revenue</th><th style="text-align:right">Cost</th><th style="text-align:right">Profit</th><th style="text-align:center">Turnover</th></tr></thead><tbody>`;
+      stockPerfData.forEach((d, i) => { bodyHtml += `<tr><td style="text-align:center;color:#999">${i + 1}</td><td>${d.product.emoji} ${d.product.name}</td><td style="text-align:center">${d.sold}</td><td style="text-align:right;color:#16a34a">${fmt(d.revenue)}</td><td style="text-align:right;color:#dc2626">${fmt(d.cost)}</td><td style="text-align:right;color:#2563eb;font-weight:bold">${fmt(d.profit)}</td><td style="text-align:center;color:#999">${d.turnover.toFixed(2)}x</td></tr>`; });
+      bodyHtml += `</tbody></table>`;
+    } else if (activeReport === 'general-ledger') {
+      bodyHtml = `<table><thead><tr><th>Date</th><th>Account</th><th>Description</th><th>Ref</th><th style="text-align:right">Debit</th><th style="text-align:right">Credit</th></tr></thead><tbody>`;
+      ledgerEntries.slice(0, 100).forEach(e => { bodyHtml += `<tr><td style="font-size:10px;color:#999">${new Date(e.date).toLocaleDateString('en-GB')}</td><td style="font-weight:600">${e.account}</td><td style="font-size:10px">${e.description}</td><td style="font-size:10px;font-family:monospace;color:#ccc">${e.ref}</td><td style="text-align:right">${e.debit > 0 ? fmt(e.debit) : '—'}</td><td style="text-align:right">${e.credit > 0 ? fmt(e.credit) : '—'}</td></tr>`; });
+      bodyHtml += `</tbody></table>`;
+    } else if (activeReport === 'trial-balance') {
+      bodyHtml = `<table><thead><tr><th>Account</th><th style="text-align:right">Debit (GHC)</th><th style="text-align:right">Credit (GHC)</th></tr></thead><tbody>`;
+      trialBalance.rows.forEach(r => { bodyHtml += `<tr><td style="font-weight:600">${r.account}</td><td style="text-align:right">${r.debit > 0 ? fmt(r.debit) : '—'}</td><td style="text-align:right">${r.credit > 0 ? fmt(r.credit) : '—'}</td></tr>`; });
+      bodyHtml += `<tr class="total"><td>Total</td><td style="text-align:right;color:#0d9488;font-size:13px">${fmt(trialBalance.totalDebit)}</td><td style="text-align:right;color:#0d9488;font-size:13px">${fmt(trialBalance.totalCredit)}</td></tr>`;
+      bodyHtml += `<tr><td colspan="3" style="font-size:10px;font-style:italic;color:${trialBalance.totalDebit === trialBalance.totalCredit ? '#16a34a' : '#dc2626'}">${trialBalance.totalDebit === trialBalance.totalCredit ? '✓ Balanced' : '⚠ Not balanced'}</td></tr>`;
+      bodyHtml += `</tbody></table>`;
+    }
+
+    printWin.document.write(`<!DOCTYPE html><html><head><title>${reportLabel}</title><style>
+      body{font-family:Arial,sans-serif;margin:20px;color:#1e293b}
+      .header{text-align:center;border-bottom:2px solid #1E5A8E;padding-bottom:10px;margin-bottom:15px}
+      .header h1{margin:0;font-size:18px;color:#1E5A8E}
+      .header div{font-size:12px;color:#666;margin-top:3px}
+      h2{text-align:center;font-size:14px;margin:10px 0}
+      .date-range{text-align:center;font-size:11px;color:#666;margin-bottom:15px}
+      table{width:100%;border-collapse:collapse;font-size:11px}
+      th{background:#1E5A8E;color:white;border:1px solid #1E5A8E;padding:6px 8px;font-weight:bold}
+      td{border:1px solid #cbd5e1;padding:4px 8px}
+      .total{font-weight:bold;background:#f0f4f8}
+      tbody tr:nth-child(even){background:#f8fafc}
+      @media print{body{margin:10px}}
+    </style></head><body>
+      <div class="header"><h1>${COMPANY.name}</h1><div>${COMPANY.address} · ${COMPANY.contact}</div></div>
+      <h2>${reportLabel}</h2>
+      <div class="date-range">Period: ${fromDate} to ${toDate} · Generated: ${new Date().toLocaleString('en-GB')}</div>
+      ${bodyHtml}
+    </body></html>`);
     printWin.document.close();
     setTimeout(() => { printWin.focus(); printWin.print(); }, 300);
     toast({ title: 'Printing report' });
