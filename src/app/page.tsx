@@ -94,7 +94,7 @@ export default function POSPage() {
   const [showStockList, setShowStockList] = useState(false);
   const [partNoInput, setPartNoInput] = useState("");
   const [productSearch, setProductSearch] = useState("");
-  const [accountsReport, setAccountsReport] = useState<"daily-sales" | "profit-loss" | "vat-tax" | "stock-value" | "cost-price" | "stock-performance" | "general-ledger" | "trial-balance">("daily-sales");
+  const [accountsReport, setAccountsReport] = useState<"daily-sales" | "profit-loss" | "vat-tax" | "stock-value" | "cost-price" | "stock-performance" | "stock-group" | "general-ledger" | "trial-balance">("daily-sales");
 
   const { toast } = useToast();
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -826,6 +826,7 @@ export default function POSPage() {
         { label: "Stock Value Report", icon: DollarSign, action: () => { setAccountsReport("stock-value"); setView("accounts-reports"); } },
         { label: "Cost Price Report", icon: FileText, action: () => { setAccountsReport("cost-price"); setView("accounts-reports"); } },
         { label: "Stock Performance", icon: TrendingUp, action: () => { setAccountsReport("stock-performance"); setView("accounts-reports"); } },
+        { label: "Stock Group Report", icon: Layers, action: () => { setAccountsReport("stock-group"); setView("accounts-reports"); } },
         { separator: true },
         { label: "General Ledger", icon: BookOpen, action: () => { setAccountsReport("general-ledger"); setView("accounts-reports"); } },
         { label: "Trial Balance", icon: FileBarChart2, action: () => { setAccountsReport("trial-balance"); setView("accounts-reports"); } },
@@ -909,7 +910,7 @@ export default function POSPage() {
     return <SupplierForm onBack={() => setView("pos")} products={products} />;
   }
   if (view === "accounts-reports") {
-    return <AccountsReports onBack={() => setView("pos")} products={products} history={history} dailyTotal={dailyTotal} transactionCount={transactionCount} initialReport={accountsReport} />;
+    return <AccountsReports onBack={() => setView("pos")} products={products} groups={groups} history={history} dailyTotal={dailyTotal} transactionCount={transactionCount} initialReport={accountsReport} />;
   }
 
   // ===== Render POS =====

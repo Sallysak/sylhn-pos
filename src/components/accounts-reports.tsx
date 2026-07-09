@@ -11,20 +11,21 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { COMPANY, CURRENCY, formatGHS, type Product, type StockHistoryEntry } from "@/lib/pos-data";
+import { COMPANY, CURRENCY, formatGHS, type Product, type StockGroup, type StockHistoryEntry } from "@/lib/pos-data";
 
-type ReportType = "daily-sales" | "profit-loss" | "vat-tax" | "stock-value" | "cost-price" | "stock-performance" | "general-ledger" | "trial-balance";
+type ReportType = "daily-sales" | "profit-loss" | "vat-tax" | "stock-value" | "cost-price" | "stock-performance" | "stock-group" | "general-ledger" | "trial-balance";
 
 interface AccountsReportsProps {
   onBack: () => void;
   products: Product[];
+  groups: StockGroup[];
   history: StockHistoryEntry[];
   dailyTotal: number;
   transactionCount: number;
   initialReport?: ReportType;
 }
 
-export function AccountsReports({ onBack, products, history, dailyTotal, transactionCount, initialReport = "daily-sales" }: AccountsReportsProps) {
+export function AccountsReports({ onBack, products, groups, history, dailyTotal, transactionCount, initialReport = "daily-sales" }: AccountsReportsProps) {
   const { toast } = useToast();
   const [activeReport, setActiveReport] = useState<ReportType>(initialReport);
   const [fromDate, setFromDate] = useState(new Date().toISOString().split('T')[0]);
@@ -37,6 +38,7 @@ export function AccountsReports({ onBack, products, history, dailyTotal, transac
     { id: "stock-value", label: "Stock Value", icon: DollarSign, color: "cyan" },
     { id: "cost-price", label: "Cost Price", icon: FileText, color: "purple" },
     { id: "stock-performance", label: "Stock Performance", icon: TrendingUp, color: "rose" },
+    { id: "stock-group", label: "Stock Group", icon: Package, color: "indigo" },
     { id: "general-ledger", label: "General Ledger", icon: BookOpen, color: "indigo" },
     { id: "trial-balance", label: "Trial Balance", icon: FileBarChart2, color: "teal" },
   ];
@@ -179,6 +181,21 @@ export function AccountsReports({ onBack, products, history, dailyTotal, transac
     return { rows, totalDebit, totalCredit };
   }, [ledgerEntries]);
 
+  // ===== Stock Group Report data =====
+  const stockGroupData = useMemo(() => {
+    return groups.map(g => {
+      const groupProducts = products.filter(p => p.groupId === g.id);
+      const itemCount = groupProducts.length;
+      const totalStock = groupProducts.reduce((s, p) => s + p.stock, 0);
+      const stockValue = groupProducts.reduce((s, p) => s + p.price * p.stock, 0);
+      const stockCost = groupProducts.reduce((s, p) => s + p.costPrice * p.stock, 0);
+      const potentialProfit = stockValue - stockCost;
+      const lowStock = groupProducts.filter(p => p.stock <= p.reorderLevel).length;
+      const outOfStock = groupProducts.filter(p => p.stock === 0).length;
+      return { group: g, itemCount, totalStock, stockValue, stockCost, potentialProfit, lowStock, outOfStock };
+    }).sort((a, b) => b.stockValue - a.stockValue);
+  }, [groups, products]);
+
   // ===== Print handler =====
   const handlePrint = () => {
     const printWin = window.open('', '_blank', 'width=900,height=600');
@@ -231,6 +248,11 @@ export function AccountsReports({ onBack, products, history, dailyTotal, transac
       bodyHtml = `<table><thead><tr><th>Date</th><th>Account</th><th>Description</th><th>Ref</th><th style="text-align:right">Debit</th><th style="text-align:right">Credit</th></tr></thead><tbody>`;
       ledgerEntries.slice(0, 100).forEach(e => { bodyHtml += `<tr><td style="font-size:10px;color:#999">${new Date(e.date).toLocaleDateString('en-GB')}</td><td style="font-weight:600">${e.account}</td><td style="font-size:10px">${e.description}</td><td style="font-size:10px;font-family:monospace;color:#ccc">${e.ref}</td><td style="text-align:right">${e.debit > 0 ? fmt(e.debit) : '—'}</td><td style="text-align:right">${e.credit > 0 ? fmt(e.credit) : '—'}</td></tr>`; });
       bodyHtml += `</tbody></table>`;
+    } else if (activeReport === 'stock-group') {
+      bodyHtml = `<table><thead><tr><th>Group</th><th style="text-align:center">Items</th><th style="text-align:center">Total Stock</th><th style="text-align:center">Low Stock</th><th style="text-align:center">Out of Stock</th><th style="text-align:right">Stock Cost</th><th style="text-align:right">Stock Value</th><th style="text-align:right">Potential Profit</th></tr></thead><tbody>`;
+      stockGroupData.forEach(d => { bodyHtml += `<tr><td style="font-weight:600">${d.group.icon} ${d.group.name}</td><td style="text-align:center">${d.itemCount}</td><td style="text-align:center">${d.totalStock}</td><td style="text-align:center;color:#d97706">${d.lowStock}</td><td style="text-align:center;color:#dc2626">${d.outOfStock}</td><td style="text-align:right;color:#dc2626">${fmt(d.stockCost)}</td><td style="text-align:right;color:#16a34a">${fmt(d.stockValue)}</td><td style="text-align:right;color:#2563eb;font-weight:bold">${fmt(d.potentialProfit)}</td></tr>`; });
+      const totals = stockGroupData.reduce((a, d) => ({ items: a.items + d.itemCount, stock: a.stock + d.totalStock, low: a.low + d.lowStock, out: a.out + d.outOfStock, cost: a.cost + d.stockCost, value: a.value + d.stockValue, profit: a.profit + d.potentialProfit }), { items: 0, stock: 0, low: 0, out: 0, cost: 0, value: 0, profit: 0 });
+      bodyHtml += `<tr class="total"><td>Total</td><td style="text-align:center">${totals.items}</td><td style="text-align:center">${totals.stock}</td><td style="text-align:center">${totals.low}</td><td style="text-align:center">${totals.out}</td><td style="text-align:right">${fmt(totals.cost)}</td><td style="text-align:right">${fmt(totals.value)}</td><td style="text-align:right">${fmt(totals.profit)}</td></tr></tbody></table>`;
     } else if (activeReport === 'trial-balance') {
       bodyHtml = `<table><thead><tr><th>Account</th><th style="text-align:right">Debit (GHC)</th><th style="text-align:right">Credit (GHC)</th></tr></thead><tbody>`;
       trialBalance.rows.forEach(r => { bodyHtml += `<tr><td style="font-weight:600">${r.account}</td><td style="text-align:right">${r.debit > 0 ? fmt(r.debit) : '—'}</td><td style="text-align:right">${r.credit > 0 ? fmt(r.credit) : '—'}</td></tr>`; });
@@ -274,6 +296,8 @@ export function AccountsReports({ onBack, products, history, dailyTotal, transac
         data.push({ Metric: 'Transactions', Value: dailySalesData.transactionCount });
       } else if (activeReport === 'stock-value') {
         products.forEach(p => data.push({ SKU: p.sku, Product: p.name, Stock: p.stock, Cost: p.costPrice, Price: p.price, StockValue: p.price * p.stock }));
+      } else if (activeReport === 'stock-group') {
+        stockGroupData.forEach(d => data.push({ Group: d.group.name, Items: d.itemCount, TotalStock: d.totalStock, LowStock: d.lowStock, OutOfStock: d.outOfStock, StockCost: d.stockCost, StockValue: d.stockValue, PotentialProfit: d.potentialProfit }));
       } else if (activeReport === 'trial-balance') {
         trialBalance.rows.forEach(r => data.push({ Account: r.account, Debit: r.debit, Credit: r.credit }));
         data.push({ Account: 'TOTAL', Debit: trialBalance.totalDebit, Credit: trialBalance.totalCredit });
@@ -491,6 +515,52 @@ export function AccountsReports({ onBack, products, history, dailyTotal, transac
                       </tbody>
                     </table>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* ===== Stock Group Report ===== */}
+            {activeReport === "stock-group" && (
+              <div className="space-y-4">
+                {/* Summary stat cards */}
+                <div className="grid grid-cols-4 gap-4">
+                  <div className="rounded-2xl p-4 bg-indigo-50 ring-1 ring-indigo-200"><div className="text-xs font-bold text-indigo-700 uppercase mb-1">Total Groups</div><div className="text-xl font-bold font-mono text-slate-800">{stockGroupData.length}</div></div>
+                  <div className="rounded-2xl p-4 bg-cyan-50 ring-1 ring-cyan-200"><div className="text-xs font-bold text-cyan-700 uppercase mb-1">Total Stock Value</div><div className="text-xl font-bold font-mono text-slate-800">{formatGHS(stockGroupData.reduce((s, d) => s + d.stockValue, 0))}</div></div>
+                  <div className="rounded-2xl p-4 bg-rose-50 ring-1 ring-rose-200"><div className="text-xs font-bold text-rose-700 uppercase mb-1">Low Stock Items</div><div className="text-xl font-bold font-mono text-rose-600">{stockGroupData.reduce((s, d) => s + d.lowStock, 0)}</div></div>
+                  <div className="rounded-2xl p-4 bg-emerald-50 ring-1 ring-emerald-200"><div className="text-xs font-bold text-emerald-700 uppercase mb-1">Potential Profit</div><div className="text-xl font-bold font-mono text-emerald-700">{formatGHS(stockGroupData.reduce((s, d) => s + d.potentialProfit, 0))}</div></div>
+                </div>
+                {/* Group table */}
+                <div className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 overflow-hidden">
+                  <div className="px-5 py-3 bg-indigo-50 border-b border-indigo-100"><span className="text-sm font-bold text-slate-700">Stock Group Analysis ({stockGroupData.length} groups)</span></div>
+                  <table className="w-full text-sm">
+                    <thead><tr className="bg-slate-800 text-white text-xs uppercase"><th className="text-left px-4 py-2">Group</th><th className="text-center px-3 py-2">Items</th><th className="text-center px-3 py-2">Stock</th><th className="text-center px-3 py-2">Low</th><th className="text-center px-3 py-2">Out</th><th className="text-right px-3 py-2">Stock Cost</th><th className="text-right px-3 py-2">Stock Value</th><th className="text-right px-4 py-2">Profit</th></tr></thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {stockGroupData.map((d, i) => (
+                        <tr key={d.group.id} className={i % 2 === 1 ? 'bg-slate-50/50' : 'bg-white'}>
+                          <td className="px-4 py-2.5"><span className="text-lg mr-1">{d.group.icon}</span><span className="font-medium text-slate-700">{d.group.name}</span></td>
+                          <td className="px-3 py-2.5 text-center font-mono">{d.itemCount}</td>
+                          <td className="px-3 py-2.5 text-center font-mono">{d.totalStock}</td>
+                          <td className="px-3 py-2.5 text-center font-mono text-amber-600">{d.lowStock}</td>
+                          <td className="px-3 py-2.5 text-center font-mono text-rose-600">{d.outOfStock}</td>
+                          <td className="px-3 py-2.5 text-right font-mono text-rose-500">{formatGHS(d.stockCost)}</td>
+                          <td className="px-3 py-2.5 text-right font-mono text-emerald-600">{formatGHS(d.stockValue)}</td>
+                          <td className="px-4 py-2.5 text-right font-mono font-semibold text-blue-600">{formatGHS(d.potentialProfit)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="bg-slate-100 font-bold">
+                        <td className="px-4 py-3 text-slate-800">Total</td>
+                        <td className="px-3 py-3 text-center font-mono">{stockGroupData.reduce((s, d) => s + d.itemCount, 0)}</td>
+                        <td className="px-3 py-3 text-center font-mono">{stockGroupData.reduce((s, d) => s + d.totalStock, 0)}</td>
+                        <td className="px-3 py-3 text-center font-mono text-amber-600">{stockGroupData.reduce((s, d) => s + d.lowStock, 0)}</td>
+                        <td className="px-3 py-3 text-center font-mono text-rose-600">{stockGroupData.reduce((s, d) => s + d.outOfStock, 0)}</td>
+                        <td className="px-3 py-3 text-right font-mono text-rose-600">{formatGHS(stockGroupData.reduce((s, d) => s + d.stockCost, 0))}</td>
+                        <td className="px-3 py-3 text-right font-mono text-emerald-600">{formatGHS(stockGroupData.reduce((s, d) => s + d.stockValue, 0))}</td>
+                        <td className="px-4 py-3 text-right font-mono text-blue-700">{formatGHS(stockGroupData.reduce((s, d) => s + d.potentialProfit, 0))}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
                 </div>
               </div>
             )}
