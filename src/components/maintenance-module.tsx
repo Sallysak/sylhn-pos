@@ -44,8 +44,14 @@ interface MaintenanceProps {
 
 export function MaintenanceModule({ onBack, cashier, dailyTotal, transactionCount }: MaintenanceProps) {
   const [tab, setTab] = useState<MaintenanceTab>("settings");
-  const [users, setUsers] = useState<SystemUser[]>(initialUsers);
+  const [users, setUsers] = useState<SystemUser[]>(() => {
+    try { const c = localStorage.getItem('sylhn-maintenance-users'); if (c) return JSON.parse(c); } catch {}
+    return initialUsers;
+  });
   const { toast } = useToast();
+
+  // Persist maintenance users
+  useEffect(() => { try { localStorage.setItem('sylhn-maintenance-users', JSON.stringify(users)); } catch {} }, [users]);
 
   const tabs = [
     { id: "settings" as const, label: "System Settings", icon: Settings2 },
@@ -134,6 +140,25 @@ function SystemSettings() {
   const [receiptFooter, setReceiptFooter] = useState("Thank you for shopping!");
   const [enableNotifications, setEnableNotifications] = useState(true);
   const [enableLowStockAlerts, setEnableLowStockAlerts] = useState(true);
+
+  // Load saved settings on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('sylhn_settings');
+      if (saved) {
+        const s = JSON.parse(saved);
+        if (s.storeName) setStoreName(s.storeName);
+        if (s.contact) setContact(s.contact);
+        if (s.address) setAddress(s.address);
+        if (s.taxRate) setTaxRate(s.taxRate);
+        if (s.currency) setCurrency(s.currency);
+        if (s.lowStockThreshold) setLowStockThreshold(s.lowStockThreshold);
+        if (s.receiptFooter) setReceiptFooter(s.receiptFooter);
+        if (typeof s.enableNotifications === 'boolean') setEnableNotifications(s.enableNotifications);
+        if (typeof s.enableLowStockAlerts === 'boolean') setEnableLowStockAlerts(s.enableLowStockAlerts);
+      }
+    } catch {}
+  }, []);
 
   return (
     <div className="h-full bg-white rounded-2xl shadow-lg ring-1 ring-slate-200/60 overflow-hidden flex flex-col">
@@ -361,7 +386,7 @@ function BackupRestore() {
     setBacking(true);
     try {
       const systemData: Record<string, any> = { _meta: { company: COMPANY.name, version: "2.0.0", backupDate: new Date().toISOString(), software: "SYLHN POS" } };
-      const keys = ["sylhn-products", "sylhn-groups", "sylhn-history", "sylhn-held-orders", "sylhn-daily-total", "sylhn-txn-count", "sylhn-suppliers", "sylhn-stocktake-schedule", "sylhn-stocktake-notifications", "sylhn-variance-thresholds", "sylhn-stock-adjustment-draft", "sylhn-stock-adjustment-audit", "sylhn-stocktake-audit-committed", "sylhn-system-users", "sylhn-system-settings", "sylhn-audit-log", "sylhn-expenses", "sylhn-cash-recon", "sylhn-momo-transactions", "sylhn-telephone-directory", "sylhn-po-draft-from-reorder", "sylhn-stocktake-last-notified", "sylhn-critical-alerts-last-notified"];
+      const keys = ["sylhn-products", "sylhn-groups", "sylhn-history", "sylhn-held-orders", "sylhn-daily-total", "sylhn-txn-count", "sylhn-purchase-suppliers", "sylhn-purchase-orders", "sylhn-purchase-transactions", "sylhn-tel-customers", "sylhn-tel-phone-orders", "sylhn-tel-call-log", "sylhn-maintenance-users", "sylhn_settings", "sylhn_security", "sylhn-stocktake-schedule", "sylhn-stocktake-notifications", "sylhn-variance-thresholds", "sylhn-stock-adjustment-draft", "sylhn-stock-adjustment-audit", "sylhn-stocktake-audit-committed", "sylhn-system-users", "sylhn-system-settings", "sylhn-audit-log", "sylhn-expenses", "sylhn-cash-recon", "sylhn-momo-transactions", "sylhn-telephone-directory", "sylhn-po-draft-from-reorder", "sylhn-stocktake-last-notified", "sylhn-critical-alerts-last-notified", "sylhn_backup_history"];
       keys.forEach(k => { const val = localStorage.getItem(k); if (val) { try { systemData[k] = JSON.parse(val); } catch { systemData[k] = val; } } });
       const jsonStr = JSON.stringify(systemData, null, 2);
       const blob = new Blob([jsonStr], { type: "application/json" });

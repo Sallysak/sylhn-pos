@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, Package, Truck, Users, History, DollarSign, Plus, X, Save,
@@ -126,12 +126,26 @@ interface PurchaseProps {
 
 export function PurchaseModule({ onBack, products }: PurchaseProps) {
   const [tab, setTab] = useState<PurchaseTab>("orders");
-  const [suppliers, setSuppliers] = useState<Supplier[]>(initialSuppliers);
-  const [orders, setOrders] = useState<PurchaseOrder[]>(initialOrders);
-  const [transactions] = useState<PurchaseTransaction[]>(initialTransactions);
+  const [suppliers, setSuppliers] = useState<Supplier[]>(() => {
+    try { const c = localStorage.getItem('sylhn-purchase-suppliers'); if (c) return JSON.parse(c); } catch {}
+    return initialSuppliers;
+  });
+  const [orders, setOrders] = useState<PurchaseOrder[]>(() => {
+    try { const c = localStorage.getItem('sylhn-purchase-orders'); if (c) return JSON.parse(c); } catch {}
+    return initialOrders;
+  });
+  const [transactions, setTransactions] = useState<PurchaseTransaction[]>(() => {
+    try { const c = localStorage.getItem('sylhn-purchase-transactions'); if (c) return JSON.parse(c); } catch {}
+    return initialTransactions;
+  });
   const [showNewOrder, setShowNewOrder] = useState(false);
   const [showNewSupplier, setShowNewSupplier] = useState(false);
   const [viewOrder, setViewOrder] = useState<PurchaseOrder | null>(null);
+
+  // Persist purchase data
+  useEffect(() => { try { localStorage.setItem('sylhn-purchase-suppliers', JSON.stringify(suppliers)); } catch {} }, [suppliers]);
+  useEffect(() => { try { localStorage.setItem('sylhn-purchase-orders', JSON.stringify(orders)); } catch {} }, [orders]);
+  useEffect(() => { try { localStorage.setItem('sylhn-purchase-transactions', JSON.stringify(transactions)); } catch {} }, [transactions]);
 
   const tabs = [
     { id: "orders" as const, label: "Purchase Orders", icon: Archive },

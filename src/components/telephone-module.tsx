@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, Phone, Truck, Users, Clock, Plus, X, PhoneCall,
@@ -91,11 +91,25 @@ interface TelephoneProps {
 export function TelephoneModule({ onBack }: TelephoneProps) {
   const { toast } = useToast();
   const [tab, setTab] = useState<TelephoneTab>("phone-orders");
-  const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
-  const [phoneOrders, setPhoneOrders] = useState<PhoneOrder[]>(initialPhoneOrders);
-  const [callLog, setCallLog] = useState<CallLogEntry[]>(initialCallLog);
+  const [customers, setCustomers] = useState<Customer[]>(() => {
+    try { const c = localStorage.getItem('sylhn-tel-customers'); if (c) return JSON.parse(c); } catch {}
+    return initialCustomers;
+  });
+  const [phoneOrders, setPhoneOrders] = useState<PhoneOrder[]>(() => {
+    try { const c = localStorage.getItem('sylhn-tel-phone-orders'); if (c) return JSON.parse(c); } catch {}
+    return initialPhoneOrders;
+  });
+  const [callLog, setCallLog] = useState<CallLogEntry[]>(() => {
+    try { const c = localStorage.getItem('sylhn-tel-call-log'); if (c) return JSON.parse(c); } catch {}
+    return initialCallLog;
+  });
   const [showDirectory, setShowDirectory] = useState(false);
   const [directoryEntries, setDirectoryEntries] = useState<PhoneDirectoryEntry[]>([]);
+
+  // Persist telephone data
+  useEffect(() => { try { localStorage.setItem('sylhn-tel-customers', JSON.stringify(customers)); } catch {} }, [customers]);
+  useEffect(() => { try { localStorage.setItem('sylhn-tel-phone-orders', JSON.stringify(phoneOrders)); } catch {} }, [phoneOrders]);
+  useEffect(() => { try { localStorage.setItem('sylhn-tel-call-log', JSON.stringify(callLog)); } catch {} }, [callLog]);
 
   const tabs = [
     { id: "phone-orders" as const, label: "Phone Orders", icon: PhoneCall },
