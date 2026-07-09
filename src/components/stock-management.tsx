@@ -1172,43 +1172,139 @@ function GroupForm({ group, onSave, onClose }: {
     return allIcons.filter((icon, idx) => allIcons.indexOf(icon) === idx); // dedupe
   }, [iconSearch, iconCategory]);
 
+  // ===== Color options with visual swatches =====
+  const COLOR_OPTIONS: { value: string; hex: string; label: string }[] = [
+    { value: 'emerald', hex: '#10B981', label: 'Emerald' },
+    { value: 'blue', hex: '#3B82F6', label: 'Blue' },
+    { value: 'red', hex: '#EF4444', label: 'Red' },
+    { value: 'amber', hex: '#F59E0B', label: 'Amber' },
+    { value: 'cyan', hex: '#06B6D4', label: 'Cyan' },
+    { value: 'purple', hex: '#8B5CF6', label: 'Purple' },
+    { value: 'sky', hex: '#0EA5E9', label: 'Sky' },
+    { value: 'orange', hex: '#F97316', label: 'Orange' },
+    { value: 'teal', hex: '#14B8A6', label: 'Teal' },
+    { value: 'pink', hex: '#EC4899', label: 'Pink' },
+    { value: 'indigo', hex: '#6366F1', label: 'Indigo' },
+    { value: 'rose', hex: '#F43F5E', label: 'Rose' },
+  ];
+
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col" style={{ maxHeight: '90vh' }}>
-        <div className="flex-shrink-0 flex items-center justify-between px-6 py-4 bg-gradient-to-r from-emerald-600 to-teal-600 text-white">
-          <h3 className="text-lg font-bold">{group ? "Edit Group" : "Add Stock Group"}</h3>
-          <button onClick={onClose} className="h-8 w-8 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center"><X className="h-4 w-4" /></button>
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <motion.div
+        initial={{ scale: 0.92, y: 20, opacity: 0 }}
+        animate={{ scale: 1, y: 0, opacity: 1 }}
+        exit={{ scale: 0.92, y: 20, opacity: 0 }}
+        transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col ring-1 ring-slate-200/60"
+        style={{ maxHeight: '90vh' }}
+      >
+        {/* ===== Header with gradient + pattern ===== */}
+        <div className="flex-shrink-0 relative overflow-hidden">
+          {/* Gradient background */}
+          <div className="absolute inset-0 bg-gradient-to-br from-emerald-600 via-teal-600 to-cyan-700" />
+          {/* Decorative pattern */}
+          <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle at 20% 50%, rgba(255,255,255,0.3) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(255,255,255,0.2) 0%, transparent 40%)' }} />
+          <div className="relative flex items-center justify-between px-6 py-4">
+            <div className="flex items-center gap-3">
+              {/* Preview circle showing the current icon + color */}
+              <div
+                className="h-11 w-11 rounded-2xl flex items-center justify-center text-2xl shadow-lg ring-2 ring-white/30"
+                style={{ background: `linear-gradient(135deg, ${COLOR_OPTIONS.find(c => c.value === form.color)?.hex || '#10B981'}, ${COLOR_OPTIONS.find(c => c.value === form.color)?.hex || '#10B981'}dd)` }}
+              >
+                {form.icon}
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white leading-tight">{group ? "Edit Stock Group" : "Add Stock Group"}</h3>
+                <p className="text-[11px] text-emerald-50/80">{form.name || 'Untitled group'}</p>
+              </div>
+            </div>
+            <button onClick={onClose} className="h-8 w-8 rounded-xl bg-white/15 hover:bg-white/30 flex items-center justify-center transition backdrop-blur-sm"><X className="h-4 w-4 text-white" /></button>
+          </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 space-y-4" style={{ scrollbarWidth: 'thin' }}>
+        {/* ===== Body ===== */}
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5" style={{ scrollbarWidth: 'thin' }}>
+          {/* Group Name */}
           <div>
-            <label className="text-xs font-semibold text-slate-600 mb-1 block">Group Name</label>
-            <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full h-10 px-3 rounded-lg border border-slate-200 focus:border-emerald-500 outline-none text-sm" placeholder="e.g. Fresh Produce" />
+            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1.5 block flex items-center gap-1">
+              <Layers className="h-3 w-3" /> Group Name
+            </label>
+            <input
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              className="w-full h-11 px-4 rounded-xl border-2 border-slate-100 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none text-sm font-medium transition bg-slate-50/50"
+              placeholder="e.g. Fresh Produce"
+            />
           </div>
+
+          {/* Description */}
           <div>
-            <label className="text-xs font-semibold text-slate-600 mb-1 block">Description</label>
-            <input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="w-full h-10 px-3 rounded-lg border border-slate-200 focus:border-emerald-500 outline-none text-sm" />
+            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1.5 block flex items-center gap-1">
+              <FileText className="h-3 w-3" /> Description
+            </label>
+            <input
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              className="w-full h-11 px-4 rounded-xl border-2 border-slate-100 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none text-sm transition bg-slate-50/50"
+              placeholder="Brief description of this group…"
+            />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+
+          {/* Icon + Color side by side */}
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-semibold text-slate-600 mb-1 block">Icon (emoji)</label>
-              {/* Selected icon display + toggle picker */}
+              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1.5 block">Icon</label>
               <button
                 onClick={() => setShowIconPicker(!showIconPicker)}
                 className={cn(
-                  "w-full h-10 px-3 rounded-lg border outline-none text-sm flex items-center justify-center gap-2 transition",
-                  showIconPicker ? "border-emerald-500 ring-2 ring-emerald-200 bg-emerald-50" : "border-slate-200 hover:border-emerald-300"
+                  "w-full h-11 px-3 rounded-xl border-2 outline-none text-sm flex items-center justify-center gap-2 transition",
+                  showIconPicker
+                    ? "border-emerald-500 ring-4 ring-emerald-500/10 bg-emerald-50"
+                    : "border-slate-100 hover:border-emerald-300 bg-slate-50/50"
                 )}
               >
-                <span className="text-xl">{form.icon}</span>
-                <span className="text-[10px] text-slate-400">click to change</span>
+                <span className="text-2xl">{form.icon}</span>
+                <span className="text-[10px] text-slate-400 font-medium">Click to change</span>
               </button>
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-600 mb-1 block">Color</label>
-              <select value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} className="w-full h-10 px-3 rounded-lg border border-slate-200 focus:border-emerald-500 outline-none text-sm">
-                {["emerald", "blue", "red", "amber", "cyan", "purple", "sky", "orange", "teal", "pink", "indigo", "rose"].map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
+              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1.5 block">Color</label>
+              <div className="relative">
+                <select
+                  value={form.color}
+                  onChange={(e) => setForm({ ...form, color: e.target.value })}
+                  className="w-full h-11 px-3 pr-8 rounded-xl border-2 border-slate-100 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none text-sm font-medium transition bg-slate-50/50 appearance-none cursor-pointer"
+                >
+                  {COLOR_OPTIONS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                </select>
+                {/* Color swatch indicator */}
+                <div
+                  className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 rounded-full ring-2 ring-white shadow-sm pointer-events-none"
+                  style={{ backgroundColor: COLOR_OPTIONS.find(c => c.value === form.color)?.hex || '#10B981' }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* ===== Color palette visual selector ===== */}
+          <div>
+            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1.5 block">Color Palette</label>
+            <div className="flex items-center gap-2 flex-wrap">
+              {COLOR_OPTIONS.map(c => (
+                <button
+                  key={c.value}
+                  onClick={() => setForm({ ...form, color: c.value })}
+                  className={cn(
+                    "h-8 w-8 rounded-xl transition-all duration-200 shadow-sm",
+                    form.color === c.value
+                      ? "ring-2 ring-offset-2 ring-slate-700 scale-110"
+                      : "hover:scale-110 hover:shadow-md"
+                  )}
+                  style={{ backgroundColor: c.hex }}
+                  title={c.label}
+                />
+              ))}
             </div>
           </div>
 
@@ -1219,20 +1315,21 @@ function GroupForm({ group, onSave, onClose }: {
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.2 }}
                 className="overflow-hidden"
               >
-                <div className="border border-slate-200 rounded-lg overflow-hidden">
+                <div className="rounded-2xl border-2 border-slate-100 overflow-hidden shadow-sm">
                   {/* Category tabs */}
-                  <div className="flex items-center gap-1 px-2 py-1.5 bg-slate-50 border-b border-slate-200 overflow-x-auto" style={{ scrollbarWidth: 'thin' }}>
+                  <div className="flex items-center gap-1 px-2 py-2 bg-gradient-to-r from-slate-50 to-white border-b border-slate-100 overflow-x-auto" style={{ scrollbarWidth: 'thin' }}>
                     {ICON_CATEGORIES.map((cat, idx) => (
                       <button
                         key={idx}
                         onClick={() => { setIconCategory(idx); setIconSearch(''); }}
                         className={cn(
-                          "px-2.5 py-1 rounded text-[10px] font-semibold whitespace-nowrap transition",
+                          "px-3 py-1.5 rounded-lg text-[11px] font-bold whitespace-nowrap transition-all",
                           iconCategory === idx && !iconSearch
-                            ? "bg-emerald-600 text-white"
-                            : "bg-white text-slate-500 hover:bg-slate-100"
+                            ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md"
+                            : "bg-white text-slate-500 hover:bg-slate-100 ring-1 ring-slate-200"
                         )}
                       >
                         {cat.label}
@@ -1241,8 +1338,8 @@ function GroupForm({ group, onSave, onClose }: {
                   </div>
 
                   {/* Icon grid */}
-                  <div className="p-2 max-h-40 overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
-                    <div className="grid grid-cols-8 gap-1">
+                  <div className="p-3 max-h-44 overflow-y-auto bg-slate-50/30" style={{ scrollbarWidth: 'thin' }}>
+                    <div className="grid grid-cols-8 gap-1.5">
                       {(iconSearch.trim() ? filteredIcons : ICON_CATEGORIES[iconCategory].icons).map((icon, idx) => (
                         <button
                           key={idx}
@@ -1251,10 +1348,10 @@ function GroupForm({ group, onSave, onClose }: {
                             setShowIconPicker(false);
                           }}
                           className={cn(
-                            "h-9 w-9 rounded-md flex items-center justify-center text-xl transition",
+                            "h-10 w-10 rounded-xl flex items-center justify-center text-xl transition-all duration-150",
                             form.icon === icon
-                              ? "bg-emerald-100 ring-2 ring-emerald-400"
-                              : "hover:bg-slate-100"
+                              ? "bg-gradient-to-br from-emerald-400 to-teal-500 ring-2 ring-emerald-500 shadow-md scale-105"
+                              : "hover:bg-white hover:shadow-md hover:scale-105"
                           )}
                           title={icon}
                         >
@@ -1268,22 +1365,64 @@ function GroupForm({ group, onSave, onClose }: {
             )}
           </AnimatePresence>
 
-          {/* Custom icon input (for typing an emoji not in the grid) */}
-          <div>
-            <label className="text-[10px] font-semibold text-slate-500 mb-0.5 block">Or type a custom emoji:</label>
+          {/* Custom icon input */}
+          <div className="flex items-center gap-2">
+            <label className="text-[10px] font-semibold text-slate-400 whitespace-nowrap">Or custom:</label>
             <input
               value={form.icon}
               onChange={(e) => setForm({ ...form, icon: e.target.value })}
-              className="w-full h-8 px-3 rounded-lg border border-slate-200 focus:border-emerald-500 outline-none text-sm text-center text-lg"
+              className="flex-1 h-8 px-3 rounded-lg border border-slate-200 focus:border-emerald-500 outline-none text-sm text-center text-lg"
               maxLength={4}
-              placeholder="Paste any emoji here…"
+              placeholder="Paste emoji…"
             />
+          </div>
+
+          {/* ===== Live preview card ===== */}
+          <div className="rounded-2xl p-4 bg-gradient-to-br from-slate-50 to-slate-100 ring-1 ring-slate-200">
+            <div className="text-[10px] font-bold text-slate-400 uppercase mb-2">Live Preview</div>
+            <div className="flex items-center gap-3">
+              <div
+                className="h-12 w-12 rounded-2xl flex items-center justify-center text-2xl shadow-md"
+                style={{
+                  background: `linear-gradient(135deg, ${COLOR_OPTIONS.find(c => c.value === form.color)?.hex || '#10B981'}, ${COLOR_OPTIONS.find(c => c.value === form.color)?.hex || '#10B981'}cc)`,
+                  border: `2px solid ${COLOR_OPTIONS.find(c => c.value === form.color)?.hex || '#10B981'}`,
+                }}
+              >
+                {form.icon}
+              </div>
+              <div className="flex-1">
+                <div className="font-bold text-slate-800 text-sm">{form.name || 'Group Name'}</div>
+                <div className="text-[11px] text-slate-500">{form.description || 'Group description…'}</div>
+              </div>
+              <span
+                className="px-2 py-0.5 rounded-lg text-[10px] font-bold"
+                style={{
+                  backgroundColor: (COLOR_OPTIONS.find(c => c.value === form.color)?.hex || '#10B981') + '20',
+                  color: COLOR_OPTIONS.find(c => c.value === form.color)?.hex || '#10B981',
+                }}
+              >
+                {form.color}
+              </span>
+            </div>
           </div>
         </div>
 
-        <div className="flex-shrink-0 px-6 py-3 border-t border-slate-200 bg-slate-50 flex justify-end gap-2">
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={() => form.name && onSave(form)} disabled={!form.name} className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700"><Save className="h-4 w-4" />{group ? "Update" : "Add Group"}</Button>
+        {/* ===== Footer ===== */}
+        <div className="flex-shrink-0 px-6 py-4 border-t border-slate-100 bg-gradient-to-r from-slate-50 to-white flex justify-end gap-3">
+          <button
+            onClick={onClose}
+            className="h-10 px-5 rounded-xl bg-white hover:bg-slate-100 text-slate-600 text-sm font-bold transition ring-1 ring-slate-200"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => form.name && onSave(form)}
+            disabled={!form.name}
+            className="h-10 px-6 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-sm font-bold transition shadow-lg shadow-emerald-500/30 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none flex items-center gap-2"
+          >
+            <Save className="h-4 w-4" />
+            {group ? 'Update Group' : 'Add Group'}
+          </button>
         </div>
       </motion.div>
     </motion.div>
