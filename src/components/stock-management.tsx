@@ -557,7 +557,7 @@ function AddModifyStock({ products, setProducts, groups, setHistory }: {
       </div>
 
       {/* Table */}
-      <ScrollArea className="flex-1">
+      <div className="flex-1 overflow-auto min-h-0" style={{ scrollbarWidth: 'thin' }}>
         <table className="w-full text-sm">
           <thead className="sticky top-0 bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs uppercase tracking-wide z-10 shadow-md">
             <tr>
@@ -634,7 +634,7 @@ function AddModifyStock({ products, setProducts, groups, setHistory }: {
             })}
           </tbody>
         </table>
-      </ScrollArea>
+      </div>
 
       {/* Form Modal */}
       <AnimatePresence>
@@ -991,7 +991,7 @@ function GroupMaintenance({ groups, setGroups, products }: {
         <span className="text-slate-500">{products.length} total products</span>
       </div>
 
-      <ScrollArea className="flex-1">
+      <div className="flex-1 overflow-auto min-h-0" style={{ scrollbarWidth: 'thin' }}>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-5">
           {groups.map(g => {
             const count = products.filter(p => p.groupId === g.id).length;
@@ -1081,7 +1081,7 @@ function GroupMaintenance({ groups, setGroups, products }: {
             );
           })}
         </div>
-      </ScrollArea>
+      </div>
 
       <AnimatePresence>
         {showForm && (
@@ -1263,7 +1263,7 @@ function StockHistoryView({ history, products }: { history: StockHistoryEntry[];
         </div>
       )}
 
-      <ScrollArea className="flex-1">
+      <div className="flex-1 overflow-auto min-h-0" style={{ scrollbarWidth: 'thin' }}>
         <div className="p-4 space-y-2">
           {filtered.slice().reverse().map((h, i) => (
             <motion.div
@@ -1327,7 +1327,7 @@ function StockHistoryView({ history, products }: { history: StockHistoryEntry[];
             </div>
           )}
         </div>
-      </ScrollArea>
+      </div>
     </div>
   );
 }
