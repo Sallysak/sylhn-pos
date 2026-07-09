@@ -122,7 +122,7 @@ const AUDIT_KEY = 'sylhn-audit-log';
 const SESSION_KEY = 'sylhn-current-user';
 
 // ===== Login Screen =====
-export function AdminLogin({ onSuccess, onCancel }: { onSuccess: (user: SystemUser) => void; onCancel: () => void }) {
+export function AdminLogin({ onSuccess, onCancel, adminOnly = false }: { onSuccess: (user: SystemUser) => void; onCancel: () => void; adminOnly?: boolean }) {
   const { toast } = useToast();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -157,7 +157,7 @@ export function AdminLogin({ onSuccess, onCancel }: { onSuccess: (user: SystemUs
     }
 
     if (!user.active) { setError('Account is deactivated. Contact administrator.'); return; }
-    if (user.role !== 'admin' && user.role !== 'manager') { setError('Insufficient privileges. Admin or Manager access required.'); return; }
+    if (adminOnly && user.role !== 'admin' && user.role !== 'manager') { setError('Insufficient privileges. Admin or Manager access required.'); return; }
 
     // Update last login
     const updated = users.map(u => u.id === user.id ? { ...u, lastLogin: new Date().toISOString() } : u);
@@ -176,8 +176,8 @@ export function AdminLogin({ onSuccess, onCancel }: { onSuccess: (user: SystemUs
           <div className="h-16 w-16 rounded-3xl bg-gradient-to-br from-rose-500 via-pink-600 to-purple-700 flex items-center justify-center shadow-2xl ring-4 ring-white/10 mb-3">
             <Shield className="h-8 w-8 text-white" />
           </div>
-          <h2 className="text-xl font-bold text-white">Admin Access</h2>
-          <p className="text-xs text-slate-400">{COMPANY.name} · Administrative Panel</p>
+          <h2 className="text-xl font-bold text-white">{adminOnly ? 'Admin Access' : 'Sign In'}</h2>
+          <p className="text-xs text-slate-400">{COMPANY.name} · {adminOnly ? 'Administrative Panel' : 'Point of Sale System'}</p>
         </div>
 
         {/* Login card */}
@@ -212,13 +212,23 @@ export function AdminLogin({ onSuccess, onCancel }: { onSuccess: (user: SystemUs
           <div className="px-8 py-3 bg-slate-50 border-t border-slate-100">
             <div className="text-[10px] text-slate-400 font-semibold uppercase mb-1">Demo Credentials</div>
             <div className="text-[10px] text-slate-500 font-mono space-y-0.5">
-              <div>admin / admin123 <span className="text-rose-500">(Administrator)</span></div>
-              <div>manager / manager123 <span className="text-blue-500">(Manager)</span></div>
+              {adminOnly ? (
+                <>
+                  <div>admin / admin123 <span className="text-rose-500">(Administrator)</span></div>
+                  <div>manager / manager123 <span className="text-blue-500">(Manager)</span></div>
+                </>
+              ) : (
+                <>
+                  <div>admin / admin123 <span className="text-rose-500">(Administrator)</span></div>
+                  <div>manager / manager123 <span className="text-blue-500">(Manager)</span></div>
+                  <div>cashier / cashier123 <span className="text-emerald-500">(Cashier)</span></div>
+                </>
+              )}
             </div>
           </div>
         </div>
 
-        <button onClick={onCancel} className="w-full mt-4 text-xs text-slate-400 hover:text-white transition">← Back to POS</button>
+        <button onClick={onCancel} className="w-full mt-4 text-xs text-slate-400 hover:text-white transition">{adminOnly ? '← Back to POS' : 'Login required to continue'}</button>
       </motion.div>
     </motion.div>
   );

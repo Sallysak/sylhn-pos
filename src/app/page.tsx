@@ -61,7 +61,7 @@ const AdminPanel = dynamic(() => import("@/components/admin-panel").then(m => ({
 
 export default function POSPage() {
   // ===== Top-level View State =====
-  const [view, setView] = useState<ViewMode>("pos");
+  const [view, setView] = useState<ViewMode>("login");
   const [openMenu, setOpenMenu] = useState<string | null>(null);
 
   // ===== Shared Data State =====
@@ -101,6 +101,7 @@ export default function POSPage() {
   const [accountsReport, setAccountsReport] = useState<"daily-sales" | "profit-loss" | "vat-tax" | "stock-value" | "cost-price" | "stock-performance" | "stock-group" | "general-ledger" | "trial-balance">("daily-sales");
   const [financeTab, setFinanceTab] = useState<"expenses" | "cash-recon" | "mobile-money">("expenses");
   const [adminUser, setAdminUser] = useState<any>(null);
+  const [loggedInUser, setLoggedInUser] = useState<any>(null);
 
   const { toast } = useToast();
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -931,6 +932,7 @@ export default function POSPage() {
     return (
       <div className="h-screen bg-slate-900">
         <AdminLogin
+          adminOnly={true}
           onSuccess={(user) => { setAdminUser(user); setView("admin-panel"); }}
           onCancel={() => setView("pos")}
         />
@@ -939,6 +941,18 @@ export default function POSPage() {
   }
   if (view === "admin-panel") {
     return <AdminPanel currentUser={adminUser} onBack={() => setView("pos")} />;
+  }
+
+  // ===== Login Screen (required to open the software) =====
+  if (view === "login") {
+    return (
+      <div className="h-screen bg-slate-900">
+        <AdminLogin
+          onSuccess={(user) => { setLoggedInUser(user); setView("pos"); toast({ title: `Welcome, ${user.fullName}`, description: `Logged in as ${user.role}` }); }}
+          onCancel={() => toast({ title: "Login required", description: "You must log in to use the system" })}
+        />
+      </div>
+    );
   }
 
   // ===== Render POS =====
@@ -1045,11 +1059,17 @@ export default function POSPage() {
                 <div className="text-xs font-mono font-bold">{transactionCount}</div>
               </div>
             </div>
-            <div className="h-9 w-9 rounded-full bg-white/20 ring-2 ring-white/30 flex items-center justify-center text-xs font-bold">
-              SJ
+            <div className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-white/10 backdrop-blur ring-1 ring-white/15">
+              <div className="h-7 w-7 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 ring-1 ring-white/30 flex items-center justify-center text-[10px] font-bold">
+                {loggedInUser ? loggedInUser.fullName.charAt(0) : 'S'}
+              </div>
+              <div className="hidden sm:block">
+                <div className="text-[10px] font-bold leading-tight">{loggedInUser ? loggedInUser.fullName : cashier}</div>
+                <div className="text-[9px] text-emerald-100/70 capitalize">{loggedInUser ? loggedInUser.role : 'Cashier'}</div>
+              </div>
             </div>
-            <button className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center transition">
-              <LogOut className="h-4 w-4" />
+            <button onClick={() => { setLoggedInUser(null); setView("login"); toast({ title: "Logged out", description: "You have been signed out" }); }} className="h-8 px-3 rounded-lg bg-rose-500/20 hover:bg-rose-500/40 text-white text-xs font-bold flex items-center gap-1.5 transition" title="Sign out">
+              <LogOut className="h-4 w-4" /> <span className="hidden sm:inline">Logout</span>
             </button>
           </div>
         </div>
