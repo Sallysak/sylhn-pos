@@ -1273,6 +1273,7 @@ export function StockQuantityAdjustment({
             products={products}
             groups={groups}
             searchText={findPartNo}
+            initialGroup={groupFilter}
             onSelect={(p) => {
               addProductToLines(p);
               setShowStockSearch(false);
@@ -1444,18 +1445,19 @@ export function StockQuantityAdjustment({
 
 // ===== Mini Stock Search Popup (light blue/green, matches reference) =====
 function StockSearchMiniPopup({
-  products, groups, searchText, onSelect, onClose,
+  products, groups, searchText, initialGroup, onSelect, onClose,
 }: {
   products: Product[];
   groups: StockGroup[];
   searchText: string;
+  initialGroup?: string;
   onSelect: (p: Product) => void;
   onClose: () => void;
 }) {
   const { toast } = useToast();
   const [query, setQuery] = useState(searchText);
   const [filterType, setFilterType] = useState('all');
-  const [filterGroup, setFilterGroup] = useState('all');
+  const [filterGroup, setFilterGroup] = useState(initialGroup || 'all');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -1463,6 +1465,20 @@ function StockSearchMiniPopup({
     const t = setTimeout(() => inputRef.current?.focus(), 50);
     return () => clearTimeout(t);
   }, []);
+
+  // Sync query with searchText prop when it changes (e.g., user keeps typing in Find Part No)
+  useEffect(() => {
+    setQuery(searchText);
+    setSelectedIndex(0);
+  }, [searchText]);
+
+  // Sync filterGroup with initialGroup prop when it changes
+  useEffect(() => {
+    if (initialGroup !== undefined) {
+      setFilterGroup(initialGroup);
+      setSelectedIndex(0);
+    }
+  }, [initialGroup]);
 
   const filtered = useMemo(() => {
     return products.filter(p => {
