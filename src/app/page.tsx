@@ -56,6 +56,8 @@ const SalesHistory = dynamic(() => import("@/components/sales-reports").then(m =
 const SupplierForm = dynamic(() => import("@/components/supplier-form").then(m => ({ default: m.SupplierForm })), { ssr: false, loading: loadingFallback });
 const AccountsReports = dynamic(() => import("@/components/accounts-reports").then(m => ({ default: m.AccountsReports })), { ssr: false, loading: loadingFallback });
 const FinancialOperations = dynamic(() => import("@/components/financial-operations").then(m => ({ default: m.FinancialOperations })), { ssr: false, loading: loadingFallback });
+const AdminLogin = dynamic(() => import("@/components/admin-panel").then(m => ({ default: m.AdminLogin })), { ssr: false, loading: loadingFallback });
+const AdminPanel = dynamic(() => import("@/components/admin-panel").then(m => ({ default: m.AdminPanel })), { ssr: false, loading: loadingFallback });
 
 export default function POSPage() {
   // ===== Top-level View State =====
@@ -98,6 +100,7 @@ export default function POSPage() {
   const [productSearch, setProductSearch] = useState("");
   const [accountsReport, setAccountsReport] = useState<"daily-sales" | "profit-loss" | "vat-tax" | "stock-value" | "cost-price" | "stock-performance" | "stock-group" | "general-ledger" | "trial-balance">("daily-sales");
   const [financeTab, setFinanceTab] = useState<"expenses" | "cash-recon" | "mobile-money">("expenses");
+  const [adminUser, setAdminUser] = useState<any>(null);
 
   const { toast } = useToast();
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -863,6 +866,8 @@ export default function POSPage() {
         { label: "Cashier Shift", icon: Clock, action: () => setView("maintenance") },
         { label: "Security & Permissions", icon: Lock, action: () => setView("maintenance") },
         { separator: true },
+        { label: "Admin Panel", icon: Shield, action: () => setView("admin-login") },
+        { separator: true },
         { label: "About SYLHN POS", icon: Store, action: () => setView("maintenance") },
         { label: "Exit", icon: Power, action: () => toast({ title: "Goodbye!", description: "Shift ended" }) },
       ],
@@ -921,6 +926,19 @@ export default function POSPage() {
   }
   if (view === "finance-ops") {
     return <FinancialOperations onBack={() => setView("pos")} dailyTotal={dailyTotal} initialTab={financeTab} />;
+  }
+  if (view === "admin-login") {
+    return (
+      <div className="h-screen bg-slate-900">
+        <AdminLogin
+          onSuccess={(user) => { setAdminUser(user); setView("admin-panel"); }}
+          onCancel={() => setView("pos")}
+        />
+      </div>
+    );
+  }
+  if (view === "admin-panel") {
+    return <AdminPanel currentUser={adminUser} onBack={() => setView("pos")} />;
   }
 
   // ===== Render POS =====
