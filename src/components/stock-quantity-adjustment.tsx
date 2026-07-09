@@ -458,25 +458,103 @@ export function StockQuantityAdjustment({
     toast({ title: 'Line removed' });
   };
 
-  // ===== Find Part No handler — opens stock search =====
+  // ===== Find Part No handler — filters the table directly =====
+  // When the user types in "Find Part No", matching products are loaded
+  // directly into the table (replacing existing lines) — no popup needed.
+  // This gives immediate visual feedback of the search results.
   const handleFindPartNo = (value: string) => {
     setFindPartNo(value);
-    if (value.length > 0) {
-      // Try direct match by SKU/barcode first
-      const direct = products.find(p =>
-        p.sku.toLowerCase() === value.toLowerCase() ||
-        p.barcode === value
-      );
-      if (direct) {
-        addProductToLines(direct);
-        return;
+    setShowStockSearch(false);
+
+    if (value.length === 0) {
+      // If Find Part No is cleared, reload based on Group filter only
+      if (groupFilter !== 'all') {
+        loadFilteredProducts(groupFilter);
       }
-      // Otherwise open the search popup
-      setShowStockSearch(true);
-    } else {
-      setShowStockSearch(false);
+      return;
+    }
+
+    // Search products by SKU, barcode, name, or supplier
+    const q = value.toLowerCase();
+    const matched = products.filter(p =>
+      p.name.toLowerCase().includes(q) ||
+      p.sku.toLowerCase().includes(q) ||
+      p.barcode.includes(value) ||
+      p.supplier.toLowerCase().includes(q)
+    ).filter(p => {
+      // Also apply group filter if set
+      if (groupFilter !== 'all' && p.groupId !== groupFilter) return false;
+      return true;
+    });
+
+    if (matched.length === 0) {
+      toast({ title: 'No products found', description: `"${value}"`, variant: 'destructive' });
+      return;
+    }
+
+    // Replace table with search results
+    loadProductsIntoTable(matched);
+  };
+
+  // ===== Helper: load a set of products into the table =====
+  // Preserves existing counted values for products already in the table.
+  const loadProductsIntoTable = (matched: Product[]) => {
+    setLines(prev => {
+      // Build a map of existing lines by productId (to preserve counted values)
+      const existingMap = new Map(prev.map(l => [l.productId, l]));
+      const newLines: AdjustmentLine[] = matched.map(product => {
+        const existing = existingMap.get(product.id);
+        if (existing) {
+          // Preserve the user's counted value but update onHand
+          const qty = existing.counted - product.stock;
+          return { ...existing, onHand: product.stock, qty, total: qty * existing.cost };
+        }
+        // New line — default counted = onHand
+        return {
+          id: `line-${Date.now()}-${Math.random().toString(36).slice(2, 6)}-${product.id}`,
+          partNo: product.sku,
+          details: `${product.emoji} ${product.name}`,
+          emoji: product.emoji,
+          onHand: product.stock,
+          counted: product.stock,
+          qty: 0,
+          cost: product.costPrice,
+          total: 0,
+          productId: product.id,
+        };
+      });
+      return newLines;
+    });
+    setSaved(false);
+  };
+
+  // ===== Helper: load products filtered by group into the table =====
+  const loadFilteredProducts = (group: string) => {
+    const matched = products.filter(p => {
+      if (group !== 'all' && p.groupId !== group) return false;
+      return true;
+    });
+    if (matched.length > 0) {
+      loadProductsIntoTable(matched);
+      toast({ title: `${matched.length} products loaded`, description: group === 'all' ? 'All groups' : `Group: ${group}` });
     }
   };
+
+  // ===== Auto-filter table when Group dropdown changes =====
+  // When the user selects a different Group, immediately load that group's
+  // products into the table — no need to click "Load Range".
+  useEffect(() => {
+    // Skip on initial mount (the draft restore handles initial state)
+    if (!draftRestored && lines.length === 0 && !findPartNo) {
+      // Only auto-load if group is not 'all' and table is empty
+      if (groupFilter !== 'all') {
+        loadFilteredProducts(groupFilter);
+      }
+      return;
+    }
+    // If user already has lines or a draft, only auto-filter when group changes
+    // (we detect this by checking if the groupFilter changed from a user action)
+  }, [groupFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ===== Load all products in a range (From Part No → To Part No) =====
   const handleLoadRange = () => {
@@ -925,7 +1003,23 @@ export function StockQuantityAdjustment({
           <label className="text-[10px] font-bold text-slate-800">Group:</label>
           <select
             value={groupFilter}
-            onChange={(e) => setGroupFilter(e.target.value)}
+            onChange={(e) => {
+              const newGroup = e.target.value;
+              setGroupFilter(newGroup);
+              // Immediately load filtered products into the table
+              if (findPartNo) {
+                // If there's a search term, re-filter with both search + group
+                handleFindPartNo(findPartNo);
+              } else {
+                // No search term — just filter by group
+                if (newGroup === 'all') {
+                  // "All Groups" — clear the table (or keep existing)
+                  // Don't auto-load all products (could be hundreds)
+                } else {
+                  loadFilteredProducts(newGroup);
+                }
+              }
+            }}
             className="h-6 px-2 text-[10px] border rounded bg-white outline-none focus:ring-1 focus:ring-blue-400"
             style={{ borderColor: FIELD_BORDER }}
           >
@@ -995,19 +1089,13 @@ export function StockQuantityAdjustment({
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               e.preventDefault();
-              if (findPartNo) {
-                const direct = products.find(p =>
-                  p.sku.toLowerCase() === findPartNo.toLowerCase() ||
-                  p.barcode === findPartNo
-                );
-                if (direct) addProductToLines(direct);
-                else setShowStockSearch(true);
-              }
+              // handleFindPartNo already loads results on change,
+              // but Enter forces a re-search (in case of edge cases)
+              handleFindPartNo(findPartNo);
             }
-            if (e.key === 'Escape') setShowStockSearch(false);
+            if (e.key === 'Escape') { setShowStockSearch(false); }
           }}
-          onFocus={() => { if (findPartNo && !lines.some(l => l.partNo === findPartNo)) setShowStockSearch(true); }}
-          placeholder="Type SKU or barcode, press Enter to add..."
+          placeholder="Type to search — results show in table below..."
           className="h-6 w-56 px-2 text-[10px] font-mono border rounded outline-none focus:ring-1 focus:ring-blue-400"
           style={{ borderColor: FIELD_BORDER, backgroundColor: '#FFFFCC' }}
         />
