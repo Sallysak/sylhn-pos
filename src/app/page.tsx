@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import dynamic from "next/dynamic";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Search, ShoppingCart, Trash2, Plus, Minus, X, Printer, CreditCard,
@@ -28,17 +29,30 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { StockManagement } from "@/components/stock-management";
-import { Reports } from "@/components/reports";
-import { PurchaseMenu } from "@/components/purchase-menu";
-import { TelephoneModule } from "@/components/telephone-module";
-import { TelephoneDirectory } from "@/components/telephone-directory";
-import { MaintenanceModule } from "@/components/maintenance-module";
-import { SoldItemsReport } from "@/components/sold-items-report";
-import { PurchaseForm } from "@/components/purchase-form";
-import { SalesMenu } from "@/components/sales-menu";
-import { DailySalesReport, SalesHistory } from "@/components/sales-reports";
-import { SupplierForm, initialSuppliers } from "@/components/supplier-form";
+import { initialSuppliers } from "@/components/supplier-form";
+
+// ===== Lazy-loaded components (code-split for faster initial load) =====
+// Each form is loaded on-demand only when the user navigates to it.
+// This keeps the initial POS page bundle small and fast.
+const loadingFallback = () => (
+  <div className="h-screen flex flex-col items-center justify-center bg-slate-50 gap-3">
+    <div className="h-10 w-10 rounded-full border-4 border-slate-200 border-t-emerald-600 animate-spin" />
+    <div className="text-sm font-semibold text-slate-500">Loading…</div>
+  </div>
+);
+
+const StockManagement = dynamic(() => import("@/components/stock-management").then(m => ({ default: m.StockManagement })), { ssr: false, loading: loadingFallback });
+const Reports = dynamic(() => import("@/components/reports").then(m => ({ default: m.Reports })), { ssr: false, loading: loadingFallback });
+const PurchaseMenu = dynamic(() => import("@/components/purchase-menu").then(m => ({ default: m.PurchaseMenu })), { ssr: false, loading: loadingFallback });
+const TelephoneModule = dynamic(() => import("@/components/telephone-module").then(m => ({ default: m.TelephoneModule })), { ssr: false, loading: loadingFallback });
+const TelephoneDirectory = dynamic(() => import("@/components/telephone-directory").then(m => ({ default: m.TelephoneDirectory })), { ssr: false, loading: loadingFallback });
+const MaintenanceModule = dynamic(() => import("@/components/maintenance-module").then(m => ({ default: m.MaintenanceModule })), { ssr: false, loading: loadingFallback });
+const SoldItemsReport = dynamic(() => import("@/components/sold-items-report").then(m => ({ default: m.SoldItemsReport })), { ssr: false, loading: loadingFallback });
+const PurchaseForm = dynamic(() => import("@/components/purchase-form").then(m => ({ default: m.PurchaseForm })), { ssr: false, loading: loadingFallback });
+const SalesMenu = dynamic(() => import("@/components/sales-menu").then(m => ({ default: m.SalesMenu })), { ssr: false, loading: loadingFallback });
+const DailySalesReport = dynamic(() => import("@/components/sales-reports").then(m => ({ default: m.DailySalesReport })), { ssr: false, loading: loadingFallback });
+const SalesHistory = dynamic(() => import("@/components/sales-reports").then(m => ({ default: m.SalesHistory })), { ssr: false, loading: loadingFallback });
+const SupplierForm = dynamic(() => import("@/components/supplier-form").then(m => ({ default: m.SupplierForm })), { ssr: false, loading: loadingFallback });
 
 export default function POSPage() {
   // ===== Top-level View State =====
@@ -845,7 +859,7 @@ export default function POSPage() {
     },
   ];
 
-  // ===== Render Other Views =====
+  // ===== Render Other Views (lazy-loaded for performance) =====
   if (view === "stock") {
     return <StockManagement onBack={() => { setView("pos"); setOpenStockQtyReport(false); }} products={products} setProducts={setProducts} groups={groups} setGroups={setGroups} history={history} setHistory={setHistory} initialView={initialStockView} openQtyReport={openStockQtyReport} onNavigateToPurchase={() => setView("purchase-form")} />;
   }
@@ -855,8 +869,7 @@ export default function POSPage() {
   if (view === "purchase") {
     return (
       <PurchaseMenu
-        onBack={() => setView("pos")}
-        products={products}
+        onBack={() => setView("pos")} products={products}
         onOpenPurchasingForm={() => setView("purchase-form")}
         onOpenSupplierForm={() => setView("supplier-form")}
       />
