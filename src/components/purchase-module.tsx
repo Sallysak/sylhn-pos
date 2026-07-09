@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, Package, Truck, Users, History, DollarSign, Plus, X, Save,
   Archive, ShoppingCart, CheckCircle2, Clock, Phone, MapPin, Search,
   TrendingUp, Filter, ChevronRight, Edit2, Trash2, Eye,
-  FileBarChart2, Calendar, Printer, Download, FileText,
+  FileBarChart2, Calendar, Printer, Download, FileText, ScanLine,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -614,6 +614,15 @@ function ReceiveStock({ orders, setOrders, products }: {
   const { toast } = useToast();
   const pendingOrders = orders.filter(o => o.status === "sent" || o.status === "partial");
 
+  // ===== Scan mode state =====
+  const [scanMode, setScanMode] = useState(false);
+  const [scanBuffer, setScanBuffer] = useState('');
+  const [scanStats, setScanStats] = useState({ scanned: 0, received: 0, notFound: 0 });
+  const [lastScan, setLastScan] = useState<{ product: string; qty: number; status: 'received' | 'notfound' | 'full' } | null>(null);
+  const scanBufferRef = useRef('');
+  const scanTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastKeyTimeRef = useRef(0);
+
   const handleReceive = (orderId: string, itemIndex: number, qty: number) => {
     setOrders(prev => prev.map(o => {
       if (o.id !== orderId) return o;
@@ -624,13 +633,164 @@ function ReceiveStock({ orders, setOrders, products }: {
     toast({ title: "Stock received", description: `${qty} units added to inventory` });
   };
 
+  // ===== Process scanned barcode — increment received qty by 1 for matching PO item =====
+  const processScannedBarcode = (barcode: string) => {
+    const trimmed = barcode.trim();
+    if (!trimmed) return;
+    setScanStats(prev => ({ ...prev, scanned: prev.scanned + 1 }));
+
+    // Find the product by barcode or SKU
+    const product = products.find(p =>
+      p.barcode === trimmed || p.sku.toLowerCase() === trimmed.toLowerCase() ||
+      p.barcode === trimmed.padStart(13, '0')
+    );
+
+    if (!product) {
+      setScanStats(prev => ({ ...prev, notFound: prev.notFound + 1 }));
+      setLastScan({ product: trimmed, qty: 0, status: 'notfound' });
+      toast({ title: 'Product not found', description: `Barcode: ${trimmed}`, variant: 'destructive' });
+      return;
+    }
+
+    // Find the matching PO item across all pending orders
+    let found = false;
+    setOrders(prev => prev.map(o => {
+      if (o.status !== 'sent' && o.status !== 'partial') return o;
+      const itemIdx = o.items.findIndex(it => it.productId === product.id || it.name === product.name);
+      if (itemIdx < 0) return o;
+      found = true;
+      const newItems = o.items.map((it, i) => {
+        if (i !== itemIdx) return it;
+        if (it.received >= it.qty) return it; // Already fully received
+        return { ...it, received: it.received + 1 };
+      });
+      const allReceived = newItems.every(it => it.received >= it.qty);
+      return { ...o, items: newItems, status: allReceived ? 'received' : 'partial' };
+    }));
+
+    if (found) {
+      setScanStats(prev => ({ ...prev, received: prev.received + 1 }));
+      setLastScan({ product: `${product.emoji} ${product.name}`, qty: 1, status: 'received' });
+    } else {
+      // Check if it's already fully received
+      let alreadyFull = false;
+      pendingOrders.forEach(o => {
+        const item = o.items.find(it => it.productId === product.id || it.name === product.name);
+        if (item && item.received >= item.qty) alreadyFull = true;
+      });
+      if (alreadyFull) {
+        setLastScan({ product: `${product.emoji} ${product.name}`, qty: 0, status: 'full' });
+        toast({ title: 'Already fully received', description: `${product.emoji} ${product.name}` });
+      } else {
+        setScanStats(prev => ({ ...prev, notFound: prev.notFound + 1 }));
+        setLastScan({ product: `${product.emoji} ${product.name}`, qty: 0, status: 'notfound' });
+        toast({ title: 'Not in any pending PO', description: `${product.emoji} ${product.name}` });
+      }
+    }
+  };
+
+  // ===== Barcode scanner keydown listener =====
+  useEffect(() => {
+    if (!scanMode) return;
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT')) return;
+      const now = Date.now();
+      if (e.key === 'Enter') {
+        if (scanBufferRef.current.length > 0) {
+          processScannedBarcode(scanBufferRef.current);
+          scanBufferRef.current = '';
+          setScanBuffer('');
+          if (scanTimerRef.current) { clearTimeout(scanTimerRef.current); scanTimerRef.current = null; }
+        }
+        e.preventDefault();
+        return;
+      }
+      if (e.key.length !== 1) return;
+      if (now - lastKeyTimeRef.current > 100 && scanBufferRef.current.length > 0) scanBufferRef.current = '';
+      lastKeyTimeRef.current = now;
+      scanBufferRef.current += e.key;
+      setScanBuffer(scanBufferRef.current);
+      if (scanTimerRef.current) clearTimeout(scanTimerRef.current);
+      scanTimerRef.current = setTimeout(() => {
+        if (scanBufferRef.current.length >= 4) {
+          processScannedBarcode(scanBufferRef.current);
+          scanBufferRef.current = '';
+          setScanBuffer('');
+        }
+      }, 150);
+    };
+    window.addEventListener('keydown', handler);
+    return () => { window.removeEventListener('keydown', handler); if (scanTimerRef.current) clearTimeout(scanTimerRef.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scanMode, pendingOrders, products, orders]);
+
+  const toggleScanMode = () => {
+    if (!scanMode) {
+      setScanMode(true);
+      setScanStats({ scanned: 0, received: 0, notFound: 0 });
+      setLastScan(null);
+      scanBufferRef.current = '';
+      setScanBuffer('');
+      toast({ title: 'Scan mode ON', description: 'Scan product barcodes to receive them against pending POs' });
+    } else {
+      setScanMode(false);
+      scanBufferRef.current = '';
+      setScanBuffer('');
+      if (scanTimerRef.current) { clearTimeout(scanTimerRef.current); scanTimerRef.current = null; }
+      toast({ title: 'Scan mode OFF', description: `${scanStats.scanned} scans · ${scanStats.received} received` });
+    }
+  };
+
   return (
     <div className="h-full bg-white rounded-2xl shadow-lg ring-1 ring-slate-200/60 overflow-hidden flex flex-col">
-      <div className="flex-shrink-0 flex items-center gap-3 px-5 py-3 bg-gradient-to-r from-slate-50 to-white border-b border-slate-200">
-        <Package className="h-5 w-5 text-amber-600" />
-        <h2 className="text-base font-bold text-slate-800">Receive Stock</h2>
-        <Badge variant="outline" className="font-mono text-xs">{pendingOrders.length} pending</Badge>
+      <div className="flex-shrink-0 flex items-center justify-between px-5 py-3 bg-gradient-to-r from-slate-50 to-white border-b border-slate-200">
+        <div className="flex items-center gap-3">
+          <Package className="h-5 w-5 text-amber-600" />
+          <h2 className="text-base font-bold text-slate-800">Receive Stock</h2>
+          <Badge variant="outline" className="font-mono text-xs">{pendingOrders.length} pending</Badge>
+        </div>
+        <button
+          onClick={toggleScanMode}
+          className={cn("h-9 px-3 rounded-lg text-sm font-bold flex items-center gap-1.5 transition shadow-sm", scanMode ? "bg-rose-600 text-white animate-pulse" : "bg-amber-500 text-white hover:bg-amber-600")}
+          title={scanMode ? 'Scan mode is ON — click to stop' : 'Turn on barcode scanner'}
+        >
+          <ScanLine className="h-4 w-4" /> {scanMode ? 'Scanning…' : 'Scan to Receive'}
+        </button>
       </div>
+
+      {/* Scanner overlay (when active) */}
+      <AnimatePresence>
+        {scanMode && (
+          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+            <div className="flex-shrink-0 px-5 py-3 bg-rose-50 border-b border-rose-200">
+              <div className="flex items-center gap-4">
+                <div className="flex-1">
+                  <div className="text-[10px] font-bold text-rose-700 uppercase mb-1">Scanner Active — scan barcodes to receive</div>
+                  <div className="h-7 px-3 flex items-center bg-white border border-rose-300 rounded-lg font-mono text-sm text-slate-800">
+                    {scanBuffer || <span className="text-slate-300">Waiting for scan…</span>}
+                    <span className="ml-0.5 inline-block w-0.5 h-4 bg-rose-500 animate-pulse" />
+                  </div>
+                </div>
+                {/* Last scan feedback */}
+                {lastScan && (
+                  <div className="text-right">
+                    {lastScan.status === 'received' && <div className="text-xs font-bold text-emerald-700">+1 received: {lastScan.product}</div>}
+                    {lastScan.status === 'notfound' && <div className="text-xs font-bold text-rose-700">Not found: {lastScan.product}</div>}
+                    {lastScan.status === 'full' && <div className="text-xs font-bold text-amber-700">Already full: {lastScan.product}</div>}
+                  </div>
+                )}
+                {/* Stats */}
+                <div className="flex items-center gap-3 text-xs">
+                  <div className="text-center"><div className="text-lg font-bold text-slate-800 font-mono">{scanStats.scanned}</div><div className="text-[8px] text-slate-400 uppercase">Scanned</div></div>
+                  <div className="text-center"><div className="text-lg font-bold text-emerald-600 font-mono">{scanStats.received}</div><div className="text-[8px] text-slate-400 uppercase">Received</div></div>
+                  <div className="text-center"><div className="text-lg font-bold text-rose-600 font-mono">{scanStats.notFound}</div><div className="text-[8px] text-slate-400 uppercase">Not Found</div></div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <ScrollArea className="flex-1">
         <div className="p-4 space-y-3">
@@ -658,7 +818,7 @@ function ReceiveStock({ orders, setOrders, products }: {
                       <div className="flex-1">
                         <div className="text-sm font-semibold text-slate-800">{item.name}</div>
                         <div className="text-xs text-slate-500">
-                          Ordered: {item.qty} · Received: {item.received} · Pending: {item.qty - item.received}
+                          Ordered: {item.qty} · Received: <span className={cn("font-bold", item.received >= item.qty ? "text-emerald-600" : "text-slate-600")}>{item.received}</span> · Pending: {item.qty - item.received}
                         </div>
                       </div>
                       <div className="w-32 bg-slate-100 rounded-full h-2 overflow-hidden">
@@ -668,13 +828,23 @@ function ReceiveStock({ orders, setOrders, products }: {
                         />
                       </div>
                       {item.received < item.qty && (
-                        <Button
-                          size="sm"
-                          onClick={() => handleReceive(o.id, i, item.qty - item.received)}
-                          className="bg-emerald-600 hover:bg-emerald-700 h-8 text-xs"
-                        >
-                          <CheckCircle2 className="h-3.5 w-3.5" /> Receive All
-                        </Button>
+                        <>
+                          <Button
+                            size="sm"
+                            onClick={() => handleReceive(o.id, i, 1)}
+                            className="bg-blue-500 hover:bg-blue-600 h-8 text-xs px-2"
+                            title="Receive 1 unit"
+                          >
+                            +1
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => handleReceive(o.id, i, item.qty - item.received)}
+                            className="bg-emerald-600 hover:bg-emerald-700 h-8 text-xs"
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5" /> Receive All
+                          </Button>
+                        </>
                       )}
                     </div>
                   ))}
