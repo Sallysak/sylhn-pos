@@ -791,58 +791,67 @@ export default function POSPage() {
     toast({ title: "Order recalled", description: `${order.items.length} items restored` });
   };
 
-  // ===== Menu Items =====
+  // ===== Permission helper =====
+  const hasPermission = (perm: string): boolean => {
+    if (!loggedInUser) return false;
+    if (loggedInUser.role === 'admin') return true; // Admin always has full access
+    return loggedInUser.permissions?.[perm as keyof typeof loggedInUser.permissions] === true;
+  };
+
+  // ===== Menu Items (filtered by logged-in user permissions) =====
   const menus = [
     {
       id: "pos",
       label: "POS",
-      items: [
+      items: hasPermission('pos') ? [
         { label: "Go to POS Screen", icon: Home, action: () => { setView("pos"); }, shortcut: "Ctrl+P" },
         { label: "New Sale", icon: Plus, action: () => { clearCart(); setView("pos"); }, shortcut: "Ctrl+N" },
         { separator: true },
         { label: "Open Cash Drawer", icon: DollarSign, action: handleOpenCash },
         { label: "Switch Register", icon: Store, action: () => toast({ title: "Switch Register", description: "Select another register to switch to" }) },
-      ],
+      ] : [],
     },
     {
       id: "sale",
       label: "Sale",
-      items: [
+      items: hasPermission('sales') ? [
         { label: "New Sale", icon: Plus, action: () => { clearCart(); setView("pos"); }, shortcut: "Ctrl+N" },
         { label: "Save / Hold Order", icon: Pause, action: handleSave, shortcut: "F2" },
         { label: "Print Receipt", icon: Printer, action: handlePrint, shortcut: "F3" },
-        { label: "Void Transaction", icon: RotateCcw, action: () => { if (cart.length === 0) { toast({ title: "Cart is already empty", variant: "destructive" }); return; } clearCart(); toast({ title: "Transaction voided (F4)" }); }, shortcut: "F4" },
+        ...(hasPermission('canVoid') ? [{ label: "Void Transaction", icon: RotateCcw, action: () => { if (cart.length === 0) { toast({ title: "Cart is already empty", variant: "destructive" }); return; } clearCart(); toast({ title: "Transaction voided (F4)" }); }, shortcut: "F4" }] : []),
         { label: "Pay Now", icon: CreditCard, action: () => { if (cart.length === 0) { toast({ title: "Cart is empty", variant: "destructive" }); return; } setShowPayment(true); }, shortcut: "F5" },
         { separator: true },
         { label: "Sales Menu", icon: FileText, action: () => setView("sales-menu") },
         { label: "Sold Items Report", icon: FileBarChart, action: () => setView("sold-items") },
         { label: "Sales History", icon: History, action: () => setView("sales-history") },
         { label: "Daily Sales Report", icon: TrendingUp, action: () => setView("daily-sales") },
-      ],
+      ] : [],
     },
     {
       id: "stock",
       label: "Stock",
-      items: [
+      items: hasPermission('stock') ? [
         { label: "Stock File", icon: FileText, action: () => { setInitialStockView("stock-file"); setView("stock"); } },
         { label: "Stock Search", icon: FileSearch, action: () => { setInitialStockView("stock-search"); setView("stock"); } },
         { label: "Add / Modify Stock", icon: Package, action: () => { setInitialStockView("add-modify"); setView("stock"); } },
         { label: "Group Maintenance", icon: Layers, action: () => { setInitialStockView("group-maintenance"); setView("stock"); } },
-        { label: "Quantity Adjustment", icon: ArrowUpDown, action: () => { setInitialStockView("quantity-adjustment"); setView("stock"); } },
+        ...(hasPermission('canAdjustStock') ? [{ label: "Quantity Adjustment", icon: ArrowUpDown, action: () => { setInitialStockView("quantity-adjustment"); setView("stock"); } }] : []),
         { label: "Stock History", icon: History, action: () => { setInitialStockView("history"); setView("stock"); } },
         { separator: true },
         { label: "Stock Qty Report", icon: FileBarChart, action: () => { setOpenStockQtyReport(true); setInitialStockView("add-modify"); setView("stock"); } },
-        { label: "Stock Reports", icon: FileBarChart, action: () => setView("reports") },
-        { label: "Quantities Report", icon: FileText, action: () => setView("reports") },
-        { label: "Stock Value Report", icon: BarChart3, action: () => setView("reports") },
-        { label: "Reorder Report", icon: RotateCcw, action: () => setView("reports") },
-        { label: "Expiry Date Report", icon: Calendar, action: () => setView("reports") },
-      ],
+        ...(hasPermission('canExport') ? [
+          { label: "Stock Reports", icon: FileBarChart, action: () => setView("reports") },
+          { label: "Quantities Report", icon: FileText, action: () => setView("reports") },
+          { label: "Stock Value Report", icon: BarChart3, action: () => setView("reports") },
+          { label: "Reorder Report", icon: RotateCcw, action: () => setView("reports") },
+          { label: "Expiry Date Report", icon: Calendar, action: () => setView("reports") },
+        ] : []),
+      ] : [],
     },
     {
       id: "purchase",
       label: "Purchase",
-      items: [
+      items: hasPermission('purchase') ? [
         { label: "Purchase", icon: FileText, action: () => setView("purchase-form") },
         { label: "Supplier", icon: Users, action: () => setView("supplier-form") },
         { label: "Purchase Orders", icon: Archive, action: () => setView("purchase") },
@@ -852,12 +861,12 @@ export default function POSPage() {
         { label: "Supplier Payments", icon: DollarSign, action: () => setView("purchase") },
         { separator: true },
         { label: "Purchase Report", icon: FileBarChart2, action: () => setView("purchase") },
-      ],
+      ] : [],
     },
     {
       id: "accounts",
       label: "Accounts",
-      items: [
+      items: hasPermission('accounts') ? [
         { label: "Daily Sales Summary", icon: TrendingUp, action: () => { setAccountsReport("daily-sales"); setView("accounts-reports"); } },
         { label: "Daily Sales Detail", icon: FileText, action: () => { setAccountsReport("daily-sales-detail"); setView("accounts-reports"); } },
         { label: "Monthly Summary", icon: BarChart3, action: () => { setAccountsReport("monthly-summary"); setView("accounts-reports"); } },
@@ -866,10 +875,12 @@ export default function POSPage() {
         { label: "Profit & Loss", icon: BarChart3, action: () => { setAccountsReport("profit-loss"); setView("accounts-reports"); } },
         { label: "VAT Tax Report", icon: Percent, action: () => { setAccountsReport("vat-tax"); setView("accounts-reports"); } },
         { separator: true },
-        { label: "Expense Management", icon: Wallet, action: () => { setFinanceTab("expenses"); setView("finance-ops"); } },
-        { label: "Cash Reconciliation", icon: Wallet, action: () => { setFinanceTab("cash-recon"); setView("finance-ops"); } },
-        { label: "Mobile Money", icon: Smartphone, action: () => { setFinanceTab("mobile-money"); setView("finance-ops"); } },
-        { separator: true },
+        ...(hasPermission('financeOps') ? [
+          { label: "Expense Management", icon: Wallet, action: () => { setFinanceTab("expenses"); setView("finance-ops"); } },
+          { label: "Cash Reconciliation", icon: Wallet, action: () => { setFinanceTab("cash-recon"); setView("finance-ops"); } },
+          { label: "Mobile Money", icon: Smartphone, action: () => { setFinanceTab("mobile-money"); setView("finance-ops"); } },
+          { separator: true },
+        ] : []),
         { label: "Stock Value Report", icon: DollarSign, action: () => { setAccountsReport("stock-value"); setView("accounts-reports"); } },
         { label: "Cost Price Report", icon: FileText, action: () => { setAccountsReport("cost-price"); setView("accounts-reports"); } },
         { label: "Stock Performance", icon: TrendingUp, action: () => { setAccountsReport("stock-performance"); setView("accounts-reports"); } },
@@ -877,12 +888,12 @@ export default function POSPage() {
         { separator: true },
         { label: "General Ledger", icon: BookOpen, action: () => { setAccountsReport("general-ledger"); setView("accounts-reports"); } },
         { label: "Trial Balance", icon: FileBarChart2, action: () => { setAccountsReport("trial-balance"); setView("accounts-reports"); } },
-      ],
+      ] : [],
     },
     {
       id: "telephone",
       label: "Telephone",
-      items: [
+      items: hasPermission('telephone') ? [
         { label: "Phone Orders", icon: PhoneCall, action: () => setView("telephone") },
         { label: "Delivery Tracking", icon: Truck, action: () => setView("telephone") },
         { label: "Customer Database", icon: Users, action: () => setView("telephone") },
@@ -890,12 +901,12 @@ export default function POSPage() {
         { label: "Phone Directory", icon: BookOpen, action: () => setView("telephone-directory") },
         { separator: true },
         { label: "Call Log", icon: Phone, action: () => setView("telephone") },
-      ],
+      ] : [],
     },
     {
       id: "maintenance",
       label: "Maintenance",
-      items: [
+      items: hasPermission('maintenance') ? [
         { label: "System Settings", icon: Settings2, action: () => setView("maintenance") },
         { label: "User Management", icon: Users, action: () => setView("maintenance") },
         { label: "Backup Database", icon: Database, action: () => setView("maintenance") },
@@ -906,10 +917,15 @@ export default function POSPage() {
         { label: "Admin Panel", icon: Shield, action: () => setView("admin-login") },
         { separator: true },
         { label: "About SYLHN POS", icon: Store, action: () => setView("maintenance") },
-        { label: "Exit", icon: Power, action: () => toast({ title: "Goodbye!", description: "Shift ended" }) },
+        { label: "Exit", icon: Power, action: () => { setLoggedInUser(null); setView("login"); toast({ title: "Goodbye!", description: "Shift ended" }) } },
+      ] : [
+        { label: "Admin Panel", icon: Shield, action: () => setView("admin-login") },
+        { separator: true },
+        { label: "About SYLHN POS", icon: Store, action: () => setView("maintenance") },
+        { label: "Exit", icon: Power, action: () => { setLoggedInUser(null); setView("login"); toast({ title: "Goodbye!", description: "Shift ended" }) } },
       ],
     },
-  ];
+  ].filter(m => m.items.length > 0); // Hide empty menus
 
   // ===== Render Other Views (lazy-loaded for performance) =====
   if (view === "stock") {
