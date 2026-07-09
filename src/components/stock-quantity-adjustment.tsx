@@ -961,6 +961,7 @@ export function StockQuantityAdjustment({
       if (e.key === 'F2') { e.preventDefault(); handleSave(); }
       else if (e.key === 'F3') { e.preventDefault(); handlePrint(); }
       else if (e.key === 'F4') { e.preventDefault(); handleDelete(); }
+      else if (e.key === 'F7') { e.preventDefault(); setShowStockSearch(true); }
       else if (e.key === 'Escape' && !isTyping && !showStockSearch) { e.preventDefault(); onClose(); }
     };
     window.addEventListener('keydown', handler);
