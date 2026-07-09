@@ -53,6 +53,7 @@ const SalesMenu = dynamic(() => import("@/components/sales-menu").then(m => ({ d
 const DailySalesReport = dynamic(() => import("@/components/sales-reports").then(m => ({ default: m.DailySalesReport })), { ssr: false, loading: loadingFallback });
 const SalesHistory = dynamic(() => import("@/components/sales-reports").then(m => ({ default: m.SalesHistory })), { ssr: false, loading: loadingFallback });
 const SupplierForm = dynamic(() => import("@/components/supplier-form").then(m => ({ default: m.SupplierForm })), { ssr: false, loading: loadingFallback });
+const AccountsReports = dynamic(() => import("@/components/accounts-reports").then(m => ({ default: m.AccountsReports })), { ssr: false, loading: loadingFallback });
 
 export default function POSPage() {
   // ===== Top-level View State =====
@@ -93,6 +94,7 @@ export default function POSPage() {
   const [showStockList, setShowStockList] = useState(false);
   const [partNoInput, setPartNoInput] = useState("");
   const [productSearch, setProductSearch] = useState("");
+  const [accountsReport, setAccountsReport] = useState<"daily-sales" | "profit-loss" | "vat-tax" | "stock-value" | "cost-price" | "stock-performance" | "general-ledger" | "trial-balance">("daily-sales");
 
   const { toast } = useToast();
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -817,16 +819,16 @@ export default function POSPage() {
       id: "accounts",
       label: "Accounts",
       items: [
-        { label: "Daily Sales", icon: TrendingUp, action: () => toast({ title: "Daily Sales", description: `Total: ${formatGHS(dailyTotal)} (${transactionCount} txns)` }) },
-        { label: "Profit & Loss", icon: BarChart3, action: () => toast({ title: "Profit & Loss", description: "View profit and loss statement" }) },
-        { label: "VAT Tax Report", icon: Percent, action: () => toast({ title: "VAT Report", description: "Tax collected report (15% VAT)" }) },
+        { label: "Daily Sales", icon: TrendingUp, action: () => { setAccountsReport("daily-sales"); setView("accounts-reports"); } },
+        { label: "Profit & Loss", icon: BarChart3, action: () => { setAccountsReport("profit-loss"); setView("accounts-reports"); } },
+        { label: "VAT Tax Report", icon: Percent, action: () => { setAccountsReport("vat-tax"); setView("accounts-reports"); } },
         { separator: true },
-        { label: "Stock Value Report", icon: DollarSign, action: () => setView("reports") },
-        { label: "Cost Price Report", icon: FileText, action: () => setView("reports") },
-        { label: "Stock Performance", icon: TrendingUp, action: () => setView("reports") },
+        { label: "Stock Value Report", icon: DollarSign, action: () => { setAccountsReport("stock-value"); setView("accounts-reports"); } },
+        { label: "Cost Price Report", icon: FileText, action: () => { setAccountsReport("cost-price"); setView("accounts-reports"); } },
+        { label: "Stock Performance", icon: TrendingUp, action: () => { setAccountsReport("stock-performance"); setView("accounts-reports"); } },
         { separator: true },
-        { label: "General Ledger", icon: BookOpen, action: () => toast({ title: "General Ledger", description: "Accounting ledger entries" }) },
-        { label: "Trial Balance", icon: FileBarChart2, action: () => toast({ title: "Trial Balance", description: "View trial balance report" }) },
+        { label: "General Ledger", icon: BookOpen, action: () => { setAccountsReport("general-ledger"); setView("accounts-reports"); } },
+        { label: "Trial Balance", icon: FileBarChart2, action: () => { setAccountsReport("trial-balance"); setView("accounts-reports"); } },
       ],
     },
     {
@@ -905,6 +907,9 @@ export default function POSPage() {
   }
   if (view === "supplier-form") {
     return <SupplierForm onBack={() => setView("pos")} products={products} />;
+  }
+  if (view === "accounts-reports") {
+    return <AccountsReports onBack={() => setView("pos")} products={products} history={history} dailyTotal={dailyTotal} transactionCount={transactionCount} initialReport={accountsReport} />;
   }
 
   // ===== Render POS =====
