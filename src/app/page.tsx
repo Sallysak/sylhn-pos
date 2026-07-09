@@ -98,7 +98,7 @@ export default function POSPage() {
   const [showStockList, setShowStockList] = useState(false);
   const [partNoInput, setPartNoInput] = useState("");
   const [productSearch, setProductSearch] = useState("");
-  const [accountsReport, setAccountsReport] = useState<"daily-sales" | "profit-loss" | "vat-tax" | "stock-value" | "cost-price" | "stock-performance" | "stock-group" | "general-ledger" | "trial-balance">("daily-sales");
+  const [accountsReport, setAccountsReport] = useState<"daily-sales" | "daily-sales-detail" | "monthly-summary" | "monthly-detail" | "profit-loss" | "vat-tax" | "stock-value" | "cost-price" | "stock-performance" | "stock-group" | "general-ledger" | "trial-balance">("daily-sales");
   const [financeTab, setFinanceTab] = useState<"expenses" | "cash-recon" | "mobile-money">("expenses");
   const [adminUser, setAdminUser] = useState<any>(null);
   const [loggedInUser, setLoggedInUser] = useState<any>(null);
@@ -826,11 +826,15 @@ export default function POSPage() {
       id: "accounts",
       label: "Accounts",
       items: [
-        { label: "Daily Sales", icon: TrendingUp, action: () => { setAccountsReport("daily-sales"); setView("accounts-reports"); } },
+        { label: "Daily Sales Summary", icon: TrendingUp, action: () => { setAccountsReport("daily-sales"); setView("accounts-reports"); } },
+        { label: "Daily Sales Detail", icon: FileText, action: () => { setAccountsReport("daily-sales-detail"); setView("accounts-reports"); } },
+        { label: "Monthly Summary", icon: BarChart3, action: () => { setAccountsReport("monthly-summary"); setView("accounts-reports"); } },
+        { label: "Monthly Detail", icon: FileBarChart2, action: () => { setAccountsReport("monthly-detail"); setView("accounts-reports"); } },
+        { separator: true },
         { label: "Profit & Loss", icon: BarChart3, action: () => { setAccountsReport("profit-loss"); setView("accounts-reports"); } },
         { label: "VAT Tax Report", icon: Percent, action: () => { setAccountsReport("vat-tax"); setView("accounts-reports"); } },
         { separator: true },
-        { label: "Expense Management", icon: Receipt, action: () => { setFinanceTab("expenses"); setView("finance-ops"); } },
+        { label: "Expense Management", icon: Wallet, action: () => { setFinanceTab("expenses"); setView("finance-ops"); } },
         { label: "Cash Reconciliation", icon: Wallet, action: () => { setFinanceTab("cash-recon"); setView("finance-ops"); } },
         { label: "Mobile Money", icon: Smartphone, action: () => { setFinanceTab("mobile-money"); setView("finance-ops"); } },
         { separator: true },

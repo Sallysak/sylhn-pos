@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { COMPANY, CURRENCY, formatGHS, type Product, type StockGroup, type StockHistoryEntry } from "@/lib/pos-data";
 
-type ReportType = "daily-sales" | "profit-loss" | "vat-tax" | "stock-value" | "cost-price" | "stock-performance" | "stock-group" | "general-ledger" | "trial-balance";
+type ReportType = "daily-sales" | "daily-sales-detail" | "monthly-summary" | "monthly-detail" | "profit-loss" | "vat-tax" | "stock-value" | "cost-price" | "stock-performance" | "stock-group" | "general-ledger" | "trial-balance";
 
 interface AccountsReportsProps {
   onBack: () => void;
@@ -32,8 +32,11 @@ export function AccountsReports({ onBack, products, groups, history, dailyTotal,
   const [toDate, setToDate] = useState(new Date().toISOString().split('T')[0]);
 
   const reports: { id: ReportType; label: string; icon: any; color: string }[] = [
-    { id: "daily-sales", label: "Daily Sales", icon: TrendingUp, color: "emerald" },
-    { id: "profit-loss", label: "Profit & Loss", icon: BarChart3, color: "blue" },
+    { id: "daily-sales", label: "Daily Sales Summary", icon: TrendingUp, color: "emerald" },
+    { id: "daily-sales-detail", label: "Daily Sales Detail", icon: FileText, color: "emerald" },
+    { id: "monthly-summary", label: "Monthly Summary", icon: BarChart3, color: "blue" },
+    { id: "monthly-detail", label: "Monthly Detail", icon: FileBarChart2, color: "blue" },
+    { id: "profit-loss", label: "Profit & Loss", icon: BarChart3, color: "indigo" },
     { id: "vat-tax", label: "VAT Tax Report", icon: Percent, color: "amber" },
     { id: "stock-value", label: "Stock Value", icon: DollarSign, color: "cyan" },
     { id: "cost-price", label: "Cost Price", icon: FileText, color: "purple" },
@@ -196,6 +199,88 @@ export function AccountsReports({ onBack, products, groups, history, dailyTotal,
     }).sort((a, b) => b.stockValue - a.stockValue);
   }, [groups, products]);
 
+  // ===== Daily Sales Detail (line-by-line: date, part no, description, qty, price, amount) =====
+  const dailySalesDetail = useMemo(() => {
+    return filteredSoldItems.map(h => {
+      const p = products.find(p => p.id === h.productId);
+      const qty = Math.abs(h.quantityChange);
+      const price = p?.price || 0;
+      return {
+        date: h.timestamp.split('T')[0],
+        time: new Date(h.timestamp).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+        partNo: h.sku,
+        description: h.productName,
+        qty,
+        price,
+        amount: qty * price,
+        reference: h.reference || '',
+        user: h.user,
+      };
+    }).sort((a, b) => b.date.localeCompare(a.date) || b.time.localeCompare(a.time));
+  }, [filteredSoldItems, products]);
+
+  const dailyDetailStats = useMemo(() => {
+    const totalQty = dailySalesDetail.reduce((s, d) => s + d.qty, 0);
+    const totalAmount = dailySalesDetail.reduce((s, d) => s + d.amount, 0);
+    const totalCost = dailySalesDetail.reduce((s, d) => {
+      const p = products.find(p => p.sku === d.partNo);
+      return s + (p ? p.costPrice * d.qty : 0);
+    }, 0);
+    const transactions = new Set(dailySalesDetail.map(d => d.reference)).size;
+    const avgBasket = transactions > 0 ? totalAmount / transactions : 0;
+    return { totalQty, totalAmount, totalCost, transactions, avgBasket, grossProfit: totalAmount - totalCost };
+  }, [dailySalesDetail, products]);
+
+  // ===== Monthly Summary (grouped by month) =====
+  const monthlySummary = useMemo(() => {
+    const monthMap = new Map<string, { month: string; label: string; transactions: Set<string>; items: number; revenue: number; cost: number; profit: number; vat: number }>();
+    filteredSoldItems.forEach(h => {
+      const monthKey = h.timestamp.substring(0, 7); // YYYY-MM
+      const date = new Date(h.timestamp + 'T00:00:00');
+      const label = date.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+      const existing = monthMap.get(monthKey) || { month: monthKey, label, transactions: new Set(), items: 0, revenue: 0, cost: 0, profit: 0, vat: 0 };
+      const p = products.find(p => p.id === h.productId);
+      const qty = Math.abs(h.quantityChange);
+      const revenue = (p?.price || 0) * qty;
+      const cost = (p?.costPrice || 0) * qty;
+      existing.items += qty;
+      existing.revenue += revenue;
+      existing.cost += cost;
+      existing.profit += revenue - cost;
+      existing.vat += (p?.taxable ? revenue * 0.15 : 0);
+      if (h.reference) existing.transactions.add(h.reference);
+      monthMap.set(monthKey, existing);
+    });
+    return Array.from(monthMap.values()).map(m => ({ ...m, transactions: m.transactions.size })).sort((a, b) => b.month.localeCompare(a.month));
+  }, [filteredSoldItems, products]);
+
+  const monthlySummaryTotals = useMemo(() => {
+    return monthlySummary.reduce((acc, m) => ({
+      transactions: acc.transactions + m.transactions,
+      items: acc.items + m.items,
+      revenue: acc.revenue + m.revenue,
+      cost: acc.cost + m.cost,
+      profit: acc.profit + m.profit,
+      vat: acc.vat + m.vat,
+    }), { transactions: 0, items: 0, revenue: 0, cost: 0, profit: 0, vat: 0 });
+  }, [monthlySummary]);
+
+  // ===== Monthly Detail (line-by-line grouped by month) =====
+  const monthlyDetail = useMemo(() => {
+    const monthMap = new Map<string, { month: string; label: string; rows: typeof dailySalesDetail; totals: { qty: number; amount: number } }>();
+    dailySalesDetail.forEach(d => {
+      const monthKey = d.date.substring(0, 7);
+      const date = new Date(monthKey + '-01T00:00:00');
+      const label = date.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+      const existing = monthMap.get(monthKey) || { month: monthKey, label, rows: [], totals: { qty: 0, amount: 0 } };
+      existing.rows.push(d);
+      existing.totals.qty += d.qty;
+      existing.totals.amount += d.amount;
+      monthMap.set(monthKey, existing);
+    });
+    return Array.from(monthMap.values()).sort((a, b) => b.month.localeCompare(a.month));
+  }, [dailySalesDetail]);
+
   // ===== Print handler =====
   const handlePrint = () => {
     const printWin = window.open('', '_blank', 'width=900,height=600');
@@ -214,6 +299,22 @@ export function AccountsReports({ onBack, products, groups, history, dailyTotal,
         <tr class="total"><td>Net Profit</td><td style="text-align:right;color:#2563eb">${fmt(dailySalesData.grossProfit)}</td></tr>
         <tr><td>Transactions</td><td style="text-align:right">${dailySalesData.transactionCount}</td></tr>
         </tbody></table>`;
+    } else if (activeReport === 'daily-sales-detail') {
+      bodyHtml = `<table><thead><tr><th>Date</th><th>Time</th><th>Part No</th><th>Description</th><th style="text-align:center">Qty</th><th style="text-align:right">Price</th><th style="text-align:right">Amount</th><th>Ref</th></tr></thead><tbody>`;
+      dailySalesDetail.slice(0, 200).forEach(d => { bodyHtml += `<tr><td style="font-size:10px">${d.date}</td><td style="font-size:10px">${d.time}</td><td style="font-family:monospace;font-size:10px">${d.partNo}</td><td>${d.description}</td><td style="text-align:center">${d.qty}</td><td style="text-align:right">${fmt(d.price)}</td><td style="text-align:right;font-weight:bold">${fmt(d.amount)}</td><td style="font-size:9px;font-family:monospace;color:#999">${d.reference}</td></tr>`; });
+      bodyHtml += `<tr class="total"><td colspan="4">TOTALS</td><td style="text-align:center">${dailyDetailStats.totalQty}</td><td></td><td style="text-align:right">${fmt(dailyDetailStats.totalAmount)}</td><td></td></tr></tbody></table>`;
+    } else if (activeReport === 'monthly-summary') {
+      bodyHtml = `<table><thead><tr><th>Month</th><th style="text-align:center">Transactions</th><th style="text-align:center">Items Sold</th><th style="text-align:right">Revenue</th><th style="text-align:right">Cost</th><th style="text-align:right">Profit</th><th style="text-align:right">VAT</th><th style="text-align:right">Margin %</th></tr></thead><tbody>`;
+      monthlySummary.forEach(m => { const margin = m.revenue > 0 ? (m.profit / m.revenue * 100) : 0; bodyHtml += `<tr><td style="font-weight:600">${m.label}</td><td style="text-align:center">${m.transactions}</td><td style="text-align:center">${m.items}</td><td style="text-align:right;color:#16a34a">${fmt(m.revenue)}</td><td style="text-align:right;color:#dc2626">${fmt(m.cost)}</td><td style="text-align:right;color:#2563eb;font-weight:bold">${fmt(m.profit)}</td><td style="text-align:right;color:#d97706">${fmt(m.vat)}</td><td style="text-align:right">${margin.toFixed(1)}%</td></tr>`; });
+      const t = monthlySummaryTotals; const tm = t.revenue > 0 ? (t.profit / t.revenue * 100) : 0;
+      bodyHtml += `<tr class="total"><td>TOTAL</td><td style="text-align:center">${t.transactions}</td><td style="text-align:center">${t.items}</td><td style="text-align:right">${fmt(t.revenue)}</td><td style="text-align:right">${fmt(t.cost)}</td><td style="text-align:right">${fmt(t.profit)}</td><td style="text-align:right">${fmt(t.vat)}</td><td style="text-align:right">${tm.toFixed(1)}%</td></tr></tbody></table>`;
+    } else if (activeReport === 'monthly-detail') {
+      monthlyDetail.forEach(m => {
+        bodyHtml += `<h3 style="margin:15px 0 5px;color:#1E5A8E;border-bottom:1px solid #ccc;padding-bottom:3px">${m.label} — ${m.rows.length} items · ${fmt(m.totals.amount)}</h3>`;
+        bodyHtml += `<table><thead><tr><th>Date</th><th>Part No</th><th>Description</th><th style="text-align:center">Qty</th><th style="text-align:right">Price</th><th style="text-align:right">Amount</th></tr></thead><tbody>`;
+        m.rows.slice(0, 100).forEach(d => { bodyHtml += `<tr><td style="font-size:10px">${d.date}</td><td style="font-family:monospace;font-size:10px">${d.partNo}</td><td>${d.description}</td><td style="text-align:center">${d.qty}</td><td style="text-align:right">${fmt(d.price)}</td><td style="text-align:right;font-weight:bold">${fmt(d.amount)}</td></tr>`; });
+        bodyHtml += `<tr class="total"><td colspan="3">Month Total</td><td style="text-align:center">${m.totals.qty}</td><td></td><td style="text-align:right">${fmt(m.totals.amount)}</td></tr></tbody></table>`;
+      });
     } else if (activeReport === 'profit-loss') {
       bodyHtml = `<table><tbody>
         <tr class="total"><td colspan="2">Revenue</td></tr>
@@ -294,6 +395,12 @@ export function AccountsReports({ onBack, products, groups, history, dailyTotal,
         data.push({ Metric: 'Gross Profit', Value: dailySalesData.grossProfit });
         data.push({ Metric: 'VAT Collected', Value: dailySalesData.vatCollected });
         data.push({ Metric: 'Transactions', Value: dailySalesData.transactionCount });
+      } else if (activeReport === 'daily-sales-detail') {
+        dailySalesDetail.forEach(d => data.push({ Date: d.date, Time: d.time, PartNo: d.partNo, Description: d.description, Qty: d.qty, Price: d.price, Amount: d.amount, Reference: d.reference }));
+      } else if (activeReport === 'monthly-summary') {
+        monthlySummary.forEach(m => data.push({ Month: m.label, Transactions: m.transactions, ItemsSold: m.items, Revenue: m.revenue, Cost: m.cost, Profit: m.profit, VAT: m.vat }));
+      } else if (activeReport === 'monthly-detail') {
+        monthlyDetail.forEach(m => m.rows.forEach(d => data.push({ Month: m.label, Date: d.date, PartNo: d.partNo, Description: d.description, Qty: d.qty, Price: d.price, Amount: d.amount })));
       } else if (activeReport === 'stock-value') {
         products.forEach(p => data.push({ SKU: p.sku, Product: p.name, Stock: p.stock, Cost: p.costPrice, Price: p.price, StockValue: p.price * p.stock }));
       } else if (activeReport === 'stock-group') {
@@ -404,6 +511,126 @@ export function AccountsReports({ onBack, products, groups, history, dailyTotal,
                       <tr className="bg-slate-50"><td className="px-4 py-3 font-bold text-slate-800">Net Profit</td><td className="px-4 py-3 text-right font-mono font-bold text-blue-700 text-base">{formatGHS(dailySalesData.grossProfit)}</td></tr>
                     </tbody>
                   </table>
+                </div>
+              </div>
+            )}
+
+            {/* ===== Daily Sales Detail ===== */}
+            {activeReport === "daily-sales-detail" && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-5 gap-3">
+                  <div className="rounded-2xl p-3 bg-emerald-50 ring-1 ring-emerald-200"><div className="text-[10px] font-bold text-emerald-700 uppercase">Items Sold</div><div className="text-lg font-bold font-mono text-slate-800">{dailyDetailStats.totalQty}</div></div>
+                  <div className="rounded-2xl p-3 bg-blue-50 ring-1 ring-blue-200"><div className="text-[10px] font-bold text-blue-700 uppercase">Revenue</div><div className="text-lg font-bold font-mono text-slate-800">{formatGHS(dailyDetailStats.totalAmount)}</div></div>
+                  <div className="rounded-2xl p-3 bg-rose-50 ring-1 ring-rose-200"><div className="text-[10px] font-bold text-rose-700 uppercase">Cost</div><div className="text-lg font-bold font-mono text-slate-800">{formatGHS(dailyDetailStats.totalCost)}</div></div>
+                  <div className="rounded-2xl p-3 bg-indigo-50 ring-1 ring-indigo-200"><div className="text-[10px] font-bold text-indigo-700 uppercase">Gross Profit</div><div className="text-lg font-bold font-mono text-indigo-700">{formatGHS(dailyDetailStats.grossProfit)}</div></div>
+                  <div className="rounded-2xl p-3 bg-amber-50 ring-1 ring-amber-200"><div className="text-[10px] font-bold text-amber-700 uppercase">Avg Basket</div><div className="text-lg font-bold font-mono text-slate-800">{formatGHS(dailyDetailStats.avgBasket)}</div></div>
+                </div>
+                <div className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 overflow-hidden">
+                  <div className="px-5 py-3 bg-emerald-50 border-b border-emerald-100"><span className="text-sm font-bold text-slate-700">Daily Sales Detail ({dailySalesDetail.length} line items)</span></div>
+                  <div className="max-h-96 overflow-auto" style={{ scrollbarWidth: 'thin' }}>
+                    <table className="w-full text-sm">
+                      <thead className="sticky top-0"><tr className="bg-slate-800 text-white text-xs uppercase"><th className="text-left px-3 py-2">Date</th><th className="text-left px-2 py-2">Time</th><th className="text-left px-2 py-2">Part No</th><th className="text-left px-3 py-2">Description</th><th className="text-center px-2 py-2">Qty</th><th className="text-right px-3 py-2">Price</th><th className="text-right px-3 py-2">Amount</th><th className="text-left px-3 py-2">Ref</th></tr></thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {dailySalesDetail.length === 0 ? <tr><td colSpan={8} className="text-center py-8 text-slate-400">No sales data for the selected period</td></tr> : dailySalesDetail.slice(0, 200).map((d, i) => (
+                          <tr key={i} className={i % 2 === 1 ? 'bg-slate-50/50' : 'bg-white'}>
+                            <td className="px-3 py-2 text-xs text-slate-500">{d.date}</td>
+                            <td className="px-2 py-2 text-xs text-slate-400 font-mono">{d.time}</td>
+                            <td className="px-2 py-2 text-xs font-mono text-slate-600">{d.partNo}</td>
+                            <td className="px-3 py-2 text-slate-700">{d.description}</td>
+                            <td className="px-2 py-2 text-center font-mono font-semibold text-slate-700">{d.qty}</td>
+                            <td className="px-3 py-2 text-right font-mono text-slate-500">{formatGHS(d.price)}</td>
+                            <td className="px-3 py-2 text-right font-mono font-bold text-emerald-600">{formatGHS(d.amount)}</td>
+                            <td className="px-3 py-2 text-[10px] font-mono text-slate-400">{d.reference}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      {dailySalesDetail.length > 0 && (
+                        <tfoot><tr className="bg-slate-100 font-bold"><td colSpan={4} className="px-3 py-3 text-slate-800">TOTALS</td><td className="px-2 py-3 text-center font-mono">{dailyDetailStats.totalQty}</td><td></td><td className="px-3 py-3 text-right font-mono text-emerald-700 text-base">{formatGHS(dailyDetailStats.totalAmount)}</td><td></td></tr></tfoot>
+                      )}
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ===== Monthly Summary ===== */}
+            {activeReport === "monthly-summary" && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-4 gap-4">
+                  <div className="rounded-2xl p-4 bg-blue-50 ring-1 ring-blue-200"><div className="text-xs font-bold text-blue-700 uppercase mb-1">Total Revenue</div><div className="text-xl font-bold font-mono text-slate-800">{formatGHS(monthlySummaryTotals.revenue)}</div></div>
+                  <div className="rounded-2xl p-4 bg-rose-50 ring-1 ring-rose-200"><div className="text-xs font-bold text-rose-700 uppercase mb-1">Total Cost</div><div className="text-xl font-bold font-mono text-slate-800">{formatGHS(monthlySummaryTotals.cost)}</div></div>
+                  <div className="rounded-2xl p-4 bg-emerald-50 ring-1 ring-emerald-200"><div className="text-xs font-bold text-emerald-700 uppercase mb-1">Total Profit</div><div className="text-xl font-bold font-mono text-emerald-700">{formatGHS(monthlySummaryTotals.profit)}</div></div>
+                  <div className="rounded-2xl p-4 bg-amber-50 ring-1 ring-amber-200"><div className="text-xs font-bold text-amber-700 uppercase mb-1">VAT Collected</div><div className="text-xl font-bold font-mono text-amber-600">{formatGHS(monthlySummaryTotals.vat)}</div></div>
+                </div>
+                <div className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 overflow-hidden">
+                  <div className="px-5 py-3 bg-blue-50 border-b border-blue-100"><span className="text-sm font-bold text-slate-700">Monthly Sales Summary ({monthlySummary.length} months)</span></div>
+                  <table className="w-full text-sm">
+                    <thead><tr className="bg-slate-800 text-white text-xs uppercase"><th className="text-left px-4 py-2">Month</th><th className="text-center px-3 py-2">Transactions</th><th className="text-center px-3 py-2">Items Sold</th><th className="text-right px-3 py-2">Revenue</th><th className="text-right px-3 py-2">Cost</th><th className="text-right px-3 py-2">Profit</th><th className="text-right px-3 py-2">VAT</th><th className="text-right px-4 py-2">Margin %</th></tr></thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {monthlySummary.length === 0 ? <tr><td colSpan={8} className="text-center py-8 text-slate-400">No sales data available</td></tr> : monthlySummary.map((m, i) => {
+                        const margin = m.revenue > 0 ? (m.profit / m.revenue * 100) : 0;
+                        return (
+                          <tr key={m.month} className={i % 2 === 1 ? 'bg-slate-50/50' : 'bg-white'}>
+                            <td className="px-4 py-2.5 font-semibold text-slate-700">{m.label}</td>
+                            <td className="px-3 py-2.5 text-center font-mono">{m.transactions}</td>
+                            <td className="px-3 py-2.5 text-center font-mono">{m.items}</td>
+                            <td className="px-3 py-2.5 text-right font-mono text-emerald-600">{formatGHS(m.revenue)}</td>
+                            <td className="px-3 py-2.5 text-right font-mono text-rose-500">{formatGHS(m.cost)}</td>
+                            <td className="px-3 py-2.5 text-right font-mono font-bold text-blue-600">{formatGHS(m.profit)}</td>
+                            <td className="px-3 py-2.5 text-right font-mono text-amber-600">{formatGHS(m.vat)}</td>
+                            <td className="px-4 py-2.5 text-right font-mono text-slate-500">{margin.toFixed(1)}%</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    {monthlySummary.length > 0 && (
+                      <tfoot><tr className="bg-slate-100 font-bold">
+                        <td className="px-4 py-3 text-slate-800">TOTAL</td>
+                        <td className="px-3 py-3 text-center font-mono">{monthlySummaryTotals.transactions}</td>
+                        <td className="px-3 py-3 text-center font-mono">{monthlySummaryTotals.items}</td>
+                        <td className="px-3 py-3 text-right font-mono text-emerald-700">{formatGHS(monthlySummaryTotals.revenue)}</td>
+                        <td className="px-3 py-3 text-right font-mono text-rose-700">{formatGHS(monthlySummaryTotals.cost)}</td>
+                        <td className="px-3 py-3 text-right font-mono text-blue-700">{formatGHS(monthlySummaryTotals.profit)}</td>
+                        <td className="px-3 py-3 text-right font-mono text-amber-700">{formatGHS(monthlySummaryTotals.vat)}</td>
+                        <td className="px-4 py-3 text-right font-mono text-slate-600">{monthlySummaryTotals.revenue > 0 ? (monthlySummaryTotals.profit / monthlySummaryTotals.revenue * 100).toFixed(1) : '0.0'}%</td>
+                      </tr></tfoot>
+                    )}
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* ===== Monthly Detail ===== */}
+            {activeReport === "monthly-detail" && (
+              <div className="space-y-4">
+                <div className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 overflow-hidden">
+                  <div className="px-5 py-3 bg-blue-50 border-b border-blue-100"><span className="text-sm font-bold text-slate-700">Monthly Sales Detail ({monthlyDetail.length} months)</span></div>
+                  <div className="max-h-96 overflow-auto p-4 space-y-4" style={{ scrollbarWidth: 'thin' }}>
+                    {monthlyDetail.length === 0 ? <div className="text-center py-8 text-slate-400">No sales data available</div> : monthlyDetail.map(m => (
+                      <div key={m.month} className="border border-slate-200 rounded-xl overflow-hidden">
+                        <div className="px-4 py-2 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-slate-200 flex items-center justify-between">
+                          <span className="text-sm font-bold text-slate-700">{m.label}</span>
+                          <span className="text-xs text-slate-500">{m.rows.length} items · <span className="font-mono font-bold text-emerald-600">{formatGHS(m.totals.amount)}</span></span>
+                        </div>
+                        <table className="w-full text-xs">
+                          <thead><tr className="bg-slate-50 text-slate-500 text-[10px] uppercase"><th className="text-left px-3 py-1.5">Date</th><th className="text-left px-2 py-1.5">Part No</th><th className="text-left px-3 py-1.5">Description</th><th className="text-center px-2 py-1.5">Qty</th><th className="text-right px-3 py-1.5">Price</th><th className="text-right px-3 py-1.5">Amount</th></tr></thead>
+                          <tbody className="divide-y divide-slate-50">
+                            {m.rows.slice(0, 50).map((d, i) => (
+                              <tr key={i} className={i % 2 === 1 ? 'bg-slate-50/30' : 'bg-white'}>
+                                <td className="px-3 py-1.5 text-slate-500">{d.date}</td>
+                                <td className="px-2 py-1.5 font-mono text-slate-600">{d.partNo}</td>
+                                <td className="px-3 py-1.5 text-slate-700">{d.description}</td>
+                                <td className="px-2 py-1.5 text-center font-mono">{d.qty}</td>
+                                <td className="px-3 py-1.5 text-right font-mono text-slate-500">{formatGHS(d.price)}</td>
+                                <td className="px-3 py-1.5 text-right font-mono font-semibold text-emerald-600">{formatGHS(d.amount)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot><tr className="bg-slate-100 font-bold"><td colSpan={3} className="px-3 py-2 text-slate-700">Month Total</td><td className="px-2 py-2 text-center font-mono">{m.totals.qty}</td><td></td><td className="px-3 py-2 text-right font-mono text-emerald-700">{formatGHS(m.totals.amount)}</td></tr></tfoot>
+                        </table>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}
