@@ -111,7 +111,7 @@ export function DailySalesReport({ onBack, dailyTotal, transactionCount }: { onB
   const handleExcel = () => {
     import("xlsx").then((XLSX) => {
       const data = [[COMPANY.name], ["Daily Sales Report"], [`For The Period ${fmtDate(fromDate)} - ${fmtDate(toDate)}`], [], ["Time", "Invoice", "Customer", "Items", "Method", "Total GHC"]];
-      filtered.forEach(t => data.push([t.time, t.invoiceNo, t.customer, t.items, t.method, t.total.toFixed(2)]));
+      filtered.forEach(t => data.push([t.time, t.invoiceNo, t.customer, String(t.items), t.method, t.total.toFixed(2)]));
       data.push(["", "", "", "", "TOTAL", totals.total.toFixed(2)]);
       const ws = XLSX.utils.aoa_to_sheet(data);
       const wb = XLSX.utils.book_new();
@@ -211,7 +211,7 @@ export function SalesHistory({ onBack }: { onBack: () => void }) {
   const handleExcel = () => {
     import("xlsx").then((XLSX) => {
       const data = [[COMPANY.name], ["Sales History"], [], ["Date", "Time", "Invoice", "Customer", "Items", "Total GHC", "Method", "Cashier", "Status"]];
-      filtered.forEach(t => data.push([t.date, t.time, t.invoiceNo, t.customer, t.items, t.total.toFixed(2), t.method, t.cashier, t.status]));
+      filtered.forEach(t => data.push([t.date, t.time, t.invoiceNo, t.customer, String(t.items), t.total.toFixed(2), t.method, t.cashier, t.status]));
       const ws = XLSX.utils.aoa_to_sheet(data);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Sales History");

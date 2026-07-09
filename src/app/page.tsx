@@ -636,7 +636,7 @@ export default function POSPage() {
       toast({ title: "Cart is empty", variant: "destructive" });
       return;
     }
-    setHeldOrders(prev => [...prev, { items: cart, customer: customerName, invoice: invoiceNumber }]);
+    setHeldOrders(prev => [...prev, { items: cart, customer: customerName, invoice: invoiceNumber || '' }]);
     clearCart();
     toast({ title: "Order saved (F2)", description: `${heldOrders.length + 1} order(s) on hold` });
   };
@@ -707,7 +707,7 @@ export default function POSPage() {
       tax: taxAmount,
       discount: discountAmount,
       timestamp: new Date(),
-      invoiceNumber,
+      invoiceNumber: invoiceNumber || '',
       items: [...cart],
       cashier,
       customer: customerName || undefined,
@@ -730,7 +730,7 @@ export default function POSPage() {
       timestamp: new Date().toISOString(),
       user: cashier,
       reason: `Sold via ${method} - Invoice ${invoiceNumber}`,
-      reference: invoiceNumber,
+      reference: invoiceNumber || undefined,
     }));
     setHistory(prev => [...prev, ...newHistory]);
     setLastPayment(result);
