@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Save, Printer, Trash2, Upload, Download, X, Search as SearchIcon,
   Package, AlertTriangle, TrendingUp, ScanLine, FileText, Zap,
+  Edit2, Plus, Image as ImageIcon, History as HistoryIcon, Tags, ArrowUpDown, Check,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -1363,6 +1364,7 @@ export function StockQuantityAdjustment({
             groups={groups}
             searchText={findPartNo}
             initialGroup={groupFilter}
+            history={history}
             onSelect={(p) => {
               addProductToLines(p);
               setShowStockSearch(false);
@@ -1534,12 +1536,13 @@ export function StockQuantityAdjustment({
 
 // ===== Mini Stock Search Popup (light blue/green, matches reference) =====
 function StockSearchMiniPopup({
-  products, groups, searchText, initialGroup, onSelect, onClose,
+  products, groups, searchText, initialGroup, history, onSelect, onClose,
 }: {
   products: Product[];
   groups: StockGroup[];
   searchText: string;
   initialGroup?: string;
+  history?: StockHistoryEntry[];
   onSelect: (p: Product) => void;
   onClose: () => void;
 }) {
@@ -1548,6 +1551,7 @@ function StockSearchMiniPopup({
   const [filterType, setFilterType] = useState('all');
   const [filterGroup, setFilterGroup] = useState(initialGroup || 'all');
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [showHistoryFor, setShowHistoryFor] = useState<Product | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -1709,25 +1713,25 @@ function StockSearchMiniPopup({
         {/* Action buttons — bottom row matching reference */}
         <div className="flex-shrink-0 px-3 py-2 flex items-center gap-1.5 border-t" style={{ borderColor: '#808080', backgroundColor: '#E8F5E9' }}>
           <button onClick={handleSelect} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1 transition" style={{ backgroundColor: '#4CAF50' }}>
-            <Save className="h-3 w-3" /> Select (Enter)
+            <Check className="h-3 w-3" /> Select (Enter)
           </button>
-          <button onClick={() => { if (filtered[selectedIndex]) onSelect(filtered[selectedIndex]); }} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1 transition" style={{ backgroundColor: '#2196F3' }}>
-            <Package className="h-3 w-3" /> Modify
+          <button onClick={() => { if (!filtered[selectedIndex]) { toast({ title: 'Select a product first', variant: 'destructive' }); return; } onSelect(filtered[selectedIndex]); }} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1 transition" style={{ backgroundColor: '#2196F3' }} title="Add selected product to the adjustment table">
+            <Edit2 className="h-3 w-3" /> Modify
           </button>
-          <button onClick={() => toast({ title: 'New Product', description: 'Use Stock File to add new products' })} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1 transition" style={{ backgroundColor: '#2196F3' }}>
-            <Package className="h-3 w-3" /> New
+          <button onClick={() => toast({ title: 'New Product', description: 'Close this form and use Stock File → Add / Modify Stock to create new products' })} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1 transition" style={{ backgroundColor: '#2196F3' }} title="Add a new product (use Stock File)">
+            <Plus className="h-3 w-3" /> New
           </button>
-          <button onClick={() => { if (!filtered[selectedIndex]) { toast({ title: 'Select a product first', variant: 'destructive' }); return; } toast({ title: 'Product Picture', description: filtered[selectedIndex].name }); }} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1 transition" style={{ backgroundColor: '#9E9E9E' }}>
-            <Package className="h-3 w-3" /> Picture
+          <button onClick={() => { if (!filtered[selectedIndex]) { toast({ title: 'Select a product first', variant: 'destructive' }); return; } const p = filtered[selectedIndex]; toast({ title: 'Product Picture', description: p.image ? `${p.emoji} ${p.name} — image on file` : `${p.emoji} ${p.name} — no image on file. Use Stock File to add a picture.` }); }} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1 transition" style={{ backgroundColor: '#9E9E9E' }} title="View product picture">
+            <ImageIcon className="h-3 w-3" /> Picture
           </button>
-          <button onClick={() => { if (!filtered[selectedIndex]) { toast({ title: 'Select a product first', variant: 'destructive' }); return; } toast({ title: 'Product History', description: filtered[selectedIndex].name }); }} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1 transition" style={{ backgroundColor: '#2196F3' }}>
-            <SearchIcon className="h-3 w-3" /> History
+          <button onClick={() => { if (!filtered[selectedIndex]) { toast({ title: 'Select a product first', variant: 'destructive' }); return; } setShowHistoryFor(filtered[selectedIndex]); }} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1 transition" style={{ backgroundColor: '#2196F3' }} title="View adjustment history for this product">
+            <HistoryIcon className="h-3 w-3" /> History
           </button>
-          <button onClick={() => { if (!filtered[selectedIndex]) { toast({ title: 'Select a product first', variant: 'destructive' }); return; } toast({ title: 'Print Labels', description: filtered[selectedIndex].name }); }} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1 transition" style={{ backgroundColor: '#9C27B0' }}>
-            <Printer className="h-3 w-3" /> Labels
+          <button onClick={() => { if (!filtered[selectedIndex]) { toast({ title: 'Select a product first', variant: 'destructive' }); return; } const p = filtered[selectedIndex]; const printWin = window.open('', '_blank', 'width=400,height=300'); if (!printWin) { toast({ title: 'Popup blocked', variant: 'destructive' }); return; } printWin.document.write(`<!DOCTYPE html><html><head><title>Label - ${p.name}</title><style>body{margin:0;padding:10mm;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:Arial,sans-serif}.label{width:80mm;height:40mm;border:1px solid #999;padding:5mm;display:flex;flex-direction:column;align-items:center;justify-content:space-between}.name{font-size:14px;font-weight:bold;text-align:center}.price{font-size:20px;font-weight:bold;color:#16a34a}.sku{font-size:10px;color:#666;font-family:monospace}</style></head><body><div class="label"><div class="name">${p.emoji} ${p.name}</div><div class="price">${formatGHS(p.price)}</div><div class="sku">${p.sku} · ${p.barcode}</div></div><script>window.onload=()=>window.print()</script></body></html>`); printWin.document.close(); toast({ title: 'Printing label', description: p.name }); }} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1 transition" style={{ backgroundColor: '#9C27B0' }} title="Print a price label for this product">
+            <Tags className="h-3 w-3" /> Labels
           </button>
-          <button onClick={() => { if (!filtered[selectedIndex]) { toast({ title: 'Select a product first', variant: 'destructive' }); return; } toast({ title: 'Quantity Adjustment', description: filtered[selectedIndex].name }); }} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1 transition" style={{ backgroundColor: '#FF9800' }}>
-            <AlertTriangle className="h-3 w-3" /> Qty
+          <button onClick={() => { if (!filtered[selectedIndex]) { toast({ title: 'Select a product first', variant: 'destructive' }); return; } toast({ title: 'Quantity Adjustment', description: `${filtered[selectedIndex].emoji} ${filtered[selectedIndex].name} — current stock: ${filtered[selectedIndex].stock}. Close this search and use the Quick Adjust button to adjust.` }); }} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1 transition" style={{ backgroundColor: '#FF9800' }} title="Quick quantity adjustment for this product">
+            <ArrowUpDown className="h-3 w-3" /> Qty
           </button>
           <div className="flex-1" />
           <button onClick={onClose} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1 transition" style={{ backgroundColor: '#F44336' }}>
@@ -1738,6 +1742,126 @@ function StockSearchMiniPopup({
           <span className="font-mono">{filtered.length} of {products.length} products</span>
           <div className="flex-1" />
           <span>↑↓ Navigate · Enter Select · Esc Close</span>
+        </div>
+
+        {/* ===== Product Adjustment History Popup ===== */}
+        <AnimatePresence>
+          {showHistoryFor && (
+            <ProductHistoryPopup
+              product={showHistoryFor}
+              history={history || []}
+              onClose={() => setShowHistoryFor(null)}
+            />
+          )}
+        </AnimatePresence>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ===== Product History Popup =====
+// Shows all stock adjustment history for a single product
+function ProductHistoryPopup({ product, history, onClose }: {
+  product: Product;
+  history: StockHistoryEntry[];
+  onClose: () => void;
+}) {
+  const entries = useMemo(() =>
+    history
+      .filter(h => h.productId === product.id)
+      .sort((a, b) => b.timestamp.localeCompare(a.timestamp)),
+    [history, product.id]
+  );
+
+  const stats = useMemo(() => {
+    const adjusted = entries.filter(e => e.action === 'adjusted');
+    const totalChange = adjusted.reduce((s, e) => s + e.quantityChange, 0);
+    return { total: entries.length, adjusted: adjusted.length, totalChange };
+  }, [entries]);
+
+  const fmtDate = (ts: string) => {
+    try {
+      const d = new Date(ts);
+      return d.toLocaleDateString('en-GB') + ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    } catch { return ts; }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-[70]"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.95, y: 20 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.95, y: 20 }}
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-lg shadow-2xl overflow-hidden flex flex-col"
+        style={{ width: '600px', maxHeight: '70vh', fontFamily: 'Arial, Helvetica, sans-serif' }}
+      >
+        {/* Title bar */}
+        <div className="flex-shrink-0 flex items-center justify-between px-4 h-8 text-white" style={{ backgroundColor: '#2196F3' }}>
+          <div className="flex items-center gap-2">
+            <HistoryIcon className="h-4 w-4" />
+            <span className="text-xs font-bold">Adjustment History — {product.emoji} {product.name}</span>
+          </div>
+          <button onClick={onClose} className="h-5 w-5 rounded bg-red-600 hover:bg-red-700 flex items-center justify-center"><X className="h-3 w-3 text-white" /></button>
+        </div>
+
+        {/* Stats */}
+        <div className="flex-shrink-0 px-4 py-2 bg-blue-50 border-b border-blue-100 flex items-center gap-4 text-[10px]">
+          <span className="text-slate-500">SKU:</span>
+          <span className="font-mono text-slate-700">{product.sku}</span>
+          <span className="text-slate-300">·</span>
+          <span className="text-slate-500">Current Stock:</span>
+          <span className="font-bold font-mono text-slate-800">{product.stock}</span>
+          <span className="text-slate-300">·</span>
+          <span className="text-slate-500">{stats.adjusted} adjustment(s)</span>
+          <span className="text-slate-300">·</span>
+          <span className="text-slate-500">Net Change:</span>
+          <span className={cn("font-bold font-mono", stats.totalChange > 0 ? "text-emerald-600" : stats.totalChange < 0 ? "text-rose-600" : "text-slate-600")}>
+            {stats.totalChange > 0 ? '+' : ''}{stats.totalChange}
+          </span>
+        </div>
+
+        {/* History list */}
+        <div className="flex-1 overflow-y-auto p-3" style={{ scrollbarWidth: 'thin' }}>
+          {entries.length === 0 ? (
+            <div className="text-center py-8 text-slate-400 text-sm">No adjustment history for this product</div>
+          ) : (
+            <div className="space-y-1.5">
+              {entries.map(h => (
+                <div key={h.id} className="flex items-center gap-3 p-2 rounded-lg bg-slate-50 text-[10px]">
+                  <div className={cn(
+                    "h-7 w-7 rounded-md flex items-center justify-center font-bold font-mono flex-shrink-0",
+                    h.quantityChange > 0 ? "bg-emerald-100 text-emerald-700" :
+                    h.quantityChange < 0 ? "bg-rose-100 text-rose-700" :
+                    "bg-slate-100 text-slate-600"
+                  )}>
+                    {h.quantityChange > 0 ? '+' : ''}{h.quantityChange}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-slate-700 font-medium truncate">{h.reason}</div>
+                    <div className="text-[9px] text-slate-400 font-mono">{fmtDate(h.timestamp)} · {h.reference} · by {h.user}</div>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <div className="text-[8px] text-slate-400 uppercase">New Qty</div>
+                    <div className="font-mono font-bold text-slate-700">{h.newQuantity}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex-shrink-0 px-4 py-2 flex items-center justify-end border-t border-slate-200 bg-slate-50">
+          <button onClick={onClose} className="h-7 px-4 rounded bg-rose-100 hover:bg-rose-200 text-rose-700 text-xs font-bold flex items-center gap-1.5 transition">
+            <X className="h-3.5 w-3.5" /> Close
+          </button>
         </div>
       </motion.div>
     </motion.div>
