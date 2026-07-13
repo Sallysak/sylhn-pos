@@ -1,0 +1,57 @@
+# SYLHN POS — Protection Manifest
+#
+# This file documents the protection system in place. DO NOT DELETE.
+#
+# Protection System Components:
+# ============================================
+#
+# 1. scripts/protection-snapshot.js
+#    - Creates a full backup of all source files to backups/snapshot-YYYY-MM-DD-HHMMSS/
+#    - Generates a SHA-256 manifest at backups/manifest.json
+#    - Run manually: `node scripts/protection-snapshot.js`
+#    - Verify:       `node scripts/protection-snapshot.js --verify`
+#    - Restore:      `node scripts/protection-snapshot.js --restore`
+#
+# 2. scripts/startup-guard.js
+#    - Checks 70+ critical files exist before dev server starts
+#    - Prints warnings if any are missing
+#    - Fast (<100ms) — runs on every startup
+#
+# 3. scripts/keep-alive.sh
+#    - Runs startup-guard.js before starting the dev server
+#    - Auto-runs --verify and --restore if any files are missing
+#    - Starts the dev server only after integrity is confirmed
+#
+# How the auto-restore works:
+# ============================================
+# When keep-alive.sh starts:
+#   1. Runs startup-guard.js → checks 70+ critical files
+#   2. Runs protection-snapshot.js --verify → checks all 133 files
+#   3. If any are MISSING → auto-runs --restore → copies from latest backup
+#   4. Only then starts the dev server
+#
+# What's protected (133 files):
+# ============================================
+# - src/app/** (page.tsx, layout.tsx, globals.css, all API routes)
+# - src/components/** (all 30+ components including operations-dashboard)
+# - src/lib/** (auth, security, validation, rate-limit, db, email, etc.)
+# - src/hooks/** (all 6 hooks)
+# - src/proxy.ts (middleware)
+# - prisma/schema.prisma
+# - public/ (manifest.json, sw.js, icons)
+# - Config files (package.json, tsconfig.json, tailwind.config.ts, etc.)
+#
+# Backup location:
+# ============================================
+# /home/z/my-project/backups/
+#   ├── manifest.json (latest — used by verify/restore)
+#   └── snapshot-YYYY-MM-DD-HHMMSS/ (full file copies)
+#
+# To create a fresh snapshot after making changes:
+#   node scripts/protection-snapshot.js
+#
+# To manually verify integrity:
+#   node scripts/protection-snapshot.js --verify
+#
+# To manually restore missing files:
+#   node scripts/protection-snapshot.js --restore

@@ -1,0 +1,2336 @@
+"use client";
+
+import { useState, useMemo, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Save, Printer, Trash2, Upload, Download, X, Search as SearchIcon,
+  Package, AlertTriangle, TrendingUp, ScanLine, FileText, Zap,
+  Edit2, Plus, Image as ImageIcon, History as HistoryIcon, Tags, ArrowUpDown, Check,
+} from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
+import {
+  COMPANY, formatGHS, type Product, type StockGroup, type StockHistoryEntry,
+} from "@/lib/pos-data";
+import { PopupWindow } from "@/components/popup-window";
+import { QuickStockAdjustment } from "@/components/quick-stock-adjustment";
+
+// ===== Light blue palette (matches reference image) =====
+const HEADER_DARK_BLUE = '#1E5A8E';     // dark blue title bar
+const BTN_BG = '#D6E6F5';               // light blue button background
+const BTN_HOVER = '#B9D7EE';            // button hover
+const ON_HAND_BG = '#FFF8DC';           // light yellow for On Hand column
+const FIELD_BORDER = '#808080';
+const GRID_LINE = '#999999';
+
+export type AdjustmentType = 'stocktake' | 'adjustment';
+
+export interface AdjustmentLine {
+  id: string;
+  partNo: string;        // SKU / barcode
+  details: string;       // product name
+  onHand: number;        // current stock
+  counted: number;       // user-entered physical count
+  qty: number;           // counted - onHand (variance, computed)
+  cost: number;          // cost per unit
+  total: number;         // qty * cost (computed)
+  productId: string;     // for syncing back
+  emoji: string;
+}
+
+// ===== Audit trail entry: records a single mutation to the draft =====
+export interface AuditEntry {
+  id: string;
+  timestamp: string;       // ISO string
+  action: 'add' | 'counted_change' | 'cost_change' | 'remove' | 'bulk_load' | 'scan_add' | 'scan_increment' | 'import' | 'clear' | 'restore' | 'save';
+  productId: string;
+  productName: string;
+  partNo: string;
+  oldValue?: string;       // previous counted/cost/qty
+  newValue?: string;       // new counted/cost/qty
+  user: string;
+  notes?: string;
+}
+
+interface StockQuantityAdjustmentProps {
+  products: Product[];
+  setProducts: React.Dispatch<React.SetStateAction<Product[]>>;
+  setHistory: React.Dispatch<React.SetStateAction<StockHistoryEntry[]>>;
+  /** Stock history (used by the "Compare with last Stocktake" report) */
+  history?: StockHistoryEntry[];
+  groups: StockGroup[];
+  onClose: () => void;
+  /** When provided, opens as overlay inside another popup. When true (default), opens as its own PopupWindow. */
+  asWindow?: boolean;
+  /** Initial adjustment type for the dropdown */
+  initialAdjustmentType?: AdjustmentType;
+  /** Optional pre-selected product to add to the table (when launched from another view) */
+  initialProductId?: string;
+}
+
+export function StockQuantityAdjustment({
+  products,
+  setProducts,
+  setHistory,
+  history = [],
+  groups,
+  onClose,
+  asWindow = true,
+  initialAdjustmentType = 'stocktake',
+  initialProductId,
+}: StockQuantityAdjustmentProps) {
+  const { toast } = useToast();
+
+  // ===== Draft persistence key (per browser) =====
+  const DRAFT_KEY = 'sylhn-stock-adjustment-draft';
+
+  // ===== Form state (with draft restore) =====
+  const [adjNumber, setAdjNumber] = useState(`ADJ-${Date.now().toString().slice(-6)}`);
+  const [adjType, setAdjType] = useState<AdjustmentType>(initialAdjustmentType);
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [details, setDetails] = useState('');
+  const [postToAC, setPostToAC] = useState('Inventory Adjustment');
+  const [fromPartNo, setFromPartNo] = useState('');
+  const [toPartNo, setToPartNo] = useState('');
+  const [groupFilter, setGroupFilter] = useState('all');
+  const [bin, setBin] = useState('');
+  const [lines, setLines] = useState<AdjustmentLine[]>([]);
+  const [selectedLine, setSelectedLine] = useState<number | null>(null);
+  const [saved, setSaved] = useState(false);
+  const [draftRestored, setDraftRestored] = useState(false);
+
+  // ===== Sync lines' onHand with current products state =====
+  // When a quick adjustment (or any external stock change) updates the products
+  // array, we need to refresh the onHand values in our lines so the table
+  // reflects the true current stock immediately — without needing to close
+  // and reopen the form.
+  useEffect(() => {
+    setLines(prev => prev.map(line => {
+      const product = products.find(p => p.id === line.productId);
+      if (!product) return line;
+      // Only update if the onHand has actually changed
+      if (product.stock === line.onHand) return line;
+      // Recompute qty (variance) = counted - new onHand
+      const newQty = line.counted - product.stock;
+      return {
+        ...line,
+        onHand: product.stock,
+        qty: newQty,
+        total: newQty * line.cost,
+      };
+    }));
+  }, [products]);
+
+  // ===== Stock Adjustment mode: reason integration =====
+  // When adjType === 'adjustment', the form shows a Reason dropdown
+  // that is applied to all adjusted items when saved.
+  const [adjustReason, setAdjustReason] = useState('Damaged goods');
+
+  // ===== Audit trail: records every mutation to the draft before it's saved =====
+  // Each entry captures: timestamp, action type, product affected, old/new values, user.
+  // Persisted alongside the draft in localStorage so it survives refresh.
+  // On Save, the audit trail is committed to the main history (via a separate key)
+  // so managers can review every change that led to the final stocktake.
+  const [auditTrail, setAuditTrail] = useState<AuditEntry[]>([]);
+  const [showAuditTrail, setShowAuditTrail] = useState(false);
+
+  // ===== Stock Search popup state =====
+  const [showStockSearch, setShowStockSearch] = useState(false);
+  const [findPartNo, setFindPartNo] = useState('');
+  const findPartNoRef = useRef<HTMLInputElement>(null);
+
+  // ===== Compare-with-last-Stocktake report state =====
+  const [showCompareReport, setShowCompareReport] = useState(false);
+
+  // ===== Quick Stock Adjustment popup state =====
+  // Opens the QuickStockAdjustment popup from within this form.
+  // When a quick adjustment is saved, the adjusted product is automatically
+  // added/updated in this form's table — relating the two forms.
+  const [showQuickAdjust, setShowQuickAdjust] = useState(false);
+  const [quickAdjustProductId, setQuickAdjustProductId] = useState<string | undefined>(undefined);
+
+  // ===== Barcode scanner mode state =====
+  // Barcode scanners act as HID keyboards — they type characters rapidly (within ~50ms)
+  // and end with Enter. We capture this via a global keydown listener that detects
+  // rapid input patterns and auto-adds matching products to the adjustment table.
+  const [scanMode, setScanMode] = useState(false);
+  const [scanBuffer, setScanBuffer] = useState('');
+  const [scanStats, setScanStats] = useState({ scanned: 0, added: 0, notFound: 0, duplicates: 0 });
+  const [lastScanFeedback, setLastScanFeedback] = useState<{ barcode: string; status: 'added' | 'duplicate' | 'notfound' | 'incremented'; productName?: string } | null>(null);
+  const scanBufferRef = useRef('');
+  const scanTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastKeyTimeRef = useRef(0);
+
+  // ===== Restore draft from localStorage on first mount =====
+  // Only restore if there's a draft AND no initialProductId was passed in
+  // (initialProductId is a "jump to product" action that shouldn't be trumped by a stale draft)
+  useEffect(() => {
+    if (initialProductId) {
+      const p = products.find(p => p.id === initialProductId);
+      if (p) addProductToLines(p);
+      return;
+    }
+    if (typeof window === 'undefined') return;
+    try {
+      const cached = window.localStorage.getItem(DRAFT_KEY);
+      if (!cached) return;
+      const draft = JSON.parse(cached);
+      if (!draft || !Array.isArray(draft.lines) || draft.lines.length === 0) return;
+      // Only restore if the draft is from the current session (within last 24h)
+      const draftAge = Date.now() - (draft.savedAt || 0);
+      if (draftAge > 24 * 60 * 60 * 1000) {
+        // Draft is stale — clear it
+        window.localStorage.removeItem(DRAFT_KEY);
+        return;
+      }
+      // Restore all fields
+      if (draft.adjNumber) setAdjNumber(draft.adjNumber);
+      if (draft.adjType) setAdjType(draft.adjType);
+      if (draft.date) setDate(draft.date);
+      if (draft.details !== undefined) setDetails(draft.details);
+      if (draft.postToAC !== undefined) setPostToAC(draft.postToAC);
+      if (draft.adjustReason) setAdjustReason(draft.adjustReason);
+      if (draft.fromPartNo !== undefined) setFromPartNo(draft.fromPartNo);
+      if (draft.toPartNo !== undefined) setToPartNo(draft.toPartNo);
+      if (draft.groupFilter !== undefined) setGroupFilter(draft.groupFilter);
+      if (draft.bin !== undefined) setBin(draft.bin);
+      // Rehydrate lines — refresh onHand from current product data so the displayed
+      // current stock is fresh, but keep the user's counted value
+      const restoredLines: AdjustmentLine[] = draft.lines
+        .map((l: any) => {
+          const product = products.find(p => p.id === l.productId);
+          if (!product) return null; // product was deleted since draft was saved
+          const freshOnHand = product.stock;
+          const freshCost = product.costPrice;
+          // Recompute variance against current on-hand (may differ from draft)
+          const counted = l.counted ?? l.onHand ?? freshOnHand;
+          const qty = counted - freshOnHand;
+          return {
+            id: l.id || `line-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            partNo: product.sku,
+            details: `${product.emoji} ${product.name}`,
+            onHand: freshOnHand,
+            counted,
+            qty,
+            cost: freshCost,
+            total: qty * freshCost,
+            productId: product.id,
+            emoji: product.emoji,
+          };
+        })
+        .filter(Boolean);
+      if (restoredLines.length > 0) {
+        setLines(restoredLines);
+        setDraftRestored(true);
+        toast({
+          title: 'Draft restored',
+          description: `${restoredLines.length} lines from your previous session`,
+        });
+      }
+    } catch {
+      // ignore corrupt draft
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ===== Auto-save draft to localStorage whenever state changes =====
+  // Skip saving when the form is empty (no lines) AND no draft has been restored —
+  // this avoids creating a draft just from opening the form.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    // Don't save if the form is "fresh" (no lines, no details, no draft restored)
+    if (lines.length === 0 && !details && !draftRestored && !saved) return;
+    // Don't save after a successful save (saved drafts are cleared separately)
+    if (saved) return;
+    const draft = {
+      adjNumber, adjType, date, details, postToAC,
+      fromPartNo, toPartNo, groupFilter, bin,
+      adjustReason,
+      lines, savedAt: Date.now(),
+    };
+    try {
+      window.localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    } catch { /* storage full or unavailable */ }
+  }, [adjNumber, adjType, date, details, postToAC, fromPartNo, toPartNo, groupFilter, bin, adjustReason, lines, saved, draftRestored]);
+
+  // ===== Persist audit trail alongside the draft =====
+  const AUDIT_KEY = 'sylhn-stock-adjustment-audit';
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (auditTrail.length === 0) return;
+    try {
+      window.localStorage.setItem(AUDIT_KEY, JSON.stringify(auditTrail));
+    } catch { /* ignore */ }
+  }, [auditTrail]);
+
+  // ===== Helper: log an audit entry =====
+  const logAudit = (
+    action: AuditEntry['action'],
+    productId: string,
+    productName: string,
+    partNo: string,
+    oldValue?: string,
+    newValue?: string,
+    notes?: string,
+  ) => {
+    const entry: AuditEntry = {
+      id: `audit-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      timestamp: new Date().toISOString(),
+      action,
+      productId,
+      productName,
+      partNo,
+      oldValue,
+      newValue,
+      user: 'Sarah Johnson', // current cashier
+      notes,
+    };
+    setAuditTrail(prev => [...prev, entry]);
+  };
+
+  // ===== Commit audit trail to permanent storage on Save =====
+  // The audit trail is saved to a separate localStorage key that the Stocktake
+  // Dashboard can read to show "every change made to a stocktake draft before it was saved".
+  const commitAuditTrail = () => {
+    if (typeof window === 'undefined') return;
+    if (auditTrail.length === 0) return;
+    try {
+      // Append to the committed audit log (keyed by adjustment number)
+      const COMMITTED_KEY = 'sylhn-stocktake-audit-committed';
+      const existing = window.localStorage.getItem(COMMITTED_KEY);
+      const log = existing ? JSON.parse(existing) : [];
+      log.push({
+        adjNumber,
+        adjType,
+        date,
+        savedAt: new Date().toISOString(),
+        entries: auditTrail,
+      });
+      // Keep only the last 50 saved stocktakes to avoid unbounded growth
+      const trimmed = log.slice(-50);
+      window.localStorage.setItem(COMMITTED_KEY, JSON.stringify(trimmed));
+      // Clear the in-progress audit trail
+      window.localStorage.removeItem(AUDIT_KEY);
+      setAuditTrail([]);
+    } catch { /* ignore */ }
+  };
+
+  // ===== Compute totals =====
+  const totals = useMemo(() => {
+    const totalQty = lines.reduce((s, l) => s + l.onHand, 0);
+    const totalCost = lines.reduce((s, l) => s + l.total, 0);
+    const totalVariance = lines.reduce((s, l) => s + l.qty, 0);
+    return { totalQty, totalCost, totalVariance };
+  }, [lines]);
+
+  // ===== Find the most recent committed stocktake/adjustment for comparison =====
+  // Looks through history for entries with action='adjusted' (i.e. previous stocktakes/adjustments),
+  // groups them by reference, and picks the most recent reference (excluding the current adjNumber
+  // if it has already been saved).
+  const lastStocktakeData = useMemo(() => {
+    // Group history entries by reference, keeping the latest timestamp per reference
+    const groups = new Map<string, { reference: string; timestamp: string; entries: StockHistoryEntry[] }>();
+    history.forEach(h => {
+      if (h.action !== 'adjusted' || !h.reference) return;
+      // Skip the current adjustment (in case it was already saved and the user is comparing again)
+      if (h.reference === adjNumber) return;
+      const existing = groups.get(h.reference);
+      if (existing) {
+        existing.entries.push(h);
+        if (h.timestamp > existing.timestamp) existing.timestamp = h.timestamp;
+      } else {
+        groups.set(h.reference, { reference: h.reference, timestamp: h.timestamp, entries: [h] });
+      }
+    });
+    if (groups.size === 0) return null;
+    // Pick the most recent reference
+    const sorted = Array.from(groups.values()).sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+    const lastEvent = sorted[0];
+    // Build a map of productId -> { counted, variance, productName, sku } from the last event
+    const productMap = new Map<string, { counted: number; variance: number; productName: string; sku: string }>();
+    lastEvent.entries.forEach(e => {
+      productMap.set(e.productId, {
+        counted: e.newQuantity,
+        variance: e.quantityChange,
+        productName: e.productName,
+        sku: e.sku,
+      });
+    });
+    return {
+      reference: lastEvent.reference,
+      timestamp: lastEvent.timestamp,
+      entries: lastEvent.entries,
+      productMap,
+    };
+  }, [history, adjNumber]);
+
+  // ===== Build the comparison rows: current adjustment lines vs. last stocktake =====
+  const comparisonRows = useMemo(() => {
+    if (!lastStocktakeData) return [];
+    return lines.map(l => {
+      const prev = lastStocktakeData.productMap.get(l.productId);
+      const prevCounted = prev?.counted ?? null;
+      // Delta = current counted - previous counted
+      // (positive means we have more than the last stocktake recorded)
+      const delta = prevCounted !== null ? l.counted - prevCounted : null;
+      return {
+        productId: l.productId,
+        partNo: l.partNo,
+        details: l.details,
+        currentOnHand: l.onHand,
+        currentCounted: l.counted,
+        previousCounted: prevCounted,
+        previousReference: prev ? lastStocktakeData.reference : null,
+        deltaFromLast: delta,
+      };
+    });
+  }, [lines, lastStocktakeData]);
+
+  // ===== Totals for comparison report =====
+  const comparisonTotals = useMemo(() => {
+    const totalCurrentCounted = comparisonRows.reduce((s, r) => s + r.currentCounted, 0);
+    const totalPreviousCounted = comparisonRows.reduce((s, r) => s + (r.previousCounted ?? 0), 0);
+    const totalDelta = comparisonRows.reduce((s, r) => s + (r.deltaFromLast ?? 0), 0);
+    const matchedProducts = comparisonRows.filter(r => r.previousCounted !== null).length;
+    const newProducts = comparisonRows.length - matchedProducts;
+    return { totalCurrentCounted, totalPreviousCounted, totalDelta, matchedProducts, newProducts };
+  }, [comparisonRows]);
+
+  // ===== Add product to adjustment table =====
+  const addProductToLines = (product: Product) => {
+    // Avoid duplicates
+    if (lines.some(l => l.productId === product.id)) {
+      toast({ title: 'Already in table', description: `${product.emoji} ${product.name}` });
+      return;
+    }
+    const newLine: AdjustmentLine = {
+      id: `line-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      partNo: product.sku,
+      details: `${product.emoji} ${product.name}`,
+      onHand: product.stock,
+      counted: product.stock,    // default to current stock
+      qty: 0,                     // variance = 0 initially
+      cost: product.costPrice,
+      total: 0,
+      productId: product.id,
+      emoji: product.emoji,
+    };
+    setLines(prev => [...prev, newLine]);
+    setSelectedLine(lines.length); // select the newly added line
+    setFindPartNo('');
+    setSaved(false);
+    logAudit('add', product.id, `${product.emoji} ${product.name}`, product.sku, undefined, String(product.stock), 'Product added to stocktake');
+    toast({ title: 'Product added', description: `${product.emoji} ${product.name}` });
+  };
+
+  // ===== Update a line's counted value (recomputes qty and total) =====
+  const updateLineCounted = (idx: number, counted: number) => {
+    const oldLine = lines[idx];
+    setLines(prev => prev.map((l, i) => {
+      if (i !== idx) return l;
+      const qty = counted - l.onHand; // positive = surplus, negative = shortage
+      return { ...l, counted, qty, total: qty * l.cost };
+    }));
+    setSaved(false);
+    if (oldLine) {
+      logAudit('counted_change', oldLine.productId, oldLine.details, oldLine.partNo, `counted=${oldLine.counted}`, `counted=${counted}`, `Variance: ${oldLine.qty} → ${counted - oldLine.onHand}`);
+    }
+  };
+
+  // ===== Update a line's cost (recomputes total) =====
+  const updateLineCost = (idx: number, cost: number) => {
+    const oldLine = lines[idx];
+    setLines(prev => prev.map((l, i) => {
+      if (i !== idx) return l;
+      return { ...l, cost, total: l.qty * cost };
+    }));
+    setSaved(false);
+  };
+
+  // ===== Remove a line =====
+  const removeLine = (idx: number) => {
+    const oldLine = lines[idx];
+    setLines(prev => prev.filter((_, i) => i !== idx));
+    setSelectedLine(null);
+    setSaved(false);
+    if (oldLine) {
+      logAudit('remove', oldLine.productId, oldLine.details, oldLine.partNo, `counted=${oldLine.counted}`, undefined, 'Line removed from stocktake');
+    }
+    toast({ title: 'Line removed' });
+  };
+
+  // ===== Find Part No handler — filters the table directly =====
+  // When the user types in "Find Part No", matching products are loaded
+  // directly into the table (replacing existing lines) — no popup needed.
+  // This gives immediate visual feedback of the search results.
+  const handleFindPartNo = (value: string) => {
+    setFindPartNo(value);
+    setShowStockSearch(false);
+
+    if (value.length === 0) {
+      // If Find Part No is cleared, reload based on Group filter only
+      if (groupFilter !== 'all') {
+        loadFilteredProducts(groupFilter);
+      }
+      return;
+    }
+
+    // Search products by SKU, barcode, name, or supplier
+    const q = value.toLowerCase();
+    const matched = products.filter(p =>
+      p.name.toLowerCase().includes(q) ||
+      p.sku.toLowerCase().includes(q) ||
+      p.barcode.includes(value) ||
+      p.supplier.toLowerCase().includes(q)
+    ).filter(p => {
+      // Also apply group filter if set
+      if (groupFilter !== 'all' && p.groupId !== groupFilter) return false;
+      return true;
+    });
+
+    if (matched.length === 0) {
+      toast({ title: 'No products found', description: `"${value}"`, variant: 'destructive' });
+      return;
+    }
+
+    // Replace table with search results
+    loadProductsIntoTable(matched);
+  };
+
+  // ===== Helper: load a set of products into the table =====
+  // Preserves existing counted values for products already in the table.
+  const loadProductsIntoTable = (matched: Product[]) => {
+    setLines(prev => {
+      // Build a map of existing lines by productId (to preserve counted values)
+      const existingMap = new Map(prev.map(l => [l.productId, l]));
+      const newLines: AdjustmentLine[] = matched.map(product => {
+        const existing = existingMap.get(product.id);
+        if (existing) {
+          // Preserve the user's counted value but update onHand
+          const qty = existing.counted - product.stock;
+          return { ...existing, onHand: product.stock, qty, total: qty * existing.cost };
+        }
+        // New line — default counted = onHand
+        return {
+          id: `line-${Date.now()}-${Math.random().toString(36).slice(2, 6)}-${product.id}`,
+          partNo: product.sku,
+          details: `${product.emoji} ${product.name}`,
+          emoji: product.emoji,
+          onHand: product.stock,
+          counted: product.stock,
+          qty: 0,
+          cost: product.costPrice,
+          total: 0,
+          productId: product.id,
+        };
+      });
+      return newLines;
+    });
+    setSaved(false);
+  };
+
+  // ===== Helper: load products filtered by group into the table =====
+  const loadFilteredProducts = (group: string) => {
+    const matched = products.filter(p => {
+      if (group !== 'all' && p.groupId !== group) return false;
+      return true;
+    });
+    if (matched.length > 0) {
+      loadProductsIntoTable(matched);
+      toast({ title: `${matched.length} products loaded`, description: group === 'all' ? 'All groups' : `Group: ${group}` });
+    }
+  };
+
+  // ===== Auto-filter table when Group dropdown changes =====
+  // When the user selects a different Group, immediately load that group's
+  // products into the table — no need to click "Load Range".
+  useEffect(() => {
+    // Skip on initial mount (the draft restore handles initial state)
+    if (!draftRestored && lines.length === 0 && !findPartNo) {
+      // Only auto-load if group is not 'all' and table is empty
+      if (groupFilter !== 'all') {
+        loadFilteredProducts(groupFilter);
+      }
+      return;
+    }
+    // If user already has lines or a draft, only auto-filter when group changes
+    // (we detect this by checking if the groupFilter changed from a user action)
+  }, [groupFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ===== Load all products in a range (From Part No → To Part No) =====
+  const handleLoadRange = () => {
+    if (!fromPartNo && !toPartNo && groupFilter === 'all') {
+      toast({ title: 'Set a range or group filter first', variant: 'destructive' });
+      return;
+    }
+    const matched = products.filter(p => {
+      // Group filter
+      if (groupFilter !== 'all' && p.groupId !== groupFilter) return false;
+      // From Part No. range (alphabetical by SKU)
+      if (fromPartNo && p.sku.toLowerCase() < fromPartNo.toLowerCase()) return false;
+      if (toPartNo && p.sku.toLowerCase() > toPartNo.toLowerCase()) return false;
+      // Bin filter
+      if (bin && !p.batchNumber.toLowerCase().includes(bin.toLowerCase())) return false;
+      return true;
+    });
+    if (matched.length === 0) {
+      toast({ title: 'No products match the range', variant: 'destructive' });
+      return;
+    }
+    // Add all matched products (skipping duplicates)
+    const newLines: AdjustmentLine[] = [];
+    matched.forEach(p => {
+      if (lines.some(l => l.productId === p.id)) return;
+      newLines.push({
+        id: `line-${Date.now()}-${Math.random().toString(36).slice(2, 6)}-${p.id}`,
+        partNo: p.sku,
+        details: `${p.emoji} ${p.name}`,
+        onHand: p.stock,
+        counted: p.stock,
+        qty: 0,
+        cost: p.costPrice,
+        total: 0,
+        productId: p.id,
+        emoji: p.emoji,
+      });
+    });
+    if (newLines.length === 0) {
+      toast({ title: 'All matching products already in table' });
+      return;
+    }
+    setLines(prev => [...prev, ...newLines]);
+    setSaved(false);
+    toast({ title: `${newLines.length} products loaded`, description: `Total lines: ${lines.length + newLines.length}` });
+  };
+
+  // ===== Save: commit adjustments to product stock + log history =====
+  const handleSave = () => {
+    // Only lines with non-zero variance (qty != 0) are real adjustments
+    const changedLines = lines.filter(l => l.qty !== 0);
+    if (changedLines.length === 0) {
+      toast({ title: 'No adjustments to save', description: 'All counted quantities match on-hand stock', variant: 'destructive' });
+      return;
+    }
+    // Update product stock
+    setProducts(prev => prev.map(p => {
+      const line = changedLines.find(l => l.productId === p.id);
+      if (!line) return p;
+      return { ...p, stock: line.counted };
+    }));
+    // Log each adjustment to history
+    const newHistory: StockHistoryEntry[] = changedLines.map(l => ({
+      id: `h-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      productId: l.productId,
+      productName: l.details,
+      sku: l.partNo,
+      action: 'adjusted',
+      quantityChange: l.qty,
+      newQuantity: l.counted,
+      timestamp: new Date().toISOString(),
+      user: 'Sarah Johnson',
+      reason: adjType === 'adjustment'
+        ? `${adjustReason} — variance ${l.qty > 0 ? '+' : ''}${l.qty}${details ? ' · ' + details : ''}`
+        : (details || `${adjType === 'stocktake' ? 'Stocktake' : 'Stock adjustment'} — variance ${l.qty > 0 ? '+' : ''}${l.qty}`),
+      reference: adjNumber,
+    }));
+    setHistory(prev => [...prev, ...newHistory]);
+    setSaved(true);
+    // Clear the in-progress draft (the adjustment has been committed)
+    if (typeof window !== 'undefined') {
+      try { window.localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
+    }
+    setDraftRestored(false);
+    // Commit the audit trail to permanent storage (for the Audit Trail report)
+    logAudit('save', '', `${adjType === 'stocktake' ? 'Stocktake' : 'Stock Adjustment'} ${adjNumber}`, adjNumber, undefined, `${changedLines.length} items`, `Saved with variance ${totals.totalVariance > 0 ? '+' : ''}${totals.totalVariance}`);
+    // Use a small timeout so the 'save' audit entry is captured before committing
+    setTimeout(() => commitAuditTrail(), 100);
+    toast({
+      title: `Saved (F2) — ${adjType === 'stocktake' ? 'Stocktake' : 'Stock Adjustment'}`,
+      description: `${changedLines.length} items adjusted · Variance total: ${totals.totalVariance > 0 ? '+' : ''}${totals.totalVariance} · ${formatGHS(Math.abs(totals.totalCost))}`,
+    });
+  };
+
+  // ===== Print adjustment report =====
+  const handlePrint = () => {
+    if (lines.length === 0) { toast({ title: 'Nothing to print', variant: 'destructive' }); return; }
+    const printWin = window.open('', '_blank', 'width=900,height=600');
+    if (!printWin) { toast({ title: 'Popup blocked', variant: 'destructive' }); return; }
+    const rows = lines.map((l, i) => `
+      <tr style="background:${i % 2 === 1 ? '#F8F8F8' : '#FFFFFF'}">
+        <td style="border:1px solid #999;padding:4px 6px;font-family:monospace">${l.partNo}</td>
+        <td style="border:1px solid #999;padding:4px 6px">${l.details}</td>
+        <td style="border:1px solid #999;padding:4px 6px;text-align:right;background:#FFF8DC">${l.onHand}</td>
+        <td style="border:1px solid #999;padding:4px 6px;text-align:right">${l.counted}</td>
+        <td style="border:1px solid #999;padding:4px 6px;text-align:right;color:${l.qty > 0 ? '#16A34A' : (l.qty < 0 ? '#DC2626' : '#666')}">${l.qty > 0 ? '+' : ''}${l.qty}</td>
+        <td style="border:1px solid #999;padding:4px 6px;text-align:right">${l.cost.toFixed(4)}</td>
+        <td style="border:1px solid #999;padding:4px 6px;text-align:right;font-weight:bold">${l.total.toFixed(3)}</td>
+      </tr>`).join('');
+    printWin.document.write(`<!DOCTYPE html><html><head><title>${adjType === 'stocktake' ? 'Stocktake' : 'Stock Adjustment'} — ${adjNumber}</title>
+      <style>
+        body { font-family: Arial, Helvetica, sans-serif; margin: 20px; }
+        .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 15px; }
+        .header h1 { margin: 0; font-size: 18px; }
+        .header div { font-size: 12px; color: #666; }
+        .info { display: flex; justify-content: space-between; margin-bottom: 15px; font-size: 11px; }
+        table { width: 100%; border-collapse: collapse; font-size: 11px; }
+        th { background: #1E5A8E; color: white; border: 1px solid #999; padding: 5px 6px; font-weight: bold; }
+        .totals { margin-top: 15px; margin-left: auto; width: 320px; font-size: 11px; }
+        .totals td { padding: 4px 8px; }
+        .totals .total-row { font-weight: bold; border-top: 2px solid #333; }
+        @media print { body { margin: 10px; } }
+      </style></head><body>
+      <div class="header">
+        <h1>${COMPANY.name}</h1>
+        <div>${COMPANY.address} · ${COMPANY.contact}</div>
+      </div>
+      <h2 style="text-align:center;font-size:14px;margin:10px 0">${adjType === 'stocktake' ? 'Stocktake Report' : 'Stock Adjustment Report'}</h2>
+      <div class="info">
+        <div><strong>Number:</strong> ${adjNumber}</div>
+        <div><strong>Date:</strong> ${date}</div>
+        <div><strong>Type:</strong> ${adjType === 'stocktake' ? 'Stocktake' : 'Stock Adjustment'}</div>
+        <div><strong>Details:</strong> ${details || '—'}</div>
+        <div><strong>Post To A/C:</strong> ${postToAC || '—'}</div>
+      </div>
+      <table>
+        <thead><tr>
+          <th style="text-align:left">Part Number</th>
+          <th style="text-align:left">Details</th>
+          <th style="text-align:right">On Hand</th>
+          <th style="text-align:right">Counted</th>
+          <th style="text-align:right">Qty</th>
+          <th style="text-align:right">Cost GHC</th>
+          <th style="text-align:right">Total GHC</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <table class="totals">
+        <tr><td>Total Qty On Hand:</td><td style="text-align:right">${totals.totalQty}</td></tr>
+        <tr><td>Total Variance:</td><td style="text-align:right;color:${totals.totalVariance > 0 ? '#16A34A' : (totals.totalVariance < 0 ? '#DC2626' : '#666')}">${totals.totalVariance > 0 ? '+' : ''}${totals.totalVariance}</td></tr>
+        <tr class="total-row"><td>Total GHC:</td><td style="text-align:right">${formatGHS(totals.totalCost)}</td></tr>
+      </table>
+      </body></html>`);
+    printWin.document.close();
+    setTimeout(() => { printWin.focus(); printWin.print(); }, 300);
+    toast({ title: 'Printing (F3)', description: `${lines.length} lines` });
+  };
+
+  // ===== Delete (clear all lines) =====
+  const handleDelete = () => {
+    if (lines.length === 0) { toast({ title: 'Nothing to delete' }); return; }
+    setLines([]);
+    setSelectedLine(null);
+    setSaved(false);
+    // Clear the in-progress draft as well
+    if (typeof window !== 'undefined') {
+      try { window.localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
+    }
+    setDraftRestored(false);
+    toast({ title: 'Deleted (F4)', description: 'All lines cleared' });
+  };
+
+  // ===== Export to Excel =====
+  const handleExport = () => {
+    if (lines.length === 0) { toast({ title: 'Nothing to export', variant: 'destructive' }); return; }
+    import('xlsx').then((XLSX) => {
+      type ExportRow = Record<string, string | number>;
+      const data: ExportRow[] = lines.map((l, i) => ({
+        '#': i + 1,
+        'Part Number': l.partNo,
+        'Details': l.details,
+        'On Hand': l.onHand,
+        'Counted': l.counted,
+        'Qty (Variance)': l.qty,
+        'Cost GHC': l.cost,
+        'Total GHC': l.total,
+      }));
+      // Append totals row
+      data.push({
+        '#': '',
+        'Part Number': '',
+        'Details': 'TOTAL',
+        'On Hand': totals.totalQty,
+        'Counted': '',
+        'Qty (Variance)': totals.totalVariance,
+        'Cost GHC': '',
+        'Total GHC': totals.totalCost,
+      });
+      const ws = XLSX.utils.json_to_sheet(data);
+      ws['!cols'] = [{ wch: 5 }, { wch: 16 }, { wch: 30 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 12 }];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, adjType === 'stocktake' ? 'Stocktake' : 'Adjustment');
+      XLSX.writeFile(wb, `${adjType === 'stocktake' ? 'stocktake' : 'stock-adjustment'}-${adjNumber}-${new Date().toISOString().split('T')[0]}.xlsx`);
+      toast({ title: 'Exported successfully', description: `${lines.length} rows to Excel` });
+    });
+  };
+
+  // ===== Import from Excel (basic CSV/XLSX picker) =====
+  const handleImport = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.xlsx,.xls,.csv';
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      import('xlsx').then((XLSX) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          try {
+            const wb = XLSX.read(ev.target?.result, { type: 'binary' });
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            const rows: any[] = XLSX.utils.sheet_to_json(ws);
+            let added = 0;
+            rows.forEach((r) => {
+              const partNo = String(r['Part Number'] || r['PartNo'] || r['SKU'] || '').trim();
+              const counted = Number(r['Counted'] || r['Qty'] || 0);
+              if (!partNo) return;
+              const product = products.find(p => p.sku.toLowerCase() === partNo.toLowerCase() || p.barcode === partNo);
+              if (!product) return;
+              if (lines.some(l => l.productId === product.id)) return;
+              const qty = counted - product.stock;
+              setLines(prev => [...prev, {
+                id: `line-${Date.now()}-${Math.random().toString(36).slice(2, 6)}-${product.id}`,
+                partNo: product.sku,
+                details: `${product.emoji} ${product.name}`,
+                onHand: product.stock,
+                counted,
+                qty,
+                cost: product.costPrice,
+                total: qty * product.costPrice,
+                productId: product.id,
+                emoji: product.emoji,
+              }]);
+              added++;
+            });
+            toast({ title: `Imported ${added} rows`, description: file.name });
+          } catch (err) {
+            toast({ title: 'Import failed', description: 'Invalid file format', variant: 'destructive' });
+          }
+        };
+        reader.readAsBinaryString(file);
+      });
+    };
+    input.click();
+  };
+
+  // ===== Barcode scanner: process a scanned barcode =====
+  // Looks up the product by barcode/SKU. If found:
+  //   - If not in the table → add it with counted=onHand+1 (first scan = 1 unit counted)
+  //   - If already in the table → increment counted by 1 (each scan = 1 more unit)
+  // If not found → increment notFound counter and show feedback
+  const processScannedBarcode = (barcode: string) => {
+    const trimmed = barcode.trim();
+    if (!trimmed) return;
+    setScanStats(prev => ({ ...prev, scanned: prev.scanned + 1 }));
+
+    const product = products.find(p =>
+      p.barcode === trimmed ||
+      p.sku.toLowerCase() === trimmed.toLowerCase() ||
+      p.barcode === trimmed.padStart(13, '0') || // EAN-13 zero-padding
+      p.sku.toLowerCase() === trimmed.toLowerCase().padStart(13, '0')
+    );
+
+    if (!product) {
+      setScanStats(prev => ({ ...prev, notFound: prev.notFound + 1 }));
+      setLastScanFeedback({ barcode: trimmed, status: 'notfound' });
+      toast({ title: 'Barcode not found', description: `"${trimmed}" — add this product to stock first`, variant: 'destructive' });
+      return;
+    }
+
+    // Check if the product is already in the lines
+    const existingIdx = lines.findIndex(l => l.productId === product.id);
+    if (existingIdx >= 0) {
+      // Increment counted by 1
+      const newCounted = lines[existingIdx].counted + 1;
+      const newQty = newCounted - lines[existingIdx].onHand;
+      setLines(prev => prev.map((l, i) => i === existingIdx ? {
+        ...l, counted: newCounted, qty: newQty, total: newQty * l.cost,
+      } : l));
+      setScanStats(prev => ({ ...prev, added: prev.added + 1 }));
+      setLastScanFeedback({ barcode: trimmed, status: 'incremented', productName: `${product.emoji} ${product.name}` });
+    } else {
+      // Add new line with counted = onHand + 1 (first physical count = 1 unit scanned)
+      const counted = product.stock + 1;
+      const qty = counted - product.stock; // = 1
+      const newLine: AdjustmentLine = {
+        id: `line-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        partNo: product.sku,
+        details: `${product.emoji} ${product.name}`,
+        onHand: product.stock,
+        counted,
+        qty,
+        cost: product.costPrice,
+        total: qty * product.costPrice,
+        productId: product.id,
+        emoji: product.emoji,
+      };
+      setLines(prev => [...prev, newLine]);
+      setScanStats(prev => ({ ...prev, added: prev.added + 1 }));
+      setLastScanFeedback({ barcode: trimmed, status: 'added', productName: `${product.emoji} ${product.name}` });
+    }
+    setSaved(false);
+  };
+
+  // ===== Barcode scanner: global keydown listener (only active in scan mode) =====
+  // Detects rapid key input characteristic of barcode scanners:
+  //   - Characters arrive within ~50ms of each other
+  //   - Scan ends with Enter
+  //   - Total scan takes < 200ms
+  // Human typing is much slower (>100ms between keys), so we can distinguish.
+  useEffect(() => {
+    if (!scanMode) return;
+
+    const handler = (e: KeyboardEvent) => {
+      // Ignore key events from input fields (let the user type normally in form fields)
+      const target = e.target as HTMLElement;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT')) {
+        return;
+      }
+
+      const now = Date.now();
+
+      // Enter = end of scan
+      if (e.key === 'Enter') {
+        if (scanBufferRef.current.length > 0) {
+          const barcode = scanBufferRef.current;
+          scanBufferRef.current = '';
+          setScanBuffer('');
+          if (scanTimerRef.current) { clearTimeout(scanTimerRef.current); scanTimerRef.current = null; }
+          processScannedBarcode(barcode);
+        }
+        e.preventDefault();
+        return;
+      }
+
+      // Only accept printable characters
+      if (e.key.length !== 1) return;
+
+      // If the gap between keys is too long (>100ms), this is probably a new scan starting
+      // (or human typing that we should ignore). Reset the buffer.
+      if (now - lastKeyTimeRef.current > 100 && scanBufferRef.current.length > 0) {
+        scanBufferRef.current = '';
+      }
+      lastKeyTimeRef.current = now;
+
+      scanBufferRef.current += e.key;
+      setScanBuffer(scanBufferRef.current);
+
+      // Set a timeout to auto-flush if Enter doesn't come (some scanners don't send Enter)
+      if (scanTimerRef.current) clearTimeout(scanTimerRef.current);
+      scanTimerRef.current = setTimeout(() => {
+        if (scanBufferRef.current.length >= 4) { // minimum barcode length
+          const barcode = scanBufferRef.current;
+          scanBufferRef.current = '';
+          setScanBuffer('');
+          processScannedBarcode(barcode);
+        }
+      }, 150);
+    };
+
+    window.addEventListener('keydown', handler);
+    return () => {
+      window.removeEventListener('keydown', handler);
+      if (scanTimerRef.current) clearTimeout(scanTimerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scanMode, lines, products]);
+
+  // ===== Toggle scan mode =====
+  const toggleScanMode = () => {
+    if (!scanMode) {
+      setScanMode(true);
+      setScanStats({ scanned: 0, added: 0, notFound: 0, duplicates: 0 });
+      setLastScanFeedback(null);
+      scanBufferRef.current = '';
+      setScanBuffer('');
+      toast({ title: 'Scan mode ON', description: 'Scan barcodes with your scanner — each scan adds 1 unit to the counted quantity' });
+    } else {
+      setScanMode(false);
+      scanBufferRef.current = '';
+      setScanBuffer('');
+      if (scanTimerRef.current) { clearTimeout(scanTimerRef.current); scanTimerRef.current = null; }
+      toast({ title: 'Scan mode OFF', description: `${scanStats.scanned} scans · ${scanStats.added} added` });
+    }
+  };
+
+  // ===== Keyboard shortcuts (F2/F3/F4/Esc) =====
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      // Skip all shortcuts when scan mode is active (scanner drives the input)
+      if (scanMode) return;
+      const target = e.target as HTMLElement;
+      const isTyping = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT');
+      if (e.key === 'F2') { e.preventDefault(); handleSave(); }
+      else if (e.key === 'F3') { e.preventDefault(); handlePrint(); }
+      else if (e.key === 'F4') { e.preventDefault(); handleDelete(); }
+      else if (e.key === 'F7') { e.preventDefault(); setShowStockSearch(true); }
+      else if (e.key === 'Escape' && !isTyping && !showStockSearch) { e.preventDefault(); onClose(); }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lines, adjType, details, postToAC, date, adjNumber, showStockSearch, scanMode]);
+
+  // ===== Form body =====
+  const body = (
+    <div className="h-full flex flex-col bg-white" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
+      {/* ===== Top: Header fields ===== */}
+      <div className="flex-shrink-0 px-3 py-2 grid grid-cols-[1fr_1fr] gap-x-4 gap-y-1.5 bg-white border-b border-slate-300">
+        {/* Left column */}
+        <div className="flex items-center gap-2">
+          <label className="text-[10px] font-bold text-slate-800 w-14">Number:</label>
+          <input value={adjNumber} onChange={(e) => setAdjNumber(e.target.value)} className="h-6 w-32 px-2 text-[10px] border rounded bg-white outline-none focus:ring-1 focus:ring-blue-400 font-mono" style={{ borderColor: FIELD_BORDER }} />
+          <select
+            value={adjType}
+            onChange={(e) => setAdjType(e.target.value as AdjustmentType)}
+            className="h-6 px-2 text-[10px] font-bold border rounded bg-white outline-none focus:ring-1 focus:ring-blue-400"
+            style={{ borderColor: FIELD_BORDER, color: HEADER_DARK_BLUE }}
+          >
+            <option value="stocktake">Stocktake</option>
+            <option value="adjustment">Stock Adjustment</option>
+          </select>
+        </div>
+        {/* Right column — From/To Part No range */}
+        <div className="flex items-center gap-2 justify-end">
+          <label className="text-[10px] font-bold text-slate-800">From Part No.:</label>
+          <input value={fromPartNo} onChange={(e) => setFromPartNo(e.target.value)} placeholder="e.g. FR-001" className="h-6 w-24 px-2 text-[10px] font-mono border rounded bg-white outline-none focus:ring-1 focus:ring-blue-400" style={{ borderColor: FIELD_BORDER }} />
+          <label className="text-[10px] font-bold text-slate-800">To Part No.:</label>
+          <input value={toPartNo} onChange={(e) => setToPartNo(e.target.value)} placeholder="e.g. GR-999" className="h-6 w-24 px-2 text-[10px] font-mono border rounded bg-white outline-none focus:ring-1 focus:ring-blue-400" style={{ borderColor: FIELD_BORDER }} />
+        </div>
+
+        <div className="flex items-center gap-2">
+          <label className="text-[10px] font-bold text-slate-800 w-14">Date:</label>
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="h-6 w-32 px-2 text-[10px] border rounded bg-white outline-none focus:ring-1 focus:ring-blue-400" style={{ borderColor: FIELD_BORDER }} />
+        </div>
+        <div className="flex items-center gap-2 justify-end">
+          <label className="text-[10px] font-bold text-slate-800">Group:</label>
+          <select
+            value={groupFilter}
+            onChange={(e) => {
+              const newGroup = e.target.value;
+              setGroupFilter(newGroup);
+              // Immediately load filtered products into the table
+              if (findPartNo) {
+                // If there's a search term, re-filter with both search + group
+                handleFindPartNo(findPartNo);
+              } else {
+                // No search term — just filter by group
+                if (newGroup === 'all') {
+                  // "All Groups" — clear the table (or keep existing)
+                  // Don't auto-load all products (could be hundreds)
+                } else {
+                  loadFilteredProducts(newGroup);
+                }
+              }
+            }}
+            className="h-6 px-2 text-[10px] border rounded bg-white outline-none focus:ring-1 focus:ring-blue-400"
+            style={{ borderColor: FIELD_BORDER }}
+          >
+            <option value="all">All Groups</option>
+            {groups.map(g => <option key={g.id} value={g.id}>{g.icon} {g.name}</option>)}
+          </select>
+          <label className="text-[10px] font-bold text-slate-800">Bin:</label>
+          <input value={bin} onChange={(e) => setBin(e.target.value)} placeholder="Batch" className="h-6 w-20 px-2 text-[10px] font-mono border rounded bg-white outline-none focus:ring-1 focus:ring-blue-400" style={{ borderColor: FIELD_BORDER }} />
+          <button
+            onClick={handleLoadRange}
+            className="h-6 px-2 rounded text-white text-[9px] font-bold transition"
+            style={{ backgroundColor: HEADER_DARK_BLUE }}
+            title="Load all products in the range/group/bin into the table"
+          >
+            Load Range
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <label className="text-[10px] font-bold text-slate-800 w-14">Details:</label>
+          <input value={details} onChange={(e) => setDetails(e.target.value)} placeholder="Reason for adjustment..." className="h-6 flex-1 px-2 text-[10px] border rounded bg-white outline-none focus:ring-1 focus:ring-blue-400" style={{ borderColor: FIELD_BORDER }} />
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-[10px] font-bold text-slate-800 w-20">Post To A/C:</label>
+          <input value={postToAC} onChange={(e) => setPostToAC(e.target.value)} placeholder="e.g. Inventory Adjustment" className="h-6 flex-1 px-2 text-[10px] border rounded bg-white outline-none focus:ring-1 focus:ring-blue-400" style={{ borderColor: FIELD_BORDER }} />
+        </div>
+      </div>
+
+      {/* ===== Stock Adjustment mode: Reason dropdown + Quick Adjust button ===== */}
+      {/* This bar only appears when "Stock Adjustment" is selected from the dropdown,
+          making it a distinct workflow from Stocktake. */}
+      {adjType === 'adjustment' && (
+        <div className="flex-shrink-0 px-3 py-2 bg-amber-50 border-b border-amber-200 flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-1.5">
+            <AlertTriangle className="h-4 w-4 text-amber-600" />
+            <label className="text-[10px] font-bold text-amber-800 uppercase">Adjustment Reason:</label>
+            <select
+              value={adjustReason}
+              onChange={(e) => setAdjustReason(e.target.value)}
+              className="h-7 px-2 text-[11px] font-semibold border border-amber-400 rounded bg-white outline-none focus:ring-2 focus:ring-amber-400 min-w-[160px]"
+            >
+              <option value="Damaged goods">Damaged goods</option>
+              <option value="Expired stock">Expired stock</option>
+              <option value="Theft / Loss">Theft / Loss</option>
+              <option value="Found stock">Found stock</option>
+              <option value="Received stock (no PO)">Received stock (no PO)</option>
+              <option value="Initial count correction">Initial count correction</option>
+              <option value="Sample / Display">Sample / Display</option>
+              <option value="Staff error">Staff error</option>
+              <option value="Other">Other (specify in Details)</option>
+            </select>
+          </div>
+          <div className="flex-1" />
+          <span className="text-[9px] text-amber-700 italic">
+            Reason will be applied to all adjusted items when saved
+          </span>
+        </div>
+      )}
+
+      {/* ===== Find Part No bar ===== */}
+      <div className="flex-shrink-0 px-3 py-1.5 flex items-center gap-2 bg-slate-50 border-b border-slate-300">
+        <label className="text-[10px] font-bold text-slate-700">Find Part no:</label>
+        <input
+          ref={findPartNoRef}
+          value={findPartNo}
+          onChange={(e) => handleFindPartNo(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              // handleFindPartNo already loads results on change,
+              // but Enter forces a re-search (in case of edge cases)
+              handleFindPartNo(findPartNo);
+            }
+            if (e.key === 'Escape') { setShowStockSearch(false); }
+          }}
+          placeholder="Type to search — results show in table below..."
+          className="h-6 w-56 px-2 text-[10px] font-mono border rounded outline-none focus:ring-1 focus:ring-blue-400"
+          style={{ borderColor: FIELD_BORDER, backgroundColor: '#FFFFCC' }}
+        />
+        <button
+          onClick={() => setShowStockSearch(true)}
+          className="h-6 px-2 rounded text-white text-[9px] font-bold flex items-center gap-1 transition"
+          style={{ backgroundColor: HEADER_DARK_BLUE }}
+          title="Open Stock Search (F7)"
+        >
+          <SearchIcon className="h-3 w-3" /> Search
+        </button>
+        <div className="flex-1" />
+        {saved && <span className="text-[10px] font-bold text-emerald-700">✓ Saved</span>}
+        {!saved && lines.length > 0 && (
+          <span className="text-[10px] font-bold text-amber-700 flex items-center gap-0.5" title="Auto-saved to localStorage — restored if you refresh or close the form">
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+            Draft auto-saved
+          </span>
+        )}
+        {draftRestored && !saved && (
+          <button
+            onClick={() => {
+              if (typeof window !== 'undefined') {
+                try { window.localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
+              }
+              setLines([]);
+              setDetails('');
+              setFromPartNo('');
+              setToPartNo('');
+              setBin('');
+              setGroupFilter('all');
+              setAdjNumber(`ADJ-${Date.now().toString().slice(-6)}`);
+              setDraftRestored(false);
+              toast({ title: 'Draft discarded', description: 'Form reset to blank' });
+            }}
+            className="h-5 px-2 rounded bg-rose-100 hover:bg-rose-200 text-rose-700 text-[9px] font-semibold transition"
+            title="Discard the restored draft and start fresh"
+          >
+            Discard draft
+          </button>
+        )}
+        <span className="text-[10px] text-slate-600 font-mono">{lines.length} lines</span>
+      </div>
+
+      {/* ===== Data Grid ===== */}
+      <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+        {/* Table header */}
+        <div className="flex-shrink-0 grid grid-cols-[40px_120px_1fr_70px_70px_70px_90px_90px] gap-0 px-2 py-1 text-[9px] font-bold text-slate-800 border-b" style={{ backgroundColor: '#E0E0E0', borderColor: GRID_LINE }}>
+          <div className="text-center">#</div>
+          <div>Part Number</div>
+          <div>Details</div>
+          <div className="text-right" style={{ backgroundColor: ON_HAND_BG }}>On Hand</div>
+          <div className="text-right">{adjType === 'adjustment' ? 'New Qty' : 'Counted'}</div>
+          <div className="text-right">Qty</div>
+          <div className="text-right">Cost GHC</div>
+          <div className="text-right">Total GHC</div>
+        </div>
+        {/* Table body */}
+        <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
+          {lines.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10 text-slate-400">
+              <Package className="h-8 w-8 mb-2 opacity-40" />
+              <div className="text-[11px] font-medium">No items added yet</div>
+              <div className="text-[9px] mt-0.5">
+                {adjType === 'adjustment'
+                  ? 'Type a Part No. above or click "Load Range" to begin'
+                  : 'Type a Part No. above or click "Load Range" to begin'}
+              </div>
+            </div>
+          ) : (
+            lines.map((l, idx) => {
+              const isSelected = selectedLine === idx;
+              const hasVariance = l.qty !== 0;
+              return (
+                <div
+                  key={l.id}
+                  onClick={() => setSelectedLine(idx)}
+                  className="grid grid-cols-[40px_120px_1fr_70px_70px_70px_90px_90px_24px] gap-0 px-2 py-0.5 text-[10px] cursor-pointer border-b group"
+                  style={{
+                    backgroundColor: isSelected ? '#D6E6F5' : (idx % 2 === 1 ? '#F8F8F8' : '#FFFFFF'),
+                    borderColor: '#E0E0E0',
+                  }}
+                >
+                  <div className="text-center text-slate-500">{idx + 1}</div>
+                  <div className="font-mono truncate text-slate-700">{l.partNo}</div>
+                  <div className="truncate text-slate-800">{l.details}</div>
+                  <div className="text-right font-mono text-slate-700" style={{ backgroundColor: ON_HAND_BG }}>{l.onHand}</div>
+                  <div className="text-right" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="number"
+                      value={l.counted}
+                      onChange={(e) => updateLineCounted(idx, parseInt(e.target.value) || 0)}
+                      className="w-full text-right font-mono bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-400 outline-none"
+                    />
+                  </div>
+                  <div className={cn("text-right font-mono font-semibold", hasVariance ? (l.qty > 0 ? "text-emerald-700" : "text-rose-700") : "text-slate-500")}>
+                    {l.qty > 0 ? '+' : ''}{l.qty}
+                  </div>
+                  <div className="text-right" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="number"
+                      step="0.0001"
+                      value={l.cost}
+                      onChange={(e) => updateLineCost(idx, parseFloat(e.target.value) || 0)}
+                      className="w-full text-right font-mono bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-400 outline-none"
+                    />
+                  </div>
+                  <div className="text-right font-mono font-semibold text-slate-800">{l.total.toFixed(3)}</div>
+                  {/* Quick Adjust button per row */}
+                  <div className="flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      onClick={() => {
+                        setQuickAdjustProductId(l.productId);
+                        setShowQuickAdjust(true);
+                      }}
+                      className={cn(
+                        "h-4 w-4 rounded flex items-center justify-center transition",
+                        isSelected ? "bg-emerald-500 text-white opacity-100" : "bg-emerald-100 text-emerald-600 opacity-0 group-hover:opacity-100"
+                      )}
+                      title="Quick Adjust this product"
+                    >
+                      <Zap className="h-2.5 w-2.5" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+      {/* ===== Bottom summary bar ===== */}
+      <div className="flex-shrink-0 px-3 py-1.5 flex items-center gap-4 border-t border-slate-300 bg-slate-50">
+        <div className="flex items-center gap-1">
+          <label className="text-[10px] font-bold text-slate-700">Bin:</label>
+          <input value={bin} readOnly className="h-5 w-20 px-1 text-[10px] font-mono border border-slate-300 rounded bg-white outline-none" />
+        </div>
+        <div className="flex items-center gap-1">
+          <label className="text-[10px] font-bold text-slate-700">Qty On Hand:</label>
+          <input value={totals.totalQty} readOnly className="h-5 w-16 px-1 text-[10px] font-mono border border-slate-300 rounded bg-white outline-none text-right" />
+        </div>
+        <div className="flex items-center gap-1">
+          <label className="text-[10px] font-bold text-slate-700">Variance:</label>
+          <input
+            value={totals.totalVariance > 0 ? `+${totals.totalVariance}` : `${totals.totalVariance}`}
+            readOnly
+            className={cn("h-5 w-16 px-1 text-[10px] font-mono font-bold border border-slate-300 rounded bg-white outline-none text-right", totals.totalVariance > 0 ? "text-emerald-700" : totals.totalVariance < 0 ? "text-rose-700" : "text-slate-500")}
+          />
+        </div>
+        <div className="flex-1" />
+        <div className="flex items-center gap-1">
+          <label className="text-[10px] font-bold text-slate-700">Total GHC:</label>
+          <input value={totals.totalCost.toFixed(2)} readOnly className="h-5 w-24 px-1 text-[10px] font-mono font-bold border border-slate-400 rounded outline-none text-right" style={{ backgroundColor: '#E6F0FF' }} />
+        </div>
+      </div>
+
+      {/* ===== Action buttons ===== */}
+      <div className="flex-shrink-0 px-3 py-2 flex items-center gap-1.5 border-t" style={{ borderColor: FIELD_BORDER, backgroundColor: '#F0F4F8' }}>
+        <button onClick={handleSave} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1 transition shadow-sm" style={{ backgroundColor: HEADER_DARK_BLUE }}>
+          <Save className="h-3 w-3" /> Save <kbd className="text-[7px] bg-white/20 px-0.5 rounded">F2</kbd>
+        </button>
+        <button onClick={handlePrint} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1 transition shadow-sm" style={{ backgroundColor: HEADER_DARK_BLUE }}>
+          <Printer className="h-3 w-3" /> Print <kbd className="text-[7px] bg-white/20 px-0.5 rounded">F3</kbd>
+        </button>
+        <button onClick={handleDelete} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1 transition shadow-sm" style={{ backgroundColor: HEADER_DARK_BLUE }}>
+          <Trash2 className="h-3 w-3" /> Delete <kbd className="text-[7px] bg-white/20 px-0.5 rounded">F4</kbd>
+        </button>
+        <button onClick={handleImport} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1 transition shadow-sm" style={{ backgroundColor: HEADER_DARK_BLUE }}>
+          <Upload className="h-3 w-3" style={{ color: '#4CAF50' }} /> Import
+        </button>
+        <button
+          onClick={toggleScanMode}
+          className={cn(
+            "h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1 transition shadow-sm",
+            scanMode && "animate-pulse"
+          )}
+          style={{ backgroundColor: scanMode ? '#F44336' : HEADER_DARK_BLUE }}
+          title={scanMode ? 'Scan mode is ON — click to stop' : 'Turn on barcode scanner mode (each scan adds 1 unit to counted qty)'}
+        >
+          <ScanLine className="h-3 w-3" style={{ color: scanMode ? '#FFC107' : '#4CAF50' }} />
+          {scanMode ? 'Scanning…' : 'Scan'}
+        </button>
+        <button onClick={handleExport} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1 transition shadow-sm" style={{ backgroundColor: HEADER_DARK_BLUE }}>
+          <Download className="h-3 w-3" style={{ color: '#4CAF50' }} /> Export
+        </button>
+        <button
+          onClick={() => {
+            if (lines.length === 0) { toast({ title: 'Add products first', description: 'Load the current adjustment before comparing', variant: 'destructive' }); return; }
+            if (!lastStocktakeData) { toast({ title: 'No previous stocktake found', description: 'Save this stocktake first, then compare against future ones', variant: 'destructive' }); return; }
+            setShowCompareReport(true);
+          }}
+          className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1 transition shadow-sm"
+          style={{ backgroundColor: HEADER_DARK_BLUE }}
+          title="Compare the current adjustment with the most recent committed stocktake"
+        >
+          <TrendingUp className="h-3 w-3" style={{ color: '#FFC107' }} /> Compare
+        </button>
+        <button
+          onClick={() => setShowAuditTrail(true)}
+          className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1 transition shadow-sm"
+          style={{ backgroundColor: HEADER_DARK_BLUE }}
+          title="View audit trail of all changes made to this draft"
+        >
+          <FileText className="h-3 w-3" style={{ color: '#FFC107' }} /> Audit
+          {auditTrail.length > 0 && (
+            <span className="ml-0.5 px-1 py-0.5 rounded-full text-[7px] font-bold bg-amber-500 text-white">
+              {auditTrail.length}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => {
+            // If a line is selected, pre-select that product in the Quick Adjust popup
+            if (selectedLine !== null && lines[selectedLine]) {
+              setQuickAdjustProductId(lines[selectedLine].productId);
+            } else {
+              setQuickAdjustProductId(undefined);
+            }
+            setShowQuickAdjust(true);
+          }}
+          className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1 transition shadow-sm"
+          style={{ backgroundColor: '#059669' }}
+          title="Open Quick Stock Adjustment for a single product — adjustments are synced back to this form"
+        >
+          <Zap className="h-3 w-3" style={{ color: '#FFC107' }} /> Quick Adjust
+        </button>
+        <div className="flex-1" />
+        {selectedLine !== null && lines[selectedLine] && (
+          <button
+            onClick={() => removeLine(selectedLine)}
+            className="h-7 px-2 rounded bg-rose-100 hover:bg-rose-200 text-rose-700 text-[10px] font-semibold flex items-center gap-1 transition"
+          >
+            <Trash2 className="h-3 w-3" /> Remove Line
+          </button>
+        )}
+        <button onClick={onClose} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1 transition shadow-sm" style={{ backgroundColor: '#F44336' }}>
+          <X className="h-3 w-3" /> Close <kbd className="text-[7px] bg-white/20 px-0.5 rounded">Esc</kbd>
+        </button>
+      </div>
+
+      {/* ===== Status bar ===== */}
+      <div className="flex-shrink-0 px-3 py-0.5 text-[8px] text-slate-600 flex items-center gap-3" style={{ backgroundColor: '#E0E0E0' }}>
+        <span className="font-mono">{adjType === 'stocktake' ? 'Stocktake' : 'Stock Adjustment'} · {adjNumber}</span>
+        <span className="font-mono">· {lines.length} lines</span>
+        {totals.totalVariance !== 0 && (
+          <span className={cn("font-mono font-bold flex items-center gap-0.5", totals.totalVariance > 0 ? "text-emerald-700" : "text-rose-700")}>
+            <AlertTriangle className="h-2.5 w-2.5" />
+            Variance: {totals.totalVariance > 0 ? '+' : ''}{totals.totalVariance}
+          </span>
+        )}
+        <div className="flex-1" />
+        <span className="text-emerald-700 font-semibold flex items-center gap-0.5">
+          <Zap className="h-2.5 w-2.5" /> Quick Adjust available — click the button to adjust a single product
+        </span>
+        <span>·</span>
+        <span>{COMPANY.name} · {COMPANY.address}</span>
+      </div>
+
+      {/* ===== Stock Search Popup ===== */}
+      <AnimatePresence>
+        {showStockSearch && (
+          <StockSearchMiniPopup
+            products={products}
+            groups={groups}
+            searchText={findPartNo}
+            initialGroup={groupFilter}
+            history={history}
+            onSelect={(p) => {
+              addProductToLines(p);
+              setShowStockSearch(false);
+            }}
+            onClose={() => setShowStockSearch(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ===== Compare with last Stocktake Report Popup ===== */}
+      <AnimatePresence>
+        {showCompareReport && lastStocktakeData && (
+          <CompareWithLastStocktakeReport
+            currentAdjNumber={adjNumber}
+            currentAdjType={adjType}
+            currentDate={date}
+            previousReference={lastStocktakeData.reference}
+            previousTimestamp={lastStocktakeData.timestamp}
+            rows={comparisonRows}
+            totals={comparisonTotals}
+            onClose={() => setShowCompareReport(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ===== Quick Stock Adjustment Popup ===== */}
+      {/* Opens the QuickStockAdjustment from within this form.
+          When a quick adjustment is saved, the product's new quantity
+          is synced back to this form's table (adding or updating the line). */}
+      <AnimatePresence>
+        {showQuickAdjust && (
+          <QuickStockAdjustment
+            products={products}
+            setProducts={setProducts}
+            setHistory={setHistory}
+            history={history}
+            groups={groups}
+            onClose={() => { setShowQuickAdjust(false); setQuickAdjustProductId(undefined); }}
+            initialProductId={quickAdjustProductId}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ===== Audit Trail Popup ===== */}
+      <AnimatePresence>
+        {showAuditTrail && (
+          <AuditTrailPopup
+            entries={auditTrail}
+            adjNumber={adjNumber}
+            onClose={() => setShowAuditTrail(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ===== Barcode Scanner Mode Overlay (fixed bottom-right) ===== */}
+      <AnimatePresence>
+        {scanMode && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 50, scale: 0.9 }}
+            transition={{ type: 'spring', damping: 20, stiffness: 300 }}
+            className="fixed bottom-4 right-4 z-[80] bg-white rounded-xl shadow-2xl ring-2 ring-rose-400 overflow-hidden"
+            style={{ width: '100%', maxWidth: '340px', fontFamily: 'Arial, Helvetica, sans-serif' }}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-3 py-2 bg-gradient-to-r from-rose-600 to-rose-500 text-white">
+              <div className="flex items-center gap-2">
+                <ScanLine className="h-4 w-4 animate-pulse" />
+                <span className="text-xs font-bold">Scanner Active</span>
+              </div>
+              <button
+                onClick={toggleScanMode}
+                className="h-5 w-5 rounded bg-white/20 hover:bg-white/30 flex items-center justify-center transition"
+                title="Stop scanning"
+              >
+                <X className="h-3 w-3 text-white" />
+              </button>
+            </div>
+
+            {/* Live buffer display */}
+            <div className="px-3 py-2 bg-slate-50 border-b border-slate-200">
+              <div className="text-[9px] font-bold text-slate-500 uppercase mb-0.5">Current buffer</div>
+              <div className="h-7 px-2 flex items-center bg-white border border-slate-300 rounded font-mono text-sm text-slate-800">
+                {scanBuffer || <span className="text-slate-300">Waiting for scan…</span>}
+                <span className="ml-0.5 inline-block w-0.5 h-4 bg-rose-500 animate-pulse" />
+              </div>
+            </div>
+
+            {/* Last scan feedback */}
+            <div className="px-3 py-2 border-b border-slate-200">
+              <div className="text-[9px] font-bold text-slate-500 uppercase mb-0.5">Last scan</div>
+              {lastScanFeedback ? (
+                <div className="flex items-center gap-2">
+                  {lastScanFeedback.status === 'added' && (
+                    <><Package className="h-4 w-4 text-emerald-600 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[11px] font-bold text-emerald-700 truncate">+ Added: {lastScanFeedback.productName}</div>
+                      <div className="text-[9px] text-slate-500 font-mono truncate">{lastScanFeedback.barcode}</div>
+                    </div></>
+                  )}
+                  {lastScanFeedback.status === 'incremented' && (
+                    <><TrendingUp className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[11px] font-bold text-blue-700 truncate">+1: {lastScanFeedback.productName}</div>
+                      <div className="text-[9px] text-slate-500 font-mono truncate">{lastScanFeedback.barcode}</div>
+                    </div></>
+                  )}
+                  {lastScanFeedback.status === 'notfound' && (
+                    <><AlertTriangle className="h-4 w-4 text-rose-600 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[11px] font-bold text-rose-700 truncate">Not found</div>
+                      <div className="text-[9px] text-slate-500 font-mono truncate">{lastScanFeedback.barcode}</div>
+                    </div></>
+                  )}
+                </div>
+              ) : (
+                <div className="text-[10px] text-slate-400 italic">No scans yet — scan a barcode to begin</div>
+              )}
+            </div>
+
+            {/* Stats */}
+            <div className="px-3 py-2 grid grid-cols-3 gap-2 bg-slate-50">
+              <div className="text-center">
+                <div className="text-base font-bold text-slate-800 font-mono">{scanStats.scanned}</div>
+                <div className="text-[8px] text-slate-500 uppercase">Scanned</div>
+              </div>
+              <div className="text-center">
+                <div className="text-base font-bold text-emerald-600 font-mono">{scanStats.added}</div>
+                <div className="text-[8px] text-slate-500 uppercase">Added/Inc</div>
+              </div>
+              <div className="text-center">
+                <div className="text-base font-bold text-rose-600 font-mono">{scanStats.notFound}</div>
+                <div className="text-[8px] text-slate-500 uppercase">Not Found</div>
+              </div>
+            </div>
+
+            {/* Instructions */}
+            <div className="px-3 py-1.5 bg-rose-50 border-t border-rose-100">
+              <div className="text-[9px] text-rose-700">
+                Each scan adds <strong>1 unit</strong> to the counted quantity.
+                Click anywhere outside form fields and scan with your barcode scanner.
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+
+  if (asWindow) {
+    return (
+      <PopupWindow
+        title="Stock Quantity Adjustment"
+        titleBarColor={HEADER_DARK_BLUE}
+        initialWidth={920}
+        initialHeight={620}
+        minWidth={720}
+        minHeight={500}
+        onClose={onClose}
+      >
+        {body}
+      </PopupWindow>
+    );
+  }
+
+  return body;
+}
+
+// ===== Mini Stock Search Popup (light blue/green, matches reference) =====
+function StockSearchMiniPopup({
+  products, groups, searchText, initialGroup, history, onSelect, onClose,
+}: {
+  products: Product[];
+  groups: StockGroup[];
+  searchText: string;
+  initialGroup?: string;
+  history?: StockHistoryEntry[];
+  onSelect: (p: Product) => void;
+  onClose: () => void;
+}) {
+  const { toast } = useToast();
+  const [query, setQuery] = useState(searchText);
+  const [filterType, setFilterType] = useState('all');
+  const [filterGroup, setFilterGroup] = useState(initialGroup || 'all');
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [showHistoryFor, setShowHistoryFor] = useState<Product | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const t = setTimeout(() => inputRef.current?.focus(), 50);
+    return () => clearTimeout(t);
+  }, []);
+
+  // Sync query with searchText prop when it changes (e.g., user keeps typing in Find Part No)
+  useEffect(() => {
+    setQuery(searchText);
+    setSelectedIndex(0);
+  }, [searchText]);
+
+  // Sync filterGroup with initialGroup prop when it changes
+  useEffect(() => {
+    if (initialGroup !== undefined) {
+      setFilterGroup(initialGroup);
+      setSelectedIndex(0);
+    }
+  }, [initialGroup]);
+
+  const filtered = useMemo(() => {
+    return products.filter(p => {
+      if (query.trim()) {
+        const q = query.toLowerCase();
+        if (!p.name.toLowerCase().includes(q) && !p.sku.toLowerCase().includes(q) && !p.barcode.includes(q) && !p.supplier.toLowerCase().includes(q)) return false;
+      }
+      if (filterType !== 'all') {
+        if (filterType === 'taxable' && !p.taxable) return false;
+        if (filterType === 'non-taxable' && p.taxable) return false;
+        if (filterType === 'low-stock' && p.stock > p.reorderLevel) return false;
+        if (filterType === 'out-of-stock' && p.stock > 0) return false;
+      }
+      if (filterGroup !== 'all' && p.groupId !== filterGroup) return false;
+      return true;
+    });
+  }, [products, query, filterType, filterGroup]);
+
+  useEffect(() => {
+    if (selectedIndex >= filtered.length) setSelectedIndex(Math.max(0, filtered.length - 1));
+  }, [filtered.length, selectedIndex]);
+
+  const handleSelect = () => {
+    if (!filtered[selectedIndex]) {
+      toast({ title: 'No product selected', variant: 'destructive' });
+      return;
+    }
+    onSelect(filtered[selectedIndex]);
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/50 flex items-start justify-center pt-16 z-[60]"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.95, y: -20 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.95, y: -20 }}
+        onClick={(e) => e.stopPropagation()}
+        className="rounded-lg shadow-2xl overflow-hidden flex flex-col"
+        style={{ width: '100%', maxWidth: '780px', maxHeight: '85vh', fontFamily: 'Arial, Helvetica, sans-serif' }}
+      >
+        {/* Title bar — light blue with dark blue text (matches reference) */}
+        <div className="flex-shrink-0 flex items-center justify-between px-3 h-7" style={{ backgroundColor: '#5B9BD5' }}>
+          <span className="text-xs font-bold text-white">Stock Search</span>
+          <button onClick={onClose} className="h-5 w-5 rounded bg-red-600 hover:bg-red-700 flex items-center justify-center transition"><X className="h-3 w-3 text-white" /></button>
+        </div>
+
+        {/* Filter section — light green background (matches reference) */}
+        <div className="flex-shrink-0 px-3 py-2 space-y-1.5" style={{ backgroundColor: '#E8F5E9' }}>
+          {/* Filter By row */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[10px] font-bold text-slate-700 uppercase">Filter By:</span>
+            <select value={filterType} onChange={(e) => { setFilterType(e.target.value); setSelectedIndex(0); }} className="h-6 px-1 text-[10px] border border-slate-400 rounded bg-white outline-none">
+              <option value="all">All Types</option>
+              <option value="taxable">Taxable (VAT)</option>
+              <option value="non-taxable">Non-Taxable</option>
+              <option value="low-stock">Low Stock</option>
+              <option value="out-of-stock">Out of Stock</option>
+            </select>
+            <select value={filterGroup} onChange={(e) => { setFilterGroup(e.target.value); setSelectedIndex(0); }} className="h-6 px-1 text-[10px] border border-slate-400 rounded bg-white outline-none">
+              <option value="all">All Stock Groups</option>
+              {groups.map(g => <option key={g.id} value={g.id}>{g.icon} {g.name}</option>)}
+            </select>
+            <select className="h-6 px-1 text-[10px] border border-slate-400 rounded bg-white outline-none" defaultValue="all">
+              <option value="all">All Sub Groups</option>
+              <option value="fresh">Fresh Items</option>
+              <option value="packaged">Packaged</option>
+              <option value="frozen">Frozen</option>
+            </select>
+            <select className="h-6 px-1 text-[10px] border border-slate-400 rounded bg-white outline-none" defaultValue="all">
+              <option value="all">All Brands</option>
+              <option value="local">Local</option>
+              <option value="imported">Imported</option>
+            </select>
+            <select className="h-6 px-1 text-[10px] border border-slate-400 rounded bg-white outline-none" defaultValue="all">
+              <option value="all">All Suppliers</option>
+            </select>
+          </div>
+          {/* Search Text row */}
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold text-slate-700 uppercase">Search Text:</span>
+            <input
+              ref={inputRef}
+              value={query}
+              onChange={(e) => { setQuery(e.target.value); setSelectedIndex(0); }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleSelect();
+                if (e.key === 'Escape') onClose();
+                if (e.key === 'ArrowDown') { e.preventDefault(); setSelectedIndex(i => Math.min(filtered.length - 1, i + 1)); }
+                if (e.key === 'ArrowUp') { e.preventDefault(); setSelectedIndex(i => Math.max(0, i - 1)); }
+              }}
+              placeholder="Details (name, SKU, barcode, supplier)"
+              className="flex-1 h-6 px-2 text-[10px] border border-slate-400 rounded bg-white outline-none focus:ring-1 focus:ring-blue-400"
+            />
+            <button onClick={() => setSelectedIndex(0)} className="h-6 px-3 rounded border border-slate-400 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-semibold">Search</button>
+          </div>
+        </div>
+
+        {/* Table — white background with column headers */}
+        <div className="flex-shrink-0 grid grid-cols-[140px_1fr_50px_90px_90px] gap-0 px-2 py-1 text-[9px] font-bold text-white" style={{ backgroundColor: '#1E5A8E' }}>
+          <div>Part no.</div>
+          <div>Details</div>
+          <div className="text-right">Qty</div>
+          <div className="text-right">Retail GHC</div>
+          <div className="text-right">Cost GHC</div>
+        </div>
+
+        {/* Table body */}
+        <div className="flex-1 overflow-y-auto bg-white min-h-0" style={{ scrollbarWidth: 'thin' }}>
+          {filtered.length === 0 ? (
+            <div className="text-center py-6 text-slate-400 text-[11px]">No products match the filters</div>
+          ) : (
+            filtered.map((p, idx) => {
+              const isSelected = idx === selectedIndex;
+              return (
+                <div
+                  key={p.id}
+                  onClick={() => setSelectedIndex(idx)}
+                  onDoubleClick={() => onSelect(p)}
+                  className="grid grid-cols-[140px_1fr_50px_90px_90px] gap-0 px-2 py-0.5 text-[10px] cursor-pointer border-b border-slate-100"
+                  style={{ backgroundColor: isSelected ? '#D6E6F5' : (idx % 2 === 1 ? '#F8F8F8' : '#FFFFFF') }}
+                >
+                  <div className="font-mono truncate text-slate-700">{p.barcode}</div>
+                  <div className="truncate text-slate-800">{p.emoji} {p.name}</div>
+                  <div className="text-right font-mono text-slate-700">{p.stock}</div>
+                  <div className="text-right font-mono text-slate-700">{p.price.toFixed(2)}</div>
+                  <div className="text-right font-mono text-slate-700">{p.costPrice.toFixed(2)}</div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Action buttons — bottom row matching reference */}
+        <div className="flex-shrink-0 px-3 py-2 flex items-center gap-1.5 border-t" style={{ borderColor: '#808080', backgroundColor: '#E8F5E9' }}>
+          <button onClick={handleSelect} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1 transition" style={{ backgroundColor: '#4CAF50' }}>
+            <Check className="h-3 w-3" /> Select (Enter)
+          </button>
+          <button onClick={() => { if (!filtered[selectedIndex]) { toast({ title: 'Select a product first', variant: 'destructive' }); return; } onSelect(filtered[selectedIndex]); }} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1 transition" style={{ backgroundColor: '#2196F3' }} title="Add selected product to the adjustment table">
+            <Edit2 className="h-3 w-3" /> Modify
+          </button>
+          <button onClick={() => toast({ title: 'New Product', description: 'Close this form and use Stock File → Add / Modify Stock to create new products' })} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1 transition" style={{ backgroundColor: '#2196F3' }} title="Add a new product (use Stock File)">
+            <Plus className="h-3 w-3" /> New
+          </button>
+          <button onClick={() => { if (!filtered[selectedIndex]) { toast({ title: 'Select a product first', variant: 'destructive' }); return; } const p = filtered[selectedIndex]; toast({ title: 'Product Picture', description: p.image ? `${p.emoji} ${p.name} — image on file` : `${p.emoji} ${p.name} — no image on file. Use Stock File to add a picture.` }); }} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1 transition" style={{ backgroundColor: '#9E9E9E' }} title="View product picture">
+            <ImageIcon className="h-3 w-3" /> Picture
+          </button>
+          <button onClick={() => { if (!filtered[selectedIndex]) { toast({ title: 'Select a product first', variant: 'destructive' }); return; } setShowHistoryFor(filtered[selectedIndex]); }} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1 transition" style={{ backgroundColor: '#2196F3' }} title="View adjustment history for this product">
+            <HistoryIcon className="h-3 w-3" /> History
+          </button>
+          <button onClick={() => { if (!filtered[selectedIndex]) { toast({ title: 'Select a product first', variant: 'destructive' }); return; } const p = filtered[selectedIndex]; const printWin = window.open('', '_blank', 'width=400,height=300'); if (!printWin) { toast({ title: 'Popup blocked', variant: 'destructive' }); return; } printWin.document.write(`<!DOCTYPE html><html><head><title>Label - ${p.name}</title><style>body{margin:0;padding:10mm;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:Arial,sans-serif}.label{width:80mm;height:40mm;border:1px solid #999;padding:5mm;display:flex;flex-direction:column;align-items:center;justify-content:space-between}.name{font-size:14px;font-weight:bold;text-align:center}.price{font-size:20px;font-weight:bold;color:#16a34a}.sku{font-size:10px;color:#666;font-family:monospace}</style></head><body><div class="label"><div class="name">${p.emoji} ${p.name}</div><div class="price">${formatGHS(p.price)}</div><div class="sku">${p.sku} · ${p.barcode}</div></div><script>window.onload=()=>window.print()</script></body></html>`); printWin.document.close(); toast({ title: 'Printing label', description: p.name }); }} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1 transition" style={{ backgroundColor: '#9C27B0' }} title="Print a price label for this product">
+            <Tags className="h-3 w-3" /> Labels
+          </button>
+          <button onClick={() => { if (!filtered[selectedIndex]) { toast({ title: 'Select a product first', variant: 'destructive' }); return; } toast({ title: 'Quantity Adjustment', description: `${filtered[selectedIndex].emoji} ${filtered[selectedIndex].name} — current stock: ${filtered[selectedIndex].stock}. Close this search and use the Quick Adjust button to adjust.` }); }} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1 transition" style={{ backgroundColor: '#FF9800' }} title="Quick quantity adjustment for this product">
+            <ArrowUpDown className="h-3 w-3" /> Qty
+          </button>
+          <div className="flex-1" />
+          <button onClick={onClose} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1 transition" style={{ backgroundColor: '#F44336' }}>
+            <X className="h-3 w-3" /> Close (Esc)
+          </button>
+        </div>
+        <div className="flex-shrink-0 px-3 py-0.5 text-[9px] text-slate-600 flex items-center gap-3" style={{ backgroundColor: '#E0E0E0' }}>
+          <span className="font-mono">{filtered.length} of {products.length} products</span>
+          <div className="flex-1" />
+          <span>↑↓ Navigate · Enter Select · Esc Close</span>
+        </div>
+
+        {/* ===== Product Adjustment History Popup ===== */}
+        <AnimatePresence>
+          {showHistoryFor && (
+            <ProductHistoryPopup
+              product={showHistoryFor}
+              history={history || []}
+              onClose={() => setShowHistoryFor(null)}
+            />
+          )}
+        </AnimatePresence>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ===== Product History Popup =====
+// Shows all stock adjustment history for a single product
+function ProductHistoryPopup({ product, history, onClose }: {
+  product: Product;
+  history: StockHistoryEntry[];
+  onClose: () => void;
+}) {
+  const entries = useMemo(() =>
+    history
+      .filter(h => h.productId === product.id)
+      .sort((a, b) => b.timestamp.localeCompare(a.timestamp)),
+    [history, product.id]
+  );
+
+  const stats = useMemo(() => {
+    const adjusted = entries.filter(e => e.action === 'adjusted');
+    const totalChange = adjusted.reduce((s, e) => s + e.quantityChange, 0);
+    return { total: entries.length, adjusted: adjusted.length, totalChange };
+  }, [entries]);
+
+  const fmtDate = (ts: string) => {
+    try {
+      const d = new Date(ts);
+      return d.toLocaleDateString('en-GB') + ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    } catch { return ts; }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-[70]"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.95, y: 20 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.95, y: 20 }}
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-lg shadow-2xl overflow-hidden flex flex-col"
+        style={{ width: '100%', maxWidth: '600px', maxHeight: '70vh', fontFamily: 'Arial, Helvetica, sans-serif' }}
+      >
+        {/* Title bar */}
+        <div className="flex-shrink-0 flex items-center justify-between px-4 h-8 text-white" style={{ backgroundColor: '#2196F3' }}>
+          <div className="flex items-center gap-2">
+            <HistoryIcon className="h-4 w-4" />
+            <span className="text-xs font-bold">Adjustment History — {product.emoji} {product.name}</span>
+          </div>
+          <button onClick={onClose} className="h-5 w-5 rounded bg-red-600 hover:bg-red-700 flex items-center justify-center"><X className="h-3 w-3 text-white" /></button>
+        </div>
+
+        {/* Stats */}
+        <div className="flex-shrink-0 px-4 py-2 bg-blue-50 border-b border-blue-100 flex items-center gap-4 text-[10px]">
+          <span className="text-slate-500">SKU:</span>
+          <span className="font-mono text-slate-700">{product.sku}</span>
+          <span className="text-slate-300">·</span>
+          <span className="text-slate-500">Current Stock:</span>
+          <span className="font-bold font-mono text-slate-800">{product.stock}</span>
+          <span className="text-slate-300">·</span>
+          <span className="text-slate-500">{stats.adjusted} adjustment(s)</span>
+          <span className="text-slate-300">·</span>
+          <span className="text-slate-500">Net Change:</span>
+          <span className={cn("font-bold font-mono", stats.totalChange > 0 ? "text-emerald-600" : stats.totalChange < 0 ? "text-rose-600" : "text-slate-600")}>
+            {stats.totalChange > 0 ? '+' : ''}{stats.totalChange}
+          </span>
+        </div>
+
+        {/* History list */}
+        <div className="flex-1 overflow-y-auto p-3" style={{ scrollbarWidth: 'thin' }}>
+          {entries.length === 0 ? (
+            <div className="text-center py-8 text-slate-400 text-sm">No adjustment history for this product</div>
+          ) : (
+            <div className="space-y-1.5">
+              {entries.map(h => (
+                <div key={h.id} className="flex items-center gap-3 p-2 rounded-lg bg-slate-50 text-[10px]">
+                  <div className={cn(
+                    "h-7 w-7 rounded-md flex items-center justify-center font-bold font-mono flex-shrink-0",
+                    h.quantityChange > 0 ? "bg-emerald-100 text-emerald-700" :
+                    h.quantityChange < 0 ? "bg-rose-100 text-rose-700" :
+                    "bg-slate-100 text-slate-600"
+                  )}>
+                    {h.quantityChange > 0 ? '+' : ''}{h.quantityChange}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-slate-700 font-medium truncate">{h.reason}</div>
+                    <div className="text-[9px] text-slate-400 font-mono">{fmtDate(h.timestamp)} · {h.reference} · by {h.user}</div>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <div className="text-[8px] text-slate-400 uppercase">New Qty</div>
+                    <div className="font-mono font-bold text-slate-700">{h.newQuantity}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex-shrink-0 px-4 py-2 flex items-center justify-end border-t border-slate-200 bg-slate-50">
+          <button onClick={onClose} className="h-7 px-4 rounded bg-rose-100 hover:bg-rose-200 text-rose-700 text-xs font-bold flex items-center gap-1.5 transition">
+            <X className="h-3.5 w-3.5" /> Close
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ===== Compare with last Stocktake Report Popup =====
+// Shows a side-by-side comparison of the current adjustment's counted quantities
+// against the most recent committed stocktake (or adjustment), highlighting
+// items where the count has changed and items that are new since the last event.
+interface ComparisonRow {
+  productId: string;
+  partNo: string;
+  details: string;
+  currentOnHand: number;
+  currentCounted: number;
+  previousCounted: number | null;
+  previousReference: string | null;
+  deltaFromLast: number | null;
+}
+
+interface ComparisonTotals {
+  totalCurrentCounted: number;
+  totalPreviousCounted: number;
+  totalDelta: number;
+  matchedProducts: number;
+  newProducts: number;
+}
+
+interface CompareReportProps {
+  currentAdjNumber: string;
+  currentAdjType: 'stocktake' | 'adjustment';
+  currentDate: string;
+  previousReference: string;
+  previousTimestamp: string;
+  rows: ComparisonRow[];
+  totals: ComparisonTotals;
+  onClose: () => void;
+}
+
+function CompareWithLastStocktakeReport({
+  currentAdjNumber,
+  currentAdjType,
+  currentDate,
+  previousReference,
+  previousTimestamp,
+  rows,
+  totals,
+  onClose,
+}: CompareReportProps) {
+  const { toast } = useToast();
+
+  // Format timestamp for display
+  const fmtPrevDate = (() => {
+    try {
+      const d = new Date(previousTimestamp);
+      return d.toLocaleDateString('en-GB') + ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    } catch {
+      return previousTimestamp;
+    }
+  })();
+
+  // Sort rows: items with delta first (descending by abs delta), then matched items with no delta, then new items
+  const sortedRows = [...rows].sort((a, b) => {
+    const aDelta = a.deltaFromLast ?? -Infinity; // null = new item, push to end
+    const bDelta = b.deltaFromLast ?? -Infinity;
+    if (aDelta === null && bDelta === null) return 0;
+    if (aDelta === null) return 1;
+    if (bDelta === null) return -1;
+    return Math.abs(bDelta) - Math.abs(aDelta);
+  });
+
+  const handlePrint = () => {
+    const printWin = window.open('', '_blank', 'width=900,height=600');
+    if (!printWin) { toast({ title: 'Popup blocked', variant: 'destructive' }); return; }
+    const rowsHtml = sortedRows.map((r, i) => {
+      const delta = r.deltaFromLast;
+      const deltaColor = delta === null ? '#666' : (delta > 0 ? '#16A34A' : delta < 0 ? '#DC2626' : '#666');
+      const deltaText = delta === null ? 'NEW' : (delta > 0 ? `+${delta}` : `${delta}`);
+      return `
+        <tr style="background:${i % 2 === 1 ? '#F8F8F8' : '#FFFFFF'}">
+          <td style="border:1px solid #999;padding:4px 6px;text-align:center">${i + 1}</td>
+          <td style="border:1px solid #999;padding:4px 6px;font-family:monospace">${r.partNo}</td>
+          <td style="border:1px solid #999;padding:4px 6px">${r.details}</td>
+          <td style="border:1px solid #999;padding:4px 6px;text-align:right;background:#FFF8DC">${r.currentOnHand}</td>
+          <td style="border:1px solid #999;padding:4px 6px;text-align:right">${r.currentCounted}</td>
+          <td style="border:1px solid #999;padding:4px 6px;text-align:right">${r.previousCounted ?? '—'}</td>
+          <td style="border:1px solid #999;padding:4px 6px;text-align:right;color:${deltaColor};font-weight:bold">${deltaText}</td>
+        </tr>`;
+    }).join('');
+    printWin.document.write(`<!DOCTYPE html><html><head><title>Compare with last Stocktake — ${currentAdjNumber}</title>
+      <style>
+        body { font-family: Arial, Helvetica, sans-serif; margin: 20px; }
+        .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 15px; }
+        .header h1 { margin: 0; font-size: 18px; }
+        .header div { font-size: 12px; color: #666; }
+        .compare-info { display: flex; justify-content: space-between; margin-bottom: 10px; padding: 10px; background: #E6F0FF; border-radius: 4px; font-size: 11px; }
+        .compare-info strong { color: #1E5A8E; }
+        table { width: 100%; border-collapse: collapse; font-size: 11px; }
+        th { background: #1E5A8E; color: white; border: 1px solid #999; padding: 5px 6px; font-weight: bold; }
+        .totals { margin-top: 15px; margin-left: auto; width: 380px; font-size: 11px; }
+        .totals td { padding: 4px 8px; }
+        .totals .total-row { font-weight: bold; border-top: 2px solid #333; }
+        @media print { body { margin: 10px; } }
+      </style></head><body>
+      <div class="header">
+        <h1>${COMPANY.name}</h1>
+        <div>${COMPANY.address} · ${COMPANY.contact}</div>
+      </div>
+      <h2 style="text-align:center;font-size:14px;margin:10px 0">Compare with last Stocktake</h2>
+      <div class="compare-info">
+        <div><strong>Current:</strong> ${currentAdjType === 'stocktake' ? 'Stocktake' : 'Stock Adjustment'} ${currentAdjNumber} · ${currentDate}</div>
+        <div><strong>Previous:</strong> ${previousReference} · ${fmtPrevDate}</div>
+      </div>
+      <table>
+        <thead><tr>
+          <th style="width:30px;text-align:center">#</th>
+          <th style="text-align:left">Part Number</th>
+          <th style="text-align:left">Details</th>
+          <th style="text-align:right">On Hand</th>
+          <th style="text-align:right">Current Counted</th>
+          <th style="text-align:right">Previous Counted</th>
+          <th style="text-align:right">Delta</th>
+        </tr></thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>
+      <table class="totals">
+        <tr><td>Matched items:</td><td style="text-align:right">${totals.matchedProducts}</td></tr>
+        <tr><td>New items (not in previous):</td><td style="text-align:right">${totals.newProducts}</td></tr>
+        <tr><td>Total current counted:</td><td style="text-align:right">${totals.totalCurrentCounted}</td></tr>
+        <tr><td>Total previous counted:</td><td style="text-align:right">${totals.totalPreviousCounted}</td></tr>
+        <tr class="total-row"><td>Net delta:</td><td style="text-align:right;color:${totals.totalDelta > 0 ? '#16A34A' : (totals.totalDelta < 0 ? '#DC2626' : '#666')}">${totals.totalDelta > 0 ? '+' : ''}${totals.totalDelta}</td></tr>
+      </table>
+      </body></html>`);
+    printWin.document.close();
+    setTimeout(() => { printWin.focus(); printWin.print(); }, 300);
+    toast({ title: 'Printing comparison report' });
+  };
+
+  const handleExport = () => {
+    import('xlsx').then((XLSX) => {
+      type Row = Record<string, string | number>;
+      const data: Row[] = sortedRows.map((r, i) => ({
+        '#': i + 1,
+        'Part Number': r.partNo,
+        'Details': r.details,
+        'On Hand': r.currentOnHand,
+        'Current Counted': r.currentCounted,
+        'Previous Counted': r.previousCounted ?? '',
+        'Delta from Last': r.deltaFromLast ?? 'NEW',
+      }));
+      data.push({
+        '#': '',
+        'Part Number': '',
+        'Details': 'TOTAL',
+        'On Hand': '',
+        'Current Counted': totals.totalCurrentCounted,
+        'Previous Counted': totals.totalPreviousCounted,
+        'Delta from Last': totals.totalDelta,
+      });
+      const ws = XLSX.utils.json_to_sheet(data);
+      ws['!cols'] = [{ wch: 5 }, { wch: 16 }, { wch: 30 }, { wch: 10 }, { wch: 16 }, { wch: 16 }, { wch: 14 }];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Comparison');
+      XLSX.writeFile(wb, `compare-stocktake-${currentAdjNumber}-${new Date().toISOString().split('T')[0]}.xlsx`);
+      toast({ title: 'Exported successfully', description: `${sortedRows.length} rows` });
+    });
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.95, y: 20 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.95, y: 20 }}
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-lg shadow-2xl overflow-hidden flex flex-col"
+        style={{ width: '100%', maxWidth: '900px', maxHeight: '85vh', fontFamily: 'Arial, Helvetica, sans-serif' }}
+      >
+        {/* Title bar */}
+        <div className="flex-shrink-0 flex items-center justify-between px-4 h-9 text-white" style={{ backgroundColor: HEADER_DARK_BLUE }}>
+          <div className="flex items-center gap-2">
+            <TrendingUp className="h-4 w-4" />
+            <span className="text-sm font-bold">Compare with last Stocktake</span>
+          </div>
+          <button onClick={onClose} className="h-6 w-6 rounded bg-red-600 hover:bg-red-700 flex items-center justify-center transition"><X className="h-3.5 w-3.5 text-white" /></button>
+        </div>
+
+        {/* Comparison info banner */}
+        <div className="flex-shrink-0 px-4 py-3 bg-blue-50 border-b border-blue-200 grid grid-cols-2 gap-4">
+          <div>
+            <div className="text-[10px] font-bold text-slate-500 uppercase">Current</div>
+            <div className="text-sm font-bold text-slate-800">{currentAdjType === 'stocktake' ? 'Stocktake' : 'Stock Adjustment'} {currentAdjNumber}</div>
+            <div className="text-[10px] text-slate-500">{currentDate} · {rows.length} items</div>
+          </div>
+          <div className="text-right">
+            <div className="text-[10px] font-bold text-slate-500 uppercase">Compared against</div>
+            <div className="text-sm font-bold text-slate-800">{previousReference}</div>
+            <div className="text-[10px] text-slate-500">{fmtPrevDate}</div>
+          </div>
+        </div>
+
+        {/* Summary stats */}
+        <div className="flex-shrink-0 px-4 py-2 bg-slate-50 border-b border-slate-200 flex items-center gap-4 text-[10px]">
+          <div>
+            <span className="text-slate-500">Matched items:</span>
+            <span className="font-bold text-slate-800 ml-1">{totals.matchedProducts}</span>
+          </div>
+          <div>
+            <span className="text-slate-500">New items:</span>
+            <span className="font-bold text-blue-700 ml-1">{totals.newProducts}</span>
+          </div>
+          <div>
+            <span className="text-slate-500">Current total:</span>
+            <span className="font-bold text-slate-800 ml-1 font-mono">{totals.totalCurrentCounted}</span>
+          </div>
+          <div>
+            <span className="text-slate-500">Previous total:</span>
+            <span className="font-bold text-slate-800 ml-1 font-mono">{totals.totalPreviousCounted}</span>
+          </div>
+          <div>
+            <span className="text-slate-500">Net delta:</span>
+            <span className={cn("font-bold ml-1 font-mono", totals.totalDelta > 0 ? "text-emerald-700" : totals.totalDelta < 0 ? "text-rose-700" : "text-slate-600")}>
+              {totals.totalDelta > 0 ? '+' : ''}{totals.totalDelta}
+            </span>
+          </div>
+        </div>
+
+        {/* Table */}
+        <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+          <div className="flex-shrink-0 grid grid-cols-[30px_120px_1fr_70px_90px_90px_80px] gap-0 px-3 py-1 text-[9px] font-bold text-white" style={{ backgroundColor: HEADER_DARK_BLUE }}>
+            <div className="text-center">#</div>
+            <div>Part Number</div>
+            <div>Details</div>
+            <div className="text-right">On Hand</div>
+            <div className="text-right">Current Counted</div>
+            <div className="text-right">Previous Counted</div>
+            <div className="text-right">Delta</div>
+          </div>
+          <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
+            {sortedRows.length === 0 ? (
+              <div className="text-center py-8 text-slate-400 text-[11px]">No items to compare</div>
+            ) : (
+              sortedRows.map((r, idx) => {
+                const delta = r.deltaFromLast;
+                const isNew = delta === null;
+                return (
+                  <div
+                    key={r.productId}
+                    className="grid grid-cols-[30px_120px_1fr_70px_90px_90px_80px] gap-0 px-3 py-0.5 text-[10px] border-b border-slate-100"
+                    style={{
+                      backgroundColor: isNew ? '#E3F2FD' : (idx % 2 === 1 ? '#F8F8F8' : '#FFFFFF'),
+                    }}
+                  >
+                    <div className="text-center text-slate-500">{idx + 1}</div>
+                    <div className="font-mono truncate text-slate-700">{r.partNo}</div>
+                    <div className="truncate text-slate-800">{r.details}</div>
+                    <div className="text-right font-mono text-slate-700" style={{ backgroundColor: ON_HAND_BG }}>{r.currentOnHand}</div>
+                    <div className="text-right font-mono font-semibold text-slate-800">{r.currentCounted}</div>
+                    <div className="text-right font-mono text-slate-600">{r.previousCounted ?? '—'}</div>
+                    <div className={cn(
+                      "text-right font-mono font-bold",
+                      isNew ? "text-blue-700" : (delta! > 0 ? "text-emerald-700" : delta! < 0 ? "text-rose-700" : "text-slate-500")
+                    )}>
+                      {isNew ? 'NEW' : (delta! > 0 ? `+${delta}` : `${delta}`)}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        {/* Action buttons */}
+        <div className="flex-shrink-0 px-4 py-2 flex items-center gap-2 border-t" style={{ borderColor: FIELD_BORDER, backgroundColor: '#F0F4F8' }}>
+          <button onClick={handlePrint} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1 transition" style={{ backgroundColor: HEADER_DARK_BLUE }}>
+            <Printer className="h-3 w-3" /> Print
+          </button>
+          <button onClick={handleExport} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1 transition" style={{ backgroundColor: HEADER_DARK_BLUE }}>
+            <Download className="h-3 w-3" style={{ color: '#4CAF50' }} /> Export
+          </button>
+          <div className="flex-1" />
+          <span className="text-[9px] text-slate-500">
+            Items in <span className="bg-blue-100 px-1 rounded">blue</span> are new since the previous stocktake ·
+            Delta colors: <span className="text-emerald-700 font-bold">+</span> surplus · <span className="text-rose-700 font-bold">−</span> shortage
+          </span>
+          <button onClick={onClose} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1 transition" style={{ backgroundColor: '#F44336' }}>
+            <X className="h-3 w-3" /> Close
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ===== Audit Trail Popup =====
+// Shows every change made to the stocktake draft before it was saved.
+// Entries are color-coded by action type and show old → new values.
+function AuditTrailPopup({
+  entries,
+  adjNumber,
+  onClose,
+}: {
+  entries: AuditEntry[];
+  adjNumber: string;
+  onClose: () => void;
+}) {
+  const { toast } = useToast();
+
+  const fmtTime = (ts: string) => {
+    try {
+      const d = new Date(ts);
+      return d.toLocaleDateString('en-GB') + ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    } catch { return ts; }
+  };
+
+  const actionConfig: Record<string, { label: string; color: string; bg: string }> = {
+    add: { label: 'Added', color: 'text-emerald-700', bg: 'bg-emerald-100' },
+    counted_change: { label: 'Count Changed', color: 'text-blue-700', bg: 'bg-blue-100' },
+    cost_change: { label: 'Cost Changed', color: 'text-amber-700', bg: 'bg-amber-100' },
+    remove: { label: 'Removed', color: 'text-rose-700', bg: 'bg-rose-100' },
+    bulk_load: { label: 'Bulk Load', color: 'text-purple-700', bg: 'bg-purple-100' },
+    scan_add: { label: 'Scan Add', color: 'text-emerald-700', bg: 'bg-emerald-100' },
+    scan_increment: { label: 'Scan +1', color: 'text-blue-700', bg: 'bg-blue-100' },
+    import: { label: 'Imported', color: 'text-purple-700', bg: 'bg-purple-100' },
+    clear: { label: 'Cleared', color: 'text-rose-700', bg: 'bg-rose-100' },
+    restore: { label: 'Restored', color: 'text-amber-700', bg: 'bg-amber-100' },
+    save: { label: 'Saved', color: 'text-emerald-700', bg: 'bg-emerald-100' },
+  };
+
+  const handleExport = () => {
+    if (entries.length === 0) { toast({ title: 'No audit entries to export', variant: 'destructive' }); return; }
+    import('xlsx').then((XLSX) => {
+      type Row = Record<string, string | number>;
+      const data: Row[] = entries.map((e, i) => ({
+        '#': i + 1,
+        'Time': fmtTime(e.timestamp),
+        'Action': actionConfig[e.action]?.label || e.action,
+        'Product': e.productName,
+        'Part No': e.partNo,
+        'Old Value': e.oldValue || '',
+        'New Value': e.newValue || '',
+        'User': e.user,
+        'Notes': e.notes || '',
+      }));
+      const ws = XLSX.utils.json_to_sheet(data);
+      ws['!cols'] = [{ wch: 4 }, { wch: 20 }, { wch: 16 }, { wch: 28 }, { wch: 14 }, { wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 30 }];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Audit Trail');
+      XLSX.writeFile(wb, `audit-trail-${adjNumber}-${new Date().toISOString().split('T')[0]}.xlsx`);
+      toast({ title: 'Exported successfully', description: `${entries.length} entries` });
+    });
+  };
+
+  // Reverse to show most-recent first
+  const sorted = [...entries].reverse();
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[80] flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.95, y: 20 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.95, y: 20 }}
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-lg shadow-2xl overflow-hidden flex flex-col"
+        style={{ width: '100%', maxWidth: '780px', maxHeight: '85vh', fontFamily: 'Arial, Helvetica, sans-serif' }}
+      >
+        {/* Title bar */}
+        <div className="flex-shrink-0 flex items-center justify-between px-4 h-9 text-white" style={{ background: 'linear-gradient(to right, #6B7280, #4B5563)' }}>
+          <div className="flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            <span className="text-sm font-bold">Audit Trail — {adjNumber}</span>
+          </div>
+          <button onClick={onClose} className="h-6 w-6 rounded bg-red-600 hover:bg-red-700 flex items-center justify-center transition"><X className="h-3.5 w-3.5 text-white" /></button>
+        </div>
+
+        {/* Summary bar */}
+        <div className="flex-shrink-0 px-4 py-2 bg-slate-50 border-b border-slate-200 flex items-center gap-4 text-[10px]">
+          <span className="font-bold text-slate-700">{entries.length} change(s) recorded</span>
+          <span className="text-slate-500">·</span>
+          <span className="text-slate-600">
+            {entries.filter(e => e.action === 'add' || e.action === 'scan_add').length} additions ·
+            {entries.filter(e => e.action === 'counted_change' || e.action === 'scan_increment').length} count changes ·
+            {entries.filter(e => e.action === 'remove').length} removals
+          </span>
+          <div className="flex-1" />
+          <span className="text-slate-500">Most recent first</span>
+        </div>
+
+        {/* Audit entries list */}
+        <div className="flex-1 overflow-y-auto p-3 space-y-1.5" style={{ scrollbarWidth: 'thin' }}>
+          {sorted.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+              <FileText className="h-10 w-10 mb-2 opacity-40" />
+              <div className="text-sm font-medium">No changes recorded yet</div>
+              <div className="text-xs mt-1">Changes to the draft (add, count, remove, scan) will appear here in real time</div>
+            </div>
+          ) : (
+            sorted.map((entry, idx) => {
+              const config = actionConfig[entry.action] || { label: entry.action, color: 'text-slate-700', bg: 'bg-slate-100' };
+              return (
+                <motion.div
+                  key={entry.id}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: Math.min(idx * 0.02, 0.2) }}
+                  className="flex items-start gap-2 p-2 rounded-lg bg-white ring-1 ring-slate-100 hover:ring-slate-200 transition"
+                >
+                  <div className={cn("h-7 w-7 rounded-md flex items-center justify-center flex-shrink-0", config.bg)}>
+                    <FileText className={cn("h-3.5 w-3.5", config.color)} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={cn("text-[10px] font-bold uppercase px-1.5 py-0.5 rounded", config.bg, config.color)}>
+                        {config.label}
+                      </span>
+                      <span className="text-[11px] font-semibold text-slate-800 truncate">{entry.productName}</span>
+                      {entry.partNo && <span className="text-[9px] font-mono text-slate-400">{entry.partNo}</span>}
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5 text-[10px]">
+                      {entry.oldValue && (
+                        <span className="text-slate-500">
+                          <span className="line-through">{entry.oldValue}</span>
+                          {' → '}
+                          <span className="font-mono font-bold text-slate-700">{entry.newValue}</span>
+                        </span>
+                      )}
+                      {entry.notes && <span className="text-slate-500 italic">· {entry.notes}</span>}
+                    </div>
+                    <div className="text-[9px] text-slate-400 mt-0.5">
+                      {fmtTime(entry.timestamp)} · by {entry.user}
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Action buttons */}
+        <div className="flex-shrink-0 px-4 py-2 flex items-center gap-2 border-t border-slate-200 bg-slate-50">
+          <button
+            onClick={handleExport}
+            disabled={entries.length === 0}
+            className="h-8 px-4 rounded-md bg-slate-600 hover:bg-slate-700 text-white text-xs font-bold flex items-center gap-1.5 transition disabled:opacity-50"
+          >
+            <Download className="h-3.5 w-3.5" /> Export (XLSX)
+          </button>
+          <div className="flex-1" />
+          <span className="text-[10px] text-slate-500">
+            Audit trail is committed to permanent storage on Save — view past stocktakes' audit trails in the Stocktake Dashboard
+          </span>
+          <button onClick={onClose} className="h-8 px-4 rounded-md bg-rose-100 hover:bg-rose-200 text-rose-700 text-xs font-bold flex items-center gap-1.5 transition">
+            <X className="h-3.5 w-3.5" /> Close
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}

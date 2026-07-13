@@ -1,0 +1,555 @@
+// Prisma schema for SYLHN POS — Grocery Store Point of Sale
+// Comprehensive relational model linking Stock, Purchase, Sale, POS,
+// Supplier, Maintenance, Telephone, and Audit modules.
+//
+// Database: SQLite (local file). All foreign keys use cuid() IDs.
+// Soft deletes via `active` flags where retention matters (products, suppliers,
+// users). Hard deletes via Cascade only for line items owned by a parent
+// transaction (SaleItem → Sale, PurchaseItem → Purchase).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// USERS & AUTH
+// ============================================================
+
+model SystemUser {
+  id           String    @id @default(cuid())
+  username     String    @unique
+  password     String    // pbkdf2$<iterations>$<salt_hex>$<hash_hex>
+  fullName     String
+  role         String    @default("cashier") // admin | manager | cashier | stockkeeper | accountant
+  phone        String    @default("")
+  email        String    @default("")
+  active       Boolean   @default(true)
+  permissions  String    @default("{}") // JSON-encoded UserPermissions
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  lastLogin    DateTime?
+
+  // Relations — every module that records "who did this" links back here.
+  auditLogs         AuditLog[]
+  sales             Sale[]               @relation("SaleCashier")
+  voidedSales       Sale[]               @relation("SaleVoidedBy")
+  stockHistory      StockHistory[]
+  purchases         Purchase[]           @relation("PurchaseCreatedBy")
+  purchaseReceived  Purchase[]           @relation("PurchaseReceivedBy")
+  expenses          Expense[]
+  heldOrders        HeldOrder[]
+  shifts            CashierShift[]
+  stocktakes        Stocktake[]
+  supplierPayments  SupplierPayment[]
+  customers         Customer[]           @relation("CustomerCreatedBy")
+  telephoneEntries  TelephoneDirectoryEntry[]
+  backups           BackupRecord[]
+
+  @@index([role])
+  @@index([active])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  timestamp DateTime @default(now())
+  userId    String?
+  user      String   // denormalized username for display even after user deletion
+  action    String   // LOGIN | LOGOUT | CREATE | UPDATE | DELETE | VOID | ADJUST | EXPORT | etc.
+  module    String   // auth | pos | sales | stock | purchase | supplier | accounts | telephone | maintenance
+  details   String
+  severity  String   @default("info") // info | warning | critical
+  ipAddress String   @default("")
+  userAgent String   @default("")
+
+  systemUser SystemUser? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([timestamp])
+  @@index([user])
+  @@index([module])
+  @@index([severity])
+}
+
+model SystemSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+}
+
+// ============================================================
+// CATALOG (Stock)
+// ============================================================
+
+model StockGroup {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  icon        String    @default("📦")
+  color       String    @default("#10b981")
+  description String    @default("")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  products Product[]
+}
+
+model Product {
+  id            String    @id @default(cuid())
+  sku           String    @unique
+  barcode       String    @default("")
+  name          String
+  emoji         String    @default("📦")
+  category      String    @default("other")
+  description   String    @default("")
+  price         Float
+  costPrice     Float     @default(0)
+  quantity      Int       @default(0)
+  unit          String    @default("each")
+  reorderLevel  Int       @default(5)
+  taxable       Boolean   @default(true)
+  batchNumber   String    @default("")
+  expiryDate    DateTime?
+  receivedDate  DateTime?
+  active        Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  groupId String?
+  group   StockGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+
+  // Relations
+  suppliers       ProductSupplier[]   // many-to-many with Supplier
+  saleItems       SaleItem[]
+  purchaseItems   PurchaseItem[]
+  stockHistory    StockHistory[]
+  stocktakeItems  StocktakeItem[]
+
+  @@index([category])
+  @@index([groupId])
+  @@index([name])
+  @@index([active])
+  @@index([barcode])
+}
+
+// Many-to-many: a product can be supplied by many suppliers, and a supplier
+// can supply many products. Includes the supplier's SKU + cost for this
+// specific product (different suppliers may charge different prices).
+model ProductSupplier {
+  id           String  @id @default(cuid())
+  productId    String
+  supplierId   String
+  supplierSku  String  @default("")  // supplier's own SKU for this product
+  supplierCost Float   @default(0)   // last known cost from this supplier
+  leadTimeDays Int     @default(0)   // typical delivery time
+  preferred    Boolean @default(false) // primary supplier for this product
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, supplierId])
+  @@index([supplierId])
+}
+
+model StockHistory {
+  id         String   @id @default(cuid())
+  productId  String
+  action     String   // adjusted | received | sold | returned | stocktake | transfer | damaged
+  quantity   Int      // negative for outflows, positive for inflows
+  reason     String   @default("")
+  reference  String   @default("")  // invoice/PO/stocktake ref
+  // Optional links to the originating transaction
+  saleId     String?
+  purchaseId String?
+  stocktakeId String?
+  userId     String?
+  createdAt  DateTime @default(now())
+
+  product     Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  sale        Sale?        @relation(fields: [saleId], references: [id], onDelete: SetNull)
+  purchase    Purchase?    @relation(fields: [purchaseId], references: [id], onDelete: SetNull)
+  stocktake   Stocktake?   @relation(fields: [stocktakeId], references: [id], onDelete: SetNull)
+  user        SystemUser?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([productId])
+  @@index([action])
+  @@index([createdAt])
+  @@index([saleId])
+  @@index([purchaseId])
+  @@index([stocktakeId])
+}
+
+// ============================================================
+// SUPPLIERS
+// ============================================================
+
+model Supplier {
+  id            String    @id @default(cuid())
+  code          String    @unique
+  name          String
+  contactName   String    @default("")
+  phone         String    @default("")
+  mobile        String    @default("")
+  email         String    @default("")
+  fax           String    @default("")
+  address       String    @default("")
+  city          String    @default("")
+  state         String    @default("")
+  country       String    @default("Ghana")
+  businessNo    String    @default("")
+  tradingTerms  String    @default("Net 30") // Net 15 | Net 30 | Net 60 | COD | Prepaid
+  creditLimit   Float     @default(0)
+  balance       Float     @default(0) // outstanding amount owed to supplier
+  taxInclusive  Boolean   @default(false)
+  notes         String    @default("")
+  active        Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  products        ProductSupplier[]
+  purchases       Purchase[]
+  payments        SupplierPayment[]
+
+  @@index([name])
+  @@index([active])
+}
+
+// Separate supplier payment model — tracks individual payments against
+// purchase invoices (a purchase can have multiple partial payments).
+model SupplierPayment {
+  id          String   @id @default(cuid())
+  supplierId  String
+  purchaseId  String?  // optional — can be an on-account payment
+  amount      Float
+  paymentDate DateTime @default(now())
+  paymentMode String   @default("cash") // cash | bank | cheque | mobile-money
+  reference   String   @default("") // cheque no, transaction ref
+  notes       String   @default("")
+  createdBy   String?  // userId
+  createdAt   DateTime @default(now())
+
+  supplier Supplier      @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  purchase Purchase?     @relation(fields: [purchaseId], references: [id], onDelete: SetNull)
+  user     SystemUser?  @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+
+  @@index([supplierId])
+  @@index([purchaseId])
+  @@index([paymentDate])
+}
+
+// ============================================================
+// SALES (POS)
+// ============================================================
+
+model Sale {
+  id            String    @id @default(cuid())
+  invoiceNumber String    @unique
+  customerId    String?
+  customerName  String    @default("") // denormalized for fast display
+  cashierId     String?
+  cashierName   String    @default("") // denormalized
+  subtotal      Float
+  discount      Float     @default(0)
+  discountPct   Float     @default(0)
+  taxRate       Float     @default(0)
+  taxAmount     Float     @default(0)
+  total         Float
+  amountPaid    Float
+  change        Float
+  paymentMethod String    @default("cash") // cash | card | wallet
+  paymentRef    String    @default("")
+  status        String    @default("completed") // completed | voided | held | refunded
+  notes         String    @default("")
+  shiftId       String?   // link to the cashier shift this sale belongs to
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  voidedAt      DateTime?
+  voidedById    String?
+  refundedAt    DateTime?
+
+  // Relations
+  customer     Customer?     @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  cashier      SystemUser?   @relation("SaleCashier", fields: [cashierId], references: [id], onDelete: SetNull)
+  voidedBy     SystemUser?   @relation("SaleVoidedBy", fields: [voidedById], references: [id], onDelete: SetNull)
+  shift        CashierShift? @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+  items        SaleItem[]
+  stockHistory StockHistory[]
+
+  @@index([createdAt])
+  @@index([status])
+  @@index([cashierId])
+  @@index([customerId])
+  @@index([shiftId])
+}
+
+model SaleItem {
+  id        String  @id @default(cuid())
+  saleId    String
+  productId String?
+  sku       String  // denormalized for historical record (product may be deleted)
+  name      String  // denormalized
+  emoji     String  @default("📦")
+  price     Float
+  quantity  Int
+  unit      String  @default("each")
+  discount  Float   @default(0)
+  taxable   Boolean @default(true)
+  total     Float
+
+  sale    Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([saleId])
+  @@index([productId])
+}
+
+// Held/parked orders — saved carts that can be recalled
+model HeldOrder {
+  id            String   @id @default(cuid())
+  invoiceNumber String
+  items         String   // JSON array of CartItem
+  customerName  String   @default("")
+  cashierId     String?
+  cashierName   String   @default("")
+  shiftId       String?
+  createdAt     DateTime @default(now())
+  recalledAt    DateTime?
+
+  cashier SystemUser?    @relation(fields: [cashierId], references: [id], onDelete: SetNull)
+  shift   CashierShift?  @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+
+  @@index([cashierId])
+  @@index([shiftId])
+  @@index([createdAt])
+}
+
+// Cashier shift tracking — opens with a float, closes with a reconciliation
+model CashierShift {
+  id           String    @id @default(cuid())
+  cashierId    String
+  cashierName  String    @default("")
+  openedAt     DateTime  @default(now())
+  closedAt     DateTime?
+  openingFloat Float     @default(0)
+  closingFloat Float?
+  expectedCash Float?
+  actualCash   Float?
+  variance     Float?
+  status       String    @default("open") // open | closed
+  notes        String    @default("")
+
+  cashier    SystemUser  @relation(fields: [cashierId], references: [id], onDelete: Cascade)
+  sales      Sale[]
+  heldOrders HeldOrder[]
+
+  @@index([cashierId])
+  @@index([status])
+  @@index([openedAt])
+}
+
+// ============================================================
+// PURCHASES
+// ============================================================
+
+model Purchase {
+  id            String    @id @default(cuid())
+  refNo         String    @unique
+  type          String    @default("purchase") // purchase | order | quote
+  supplierId    String?
+  supplierName  String    @default("") // denormalized
+  status        String    @default("received") // draft | ordered | received | cancelled
+  subtotal      Float     @default(0)
+  discount      Float     @default(0)
+  taxAmount     Float     @default(0)
+  total         Float     @default(0)
+  amountPaid    Float     @default(0)
+  notes         String    @default("")
+  createdById   String?
+  receivedById  String?
+  receivedAt    DateTime?
+  expectedAt    DateTime? // expected delivery date for orders
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  supplier       Supplier?         @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  createdBy      SystemUser?       @relation("PurchaseCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  receivedBy     SystemUser?       @relation("PurchaseReceivedBy", fields: [receivedById], references: [id], onDelete: SetNull)
+  items          PurchaseItem[]
+  payments       SupplierPayment[]
+  stockHistory   StockHistory[]
+
+  @@index([createdAt])
+  @@index([status])
+  @@index([supplierId])
+  @@index([type])
+}
+
+model PurchaseItem {
+  id          String    @id @default(cuid())
+  purchaseId  String
+  productId   String?
+  partNo      String    // denormalized SKU
+  details     String    // denormalized name
+  emoji       String    @default("📦")
+  quantity    Int
+  cost        Float
+  tax         Boolean   @default(true)
+  total       Float
+  expiryDate  DateTime?
+  receivedQty Int?      // partial receipt tracking for orders
+
+  purchase Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  product  Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([purchaseId])
+  @@index([productId])
+}
+
+// ============================================================
+// TELEPHONE DIRECTORY & CUSTOMERS
+// ============================================================
+
+// Customer model — links to sales and the telephone directory
+model Customer {
+  id           String    @id @default(cuid())
+  name         String
+  phone        String    @default("")
+  mobile       String    @default("")
+  email        String    @default("")
+  address      String    @default("")
+  city         String    @default("")
+  group        String    @default("regular") // regular | vip | wholesale
+  creditLimit  Float     @default(0)
+  balance      Float     @default(0)
+  notes        String    @default("")
+  active       Boolean   @default(true)
+  createdById  String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  createdBy SystemUser? @relation("CustomerCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  sales     Sale[]
+
+  @@index([name])
+  @@index([phone])
+  @@index([active])
+}
+
+// Telephone directory — separate from customers (directory can include
+// suppliers, delivery drivers, service providers, etc.)
+model TelephoneDirectoryEntry {
+  id           String    @id @default(cuid())
+  name         String
+  homePhone    String    @default("")
+  workPhone    String    @default("")
+  mobile       String    @default("")
+  fax          String    @default("")
+  email        String    @default("")
+  website      String    @default("")
+  address      String    @default("")
+  group        String    @default("general") // general | supplier | customer | staff | vendor
+  notes        String    @default("")
+  createdById  String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  createdBy SystemUser? @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([name])
+  @@index([group])
+  @@index([mobile])
+}
+
+// ============================================================
+// ACCOUNTS (Finance)
+// ============================================================
+
+model Expense {
+  id          String   @id @default(cuid())
+  date        DateTime @default(now())
+  category    String   // rent | utilities | salaries | marketing | supplies | transport | other
+  description String
+  amount      Float
+  paymentMode String   @default("cash") // cash | card | mobile-money | cheque
+  reference   String   @default("")
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  user SystemUser? @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([date])
+  @@index([category])
+  @@index([createdById])
+}
+
+// ============================================================
+// MAINTENANCE (Stocktake + Backup tracking)
+// ============================================================
+
+// Stocktake session — a scheduled or ad-hoc count of stock
+model Stocktake {
+  id            String    @id @default(cuid())
+  refNo         String    @unique
+  scheduledFor  DateTime
+  startedAt     DateTime?
+  completedAt   DateTime?
+  status        String    @default("scheduled") // scheduled | in-progress | completed | overdue
+  countMethod   String    @default("full") // full | cycle | spot
+  scope         String    @default("all") // all | group:<id> | location:<id>
+  notes         String    @default("")
+  conductedById String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  conductedBy SystemUser?     @relation(fields: [conductedById], references: [id], onDelete: SetNull)
+  items       StocktakeItem[]
+  stockHistory StockHistory[]
+
+  @@index([status])
+  @@index([scheduledFor])
+  @@index([conductedById])
+}
+
+model StocktakeItem {
+  id           String  @id @default(cuid())
+  stocktakeId  String
+  productId    String
+  expectedQty  Int
+  countedQty   Int?
+  variance     Int?
+  reason       String  @default("")
+  countedAt    DateTime?
+
+  stocktake Stocktake @relation(fields: [stocktakeId], references: [id], onDelete: Cascade)
+  product   Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([stocktakeId, productId])
+  @@index([stocktakeId])
+  @@index([productId])
+}
+
+// Backup record — tracks when backups were created/restored
+model BackupRecord {
+  id          String   @id @default(cuid())
+  type        String   // auto | manual | restore
+  filename    String
+  sizeBytes   Int
+  status      String   @default("completed") // completed | failed | restored
+  createdById String?
+  createdAt   DateTime @default(now())
+  notes       String   @default("")
+
+  createdBy SystemUser? @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([type])
+  @@index([status])
+}

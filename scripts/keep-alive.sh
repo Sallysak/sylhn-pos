@@ -1,10 +1,26 @@
 #!/bin/bash
 # SYLHN POS — Keep-alive wrapper for the Next.js dev server.
 # Restarts the server if it dies. Used for long-running preview sessions.
+# Also runs the Startup Guard to verify file integrity before starting.
 cd /home/z/my-project
 
 LOG=/home/z/my-project/dev.log
 PIDFILE=/home/z/my-project/dev.pid
+
+# ===== Run Startup Guard — verify all critical files exist =====
+echo "Running Startup Guard..."
+node scripts/startup-guard.js
+
+# ===== Auto-restore if files are missing and a backup exists =====
+if [ -f "backups/manifest.json" ]; then
+  RESTORE_OUTPUT=$(node scripts/protection-snapshot.js --verify 2>&1)
+  if echo "$RESTORE_OUTPUT" | grep -q "MISSING"; then
+    echo ""
+    echo "⚠  CRITICAL: Missing files detected! Auto-restoring from backup..."
+    node scripts/protection-snapshot.js --restore
+    echo ""
+  fi
+fi
 
 # Kill any existing dev server
 if [ -f "$PIDFILE" ]; then

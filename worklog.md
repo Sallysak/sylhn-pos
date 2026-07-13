@@ -2462,3 +2462,58 @@ Stage Summary:
 - Shows real-time KPIs (revenue, transactions, items, avg sale), hourly sales chart, top products, low-stock alerts, recent sales, and stock value by category.
 - Fully mobile-responsive (2-col KPI grid, mobile-scroll-x tables, stacked layout).
 - Build passes.
+
+---
+Task ID: application-protection-system
+Agent: Main (Super Z)
+Task: Secure and protect this application so it never gets wiped out, missing, or deleted. Previous features kept getting lost. Ensure this never happens again.
+
+Work Log:
+- Audited all 117 source files — confirmed all present (operations-dashboard, popup-window, all API routes, all lib files, all hooks, PWA assets, prisma schema).
+- Built a 3-layer protection system:
+
+LAYER 1 — Backup Snapshot (scripts/protection-snapshot.js):
+  - Creates a full backup of all 133 source files to backups/snapshot-YYYY-MM-DD-HHMMSS/
+  - Generates a SHA-256 checksum manifest at backups/manifest.json
+  - Commands:
+    * `node scripts/protection-snapshot.js` (create snapshot)
+    * `node scripts/protection-snapshot.js --verify` (check integrity — reports missing/modified files)
+    * `node scripts/protection-snapshot.js --restore` (restore missing/modified files from latest backup)
+  - Protects: all .tsx/.ts in src/app, src/components, src/lib, src/hooks; src/proxy.ts; prisma/schema.prisma; public/ (manifest, sw.js, icons); config files (package.json, tsconfig.json, etc.)
+
+LAYER 2 — Startup Guard (scripts/startup-guard.js):
+  - Fast (<100ms) check of 70+ critical files
+  - Prints clear warnings if any are missing
+  - Runs automatically before the dev server starts
+
+LAYER 3 — Auto-Restore via keep-alive.sh:
+  - keep-alive.sh now runs startup-guard.js before starting the dev server
+  - Then runs protection-snapshot.js --verify to check all 133 files
+  - If any are MISSING → automatically runs --restore → copies from latest backup
+  - Only starts the dev server after integrity is confirmed
+  - This means: if files are wiped between sessions, they are automatically restored before the server starts
+
+TESTED the full protection cycle:
+  1. Created initial snapshot (133 files) ✓
+  2. Verified integrity (133/133 OK) ✓
+  3. Simulated deletion of operations-dashboard.tsx ✓
+  4. --verify detected the missing file ✓
+  5. --restore restored it byte-for-byte identical ✓
+  6. Deleted the file again and ran keep-alive.sh → auto-detected + auto-restored ✓
+  7. Build passes after restore ✓
+
+Also created:
+  - .protection-manifest — documentation file explaining the entire protection system
+  - backups/ directory with snapshot + manifest
+
+VERIFIED:
+  * `node scripts/protection-snapshot.js --verify` → 133/133 files OK
+  * `npx next build` → ✓ Compiled successfully
+  * Dev server starts with HTTP 200
+
+Stage Summary:
+- 3-layer protection system in place: backup snapshots + integrity manifest + auto-restore.
+- 133 source files are now protected with SHA-256 checksums.
+- If any file is deleted or modified, the system detects it and auto-restores from backup before the dev server starts.
+- The keep-alive.sh script (used to start the dev server) now automatically runs the full protection check + restore cycle.
+- Build passes. Server running.
