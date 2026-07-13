@@ -13,7 +13,10 @@ export async function GET(req: NextRequest) {
 
   try {
     const groups = await db.stockGroup.findMany({
-      include: { products: true },
+      include: {
+        products: { where: { active: true } },
+        _count: { select: { products: true } },
+      },
       orderBy: { name: "asc" },
     });
     return NextResponse.json({ groups });
@@ -71,7 +74,20 @@ export async function POST(req: NextRequest) {
         color: g.color || "#10b981",
         description: g.description || "",
       },
+      include: { _count: { select: { products: true } } },
     });
+
+    await db.auditLog.create({
+      data: {
+        userId: user.uid,
+        user: user.username,
+        action: "CREATE",
+        module: "stock",
+        details: `Stock group ${group.name} created`,
+        severity: "info",
+      },
+    });
+
     return NextResponse.json({ success: true, group });
   } catch (e) {
     console.error("POST /api/stock-groups error:", e);

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireAuth, requireRole } from "@/lib/auth";
-import { hashPassword } from "@/lib/auth";
+import { requireAuth, requireRole, hashPassword } from "@/lib/auth";
 import { UserSchema, validate, validationError } from "@/lib/validation";
 import { rateLimitApiRead, rateLimitApiWrite, rateLimitResponse, getClientIp } from "@/lib/rate-limit";
 
@@ -16,6 +15,17 @@ export async function GET(req: NextRequest) {
   try {
     const users = await db.systemUser.findMany({
       orderBy: { createdAt: "desc" },
+      include: {
+        _count: {
+          select: {
+            sales: true,
+            purchases: true,
+            auditLogs: true,
+            expenses: true,
+            shifts: true,
+          },
+        },
+      },
     });
     // Strip passwords
     const safe = users.map(u => ({ ...u, password: undefined }));
@@ -28,7 +38,8 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   // Only admin can create/modify users
-  try { await requireRole("admin"); } catch (e) { return e as Response; }
+  let user;
+  try { user = await requireRole("admin"); } catch (e) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);
@@ -72,7 +83,7 @@ export async function POST(req: NextRequest) {
     // Hash the password before storing
     const hashedPassword = await hashPassword(u.password);
 
-    const user = await db.systemUser.create({
+    const newUser = await db.systemUser.create({
       data: {
         username: u.username,
         password: hashedPassword,
@@ -83,7 +94,19 @@ export async function POST(req: NextRequest) {
         permissions: typeof u.permissions === "string" ? u.permissions : JSON.stringify(u.permissions || {}),
       },
     });
-    return NextResponse.json({ success: true, user: { ...user, password: undefined } });
+
+    await db.auditLog.create({
+      data: {
+        userId: user.uid,
+        user: user.username,
+        action: "CREATE",
+        module: "auth",
+        details: `User ${newUser.username} (${newUser.fullName}) created with role ${newUser.role}`,
+        severity: "warning",
+      },
+    });
+
+    return NextResponse.json({ success: true, user: { ...newUser, password: undefined } });
   } catch (e) {
     console.error("POST /api/users error:", e);
     return NextResponse.json({ error: "Failed to create user" }, { status: 500 });

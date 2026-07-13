@@ -25,7 +25,13 @@ export async function GET(req: NextRequest) {
 
     const purchases = await db.purchase.findMany({
       where,
-      include: { items: true, supplier: true },
+      include: {
+        items: true,
+        supplier: true,
+        createdBy: { select: { id: true, fullName: true, username: true } },
+        receivedBy: { select: { id: true, fullName: true, username: true } },
+        payments: true,
+      },
       orderBy: { createdAt: "desc" },
       take: limit,
     });
@@ -70,8 +76,10 @@ export async function POST(req: NextRequest) {
         total: Number(p.total) || 0,
         amountPaid: Number(p.amountPaid) || 0,
         notes: p.notes || "",
-        createdBy: p.createdBy,
+        createdById: user.uid, // link to logged-in SystemUser
+        receivedById: p.status === "received" ? user.uid : null,
         receivedAt: p.receivedAt ? new Date(p.receivedAt as string) : (p.status === "received" ? new Date() : null),
+        expectedAt: (body as any).expectedAt ? new Date((body as any).expectedAt) : null,
         items: {
           create: p.items.map((item) => ({
             productId: item.productId || null,
@@ -88,7 +96,7 @@ export async function POST(req: NextRequest) {
       include: { items: true },
     });
 
-    // If received, increment stock
+    // If received, increment stock + create linked StockHistory entries
     if (purchase.status === "received") {
       for (const item of purchase.items) {
         if (item.productId) {
@@ -106,11 +114,25 @@ export async function POST(req: NextRequest) {
               quantity: item.quantity,
               reason: `Purchase ${refNo}`,
               reference: refNo,
+              purchaseId: purchase.id,
+              userId: user.uid,
             },
           });
         }
       }
     }
+
+    // Log audit
+    await db.auditLog.create({
+      data: {
+        userId: user.uid,
+        user: user.username,
+        action: "CREATE",
+        module: "purchase",
+        details: `Purchase ${refNo} created — ${purchase.items.length} items, total ${purchase.total}`,
+        severity: "info",
+      },
+    });
 
     return NextResponse.json({ success: true, purchase });
   } catch (e) {

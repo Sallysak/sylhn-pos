@@ -15,12 +15,24 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const { id } = await params;
     let sale = await db.sale.findUnique({
       where: { id },
-      include: { items: true },
+      include: {
+        items: true,
+        customer: true,
+        cashier: { select: { id: true, fullName: true, username: true } },
+        voidedBy: { select: { id: true, fullName: true, username: true } },
+        shift: true,
+      },
     });
     if (!sale) {
       sale = await db.sale.findUnique({
         where: { invoiceNumber: id },
-        include: { items: true },
+        include: {
+          items: true,
+          customer: true,
+          cashier: { select: { id: true, fullName: true, username: true } },
+          voidedBy: { select: { id: true, fullName: true, username: true } },
+          shift: true,
+        },
       });
     }
     if (!sale) return NextResponse.json({ error: "Sale not found" }, { status: 404 });
@@ -59,6 +71,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         return NextResponse.json({ error: "Sale already voided" }, { status: 400 });
       }
 
+      // Restore stock + create linked StockHistory entries
       for (const item of sale.items) {
         if (item.productId) {
           await db.product.update({
@@ -72,6 +85,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
               quantity: item.quantity,
               reason: `Void of ${sale.invoiceNumber}`,
               reference: sale.invoiceNumber,
+              saleId: sale.id,
+              userId: user.uid,
             },
           });
         }
@@ -82,10 +97,22 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         data: {
           status: "voided",
           voidedAt: new Date(),
-          voidedBy: user.username,
+          voidedById: user.uid,
         },
         include: { items: true },
       });
+
+      await db.auditLog.create({
+        data: {
+          userId: user.uid,
+          user: user.username,
+          action: "VOID",
+          module: "sales",
+          details: `Sale ${sale.invoiceNumber} voided`,
+          severity: "warning",
+        },
+      });
+
       return NextResponse.json({ success: true, sale: updated });
     }
 

@@ -16,7 +16,9 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const dateFrom = searchParams.get("dateFrom");
     const dateTo = searchParams.get("dateTo");
-    const cashier = searchParams.get("cashier");
+    const cashierId = searchParams.get("cashierId");
+    const customerId = searchParams.get("customerId");
+    const shiftId = searchParams.get("shiftId");
     const limit = Math.min(parseInt(searchParams.get("limit") || "100", 10), 1000);
 
     const where: any = {};
@@ -25,11 +27,18 @@ export async function GET(req: NextRequest) {
       if (dateFrom) where.createdAt.gte = new Date(dateFrom);
       if (dateTo) where.createdAt.lte = new Date(dateTo);
     }
-    if (cashier) where.cashierName = cashier;
+    if (cashierId) where.cashierId = cashierId;
+    if (customerId) where.customerId = customerId;
+    if (shiftId) where.shiftId = shiftId;
 
     const sales = await db.sale.findMany({
       where,
-      include: { items: true },
+      include: {
+        items: true,
+        customer: true,
+        cashier: { select: { id: true, fullName: true, username: true } },
+        shift: true,
+      },
       orderBy: { createdAt: "desc" },
       take: limit,
     });
@@ -65,7 +74,9 @@ export async function POST(req: NextRequest) {
     const sale = await db.sale.create({
       data: {
         invoiceNumber,
+        customerId: (body as any).customerId || null,
         customerName: s.customerName || "",
+        cashierId: user.uid, // link to logged-in SystemUser
         cashierName: s.cashierName,
         subtotal: Number(s.subtotal) || 0,
         discount: Number(s.discount) || 0,
@@ -79,6 +90,7 @@ export async function POST(req: NextRequest) {
         paymentRef: s.paymentRef || "",
         status: s.status || "completed",
         notes: s.notes || "",
+        shiftId: (body as any).shiftId || null,
         items: {
           create: s.items.map((item) => ({
             productId: item.productId || null,
@@ -96,7 +108,7 @@ export async function POST(req: NextRequest) {
       include: { items: true },
     });
 
-    // Decrement stock for each item
+    // Decrement stock + create linked StockHistory entries
     for (const item of sale.items) {
       if (item.productId) {
         await db.product.update({
@@ -110,10 +122,24 @@ export async function POST(req: NextRequest) {
             quantity: -item.quantity,
             reason: `Sale ${invoiceNumber}`,
             reference: invoiceNumber,
+            saleId: sale.id,
+            userId: user.uid,
           },
         });
       }
     }
+
+    // Log audit
+    await db.auditLog.create({
+      data: {
+        userId: user.uid,
+        user: user.username,
+        action: "CREATE",
+        module: "sales",
+        details: `Sale ${invoiceNumber} created — ${sale.items.length} items, total ${sale.total}`,
+        severity: "info",
+      },
+    });
 
     return NextResponse.json({ success: true, sale });
   } catch (e) {

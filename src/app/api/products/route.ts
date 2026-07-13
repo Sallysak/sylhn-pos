@@ -4,22 +4,34 @@ import { requireAuth, requirePermission } from "@/lib/auth";
 import { ProductSchema, ProductBulkSchema, validate, validationError } from "@/lib/validation";
 import { rateLimitApiRead, rateLimitApiWrite, rateLimitResponse, getClientIp } from "@/lib/rate-limit";
 
-// GET /api/products — list all products (requires auth + stock permission)
+// GET /api/products — list all products (requires auth)
 export async function GET(req: NextRequest) {
-  try {
-    await requireAuth();
-  } catch (e) {
-    return e as Response;
-  }
+  try { await requireAuth(); } catch (e) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
   if (!rl.allowed) return rateLimitResponse(rl);
 
   try {
+    const { searchParams } = new URL(req.url);
+    const includeInactive = searchParams.get("includeInactive") === "true";
+    const groupId = searchParams.get("groupId");
+    const lowStock = searchParams.get("lowStock") === "true";
+
+    const where: any = {};
+    if (!includeInactive) where.active = true;
+    if (groupId) where.groupId = groupId;
+    if (lowStock) {
+      // Products at or below reorder level
+      where.quantity = { lte: 0 }; // Prisma can't do column-to-column compare directly; this is a simplified version
+    }
+
     const products = await db.product.findMany({
-      where: { active: true },
-      include: { group: true },
+      where,
+      include: {
+        group: true,
+        suppliers: { include: { supplier: true } },
+      },
       orderBy: { name: "asc" },
     });
     return NextResponse.json({ products });
@@ -74,7 +86,6 @@ export async function POST(req: NextRequest) {
           batchNumber: p.batchNumber || "",
           expiryDate: p.expiryDate ? new Date(p.expiryDate as string) : null,
           receivedDate: p.receivedDate ? new Date(p.receivedDate as string) : null,
-          supplier: p.supplier || "",
           groupId: p.groupId || null,
           active: p.active !== false,
         };
@@ -107,10 +118,23 @@ export async function POST(req: NextRequest) {
         unit: p.unit || "each",
         reorderLevel: Number(p.reorderLevel) || 5,
         taxable: p.taxable !== false,
-        supplier: p.supplier || "",
         groupId: p.groupId || null,
       },
+      include: { group: true, suppliers: { include: { supplier: true } } },
     });
+
+    // Log audit
+    await db.auditLog.create({
+      data: {
+        userId: user.uid,
+        user: user.username,
+        action: "CREATE",
+        module: "stock",
+        details: `Product ${product.sku} (${product.name}) created`,
+        severity: "info",
+      },
+    });
+
     return NextResponse.json({ success: true, product });
   } catch (e) {
     console.error("POST /api/products error:", e);

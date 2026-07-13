@@ -14,7 +14,18 @@ export async function GET(req: NextRequest) {
   try {
     const suppliers = await db.supplier.findMany({
       where: { active: true },
-      include: { purchases: { take: 5, orderBy: { createdAt: "desc" } } },
+      include: {
+        products: { include: { product: true } },
+        purchases: {
+          take: 10,
+          orderBy: { createdAt: "desc" },
+          select: { id: true, refNo: true, total: true, status: true, createdAt: true },
+        },
+        payments: {
+          take: 10,
+          orderBy: { paymentDate: "desc" },
+        },
+      },
       orderBy: { name: "asc" },
     });
     return NextResponse.json({ suppliers });
@@ -47,19 +58,20 @@ export async function POST(req: NextRequest) {
         if (!r.success) continue;
         const data = {
           name: r.data.name,
-          contact: r.data.contact || "",
+          contactName: r.data.contact || "",
           phone: r.data.phone || "",
           email: r.data.email || "",
           address: r.data.address || "",
           balance: Number(r.data.balance) || 0,
-          products: typeof r.data.products === "string" ? r.data.products : JSON.stringify(r.data.products || []),
           active: r.data.active !== false,
         };
         const existing = await db.supplier.findFirst({ where: { name: r.data.name } });
         if (existing) {
           results.push(await db.supplier.update({ where: { id: existing.id }, data }));
         } else {
-          results.push(await db.supplier.create({ data }));
+          results.push(await db.supplier.create({
+            data: { ...data, code: `SUP-${Date.now().toString().slice(-5)}` },
+          }));
         }
       }
       return NextResponse.json({ success: true, count: results.length });
@@ -71,15 +83,28 @@ export async function POST(req: NextRequest) {
 
     const supplier = await db.supplier.create({
       data: {
+        code: `SUP-${Date.now().toString().slice(-5)}`,
         name: s.name,
-        contact: s.contact || "",
+        contactName: s.contact || "",
         phone: s.phone || "",
         email: s.email || "",
         address: s.address || "",
         balance: Number(s.balance) || 0,
-        products: typeof s.products === "string" ? s.products : JSON.stringify(s.products || []),
+      },
+      include: { products: true, purchases: true },
+    });
+
+    await db.auditLog.create({
+      data: {
+        userId: user.uid,
+        user: user.username,
+        action: "CREATE",
+        module: "supplier",
+        details: `Supplier ${supplier.code} (${supplier.name}) created`,
+        severity: "info",
       },
     });
+
     return NextResponse.json({ success: true, supplier });
   } catch (e) {
     console.error("POST /api/suppliers error:", e);
