@@ -9,7 +9,7 @@
  * Updates: new SW takes over on next navigation (skipWaiting).
  */
 
-const CACHE_VERSION = "sylhn-pos-v1";
+const CACHE_VERSION = "sylhn-pos-v2";
 const APP_SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 

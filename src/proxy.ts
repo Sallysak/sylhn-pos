@@ -29,9 +29,8 @@ const SECURITY_HEADERS: Record<string, string> = {
   "Cross-Origin-Opener-Policy": "same-origin",
   "Cross-Origin-Resource-Policy": "same-origin",
   // Content Security Policy — only allow same-origin + a few needed exceptions.
-  // frame-ancestors allows the preview iframe host (preview-*.space-z.ai) so the
-  // app can be embedded in the chat preview UI; all other cross-origin sites
-  // remain blocked.
+  // frame-ancestors must include the chat host (chat.z.ai) and the preview host
+  // (*.space-z.ai) because the chat UI at chat.z.ai embeds the preview iframe.
   "Content-Security-Policy": [
     "default-src 'self'",
     "script-src 'self' 'unsafe-inline' 'unsafe-eval'", // Next.js needs inline/eval
@@ -39,7 +38,7 @@ const SECURITY_HEADERS: Record<string, string> = {
     "font-src 'self' https://fonts.gstatic.com data:",
     "img-src 'self' data: blob: https:",
     "connect-src 'self' https:",
-    "frame-ancestors 'self' https://*.space-z.ai http://*.space-z.ai",
+    "frame-ancestors 'self' https://*.space-z.ai https://*.z.ai http://*.space-z.ai http://*.z.ai",
     "form-action 'self'",
     "base-uri 'self'",
     "object-src 'none'",

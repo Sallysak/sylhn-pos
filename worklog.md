@@ -2136,3 +2136,27 @@ Stage Summary:
 - Offline fallback: client-side login falls back to localStorage only when server is unreachable.
 - Database: all 3 default users have hashed passwords (verified).
 - Build passes cleanly, lint passes, TypeScript passes.
+
+---
+Task ID: fix-preview-iframe-csp
+Agent: Main (Super Z)
+Task: Preview iframe refused to connect — CSP frame-ancestors blocked chat.z.ai from embedding the app.
+
+Work Log:
+- Diagnosed: the chat UI (parent iframe) is at chat.z.ai, but my previous CSP only allowed *.space-z.ai in frame-ancestors. The browser checks the PARENT origin against frame-ancestors, so chat.z.ai was being blocked.
+- Also: the stale-while-revalidate service worker was serving cached responses that still carried the old "frame-ancestors 'none'" header, producing a second CSP violation in the console.
+- Updated src/proxy.ts:
+  * frame-ancestors now: 'self' https://*.space-z.ai https://*.z.ai http://*.space-z.ai http://*.z.ai
+  * Covers both the preview host (preview-*.space-z.ai) and the chat host (chat.z.ai + any *.z.ai subdomain).
+- Bumped public/sw.js CACHE_VERSION from "sylhn-pos-v1" to "sylhn-pos-v2" — on next load the SW activate handler deletes the old v1 caches, so stale responses with the old 'none' CSP are evicted.
+- Created scripts/keep-alive.sh — robust dev-server launcher that kills stale processes, starts the server in a new session (setsid) so it survives shell exit, writes a PID file, and waits for readiness. Used to restart the dev server cleanly after the proxy.ts change.
+- Restarted dev server via keep-alive.sh. Verified:
+  * HTTP 200 on /
+  * content-security-policy: ... frame-ancestors 'self' https://*.space-z.ai https://*.z.ai http://*.space-z.ai http://*.z.ai ...
+  * x-frame-options: SAMEORIGIN
+  * Server stable (next-server PID 6112 still running after 10s+)
+
+Stage Summary:
+- Preview iframe should now load — chat.z.ai (the parent) is now an allowed frame-ancestor.
+- Old cached CSP 'none' responses evicted by SW v1 → v2 cache bump. Users may need to refresh once to activate the new service worker.
+- Dev server restarted cleanly and stable. All other security headers (HSTS, nosniff, Permissions-Policy, etc.) remain in place.
