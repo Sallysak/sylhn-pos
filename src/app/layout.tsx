@@ -42,12 +42,22 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-// Register service worker on the client
+// Register service worker on the client (production only).
+// In development, the SW causes stale-chunk errors because Next.js HMR
+// rebuilds chunks on every file change, but the SW caches them.
 const SW_REGISTER = `
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
-  });
+  if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+    // DEV: unregister any existing service worker so it doesn't serve stale chunks
+    navigator.serviceWorker.getRegistrations().then((regs) => {
+      regs.forEach((r) => r.unregister());
+    });
+  } else {
+    // PROD: register the service worker for offline support
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    });
+  }
 }
 `;
 

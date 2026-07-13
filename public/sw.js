@@ -2,14 +2,15 @@
  * SYLHN POS — Service Worker
  *
  * Caching strategy:
- *   - App shell (HTML/JS/CSS): stale-while-revalidate
+ *   - App shell (HTML): stale-while-revalidate
  *   - Static assets (images, fonts): cache-first
  *   - API calls: network-first, fall back to cache
+ *   - Next.js JS/CSS chunks: NEVER cache (they change on every deploy/HMR)
  *
- * Updates: new SW takes over on next navigation (skipWaiting).
+ * Updates: new SW takes over immediately (skipWaiting + clients.claim).
  */
 
-const CACHE_VERSION = "sylhn-pos-v2";
+const CACHE_VERSION = "sylhn-pos-v3";
 const APP_SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 
@@ -25,21 +26,30 @@ const APP_SHELL = [
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(APP_SHELL_CACHE)
-      .then((cache) => cache.addAll(APP_SHELL).catch(() => { /* ignore individual failures */ }))
+      .then((cache) => cache.addAll(APP_SHELL).catch(() => {}))
       .then(() => self.skipWaiting())
   );
 });
 
-// ===== Activate: clean up old caches =====
+// ===== Activate: clean up ALL old caches + take control immediately =====
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys()
       .then((keys) => Promise.all(
         keys
           .filter((key) => !key.startsWith(CACHE_VERSION))
-          .map((key) => caches.delete(key))
+          .map((key) => {
+            console.log("[SW] Deleting old cache:", key);
+            return caches.delete(key);
+          })
       ))
       .then(() => self.clients.claim())
+      .then(() => {
+        // Tell all clients to refresh so they pick up the new SW + fresh chunks
+        return self.clients.matchAll({ type: "window" }).then((clients) => {
+          clients.forEach((client) => client.navigate(client.url));
+        });
+      })
   );
 });
 
@@ -55,20 +65,40 @@ self.addEventListener("fetch", (event) => {
   // Skip Next.js HMR
   if (url.pathname.startsWith("/_next/webpack-hmr")) return;
 
+  // CRITICAL: Never cache Next.js JS/CSS chunks — they change on every deploy
+  // and HMR update. Caching them causes "module factory not available" errors
+  // when the app tries to load a chunk that references a deleted module.
+  if (url.pathname.startsWith("/_next/static/chunks/") ||
+      url.pathname.startsWith("/_next/static/compiled/") ||
+      url.pathname.startsWith("/_next/static/development/") ||
+      url.pathname.includes(".hot-update.")) {
+    // Bypass cache entirely — always fetch from network
+    event.respondWith(fetch(request));
+    return;
+  }
+
   // API calls: network-first
   if (url.pathname.startsWith("/api/")) {
     event.respondWith(networkFirst(request));
     return;
   }
 
-  // Static assets: cache-first
+  // Static assets (images, fonts, icons): cache-first
   if (url.pathname.match(/\.(png|jpg|jpeg|gif|svg|webp|ico|woff2?|ttf|eot)$/)) {
     event.respondWith(cacheFirst(request));
     return;
   }
 
-  // App shell (HTML/JS/CSS): stale-while-revalidate
-  event.respondWith(staleWhileRevalidate(request));
+  // HTML pages: network-first (so we always get the latest HTML with fresh chunk references)
+  if (request.headers.get("accept")?.includes("text/html")) {
+    event.respondWith(networkFirst(request));
+    return;
+  }
+
+  // Everything else: try network, fall back to cache
+  event.respondWith(
+    fetch(request).catch(() => caches.match(request).then((r) => r || new Response("", { status: 503 })))
+  );
 });
 
 // ===== Strategies =====
@@ -86,7 +116,7 @@ async function cacheFirst(request) {
 async function networkFirst(request) {
   try {
     const res = await fetch(request);
-    if (res.ok) {
+    if (res.ok && res.type !== "opaque") {
       const clone = res.clone();
       caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, clone)).catch(() => {});
     }
@@ -98,23 +128,6 @@ async function networkFirst(request) {
       headers: { "Content-Type": "application/json" },
     });
   }
-}
-
-async function staleWhileRevalidate(request) {
-  const cache = await caches.open(APP_SHELL_CACHE);
-  const cached = await cache.match(request);
-
-  const fetchPromise = fetch(request)
-    .then((res) => {
-      if (res && res.ok) {
-        const clone = res.clone();
-        cache.put(request, clone).catch(() => {});
-      }
-      return res;
-    })
-    .catch(() => cached);
-
-  return cached || fetchPromise;
 }
 
 // ===== Message: skip waiting =====
