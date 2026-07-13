@@ -61,19 +61,21 @@ export function rateLimit(
 
 // ===== Pre-configured limits =====
 
-/** Login: 5 attempts per 15 minutes per IP. */
+/** Login: 10 attempts per 15 minutes per IP (increased from 5 for UX). */
 export function rateLimitLogin(ip: string): RateLimitResult {
-  return rateLimit(`login:${ip}`, 5, 15 * 60);
+  return rateLimit(`login:${ip}`, 10, 15 * 60);
 }
 
-/** General API write: 60 requests per minute per IP. */
+/** General API write: 120 requests per minute per IP (increased from 60). */
 export function rateLimitApiWrite(ip: string): RateLimitResult {
-  return rateLimit(`api-write:${ip}`, 60, 60);
+  return rateLimit(`api-write:${ip}`, 120, 60);
 }
 
-/** General API read: 120 requests per minute per IP. */
+/** General API read: 300 requests per minute per IP (increased from 120 —
+ *  the session restore calls /api/auth/me on every page load, and the POS
+ *  UI makes frequent read calls for products, sales, etc.) */
 export function rateLimitApiRead(ip: string): RateLimitResult {
-  return rateLimit(`api-read:${ip}`, 120, 60);
+  return rateLimit(`api-read:${ip}`, 300, 60);
 }
 
 /** Email sending: 5 per hour per IP (anti-spam). */

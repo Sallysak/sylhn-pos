@@ -49,6 +49,8 @@ const PUBLIC_API_PATHS = [
   "/api/health",
   "/api/auth/login",
   "/api/auth/logout",
+  "/api/auth/me",
+  "/api/auth/csrf",
 ];
 
 function isPublicApiPath(pathname: string): boolean {
