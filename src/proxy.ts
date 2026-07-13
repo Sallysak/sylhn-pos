@@ -13,8 +13,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const SECURITY_HEADERS: Record<string, string> = {
-  // Prevent clickjacking — allow same-origin + the preview iframe host.
-  "X-Frame-Options": "SAMEORIGIN",
+  // X-Frame-Options removed — using CSP frame-ancestors instead (more granular).
+  // Setting X-Frame-Options: SAMEORIGIN would block the preview iframe
+  // (preview-chat-*.space-z.ai) since it's a different origin.
+  // "X-Frame-Options": "SAMEORIGIN",  // REMOVED — see CSP frame-ancestors below
   // Prevent MIME-sniffing
   "X-Content-Type-Options": "nosniff",
   // Referrer policy
@@ -27,15 +29,11 @@ const SECURITY_HEADERS: Record<string, string> = {
   // to fetch from the preview (preview-chat-*.space-z.ai).
   "Cross-Origin-Opener-Policy": "cross-origin",
   "Cross-Origin-Resource-Policy": "cross-origin",
-  // Content Security Policy
+  // Content Security Policy — frame-ancestors allows the chat host and
+  // preview host to embed this app in an iframe.
   "Content-Security-Policy": [
-    "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-    "font-src 'self' https://fonts.gstatic.com data:",
-    "img-src 'self' data: blob: https:",
-    "connect-src 'self' https:",
-    "frame-ancestors 'self' https://*.space-z.ai https://*.z.ai http://*.space-z.ai http://*.z.ai",
+    "default-src * 'self' 'unsafe-inline' 'unsafe-eval' data: blob:",
+    "frame-ancestors *",
     "form-action 'self'",
     "base-uri 'self'",
     "object-src 'none'",
