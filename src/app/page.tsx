@@ -733,7 +733,7 @@ export default function POSPage() {
     return () => window.removeEventListener('keydown', handler);
   });
 
-  const completePayment = (method: string, amountPaid: number) => {
+  const completePayment = async (method: string, amountPaid: number) => {
     const change = amountPaid - total;
     const result: PaymentResult = {
       method,
@@ -749,13 +749,13 @@ export default function POSPage() {
       cashier,
       customer: customerName || undefined,
     };
-    // Reduce stock levels
+    // Reduce stock levels locally (optimistic)
     setProducts(prev => prev.map(p => {
       const cartItem = cart.find(c => c.productId === p.id);
       if (!cartItem) return p;
       return { ...p, stock: Math.max(0, p.stock - cartItem.quantity) };
     }));
-    // Add history entries
+    // Add history entries locally
     const newHistory = cart.map(item => ({
       id: `h-${Date.now()}-${item.productId}`,
       productId: item.productId,
@@ -775,6 +775,49 @@ export default function POSPage() {
     setTransactionCount(prev => prev + 1);
     setShowPayment(false);
     setShowReceipt(true);
+
+    // ===== Record sale to database (permanent persistence) =====
+    // POST to /api/sales which creates Sale + SaleItem records, decrements
+    // stock atomically, and records StockHistory entries. The sale is
+    // permanently recorded even if the user clears localStorage.
+    try {
+      const res = await fetch('/api/sales', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          invoiceNumber: result.invoiceNumber,
+          customerName: result.customer || '',
+          cashierName: result.cashier,
+          subtotal: result.subtotal,
+          discount: result.discount,
+          taxRate: TAX_RATE,
+          taxAmount: result.tax,
+          total: result.total,
+          amountPaid: result.amountPaid,
+          change: result.change,
+          paymentMethod: result.method,
+          status: 'completed',
+          items: result.items.map(item => ({
+            productId: item.productId,
+            sku: item.sku,
+            name: item.name,
+            price: item.price,
+            quantity: item.quantity,
+            unit: item.unit,
+            discount: item.discount,
+            taxable: item.taxable,
+            total: item.price * item.quantity * (1 - item.discount / 100),
+          })),
+        }),
+      });
+      if (!res.ok) {
+        console.warn('Sale recording failed:', await res.text());
+        toast({ title: 'Warning', description: 'Sale completed locally but could not be saved to server', variant: 'destructive' });
+      }
+    } catch (e) {
+      console.warn('Sale recording error (offline?):', e);
+    }
   };
 
   const finishReceipt = () => {

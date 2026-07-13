@@ -116,6 +116,66 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       return NextResponse.json({ success: true, sale: updated });
     }
 
+    if (body.status === "refunded") {
+      // Refunding requires canVoid permission (same trust level)
+      try { requirePermission(user.role, "canVoid"); } catch (e) { return e as Response; }
+
+      const sale = await db.sale.findUnique({
+        where: { id },
+        include: { items: true },
+      });
+      if (!sale) return NextResponse.json({ error: "Sale not found" }, { status: 404 });
+      if (sale.status === "refunded") {
+        return NextResponse.json({ error: "Sale already refunded" }, { status: 400 });
+      }
+      if (sale.status === "voided") {
+        return NextResponse.json({ error: "Cannot refund a voided sale" }, { status: 400 });
+      }
+
+      // Restore stock for each item + create linked StockHistory entries
+      for (const item of sale.items) {
+        if (item.productId) {
+          await db.product.update({
+            where: { id: item.productId },
+            data: { quantity: { increment: item.quantity } },
+          });
+          await db.stockHistory.create({
+            data: {
+              productId: item.productId,
+              action: "returned",
+              quantity: item.quantity,
+              reason: `Refund of ${sale.invoiceNumber}`,
+              reference: sale.invoiceNumber,
+              saleId: sale.id,
+              userId: user.uid,
+            },
+          });
+        }
+      }
+
+      const updated = await db.sale.update({
+        where: { id },
+        data: {
+          status: "refunded",
+          refundedAt: new Date(),
+        },
+        include: { items: true, customer: true, cashier: { select: { fullName: true, username: true } } },
+      });
+
+      await db.auditLog.create({
+        data: {
+          userId: user.uid,
+          user: user.username,
+          action: "REFUND",
+          module: "sales",
+          details: `Sale ${sale.invoiceNumber} refunded — ${sale.items.length} items, total ${sale.total} restored to stock`,
+          severity: "critical",
+        },
+      });
+
+      return NextResponse.json({ success: true, sale: updated });
+    }
+
     const updated = await db.sale.update({
       where: { id },
       data: {
