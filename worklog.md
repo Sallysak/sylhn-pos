@@ -1899,3 +1899,25 @@ Stage Summary:
   1. **Quick Adjust** (new): Single-product, instant adjustments — for day-to-day corrections (damaged, expired, found, etc.). Streamlined UI with product search, mode buttons, quick-amount buttons, live preview, and reason tracking.
   2. **Quantity Adjustment** (existing): Full stocktake events — for periodic inventory counts with multiple products, barcode scanning, draft persistence, audit trail, and variance comparison.
 - Build compiles cleanly (next build ✓) and dev server responds HTTP 200 with no runtime errors
+
+---
+Task ID: login-credentials-recovery
+Agent: Main (Super Z)
+Task: User reports "invalid credentials for administrator" when trying to log in.
+
+Work Log:
+- Diagnosed login flow in src/components/admin-panel.tsx:
+  * AdminLogin reads users from localStorage['sylhn-system-users'], falling back to DEFAULT_USERS (admin/admin123) only if cache is empty.
+  * If user previously changed admin password via Admin Panel (User Management tab) and forgot, OR if cached data got into a bad state, the default admin123 will not work.
+  * Login flow: find user by username + password match → if not found, increment attempts → after 3 fails, lock for 30 seconds.
+- Added a "Reset password" link in the Demo Credentials hint section of the login screen.
+- Added handleResetCredentials() function: clears localStorage keys (sylhn-system-users, sylhn-current-user, sylhn-login-attempts), resets form state, shows a toast, and reloads the page so the users useMemo re-reads from DEFAULT_USERS.
+- Added a confirmation dialog ("Reset all credentials?") that lists what will be restored and warns that any custom users/password changes will be lost. Dialog has Cancel + "Yes, reset" buttons.
+- The reset flow works even during the 30-second lockout (handleResetCredentials doesn't check `locked`), so users can self-recover from a stuck lockout state.
+- Also made the login card padding responsive (px-5 sm:px-8) so it's not cramped on small phones.
+
+Stage Summary:
+- Default credentials are admin / admin123, manager / manager123, cashier / cashier123.
+- If user forgot their admin password, they can now click "Reset password" on the login screen → confirm → defaults are restored.
+- No more need to dig into browser DevTools to clear localStorage.
+- Lint passes, build passes.

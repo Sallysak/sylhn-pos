@@ -130,6 +130,7 @@ export function AdminLogin({ onSuccess, onCancel, adminOnly = false }: { onSucce
   const [error, setError] = useState('');
   const [attempts, setAttempts] = useState(0);
   const [locked, setLocked] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   const users = useMemo(() => {
     try {
@@ -137,6 +138,30 @@ export function AdminLogin({ onSuccess, onCancel, adminOnly = false }: { onSucce
       return cached ? JSON.parse(cached) : DEFAULT_USERS;
     } catch { return DEFAULT_USERS; }
   }, []);
+
+  // Reset all credentials back to the factory defaults (admin/admin123, etc.).
+  // Useful when the admin password has been changed and forgotten, or when
+  // cached user data has become corrupted.
+  const handleResetCredentials = () => {
+    try {
+      localStorage.removeItem(USERS_KEY);
+      localStorage.removeItem(SESSION_KEY);
+      localStorage.removeItem('sylhn-login-attempts');
+    } catch { /* ignore */ }
+    setShowResetConfirm(false);
+    setAttempts(0);
+    setLocked(false);
+    setError('');
+    setUsername('');
+    setPassword('');
+    toast({
+      title: 'Credentials reset',
+      description: 'Default users restored. Sign in with admin / admin123.',
+    });
+    // Force re-mount of the login component so the users useMemo re-reads
+    // from DEFAULT_USERS instead of the (now-cleared) cache.
+    setTimeout(() => window.location.reload(), 400);
+  };
 
   const handleLogin = () => {
     if (locked) return;
@@ -182,7 +207,7 @@ export function AdminLogin({ onSuccess, onCancel, adminOnly = false }: { onSucce
 
         {/* Login card */}
         <div className="bg-white rounded-3xl shadow-2xl overflow-hidden ring-1 ring-white/20">
-          <div className="px-8 py-6 space-y-4">
+          <div className="px-5 sm:px-8 py-5 sm:py-6 space-y-4">
             {error && (
               <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-2 p-3 rounded-xl bg-rose-50 ring-1 ring-rose-200 text-rose-700 text-xs">
                 <AlertTriangle className="h-4 w-4 flex-shrink-0" /> {error}
@@ -209,8 +234,17 @@ export function AdminLogin({ onSuccess, onCancel, adminOnly = false }: { onSucce
           </div>
 
           {/* Demo credentials hint */}
-          <div className="px-8 py-3 bg-slate-50 border-t border-slate-100">
-            <div className="text-[10px] text-slate-400 font-semibold uppercase mb-1">Demo Credentials</div>
+          <div className="px-5 sm:px-8 py-3 bg-slate-50 border-t border-slate-100">
+            <div className="flex items-center justify-between mb-1">
+              <div className="text-[10px] text-slate-400 font-semibold uppercase">Demo Credentials</div>
+              <button
+                onClick={() => setShowResetConfirm(true)}
+                className="text-[10px] text-rose-500 hover:text-rose-700 font-semibold transition underline-offset-2 hover:underline"
+                title="Restore admin/manager/cashier to default passwords"
+              >
+                Reset password
+              </button>
+            </div>
             <div className="text-[10px] text-slate-500 font-mono space-y-0.5">
               {adminOnly ? (
                 <>
@@ -230,6 +264,46 @@ export function AdminLogin({ onSuccess, onCancel, adminOnly = false }: { onSucce
 
         <button onClick={onCancel} className="w-full mt-4 text-xs text-slate-400 hover:text-white transition">{adminOnly ? '← Back to POS' : 'Login required to continue'}</button>
       </motion.div>
+
+      {/* ===== Reset Credentials Confirmation Dialog ===== */}
+      {showResetConfirm && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4" onClick={() => setShowResetConfirm(false)}>
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden"
+          >
+            <div className="px-6 py-4 bg-gradient-to-r from-amber-500 to-rose-500 text-white flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5" />
+              <h3 className="text-sm font-bold">Reset all credentials?</h3>
+            </div>
+            <div className="px-6 py-4 text-xs text-slate-600 space-y-2">
+              <p>This will restore the default users and passwords:</p>
+              <ul className="font-mono text-[11px] text-slate-700 bg-slate-50 rounded-lg p-2 space-y-0.5">
+                <li>admin / admin123</li>
+                <li>manager / manager123</li>
+                <li>cashier / cashier123</li>
+              </ul>
+              <p className="text-rose-600 font-semibold">Any users you added or passwords you changed will be lost.</p>
+            </div>
+            <div className="px-6 py-3 bg-slate-50 border-t border-slate-100 flex gap-2 justify-end">
+              <button
+                onClick={() => setShowResetConfirm(false)}
+                className="h-9 px-4 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleResetCredentials}
+                className="h-9 px-4 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition flex items-center gap-1.5"
+              >
+                <KeyRound className="h-3.5 w-3.5" /> Yes, reset
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </motion.div>
   );
 }
