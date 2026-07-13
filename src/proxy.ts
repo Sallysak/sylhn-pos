@@ -13,8 +13,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const SECURITY_HEADERS: Record<string, string> = {
-  // Prevent clickjacking
-  "X-Frame-Options": "DENY",
+  // Prevent clickjacking — allow same-origin + the preview iframe host.
+  // (X-Frame-Options is gradually being replaced by CSP frame-ancestors,
+  // but we set both for defense-in-depth and older-browser support.)
+  "X-Frame-Options": "SAMEORIGIN",
   // Prevent MIME-sniffing
   "X-Content-Type-Options": "nosniff",
   // Referrer policy
@@ -26,7 +28,10 @@ const SECURITY_HEADERS: Record<string, string> = {
   // Cross-origin policies
   "Cross-Origin-Opener-Policy": "same-origin",
   "Cross-Origin-Resource-Policy": "same-origin",
-  // Content Security Policy — only allow same-origin + a few needed exceptions
+  // Content Security Policy — only allow same-origin + a few needed exceptions.
+  // frame-ancestors allows the preview iframe host (preview-*.space-z.ai) so the
+  // app can be embedded in the chat preview UI; all other cross-origin sites
+  // remain blocked.
   "Content-Security-Policy": [
     "default-src 'self'",
     "script-src 'self' 'unsafe-inline' 'unsafe-eval'", // Next.js needs inline/eval
@@ -34,7 +39,7 @@ const SECURITY_HEADERS: Record<string, string> = {
     "font-src 'self' https://fonts.gstatic.com data:",
     "img-src 'self' data: blob: https:",
     "connect-src 'self' https:",
-    "frame-ancestors 'none'",
+    "frame-ancestors 'self' https://*.space-z.ai http://*.space-z.ai",
     "form-action 'self'",
     "base-uri 'self'",
     "object-src 'none'",
