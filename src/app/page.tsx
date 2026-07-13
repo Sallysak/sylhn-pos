@@ -61,6 +61,7 @@ const AdminLogin = dynamic(() => import("@/components/admin-panel").then(m => ({
 const AdminPanel = dynamic(() => import("@/components/admin-panel").then(m => ({ default: m.AdminPanel })), { ssr: false, loading: loadingFallback });
 const OperationsDashboard = dynamic(() => import("@/components/operations-dashboard").then(m => ({ default: m.OperationsDashboard })), { ssr: false, loading: loadingFallback });
 const ReceiptArchive = dynamic(() => import("@/components/receipt-archive").then(m => ({ default: m.ReceiptArchive })), { ssr: false, loading: loadingFallback });
+const SyncSettings = dynamic(() => import("@/components/sync-settings").then(m => ({ default: m.SyncSettings })), { ssr: false, loading: loadingFallback });
 
 export default function POSPage() {
   // ===== Top-level View State =====
@@ -1004,6 +1005,8 @@ export default function POSPage() {
         { label: "User Management", icon: Users, action: () => setView("maintenance") },
         { label: "Backup Database", icon: Database, action: () => setView("maintenance") },
         { separator: true },
+        { label: "☁️ Server Sync", icon: RefreshCw, action: () => setView("sync-settings") },
+        { separator: true },
         { label: "Cashier Shift", icon: Clock, action: () => setView("maintenance") },
         { label: "Security & Permissions", icon: Lock, action: () => setView("maintenance") },
         { separator: true },
@@ -1026,6 +1029,9 @@ export default function POSPage() {
   }
   if (view === "receipt-archive") {
     return <ReceiptArchive onBack={() => setView("pos")} />;
+  }
+  if (view === "sync-settings") {
+    return <SyncSettings onBack={() => setView("pos")} />;
   }
   if (view === "stock") {
     return <StockManagement onBack={() => { setView("pos"); setOpenStockQtyReport(false); }} products={products} setProducts={setProducts} groups={groups} setGroups={setGroups} history={history} setHistory={setHistory} initialView={initialStockView} openQtyReport={openStockQtyReport} onNavigateToPurchase={() => setView("purchase-form")} />;
