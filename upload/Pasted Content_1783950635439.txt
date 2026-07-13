@@ -1,0 +1,921 @@
+400.8000183105469
+4index-Bm0jSdsv.js:7 https://svelte.dev/e/derived_inert
+JJ @ index-Bm0jSdsv.js:7
+index-Bm0jSdsv.js:2182 346.3999938964844
+index-Bm0jSdsv.js:2177 Object
+vi @ index-Bm0jSdsv.js:2177
+4index-Bm0jSdsv.js:7 https://svelte.dev/e/derived_inert
+JJ @ index-Bm0jSdsv.js:7
+index-Bm0jSdsv.js:1678 Failed to fetch download files: AbortError: The user aborted a request.
+queryFn @ index-Bm0jSdsv.js:1678
+index-Bm0jSdsv.js:2171 chat: Object
+index-Bm0jSdsv.js:2171 historyCurrentId: d2148a09-69b5-4def-ac3d-7cc481cda624
+index-Bm0jSdsv.js:7 https://svelte.dev/e/derived_inert
+JJ @ index-Bm0jSdsv.js:7
+index-Bm0jSdsv.js:2177 Object
+vi @ index-Bm0jSdsv.js:2177
+8index-Bm0jSdsv.js:7 https://svelte.dev/e/derived_inert
+JJ @ index-Bm0jSdsv.js:7
+index-Bm0jSdsv.js:1678 Failed to fetch download files: AbortError: The user aborted a request.
+queryFn @ index-Bm0jSdsv.js:1678
+index-Bm0jSdsv.js:2171 chat: Object
+index-Bm0jSdsv.js:2171 historyCurrentId: d2148a09-69b5-4def-ac3d-7cc481cda624
+2index-Bm0jSdsv.js:7 https://svelte.dev/e/derived_inert
+JJ @ index-Bm0jSdsv.js:7
+index-Bm0jSdsv.js:2177 Object
+vi @ index-Bm0jSdsv.js:2177
+sdata.chatglm.cn/frontend/zai/e.gif?pd=zai&bt=pv&tm=pc&ct=chat_search&ctvl=prompt&usid=b1227dba-9bfa-47fe-8565-8214ad7aaaa3&fr=default&pvid=&_n_is_guest=0&url=%2Fc%2F792166e4-ad43-4494-83ce-3ec201bda5ea%3Ffr%3Ddefault&ctnm=1&extra=&pds=&pdt=&ctid=GLM-5.2:1  Failed to load resource: net::ERR_CONNECTION_TIMED_OUT
+12index-Bm0jSdsv.js:7 https://svelte.dev/e/derived_inert
+JJ @ index-Bm0jSdsv.js:7
+index-Bm0jSdsv.js:1678 Failed to fetch download files: AbortError: signal is aborted without reason
+    at Object.onCancel (index-Bm0jSdsv.js:76:67202)
+    at Object.o [as cancel] (index-Bm0jSdsv.js:76:61538)
+    at yz.removeObserver (index-Bm0jSdsv.js:76:65624)
+    at kz.destroy (index-Bm0jSdsv.js:76:71012)
+    at kz.onUnsubscribe (index-Bm0jSdsv.js:76:70718)
+    at index-Bm0jSdsv.js:76:55139
+    at pF (index-Bm0jSdsv.js:7:27204)
+    at Zi (index-Bm0jSdsv.js:7:27681)
+    at LE (index-Bm0jSdsv.js:7:27385)
+    at Zi (index-Bm0jSdsv.js:7:27598)
+queryFn @ index-Bm0jSdsv.js:1678
+index-Bm0jSdsv.js:2171 chat: Object
+index-Bm0jSdsv.js:2171 historyCurrentId: d2148a09-69b5-4def-ac3d-7cc481cda624
+3index-Bm0jSdsv.js:7 https://svelte.dev/e/derived_inert
+JJ @ index-Bm0jSdsv.js:7
+sdata.chatglm.cn/frontend/zai/e.gif?pd=zai&bt=er&tm=pc&ct=global_network_error&ctvl=Failed+to+fetch&usid=b1227dba-9bfa-47fe-8565-8214ad7aaaa3&fr=default&pvid=&_n_is_guest=0&url=%2Fc%2F792166e4-ad43-4494-83ce-3ec201bda5ea%3Ffr%3Ddefault&ctnm=&extra=&pds=&pdt=&ctid=:1  Failed to load resource: net::ERR_CONNECTION_TIMED_OUT
+sdata.chatglm.cn/frontend/zai/e.gif?pd=zai&bt=expose&tm=pc&ct=captcha_verify_success&ctvl=success&usid=b1227dba-9bfa-47fe-8565-8214ad7aaaa3&fr=default&pvid=&_n_is_guest=0&url=%2Fc%2F792166e4-ad43-4494-83ce-3ec201bda5ea%3Ffr%3Ddefault&ctnm=&extra=&pds=&pdt=&ctid=:1  Failed to load resource: net::ERR_TIMED_OUT
+sdata.chatglm.cn/frontend/zai/e.gif?pd=zai&bt=cl&tm=pc&ct=model_degrade_prompt_click&ctvl=reject&usid=b1227dba-9bfa-47fe-8565-8214ad7aaaa3&fr=default&pvid=&_n_is_guest=0&url=%2Fc%2F792166e4-ad43-4494-83ce-3ec201bda5ea%3Ffr%3Ddefault&ctnm=&extra=&pds=&pdt=general_agent&ctid=:1  Failed to load resource: net::ERR_TIMED_OUT
+sdata.chatglm.cn/frontend/zai/e.gif?pd=zai&bt=er&tm=pc&ct=global_network_error&ctvl=signal+is+aborted+without+reason&usid=b1227dba-9bfa-47fe-8565-8214ad7aaaa3&fr=default&pvid=&_n_is_guest=0&url=%2Fc%2F792166e4-ad43-4494-83ce-3ec201bda5ea%3Ffr%3Ddefault&ctnm=&extra=&pds=&pdt=&ctid=:1  Failed to load resource: net::ERR_CONNECTION_TIMED_OUT
+sdata.chatglm.cn/frontend/zai/e.gif?pd=zai&bt=expose&tm=pc&ct=ppt_artifacts_list&ctvl=&usid=b1227dba-9bfa-47fe-8565-8214ad7aaaa3&fr=default&pvid=&_n_is_guest=0&url=%2Fc%2F792166e4-ad43-4494-83ce-3ec201bda5ea%3Ffr%3Ddefault&ctnm=&extra=&pds=&pdt=general_agent&ctid=&task_id=d2148a09-69b5-4def-ac3d-7cc481cda624&file_count=102:1  Failed to load resource: net::ERR_TIMED_OUT
+j2c03hoppk-default-cn.rum.aliyuncs.com/:1  Failed to load resource: net::ERR_CONNECTION_RESET
+/api/v1/web-dev/workspaces/files/content:1  Failed to load resource: the server responded with a status of 404 (Not Found)
+/api/v1/web-dev/workspaces/files/content:1  Failed to load resource: the server responded with a status of 404 (Not Found)
+120index-Bm0jSdsv.js:7 https://svelte.dev/e/derived_inert
+JJ @ index-Bm0jSdsv.js:7
+/api/v1/web-dev/workspaces/files/content:1  Failed to load resource: the server responded with a status of 404 (Not Found)
+index-Bm0jSdsv.js:2177 Object
+vi @ index-Bm0jSdsv.js:2177
+16index-Bm0jSdsv.js:7 https://svelte.dev/e/derived_inert
+JJ @ index-Bm0jSdsv.js:7
+index-Bm0jSdsv.js:1678 Failed to fetch download files: AbortError: signal is aborted without reason
+    at Object.onCancel (index-Bm0jSdsv.js:76:67202)
+    at Object.o [as cancel] (index-Bm0jSdsv.js:76:61538)
+    at yz.removeObserver (index-Bm0jSdsv.js:76:65624)
+    at kz.destroy (index-Bm0jSdsv.js:76:71012)
+    at kz.onUnsubscribe (index-Bm0jSdsv.js:76:70718)
+    at index-Bm0jSdsv.js:76:55139
+    at pF (index-Bm0jSdsv.js:7:27204)
+    at Zi (index-Bm0jSdsv.js:7:27681)
+    at LE (index-Bm0jSdsv.js:7:27385)
+    at Zi (index-Bm0jSdsv.js:7:27598)
+queryFn @ index-Bm0jSdsv.js:1678
+index-Bm0jSdsv.js:2171 chat: Object
+index-Bm0jSdsv.js:2171 historyCurrentId: 738965d2-ee9c-4626-962d-01f5f5416d27
+4index-Bm0jSdsv.js:7 https://svelte.dev/e/derived_inert
+JJ @ index-Bm0jSdsv.js:7
+index-Bm0jSdsv.js:2177 Object
+vi @ index-Bm0jSdsv.js:2177
+20index-Bm0jSdsv.js:7 https://svelte.dev/e/derived_inert
+JJ @ index-Bm0jSdsv.js:7
+index-Bm0jSdsv.js:1678 Failed to fetch download files: AbortError: The user aborted a request.
+queryFn @ index-Bm0jSdsv.js:1678
+index-Bm0jSdsv.js:2171 chat: Object
+index-Bm0jSdsv.js:2171 historyCurrentId: 738965d2-ee9c-4626-962d-01f5f5416d27
+5index-Bm0jSdsv.js:7 https://svelte.dev/e/derived_inert
+JJ @ index-Bm0jSdsv.js:7
+index-Bm0jSdsv.js:2177 Object
+vi @ index-Bm0jSdsv.js:2177
+48index-Bm0jSdsv.js:7 https://svelte.dev/e/derived_inert
+JJ @ index-Bm0jSdsv.js:7
+index-Bm0jSdsv.js:1678 Failed to fetch download files: AbortError: The user aborted a request.
+queryFn @ index-Bm0jSdsv.js:1678
+index-Bm0jSdsv.js:2171 chat: Object
+index-Bm0jSdsv.js:2171 historyCurrentId: 738965d2-ee9c-4626-962d-01f5f5416d27
+6index-Bm0jSdsv.js:7 https://svelte.dev/e/derived_inert
+JJ @ index-Bm0jSdsv.js:7
+preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/_next/static/chunks/src_components_admin-panel_tsx_ac46bf25._.js:1  Failed to load resource: the server responded with a status of 502 (Bad Gateway)
+preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/_next/static/chunks/src_components_admin-panel_tsx_ac46bf25._.js:1  Failed to load resource: the server responded with a status of 502 (Bad Gateway)
+preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/_next/static/chunks/src_components_admin-panel_tsx_ac46bf25._.js:1  Failed to load resource: the server responded with a status of 502 (Bad Gateway)
+preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/_next/static/chunks/src_components_admin-panel_tsx_ac46bf25._.js:1  Failed to load resource: the server responded with a status of 502 (Bad Gateway)
+preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/_next/static/chunks/src_components_admin-panel_tsx_ac46bf25._.js:1  Failed to load resource: the server responded with a status of 502 (Bad Gateway)
+preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/_next/static/chunks/src_components_admin-panel_tsx_ac46bf25._.js:1  Failed to load resource: the server responded with a status of 502 (Bad Gateway)
+preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/_next/static/chunks/src_components_admin-panel_tsx_ac46bf25._.js:1  Failed to load resource: the server responded with a status of 502 (Bad Gateway)
+preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/_next/static/chunks/node_modules_lucide-react_dist_esm_icons_73baa0f4._.js:1  Failed to load resource: the server responded with a status of 502 (Bad Gateway)
+preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/_next/static/chunks/node_modules_lucide-react_dist_esm_icons_73baa0f4._.js:1  Failed to load resource: the server responded with a status of 502 (Bad Gateway)
+preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/_next/static/chunks/node_modules_lucide-react_dist_esm_icons_73baa0f4._.js:1  Failed to load resource: the server responded with a status of 502 (Bad Gateway)
+preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/_next/static/chunks/node_modules_lucide-react_dist_esm_icons_73baa0f4._.js:1  Failed to load resource: the server responded with a status of 502 (Bad Gateway)
+preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/_next/static/chunks/node_modules_lucide-react_dist_esm_icons_73baa0f4._.js:1  Failed to load resource: the server responded with a status of 502 (Bad Gateway)
+preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/_next/static/chunks/node_modules_lucide-react_dist_esm_icons_73baa0f4._.js:1  Failed to load resource: the server responded with a status of 502 (Bad Gateway)
+preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/_next/static/chunks/node_modules_lucide-react_dist_esm_icons_73baa0f4._.js:1  Failed to load resource: the server responded with a status of 502 (Bad Gateway)
+preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/_next/static/chunks/src_components_admin-panel_tsx_de6a9bf4._.js:1  Failed to load resource: the server responded with a status of 502 (Bad Gateway)
+preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/_next/static/chunks/src_components_admin-panel_tsx_de6a9bf4._.js:1  Failed to load resource: the server responded with a status of 502 (Bad Gateway)
+preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/_next/static/chunks/src_components_admin-panel_tsx_de6a9bf4._.js:1  Failed to load resource: the server responded with a status of 502 (Bad Gateway)
+preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/_next/static/chunks/src_components_admin-panel_tsx_de6a9bf4._.js:1  Failed to load resource: the server responded with a status of 502 (Bad Gateway)
+preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/_next/static/chunks/src_components_admin-panel_tsx_de6a9bf4._.js:1  Failed to load resource: the server responded with a status of 502 (Bad Gateway)
+preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/_next/static/chunks/src_components_admin-panel_tsx_de6a9bf4._.js:1  Failed to load resource: the server responded with a status of 502 (Bad Gateway)
+preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/_next/static/chunks/src_components_admin-panel_tsx_de6a9bf4._.js:1  Failed to load resource: the server responded with a status of 502 (Bad Gateway)
+preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/__nextjs_original-stack-frames:1  Failed to load resource: the server responded with a status of 502 (Bad Gateway)
+preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/__nextjs_original-stack-frames:1  Failed to load resource: the server responded with a status of 502 (Bad Gateway)
+preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/__nextjs_original-stack-frames:1  Failed to load resource: the server responded with a status of 502 (Bad Gateway)
+preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/__nextjs_original-stack-frames:1  Failed to load resource: the server responded with a status of 502 (Bad Gateway)
+__nextjs_original-stack-frames:1  Failed to load resource: the server responded with a status of 502 (Bad Gateway)
+__nextjs_original-stack-frames:1  Failed to load resource: the server responded with a status of 502 (Bad Gateway)
+__nextjs_original-stack-frames:1  Failed to load resource: the server responded with a status of 502 (Bad Gateway)
+24index-Bm0jSdsv.js:7 https://svelte.dev/e/derived_inert
+JJ @ index-Bm0jSdsv.js:7
+index-Bm0jSdsv.js:2182 342.3999938964844
+24index-Bm0jSdsv.js:7 https://svelte.dev/e/derived_inert
+JJ @ index-Bm0jSdsv.js:7
+index-Bm0jSdsv.js:2182 351.20001220703125
+24index-Bm0jSdsv.js:7 https://svelte.dev/e/derived_inert
+JJ @ index-Bm0jSdsv.js:7
+index-Bm0jSdsv.js:2182 345.6000061035156
+24index-Bm0jSdsv.js:7 https://svelte.dev/e/derived_inert
+JJ @ index-Bm0jSdsv.js:7
+index-Bm0jSdsv.js:2182 348.8000183105469
+/api/v1/web-dev/workspaces/files/content:1  Failed to load resource: the server responded with a status of 429 (Too Many Requests)
+/api/v1/web-dev/workspaces/files/ls-tree:1  Failed to load resource: the server responded with a status of 429 (Too Many Requests)
+28index-Bm0jSdsv.js:7 https://svelte.dev/e/derived_inert
+JJ @ index-Bm0jSdsv.js:7
+index-Bm0jSdsv.js:2182 436.8000183105469
+28index-Bm0jSdsv.js:7 https://svelte.dev/e/derived_inert
+JJ @ index-Bm0jSdsv.js:7
+index-Bm0jSdsv.js:2182 481.6000061035156
+28index-Bm0jSdsv.js:7 https://svelte.dev/e/derived_inert
+JJ @ index-Bm0jSdsv.js:7
+index-Bm0jSdsv.js:2182 352.8000183105469
+28index-Bm0jSdsv.js:7 https://svelte.dev/e/derived_inert
+JJ @ index-Bm0jSdsv.js:7
+index-Bm0jSdsv.js:2182 326.3999938964844
+j2c03hoppk-default-cn.rum.aliyuncs.com/:1  Failed to load resource: net::ERR_TIMED_OUT
+28index-Bm0jSdsv.js:7 https://svelte.dev/e/derived_inert
+JJ @ index-Bm0jSdsv.js:7
+index-Bm0jSdsv.js:2182 345.6000061035156
+7index-Bm0jSdsv.js:7 https://svelte.dev/e/derived_inert
+JJ @ index-Bm0jSdsv.js:7
+(index):1  Failed to load resource: the server responded with a status of 429 (Too Many Requests)
+preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/:1  Failed to load resource: the server responded with a status of 429 (Too Many Requests)
+(index):1  Failed to load resource: the server responded with a status of 429 (Too Many Requests)
+preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/:1  Failed to load resource: the server responded with a status of 429 (Too Many Requests)
+(index):1  Failed to load resource: the server responded with a status of 429 (Too Many Requests)
+(index):1  Failed to load resource: the server responded with a status of 429 (Too Many Requests)
+(index):1  Failed to load resource: the server responded with a status of 429 (Too Many Requests)
+28index-Bm0jSdsv.js:7 https://svelte.dev/e/derived_inert
+JJ @ index-Bm0jSdsv.js:7
+/api/v1/web-dev/workspaces/files/content:1  Failed to load resource: the server responded with a status of 404 (Not Found)
+(index):1  Failed to load resource: the server responded with a status of 429 (Too Many Requests)
+preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/:1  Failed to load resource: the server responded with a status of 429 (Too Many Requests)
+(index):1  Failed to load resource: the server responded with a status of 429 (Too Many Requests)
+preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/:1  Failed to load resource: the server responded with a status of 429 (Too Many Requests)
+(index):1  Failed to load resource: the server responded with a status of 429 (Too Many Requests)
+(index):1  Failed to load resource: the server responded with a status of 429 (Too Many Requests)
+(index):1  Failed to load resource: the server responded with a status of 429 (Too Many Requests)
+[NEW] Explain Console errors by using Copilot in Edge: click  to explain an error. Learn moreDon't show again
+browser-sdk.js:1  GET https://chat.z.ai/api/v1/web-dev/workspaces/git/log?chatId=792166e4-ad43-4494-83ce-3ec201bda5ea&limit=50 net::ERR_NAME_NOT_RESOLVED
+(anonymous) @ browser-sdk.js:1
+fetch @ jquery.min.js:1
+window.fetch @ index-Bm0jSdsv.js:33
+V3e @ index-Bm0jSdsv.js:1024
+queryFn @ index-Bm0jSdsv.js:2047
+i @ index-Bm0jSdsv.js:76
+_ @ index-Bm0jSdsv.js:76
+start @ index-Bm0jSdsv.js:76
+fetch @ index-Bm0jSdsv.js:76
+Gv @ index-Bm0jSdsv.js:76
+onSubscribe @ index-Bm0jSdsv.js:76
+subscribe @ index-Bm0jSdsv.js:76
+(anonymous) @ index-Bm0jSdsv.js:76
+kF @ index-Bm0jSdsv.js:7
+P1 @ index-Bm0jSdsv.js:7
+bL @ index-Bm0jSdsv.js:7
+k4 @ index-Bm0jSdsv.js:7
+flush @ index-Bm0jSdsv.js:7
+(anonymous) @ index-Bm0jSdsv.js:7
+ex @ index-Bm0jSdsv.js:7
+Wz @ index-Bm0jSdsv.js:7
+(anonymous) @ index-Bm0jSdsv.js:7
+browser-sdk.js:1  GET https://chat.z.ai/api/v1/sandbox/version/list?chatId=792166e4-ad43-4494-83ce-3ec201bda5ea&artifact=slides net::ERR_NAME_NOT_RESOLVED
+(anonymous) @ browser-sdk.js:1
+fetch @ jquery.min.js:1
+window.fetch @ index-Bm0jSdsv.js:33
+vy @ index-Bm0jSdsv.js:1024
+queryFn @ index-Bm0jSdsv.js:2047
+i @ index-Bm0jSdsv.js:76
+_ @ index-Bm0jSdsv.js:76
+start @ index-Bm0jSdsv.js:76
+fetch @ index-Bm0jSdsv.js:76
+Gv @ index-Bm0jSdsv.js:76
+onSubscribe @ index-Bm0jSdsv.js:76
+subscribe @ index-Bm0jSdsv.js:76
+(anonymous) @ index-Bm0jSdsv.js:76
+kF @ index-Bm0jSdsv.js:7
+P1 @ index-Bm0jSdsv.js:7
+bL @ index-Bm0jSdsv.js:7
+k4 @ index-Bm0jSdsv.js:7
+flush @ index-Bm0jSdsv.js:7
+(anonymous) @ index-Bm0jSdsv.js:7
+ex @ index-Bm0jSdsv.js:7
+Wz @ index-Bm0jSdsv.js:7
+(anonymous) @ index-Bm0jSdsv.js:7
+browser-sdk.js:1  GET https://chat.z.ai/api/v1/web-dev/deployments?chatId=792166e4-ad43-4494-83ce-3ec201bda5ea net::ERR_NAME_NOT_RESOLVED
+(anonymous) @ browser-sdk.js:1
+fetch @ jquery.min.js:1
+window.fetch @ index-Bm0jSdsv.js:33
+Mde @ index-Bm0jSdsv.js:49
+queryFn @ index-Bm0jSdsv.js:2047
+i @ index-Bm0jSdsv.js:76
+_ @ index-Bm0jSdsv.js:76
+start @ index-Bm0jSdsv.js:76
+fetch @ index-Bm0jSdsv.js:76
+Gv @ index-Bm0jSdsv.js:76
+onSubscribe @ index-Bm0jSdsv.js:76
+subscribe @ index-Bm0jSdsv.js:76
+(anonymous) @ index-Bm0jSdsv.js:76
+kF @ index-Bm0jSdsv.js:7
+P1 @ index-Bm0jSdsv.js:7
+bL @ index-Bm0jSdsv.js:7
+k4 @ index-Bm0jSdsv.js:7
+flush @ index-Bm0jSdsv.js:7
+(anonymous) @ index-Bm0jSdsv.js:7
+ex @ index-Bm0jSdsv.js:7
+Wz @ index-Bm0jSdsv.js:7
+(anonymous) @ index-Bm0jSdsv.js:7
+index-Bm0jSdsv.js:2047 获取部署列表失败: TypeError: Failed to fetch
+    at browser-sdk.js:1:152303
+    at fetch (jquery.min.js:1:160974)
+    at window.fetch (index-Bm0jSdsv.js:33:6877)
+    at Mde (index-Bm0jSdsv.js:49:8584)
+    at queryFn (index-Bm0jSdsv.js:2047:35168)
+    at Object.i [as fn] (index-Bm0jSdsv.js:76:66630)
+    at _ (index-Bm0jSdsv.js:76:61994)
+    at Object.start (index-Bm0jSdsv.js:76:62488)
+    at yz.fetch (index-Bm0jSdsv.js:76:67542)
+    at kz.Gv (index-Bm0jSdsv.js:76:76050)
+queryFn @ index-Bm0jSdsv.js:2047
+await in queryFn
+i @ index-Bm0jSdsv.js:76
+_ @ index-Bm0jSdsv.js:76
+start @ index-Bm0jSdsv.js:76
+fetch @ index-Bm0jSdsv.js:76
+Gv @ index-Bm0jSdsv.js:76
+onSubscribe @ index-Bm0jSdsv.js:76
+subscribe @ index-Bm0jSdsv.js:76
+(anonymous) @ index-Bm0jSdsv.js:76
+kF @ index-Bm0jSdsv.js:7
+P1 @ index-Bm0jSdsv.js:7
+bL @ index-Bm0jSdsv.js:7
+k4 @ index-Bm0jSdsv.js:7
+flush @ index-Bm0jSdsv.js:7
+(anonymous) @ index-Bm0jSdsv.js:7
+ex @ index-Bm0jSdsv.js:7
+Wz @ index-Bm0jSdsv.js:7
+(anonymous) @ index-Bm0jSdsv.js:7
+(index):1  Failed to load resource: the server responded with a status of 502 (Bad Gateway)
+  GET https://preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/ 502 (Bad Gateway)
+g @ index-Bm0jSdsv.js:7
+z @ index-Bm0jSdsv.js:2047
+(anonymous) @ index-Bm0jSdsv.js:7
+kF @ index-Bm0jSdsv.js:7
+P1 @ index-Bm0jSdsv.js:7
+Vl @ index-Bm0jSdsv.js:7
+Qo @ index-Bm0jSdsv.js:7
+ensure @ index-Bm0jSdsv.js:7
+i @ index-Bm0jSdsv.js:7
+(anonymous) @ index-Bm0jSdsv.js:7
+(anonymous) @ index-Bm0jSdsv.js:2047
+(anonymous) @ index-Bm0jSdsv.js:7
+kF @ index-Bm0jSdsv.js:7
+P1 @ index-Bm0jSdsv.js:7
+z9 @ index-Bm0jSdsv.js:7
+k4 @ index-Bm0jSdsv.js:7
+flush @ index-Bm0jSdsv.js:7
+(anonymous) @ index-Bm0jSdsv.js:7
+ex @ index-Bm0jSdsv.js:7
+Wz @ index-Bm0jSdsv.js:7
+(anonymous) @ index-Bm0jSdsv.js:7
+  GET https://preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/ 502 (Bad Gateway)
+g @ index-Bm0jSdsv.js:7
+z @ index-Bm0jSdsv.js:2047
+(anonymous) @ index-Bm0jSdsv.js:7
+kF @ index-Bm0jSdsv.js:7
+P1 @ index-Bm0jSdsv.js:7
+Vl @ index-Bm0jSdsv.js:7
+Qo @ index-Bm0jSdsv.js:7
+ensure @ index-Bm0jSdsv.js:7
+i @ index-Bm0jSdsv.js:7
+(anonymous) @ index-Bm0jSdsv.js:7
+(anonymous) @ index-Bm0jSdsv.js:2047
+(anonymous) @ index-Bm0jSdsv.js:7
+kF @ index-Bm0jSdsv.js:7
+P1 @ index-Bm0jSdsv.js:7
+z9 @ index-Bm0jSdsv.js:7
+k4 @ index-Bm0jSdsv.js:7
+flush @ index-Bm0jSdsv.js:7
+(anonymous) @ index-Bm0jSdsv.js:7
+ex @ index-Bm0jSdsv.js:7
+Wz @ index-Bm0jSdsv.js:7
+(anonymous) @ index-Bm0jSdsv.js:7
+  GET https://preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/ 502 (Bad Gateway)
+g @ index-Bm0jSdsv.js:7
+z @ index-Bm0jSdsv.js:2047
+(anonymous) @ index-Bm0jSdsv.js:7
+kF @ index-Bm0jSdsv.js:7
+P1 @ index-Bm0jSdsv.js:7
+Vl @ index-Bm0jSdsv.js:7
+Qo @ index-Bm0jSdsv.js:7
+ensure @ index-Bm0jSdsv.js:7
+i @ index-Bm0jSdsv.js:7
+(anonymous) @ index-Bm0jSdsv.js:7
+(anonymous) @ index-Bm0jSdsv.js:2047
+(anonymous) @ index-Bm0jSdsv.js:7
+kF @ index-Bm0jSdsv.js:7
+P1 @ index-Bm0jSdsv.js:7
+z9 @ index-Bm0jSdsv.js:7
+k4 @ index-Bm0jSdsv.js:7
+flush @ index-Bm0jSdsv.js:7
+(anonymous) @ index-Bm0jSdsv.js:7
+ex @ index-Bm0jSdsv.js:7
+Wz @ index-Bm0jSdsv.js:7
+(anonymous) @ index-Bm0jSdsv.js:7
+  GET https://preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/ 502 (Bad Gateway)
+g @ index-Bm0jSdsv.js:7
+z @ index-Bm0jSdsv.js:2047
+(anonymous) @ index-Bm0jSdsv.js:7
+kF @ index-Bm0jSdsv.js:7
+P1 @ index-Bm0jSdsv.js:7
+Vl @ index-Bm0jSdsv.js:7
+Qo @ index-Bm0jSdsv.js:7
+ensure @ index-Bm0jSdsv.js:7
+i @ index-Bm0jSdsv.js:7
+(anonymous) @ index-Bm0jSdsv.js:7
+(anonymous) @ index-Bm0jSdsv.js:2047
+(anonymous) @ index-Bm0jSdsv.js:7
+kF @ index-Bm0jSdsv.js:7
+P1 @ index-Bm0jSdsv.js:7
+z9 @ index-Bm0jSdsv.js:7
+k4 @ index-Bm0jSdsv.js:7
+flush @ index-Bm0jSdsv.js:7
+(anonymous) @ index-Bm0jSdsv.js:7
+ex @ index-Bm0jSdsv.js:7
+Wz @ index-Bm0jSdsv.js:7
+(anonymous) @ index-Bm0jSdsv.js:7
+  GET https://preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/ 502 (Bad Gateway)
+g @ index-Bm0jSdsv.js:7
+z @ index-Bm0jSdsv.js:2047
+(anonymous) @ index-Bm0jSdsv.js:7
+kF @ index-Bm0jSdsv.js:7
+P1 @ index-Bm0jSdsv.js:7
+Vl @ index-Bm0jSdsv.js:7
+Qo @ index-Bm0jSdsv.js:7
+ensure @ index-Bm0jSdsv.js:7
+i @ index-Bm0jSdsv.js:7
+(anonymous) @ index-Bm0jSdsv.js:7
+(anonymous) @ index-Bm0jSdsv.js:2047
+(anonymous) @ index-Bm0jSdsv.js:7
+kF @ index-Bm0jSdsv.js:7
+P1 @ index-Bm0jSdsv.js:7
+z9 @ index-Bm0jSdsv.js:7
+k4 @ index-Bm0jSdsv.js:7
+flush @ index-Bm0jSdsv.js:7
+(anonymous) @ index-Bm0jSdsv.js:7
+ex @ index-Bm0jSdsv.js:7
+Wz @ index-Bm0jSdsv.js:7
+(anonymous) @ index-Bm0jSdsv.js:7
+browser-sdk.js:1  POST https://chat.z.ai/api/v1/web-dev/workspaces/files/ls-tree net::ERR_NAME_NOT_RESOLVED
+(anonymous) @ browser-sdk.js:1
+fetch @ jquery.min.js:1
+window.fetch @ index-Bm0jSdsv.js:33
+Lde @ index-Bm0jSdsv.js:49
+queryFn @ index-Bm0jSdsv.js:2047
+i @ index-Bm0jSdsv.js:76
+_ @ index-Bm0jSdsv.js:76
+start @ index-Bm0jSdsv.js:76
+fetch @ index-Bm0jSdsv.js:76
+Gv @ index-Bm0jSdsv.js:76
+fetch @ index-Bm0jSdsv.js:76
+refetch @ index-Bm0jSdsv.js:76
+w @ index-Bm0jSdsv.js:2047
+(anonymous) @ index-Bm0jSdsv.js:2047
+B @ index-Bm0jSdsv.js:7
+(anonymous) @ index-Bm0jSdsv.js:2047
+kF @ index-Bm0jSdsv.js:7
+P1 @ index-Bm0jSdsv.js:7
+bL @ index-Bm0jSdsv.js:7
+k4 @ index-Bm0jSdsv.js:7
+flush @ index-Bm0jSdsv.js:7
+(anonymous) @ index-Bm0jSdsv.js:7
+ex @ index-Bm0jSdsv.js:7
+Wz @ index-Bm0jSdsv.js:7
+(anonymous) @ index-Bm0jSdsv.js:7
+browser-sdk.js:1  POST https://chat.z.ai/api/v1/web-dev/workspaces/status net::ERR_NAME_NOT_RESOLVED
+(anonymous) @ browser-sdk.js:1
+fetch @ jquery.min.js:1
+window.fetch @ index-Bm0jSdsv.js:33
+Cj @ index-Bm0jSdsv.js:50
+queryFn @ index-Bm0jSdsv.js:2047
+i @ index-Bm0jSdsv.js:76
+_ @ index-Bm0jSdsv.js:76
+start @ index-Bm0jSdsv.js:76
+fetch @ index-Bm0jSdsv.js:76
+Gv @ index-Bm0jSdsv.js:76
+onSubscribe @ index-Bm0jSdsv.js:76
+subscribe @ index-Bm0jSdsv.js:76
+(anonymous) @ index-Bm0jSdsv.js:76
+kF @ index-Bm0jSdsv.js:7
+P1 @ index-Bm0jSdsv.js:7
+bL @ index-Bm0jSdsv.js:7
+k4 @ index-Bm0jSdsv.js:7
+flush @ index-Bm0jSdsv.js:7
+(anonymous) @ index-Bm0jSdsv.js:7
+ex @ index-Bm0jSdsv.js:7
+Wz @ index-Bm0jSdsv.js:7
+(anonymous) @ index-Bm0jSdsv.js:7
+  GET https://preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/ 502 (Bad Gateway)
+(anonymous) @ (index):37
+setTimeout
+(anonymous) @ (index):36
+  GET https://preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/ 502 (Bad Gateway)
+(anonymous) @ preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/:37
+setTimeout
+(anonymous) @ preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/:36
+  GET https://preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/ 502 (Bad Gateway)
+(anonymous) @ (index):37
+setTimeout
+(anonymous) @ (index):36
+  GET https://preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/ 502 (Bad Gateway)
+(anonymous) @ (index):37
+setTimeout
+(anonymous) @ (index):36
+  GET https://preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/ 502 (Bad Gateway)
+(anonymous) @ (index):37
+setTimeout
+(anonymous) @ (index):36
+  GET https://preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/ 502 (Bad Gateway)
+(anonymous) @ preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/:37
+setTimeout
+(anonymous) @ preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/:36
+  GET https://preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/ 502 (Bad Gateway)
+(anonymous) @ (index):37
+setTimeout
+(anonymous) @ (index):36
+  GET https://preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/ 502 (Bad Gateway)
+(anonymous) @ (index):37
+setTimeout
+(anonymous) @ (index):36
+  GET https://preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/ 502 (Bad Gateway)
+(anonymous) @ (index):37
+setTimeout
+(anonymous) @ (index):36
+  GET https://preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/ 502 (Bad Gateway)
+(anonymous) @ (index):37
+setTimeout
+(anonymous) @ (index):36
+  GET https://preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/ 502 (Bad Gateway)
+(anonymous) @ (index):37
+setTimeout
+(anonymous) @ (index):36
+  GET https://preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/ 502 (Bad Gateway)
+(anonymous) @ (index):37
+setTimeout
+(anonymous) @ (index):36
+  GET https://preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/ 502 (Bad Gateway)
+(anonymous) @ (index):37
+setTimeout
+(anonymous) @ (index):36
+  GET https://preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/ 502 (Bad Gateway)
+(anonymous) @ (index):37
+setTimeout
+(anonymous) @ (index):36
+(index):1  GET https://preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/_next/static/chunks/node_modules_394613a2._.js net::ERR_ABORTED 502 (Bad Gateway)
+(index):1  GET https://preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/_next/static/chunks/src_2bc135c0._.js net::ERR_ABORTED 502 (Bad Gateway)
+(index):1  GET https://preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/_next/static/chunks/src_components_e1cb5d95._.js net::ERR_ABORTED 502 (Bad Gateway)
+turbopack-_23a915ee._.js:656 Uncaught ChunkLoadError: Failed to load chunk /_next/static/chunks/node_modules_394613a2._.js from module [project]/node_modules/next/dist/compiled/react-server-dom-turbopack/cjs/react-server-dom-turbopack-client.browser.development.js [app-client] (ecmascript)
+    at turbopack-_23a915ee._.js:656:25
+(anonymous) @ turbopack-_23a915ee._.js:656
+Promise.catch
+loadChunkByUrlInternal @ turbopack-_23a915ee._.js:641
+loadChunkByUrl @ turbopack-_23a915ee._.js:632
+preloadModule @ react-server-dom-turbopack-client.browser.development.js:78
+resolveModule @ react-server-dom-turbopack-client.browser.development.js:2876
+processFullStringRow @ react-server-dom-turbopack-client.browser.development.js:4288
+processFullBinaryRow @ react-server-dom-turbopack-client.browser.development.js:4283
+processBinaryChunk @ react-server-dom-turbopack-client.browser.development.js:4506
+progress @ react-server-dom-turbopack-client.browser.development.js:4780
+Promise.then
+startReadingFromStream @ react-server-dom-turbopack-client.browser.development.js:4788
+(anonymous) @ react-server-dom-turbopack-client.browser.development.js:5058
+module evaluation @ node_modules_next_dist_client_17643121._.js:12577
+(anonymous) @ turbopack-_23a915ee._.js:879
+runModuleExecutionHooks @ turbopack-_23a915ee._.js:904
+instantiateModule @ turbopack-_23a915ee._.js:877
+getOrInstantiateModuleFromParent @ turbopack-_23a915ee._.js:830
+commonJsRequire @ turbopack-_23a915ee._.js:259
+(anonymous) @ node_modules_next_dist_client_17643121._.js:12703
+(anonymous) @ node_modules_next_dist_client_17643121._.js:177
+loadScriptsInSequence @ node_modules_next_dist_client_17643121._.js:141
+appBootstrap @ node_modules_next_dist_client_17643121._.js:170
+module evaluation @ node_modules_next_dist_client_17643121._.js:12702
+(anonymous) @ turbopack-_23a915ee._.js:879
+runModuleExecutionHooks @ turbopack-_23a915ee._.js:904
+instantiateModule @ turbopack-_23a915ee._.js:877
+getOrInstantiateRuntimeModule @ turbopack-_23a915ee._.js:808
+registerChunk @ turbopack-_23a915ee._.js:1626
+await in registerChunk
+registerChunk @ turbopack-_23a915ee._.js:1564
+(anonymous) @ turbopack-_23a915ee._.js:1853
+(anonymous) @ turbopack-_23a915ee._.js:1857
+(index):1  GET https://preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/_next/static/chunks/src_app_layout_tsx_1cf6b850._.js net::ERR_ABORTED 502 (Bad Gateway)
+(index):1  GET https://preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/_next/static/chunks/src_197d9c60._.js net::ERR_ABORTED 502 (Bad Gateway)
+(index):1  GET https://preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/_next/static/chunks/src_app_page_tsx_fd8e7853._.js net::ERR_ABORTED 502 (Bad Gateway)
+turbopack-_23a915ee._.js:1745  GET https://preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_c8c997ce._.js net::ERR_ABORTED 502 (Bad Gateway)
+doLoadChunk @ turbopack-_23a915ee._.js:1745
+loadChunkCached @ turbopack-_23a915ee._.js:1634
+loadChunkByUrlInternal @ turbopack-_23a915ee._.js:637
+loadChunkPath @ turbopack-_23a915ee._.js:669
+loadChunkInternal @ turbopack-_23a915ee._.js:572
+loadChunk @ turbopack-_23a915ee._.js:564
+(anonymous) @ [turbopack]_browser_dev_hmr-client_hmr-client_ts_956a0d3a._.js:8
+(anonymous) @ [turbopack]_browser_dev_hmr-client_hmr-client_ts_956a0d3a._.js:8
+asyncLoader @ turbopack-_23a915ee._.js:248
+createProcessTurbopackMessage @ node_modules_next_dist_client_17643121._.js:10955
+createWebSocket @ node_modules_next_dist_client_17643121._.js:10874
+hydrate @ node_modules_next_dist_client_17643121._.js:12626
+(anonymous) @ node_modules_next_dist_client_17643121._.js:12705
+(anonymous) @ node_modules_next_dist_client_17643121._.js:177
+loadScriptsInSequence @ node_modules_next_dist_client_17643121._.js:141
+appBootstrap @ node_modules_next_dist_client_17643121._.js:170
+module evaluation @ node_modules_next_dist_client_17643121._.js:12702
+(anonymous) @ turbopack-_23a915ee._.js:879
+runModuleExecutionHooks @ turbopack-_23a915ee._.js:904
+instantiateModule @ turbopack-_23a915ee._.js:877
+getOrInstantiateRuntimeModule @ turbopack-_23a915ee._.js:808
+registerChunk @ turbopack-_23a915ee._.js:1626
+await in registerChunk
+registerChunk @ turbopack-_23a915ee._.js:1564
+(anonymous) @ turbopack-_23a915ee._.js:1853
+(anonymous) @ turbopack-_23a915ee._.js:1857
+turbopack-_23a915ee._.js:656 Uncaught (in promise) ChunkLoadError: Failed to load chunk /_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_c8c997ce._.js from module [turbopack]/browser/dev/hmr-client/hmr-client.ts [app-client] (ecmascript, async loader)
+    at turbopack-_23a915ee._.js:656:25
+    at async Promise.all (preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/index 0)
+(anonymous) @ turbopack-_23a915ee._.js:656
+Promise.catch
+loadChunkByUrlInternal @ turbopack-_23a915ee._.js:641
+loadChunkPath @ turbopack-_23a915ee._.js:669
+loadChunkInternal @ turbopack-_23a915ee._.js:572
+loadChunk @ turbopack-_23a915ee._.js:564
+(anonymous) @ [turbopack]_browser_dev_hmr-client_hmr-client_ts_956a0d3a._.js:8
+(anonymous) @ [turbopack]_browser_dev_hmr-client_hmr-client_ts_956a0d3a._.js:8
+asyncLoader @ turbopack-_23a915ee._.js:248
+createProcessTurbopackMessage @ node_modules_next_dist_client_17643121._.js:10955
+createWebSocket @ node_modules_next_dist_client_17643121._.js:10874
+hydrate @ node_modules_next_dist_client_17643121._.js:12626
+(anonymous) @ node_modules_next_dist_client_17643121._.js:12705
+(anonymous) @ node_modules_next_dist_client_17643121._.js:177
+loadScriptsInSequence @ node_modules_next_dist_client_17643121._.js:141
+appBootstrap @ node_modules_next_dist_client_17643121._.js:170
+module evaluation @ node_modules_next_dist_client_17643121._.js:12702
+(anonymous) @ turbopack-_23a915ee._.js:879
+runModuleExecutionHooks @ turbopack-_23a915ee._.js:904
+instantiateModule @ turbopack-_23a915ee._.js:877
+getOrInstantiateRuntimeModule @ turbopack-_23a915ee._.js:808
+registerChunk @ turbopack-_23a915ee._.js:1626
+await in registerChunk
+registerChunk @ turbopack-_23a915ee._.js:1564
+(anonymous) @ turbopack-_23a915ee._.js:1853
+(anonymous) @ turbopack-_23a915ee._.js:1857
+turbopack-_23a915ee._.js:1745  GET https://preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_c7192189._.js net::ERR_ABORTED 502 (Bad Gateway)
+doLoadChunk @ turbopack-_23a915ee._.js:1745
+loadChunkCached @ turbopack-_23a915ee._.js:1634
+loadChunkByUrlInternal @ turbopack-_23a915ee._.js:637
+loadChunkPath @ turbopack-_23a915ee._.js:669
+loadChunkInternal @ turbopack-_23a915ee._.js:572
+loadChunk @ turbopack-_23a915ee._.js:564
+(anonymous) @ [turbopack]_browser_dev_hmr-client_hmr-client_ts_956a0d3a._.js:8
+(anonymous) @ [turbopack]_browser_dev_hmr-client_hmr-client_ts_956a0d3a._.js:8
+asyncLoader @ turbopack-_23a915ee._.js:248
+createProcessTurbopackMessage @ node_modules_next_dist_client_17643121._.js:10955
+createWebSocket @ node_modules_next_dist_client_17643121._.js:10874
+hydrate @ node_modules_next_dist_client_17643121._.js:12626
+(anonymous) @ node_modules_next_dist_client_17643121._.js:12705
+(anonymous) @ node_modules_next_dist_client_17643121._.js:177
+loadScriptsInSequence @ node_modules_next_dist_client_17643121._.js:141
+appBootstrap @ node_modules_next_dist_client_17643121._.js:170
+module evaluation @ node_modules_next_dist_client_17643121._.js:12702
+(anonymous) @ turbopack-_23a915ee._.js:879
+runModuleExecutionHooks @ turbopack-_23a915ee._.js:904
+instantiateModule @ turbopack-_23a915ee._.js:877
+getOrInstantiateRuntimeModule @ turbopack-_23a915ee._.js:808
+registerChunk @ turbopack-_23a915ee._.js:1626
+await in registerChunk
+registerChunk @ turbopack-_23a915ee._.js:1564
+(anonymous) @ turbopack-_23a915ee._.js:1853
+(anonymous) @ turbopack-_23a915ee._.js:1857
+(index):1  GET https://preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/_next/static/chunks/node_modules_03fec7d4._.js net::ERR_ABORTED 502 (Bad Gateway)
+node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644  POST https://preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/__nextjs_original-stack-frames 502 (Bad Gateway)
+(anonymous) @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+(anonymous) @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+eI @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+i @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+(anonymous) @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+(anonymous) @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+eR @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+(anonymous) @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+(anonymous) @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+nH @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+i @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+(anonymous) @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+(anonymous) @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+i @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+(anonymous) @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+(anonymous) @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+nH @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+i @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+(anonymous) @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+(anonymous) @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+(anonymous) @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+lg @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+sf @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+sd @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+sf @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+sd @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+sf @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+sd @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+sf @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+sd @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+sf @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+sd @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+sf @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+sd @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+sf @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+sd @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+sf @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+ck @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+(anonymous) @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+E @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+postMessage
+i @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+E @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+postMessage
+i @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+E @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+postMessage
+i @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+t.unstable_scheduleCallback @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+cH @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+cF @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+(anonymous) @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+postMessage
+schedulePerformWorkUntilDeadline @ node_modules_next_dist_compiled_a0e4c7b4._.js:2754
+performWorkUntilDeadline @ node_modules_next_dist_compiled_a0e4c7b4._.js:2674
+postMessage
+schedulePerformWorkUntilDeadline @ node_modules_next_dist_compiled_a0e4c7b4._.js:2754
+performWorkUntilDeadline @ node_modules_next_dist_compiled_a0e4c7b4._.js:2674
+postMessage
+schedulePerformWorkUntilDeadline @ node_modules_next_dist_compiled_a0e4c7b4._.js:2754
+performWorkUntilDeadline @ node_modules_next_dist_compiled_a0e4c7b4._.js:2674
+postMessage
+schedulePerformWorkUntilDeadline @ node_modules_next_dist_compiled_a0e4c7b4._.js:2754
+performWorkUntilDeadline @ node_modules_next_dist_compiled_a0e4c7b4._.js:2674
+postMessage
+schedulePerformWorkUntilDeadline @ node_modules_next_dist_compiled_a0e4c7b4._.js:2754
+performWorkUntilDeadline @ node_modules_next_dist_compiled_a0e4c7b4._.js:2674
+postMessage
+schedulePerformWorkUntilDeadline @ node_modules_next_dist_compiled_a0e4c7b4._.js:2754
+performWorkUntilDeadline @ node_modules_next_dist_compiled_a0e4c7b4._.js:2674
+postMessage
+schedulePerformWorkUntilDeadline @ node_modules_next_dist_compiled_a0e4c7b4._.js:2754
+performWorkUntilDeadline @ node_modules_next_dist_compiled_a0e4c7b4._.js:2674
+postMessage
+schedulePerformWorkUntilDeadline @ node_modules_next_dist_compiled_a0e4c7b4._.js:2754
+performWorkUntilDeadline @ node_modules_next_dist_compiled_a0e4c7b4._.js:2674
+postMessage
+schedulePerformWorkUntilDeadline @ node_modules_next_dist_compiled_a0e4c7b4._.js:2754
+performWorkUntilDeadline @ node_modules_next_dist_compiled_a0e4c7b4._.js:2674
+postMessage
+schedulePerformWorkUntilDeadline @ node_modules_next_dist_compiled_a0e4c7b4._.js:2754
+performWorkUntilDeadline @ node_modules_next_dist_compiled_a0e4c7b4._.js:2674
+postMessage
+schedulePerformWorkUntilDeadline @ node_modules_next_dist_compiled_a0e4c7b4._.js:2754
+performWorkUntilDeadline @ node_modules_next_dist_compiled_a0e4c7b4._.js:2674
+postMessage
+schedulePerformWorkUntilDeadline @ node_modules_next_dist_compiled_a0e4c7b4._.js:2754
+performWorkUntilDeadline @ node_modules_next_dist_compiled_a0e4c7b4._.js:2674
+postMessage
+schedulePerformWorkUntilDeadline @ node_modules_next_dist_compiled_a0e4c7b4._.js:2754
+performWorkUntilDeadline @ node_modules_next_dist_compiled_a0e4c7b4._.js:2674
+postMessage
+schedulePerformWorkUntilDeadline @ node_modules_next_dist_compiled_a0e4c7b4._.js:2754
+performWorkUntilDeadline @ node_modules_next_dist_compiled_a0e4c7b4._.js:2674
+postMessage
+schedulePerformWorkUntilDeadline @ node_modules_next_dist_compiled_a0e4c7b4._.js:2754
+performWorkUntilDeadline @ node_modules_next_dist_compiled_a0e4c7b4._.js:2674
+postMessage
+schedulePerformWorkUntilDeadline @ node_modules_next_dist_compiled_a0e4c7b4._.js:2754
+performWorkUntilDeadline @ node_modules_next_dist_compiled_a0e4c7b4._.js:2674
+postMessage
+schedulePerformWorkUntilDeadline @ node_modules_next_dist_compiled_a0e4c7b4._.js:2754
+performWorkUntilDeadline @ node_modules_next_dist_compiled_a0e4c7b4._.js:2674
+postMessage
+schedulePerformWorkUntilDeadline @ node_modules_next_dist_compiled_a0e4c7b4._.js:2754
+performWorkUntilDeadline @ node_modules_next_dist_compiled_a0e4c7b4._.js:2674
+postMessage
+schedulePerformWorkUntilDeadline @ node_modules_next_dist_compiled_a0e4c7b4._.js:2754
+exports.unstable_scheduleCallback @ node_modules_next_dist_compiled_a0e4c7b4._.js:2842
+scheduleTaskForRootDuringMicrotask @ node_modules_next_dist_compiled_react-dom_1e674e59._.js:10210
+processRootScheduleInMicrotask @ node_modules_next_dist_compiled_react-dom_1e674e59._.js:10170
+(anonymous) @ node_modules_next_dist_compiled_react-dom_1e674e59._.js:10249
+node_modules_next_dist_f3530cac._.js:2298 [HMR] connected
+node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644  POST https://preview-chat-792166e4-ad43-4494-83ce-3ec201bda5ea.space-z.ai/__nextjs_original-stack-frames 502 (Bad Gateway)
+(anonymous) @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+(anonymous) @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+eI @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+i @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+(anonymous) @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+(anonymous) @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+eR @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+(anonymous) @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+(anonymous) @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+nH @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+i @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+(anonymous) @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+(anonymous) @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+i @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+(anonymous) @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+(anonymous) @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+nH @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+i @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+(anonymous) @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+(anonymous) @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+(anonymous) @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+lg @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+sf @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+sd @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+sf @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+sd @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+sf @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+sd @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+sf @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+sd @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+sf @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+sd @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+sf @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+sd @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+sf @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+sd @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+sf @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+ck @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+(anonymous) @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+E @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+postMessage
+i @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+E @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+postMessage
+i @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+t.unstable_scheduleCallback @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+cH @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+cF @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+(anonymous) @ node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644
+11node_modules_next_dist_f3530cac._.js:2298 [HMR] connected
+browser-sdk.js:1  POST https://chat.z.ai/api/v1/web-dev/workspaces/files/ls-tree 429 (Too Many Requests)
+(anonymous) @ browser-sdk.js:1
+fetch @ jquery.min.js:1
+window.fetch @ index-Bm0jSdsv.js:33
+Lde @ index-Bm0jSdsv.js:49
+queryFn @ index-Bm0jSdsv.js:2047
+i @ index-Bm0jSdsv.js:76
+_ @ index-Bm0jSdsv.js:76
+start @ index-Bm0jSdsv.js:76
+fetch @ index-Bm0jSdsv.js:76
+Gv @ index-Bm0jSdsv.js:76
+fetch @ index-Bm0jSdsv.js:76
+refetch @ index-Bm0jSdsv.js:76
+w @ index-Bm0jSdsv.js:2047
+(anonymous) @ index-Bm0jSdsv.js:2047
+(anonymous) @ index-Bm0jSdsv.js:31
+(anonymous) @ index-Bm0jSdsv.js:8
+emit @ index-Bm0jSdsv.js:8
+xs @ index-Bm0jSdsv.js:2171
+(anonymous) @ index-Bm0jSdsv.js:31
+requestIdleCallback
+sP @ index-Bm0jSdsv.js:31
+(anonymous) @ index-Bm0jSdsv.js:31
+requestIdleCallback
+sP @ index-Bm0jSdsv.js:31
+(anonymous) @ index-Bm0jSdsv.js:31
+requestIdleCallback
+sP @ index-Bm0jSdsv.js:31
+(anonymous) @ index-Bm0jSdsv.js:31
+requestIdleCallback
+sP @ index-Bm0jSdsv.js:31
+(anonymous) @ index-Bm0jSdsv.js:31
+requestIdleCallback
+sP @ index-Bm0jSdsv.js:31
+(anonymous) @ index-Bm0jSdsv.js:31
+requestIdleCallback
+sP @ index-Bm0jSdsv.js:31
+(anonymous) @ index-Bm0jSdsv.js:31
+requestIdleCallback
+sP @ index-Bm0jSdsv.js:31
+(anonymous) @ index-Bm0jSdsv.js:31
+requestIdleCallback
+sP @ index-Bm0jSdsv.js:31
+(anonymous) @ index-Bm0jSdsv.js:31
+requestIdleCallback
+sP @ index-Bm0jSdsv.js:31
+(anonymous) @ index-Bm0jSdsv.js:31
+requestIdleCallback
+sP @ index-Bm0jSdsv.js:31
+(anonymous) @ index-Bm0jSdsv.js:31
+requestIdleCallback
+sP @ index-Bm0jSdsv.js:31
+(anonymous) @ index-Bm0jSdsv.js:31
+requestIdleCallback
+sP @ index-Bm0jSdsv.js:31
+(anonymous) @ index-Bm0jSdsv.js:31
+requestIdleCallback
+sP @ index-Bm0jSdsv.js:31
+(anonymous) @ index-Bm0jSdsv.js:31
+requestIdleCallback
+sP @ index-Bm0jSdsv.js:31
+(anonymous) @ index-Bm0jSdsv.js:31
+requestIdleCallback
+sP @ index-Bm0jSdsv.js:31
+(anonymous) @ index-Bm0jSdsv.js:31
+requestIdleCallback
+sP @ index-Bm0jSdsv.js:31
+(anonymous) @ index-Bm0jSdsv.js:31
+requestIdleCallback
+sP @ index-Bm0jSdsv.js:31
+(anonymous) @ index-Bm0jSdsv.js:31
+requestIdleCallback
+sP @ index-Bm0jSdsv.js:31
+(anonymous) @ index-Bm0jSdsv.js:31
+requestIdleCallback
+sP @ index-Bm0jSdsv.js:31
+(anonymous) @ index-Bm0jSdsv.js:31
+requestIdleCallback
+sP @ index-Bm0jSdsv.js:31
+(anonymous) @ index-Bm0jSdsv.js:31
+requestIdleCallback
+sP @ index-Bm0jSdsv.js:31
+(anonymous) @ index-Bm0jSdsv.js:31
+requestIdleCallback
+sP @ index-Bm0jSdsv.js:31
+(anonymous) @ index-Bm0jSdsv.js:31
+requestIdleCallback
+sP @ index-Bm0jSdsv.js:31
+(anonymous) @ index-Bm0jSdsv.js:31
+requestIdleCallback
+sP @ index-Bm0jSdsv.js:31
+(anonymous) @ index-Bm0jSdsv.js:31
+requestIdleCallback
+sP @ index-Bm0jSdsv.js:31
+(anonymous) @ index-Bm0jSdsv.js:31
+requestIdleCallback
+sP @ index-Bm0jSdsv.js:31
+(anonymous) @ index-Bm0jSdsv.js:31
+requestIdleCallback
+sP @ index-Bm0jSdsv.js:31
+(anonymous) @ index-Bm0jSdsv.js:31
+requestIdleCallback
+sP @ index-Bm0jSdsv.js:31
+(anonymous) @ index-Bm0jSdsv.js:31
+requestIdleCallback
+sP @ index-Bm0jSdsv.js:31
+(anonymous) @ index-Bm0jSdsv.js:31
+requestIdleCallback
+sP @ index-Bm0jSdsv.js:31
+(anonymous) @ index-Bm0jSdsv.js:31
+requestIdleCallback
+sP @ index-Bm0jSdsv.js:31
+(anonymous) @ index-Bm0jSdsv.js:31
+requestIdleCallback
+sP @ index-Bm0jSdsv.js:31
+(anonymous) @ index-Bm0jSdsv.js:31
+2node_modules_next_dist_f3530cac._.js:2298 [HMR] connected
+browser-sdk.js:1  POST https://chat.z.ai/api/v1/web-dev/workspaces/files/content 429 (Too Many Requests)
+(anonymous) @ browser-sdk.js:1
+fetch @ jquery.min.js:1
+window.fetch @ index-Bm0jSdsv.js:33
+wC @ index-Bm0jSdsv.js:49
+queryFn @ index-Bm0jSdsv.js:2047
+i @ index-Bm0jSdsv.js:76
+_ @ index-Bm0jSdsv.js:76
+start @ index-Bm0jSdsv.js:76
+fetch @ index-Bm0jSdsv.js:76
+Gv @ index-Bm0jSdsv.js:76
+setOptions @ index-Bm0jSdsv.js:76
+(anonymous) @ index-Bm0jSdsv.js:76
+(anonymous) @ index-Bm0jSdsv.js:76
+B @ index-Bm0jSdsv.js:7
+(anonymous) @ index-Bm0jSdsv.js:76
+kF @ index-Bm0jSdsv.js:7
+P1 @ index-Bm0jSdsv.js:7
+z9 @ index-Bm0jSdsv.js:7
+k4 @ index-Bm0jSdsv.js:7
+flush @ index-Bm0jSdsv.js:7
+(anonymous) @ index-Bm0jSdsv.js:7
+ex @ index-Bm0jSdsv.js:7
+Wz @ index-Bm0jSdsv.js:7
+(anonymous) @ index-Bm0jSdsv.js:7
