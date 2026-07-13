@@ -2421,3 +2421,44 @@ Stage Summary:
 - 2-col forms stack vertically on mobile.
 - shadcn Dialog modals auto-resize to calc(100vw - 16px) on mobile.
 - Build passes.
+
+---
+Task ID: restore-operations-dashboard
+Agent: Main (Super Z)
+Task: The "Operations Dashboard" built into the POS menu is missing/wiped out — restore or rebuild it.
+
+Work Log:
+- Confirmed the Operations Dashboard was completely gone:
+  * src/components/operations-dashboard.tsx — file missing
+  * src/app/page.tsx — no import, no view render, no menu item
+  * src/lib/pos-types.ts — "dashboard" removed from ViewMode type
+- Rebuilt everything from scratch:
+
+1. ADDED "dashboard" to ViewMode type in src/lib/pos-types.ts.
+
+2. CREATED src/components/operations-dashboard.tsx (~340 lines) with:
+  * Header: gradient dark slate, back button, live clock, refresh button
+  * 4 KPI cards (2x2 on mobile, 1x4 on desktop): Today's Revenue, Transactions, Items Sold, Avg Sale — each with gradient icon, trend arrow
+  * 4 mini-stat cards: Low Stock Items, Out of Stock, Stock Value (Cost), Stock Value (Retail) — low/out-of-stock are clickable
+  * Hourly Sales bar chart (8 AM–7 PM): gradient bars, hover tooltip with revenue + count, peak hour display
+  * Top Selling Products list: emoji + name + qty sold + revenue, ranked #1-5 with badges
+  * Low Stock Alerts table (mobile-scroll-x wrapped): product, stock, reorder level, status badge (Out/Low)
+  * Recent Sales list: invoice number, customer, items, total, time
+  * Stock Value by Category: animated horizontal bars with item count
+  * Footer: company info
+  * Data sources: localStorage 'sylhn-sales-history' for today's sales, products prop for stock data
+  * Refresh button re-reads localStorage
+  * Fully responsive: 2-col grids on mobile, 4-col on desktop, mobile-scroll-x on tables
+
+3. ADDED to src/app/page.tsx:
+  * Dynamic import: `const OperationsDashboard = dynamic(() => import("@/components/operations-dashboard")...)`
+  * View render: `if (view === "dashboard") { return <OperationsDashboard ... />; }`
+  * Menu item in POS menu: `{ label: "📊 Operations Dashboard", icon: TrendingUp, action: () => setView("dashboard") }` (with separators)
+
+- VERIFIED: npx eslint → 0 errors, npx next build → ✓ Compiled successfully.
+
+Stage Summary:
+- Operations Dashboard fully rebuilt and accessible via POS menu → "📊 Operations Dashboard".
+- Shows real-time KPIs (revenue, transactions, items, avg sale), hourly sales chart, top products, low-stock alerts, recent sales, and stock value by category.
+- Fully mobile-responsive (2-col KPI grid, mobile-scroll-x tables, stacked layout).
+- Build passes.
