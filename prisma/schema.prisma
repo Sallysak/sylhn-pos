@@ -1,8 +1,5 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// Prisma schema for SYLHN POS — Grocery Store Point of Sale
+// SQLite local database for products, sales, purchases, suppliers, stock groups, users.
 
 generator client {
   provider = "prisma-client-js"
@@ -13,20 +10,241 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+// ===== Users & Auth =====
+model SystemUser {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  password     String
+  fullName     String
+  role         String   @default("cashier") // admin | manager | cashier | stockkeeper | accountant
+  phone        String   @default("")
+  email        String   @default("")
+  active       Boolean  @default(true)
+  permissions  String   @default("{}") // JSON-encoded UserPermissions
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  lastLogin    DateTime?
+
+  auditLogs AuditLog[]
 }
 
-model Post {
+model AuditLog {
   id        String   @id @default(cuid())
-  title     String
-  content   String?
-  published Boolean  @default(false)
-  authorId  String
+  timestamp DateTime @default(now())
+  userId    String?
+  user      String
+  action    String
+  module    String
+  details   String
+  severity  String   @default("info") // info | warning | critical
+
+  systemUser SystemUser? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([timestamp])
+  @@index([user])
+}
+
+// ===== Catalog =====
+model StockGroup {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  icon        String    @default("📦")
+  color       String    @default("#10b981")
+  description String    @default("")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  products    Product[]
+}
+
+model Product {
+  id           String   @id @default(cuid())
+  sku          String   @unique
+  barcode      String   @default("")
+  name         String
+  emoji        String   @default("📦")
+  category     String   @default("other")
+  description  String   @default("")
+  price        Float
+  costPrice    Float    @default(0)
+  quantity     Int      @default(0)
+  unit         String   @default("each")
+  reorderLevel Int      @default(5)
+  taxable      Boolean  @default(true)
+  batchNumber  String   @default("")
+  expiryDate   DateTime?
+  receivedDate DateTime?
+  supplier     String   @default("")
+  groupId      String?
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  group         StockGroup?      @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  saleItems     SaleItem[]
+  stockHistory  StockHistory[]
+  purchaseItems PurchaseItem[]
+
+  @@index([category])
+  @@index([groupId])
+  @@index([name])
+}
+
+model StockHistory {
+  id        String   @id @default(cuid())
+  productId String
+  action    String   // adjusted | received | sold | returned | stocktake
+  quantity  Int
+  reason    String   @default("")
+  reference String   @default("")
+  userId    String?
+  createdAt DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@index([createdAt])
+}
+
+// ===== Sales =====
+model Sale {
+  id            String    @id @default(cuid())
+  invoiceNumber String    @unique
+  customerName  String    @default("")
+  cashierName   String
+  subtotal      Float
+  discount      Float     @default(0)
+  discountPct   Float     @default(0)
+  taxRate       Float     @default(0)
+  taxAmount     Float     @default(0)
+  total         Float
+  amountPaid    Float
+  change        Float
+  paymentMethod String    @default("cash") // cash | card | wallet
+  paymentRef    String    @default("")
+  status        String    @default("completed") // completed | voided | held
+  notes         String    @default("")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  voidedAt      DateTime?
+  voidedBy      String?
+
+  items SaleItem[]
+
+  @@index([createdAt])
+  @@index([status])
+  @@index([cashierName])
+}
+
+model SaleItem {
+  id        String  @id @default(cuid())
+  saleId    String
+  productId String?
+  sku       String
+  name      String
+  price     Float
+  quantity  Int
+  unit      String  @default("each")
+  discount  Float   @default(0)
+  taxable   Boolean @default(true)
+  total     Float
+
+  sale    Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([saleId])
+  @@index([productId])
+}
+
+// ===== Purchases =====
+model Supplier {
+  id        String   @id @default(cuid())
+  name      String
+  contact   String   @default("")
+  phone     String   @default("")
+  email     String   @default("")
+  address   String   @default("")
+  balance   Float    @default(0)
+  products  String   @default("[]") // JSON array of supplied product SKUs
+  active    Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  purchases Purchase[]
+}
+
+model Purchase {
+  id           String    @id @default(cuid())
+  refNo        String    @unique
+  type         String    @default("purchase") // purchase | order
+  supplierId   String?
+  supplierName String    @default("")
+  status       String    @default("received") // draft | ordered | received | cancelled
+  subtotal     Float     @default(0)
+  discount     Float     @default(0)
+  taxAmount    Float     @default(0)
+  total        Float     @default(0)
+  amountPaid   Float     @default(0)
+  notes        String    @default("")
+  createdBy    String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  receivedAt   DateTime?
+
+  supplier Supplier?      @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  items    PurchaseItem[]
+
+  @@index([createdAt])
+  @@index([status])
+  @@index([supplierId])
+}
+
+model PurchaseItem {
+  id          String  @id @default(cuid())
+  purchaseId  String
+  productId   String?
+  partNo      String
+  details     String
+  quantity    Int
+  cost        Float
+  tax         Boolean  @default(true)
+  total       Float
+  expiryDate  DateTime?
+
+  purchase Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  product  Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([purchaseId])
+  @@index([productId])
+}
+
+// ===== Settings =====
+model SystemSetting {
+  id    String @id @default(cuid())
+  key   String @unique
+  value String
+}
+
+model Expense {
+  id          String   @id @default(cuid())
+  date        DateTime @default(now())
+  category    String
+  description String
+  amount      Float
+  paymentMode String   @default("cash") // cash | card | mobile-money
+  createdBy   String
+  createdAt   DateTime @default(now())
+
+  @@index([date])
+  @@index([category])
+}
+
+model HeldOrder {
+  id           String   @id @default(cuid())
+  items        String   // JSON array of CartItem
+  customerName String   @default("")
+  invoiceNumber String
+  cashierName  String
+  createdAt    DateTime @default(now())
+
+  @@index([cashierName])
 }
