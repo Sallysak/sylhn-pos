@@ -14,8 +14,6 @@ import { NextRequest, NextResponse } from "next/server";
 
 const SECURITY_HEADERS: Record<string, string> = {
   // Prevent clickjacking — allow same-origin + the preview iframe host.
-  // (X-Frame-Options is gradually being replaced by CSP frame-ancestors,
-  // but we set both for defense-in-depth and older-browser support.)
   "X-Frame-Options": "SAMEORIGIN",
   // Prevent MIME-sniffing
   "X-Content-Type-Options": "nosniff",
@@ -23,17 +21,16 @@ const SECURITY_HEADERS: Record<string, string> = {
   "Referrer-Policy": "strict-origin-when-cross-origin",
   // HSTS (1 year, include subdomains)
   "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
-  // Permissions policy — lock down camera/microphone/geolocation (POS doesn't need them)
+  // Permissions policy
   "Permissions-Policy": "camera=(), microphone=(), geolocation=(), interest-cohort=()",
-  // Cross-origin policies
-  "Cross-Origin-Opener-Policy": "same-origin",
-  "Cross-Origin-Resource-Policy": "same-origin",
-  // Content Security Policy — only allow same-origin + a few needed exceptions.
-  // frame-ancestors must include the chat host (chat.z.ai) and the preview host
-  // (*.space-z.ai) because the chat UI at chat.z.ai embeds the preview iframe.
+  // Cross-origin — MUST be cross-origin to allow the chat parent (chat.z.ai)
+  // to fetch from the preview (preview-chat-*.space-z.ai).
+  "Cross-Origin-Opener-Policy": "cross-origin",
+  "Cross-Origin-Resource-Policy": "cross-origin",
+  // Content Security Policy
   "Content-Security-Policy": [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval'", // Next.js needs inline/eval
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com data:",
     "img-src 'self' data: blob: https:",
@@ -65,6 +62,21 @@ export function proxy(req: NextRequest) {
   const pathname = req.nextUrl.pathname;
   const method = req.method;
   const isApi = pathname.startsWith("/api");
+  const origin = req.headers.get("origin") || "";
+
+  // ===== Handle CORS preflight (OPTIONS) =====
+  if (method === "OPTIONS") {
+    const res = new NextResponse(null, { status: 204 });
+    // Allow the chat parent and preview hosts
+    if (origin.includes("z.ai") || origin.includes("space-z.ai")) {
+      res.headers.set("Access-Control-Allow-Origin", origin);
+      res.headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
+      res.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-CSRF-Token, X-Requested-With");
+      res.headers.set("Access-Control-Allow-Credentials", "true");
+      res.headers.set("Access-Control-Max-Age", "86400");
+    }
+    return res;
+  }
 
   // Build the response
   const res = NextResponse.next();
@@ -74,7 +86,15 @@ export function proxy(req: NextRequest) {
     res.headers.set(key, value);
   }
 
-  // 2. CSRF check on /api write methods (except public paths)
+  // 2. Add CORS headers — allow chat.z.ai and *.space-z.ai to fetch from us
+  if (origin && (origin.includes("z.ai") || origin.includes("space-z.ai"))) {
+    res.headers.set("Access-Control-Allow-Origin", origin);
+    res.headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
+    res.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-CSRF-Token, X-Requested-With");
+    res.headers.set("Access-Control-Allow-Credentials", "true");
+  }
+
+  // 3. CSRF check on /api write methods (except public paths)
   if (isApi && isWriteMethod(method) && !isPublicApiPath(pathname)) {
     const csrfToken = req.headers.get("x-csrf-token");
     const cookieToken = req.cookies.get("sylhn-csrf")?.value;
@@ -85,11 +105,6 @@ export function proxy(req: NextRequest) {
       );
     }
   }
-
-  // 3. For non-public /api GET/HEAD/OPTIONS, the route handlers themselves
-  //    call requireAuth() / requireRole(). Middleware can't read httpOnly
-  //    cookies easily here in a way that adds value — the route handler is
-  //    the source of truth.
 
   return res;
 }
