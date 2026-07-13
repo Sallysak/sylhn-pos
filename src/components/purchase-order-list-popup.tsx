@@ -128,6 +128,8 @@ export function PurchaseOrderListPopup({
     }
     if (onSelect) onSelect(row);
     else toast({ title: 'Selected', description: `${row.transactionType} · ${row.invoiceNo}` });
+    // ALWAYS close the popup after Select.
+    onClose();
   };
 
   const handlePrint = () => {

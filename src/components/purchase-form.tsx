@@ -231,9 +231,37 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
 
   // ===== Load an existing purchase into the form =====
   const loadPurchaseIntoForm = (row: PurchaseListRow) => {
+    // Always close the popup first so the form is visible immediately,
+    // even if the lookup below fails for any reason.
+    setListPopupMode('none');
+    setFindPartNo('');
+    setOnHand(0);
+    setBin('');
+
     const found = existingPurchases.find(p => p.id === row.id);
     if (!found) {
-      toast({ title: 'Purchase not found', variant: 'destructive' });
+      // Fallback: use the row data directly. The row itself may carry items
+      // (since existingPurchases entries are passed as the transactions prop).
+      const rowAny = row as any;
+      setInvoiceNo(rowAny.invoiceNo || row.invoiceNo || `PUR-${Date.now().toString().slice(-6)}`);
+      setSupplier(rowAny.supplier || rowAny.transactionType?.replace(/^\d+-/, '') || '');
+      setDate(rowAny.date || new Date().toISOString().split('T')[0]);
+      setRefNo(rowAny.reference || '');
+      setPaidAmount(rowAny.paid || 0);
+      const items = Array.isArray(rowAny.items) ? rowAny.items : [];
+      setLines(items.map((it: any, i: number) => ({
+        id: `line-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 6)}`,
+        partNo: it.sku || it.partNo || '',
+        details: `${it.emoji || '📦'} ${it.name || it.details || ''}`,
+        emoji: it.emoji || '📦',
+        quantity: it.qty || it.quantity || 1,
+        cost: it.cost || 0,
+        expiry: '',
+        tax: it.taxable ?? it.tax ?? true,
+        total: (it.qty || it.quantity || 1) * (it.cost || 0),
+      })));
+      setSaved(false);
+      toast({ title: 'Purchase loaded', description: `${rowAny.invoiceNo || row.invoiceNo} · ${items.length} items` });
       return;
     }
     setInvoiceNo(found.invoiceNo);
@@ -241,57 +269,74 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
     setDate(found.date || new Date().toISOString().split('T')[0]);
     setRefNo(found.reference || '');
     setPaidAmount(found.paid);
-    if (found.items && found.items.length > 0) {
-      setLines(found.items.map(it => ({
-        id: `line-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        partNo: it.sku,
-        details: `${it.emoji} ${it.name}`,
-        emoji: it.emoji,
-        quantity: it.qty,
-        cost: it.cost,
-        expiry: '',
-        tax: it.taxable,
-        total: it.qty * it.cost,
-      })));
-    }
-    setFindPartNo('');
-    setListPopupMode('none');
-    setOnHand(0);
-    setBin('');
+    // Always set lines — even if found.items is undefined, set to [] so the
+    // form reflects the loaded state (rather than keeping stale lines).
+    const items = (found.items && found.items.length > 0) ? found.items : [];
+    setLines(items.map((it, i) => ({
+      id: `line-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 6)}`,
+      partNo: it.sku,
+      details: `${it.emoji} ${it.name}`,
+      emoji: it.emoji,
+      quantity: it.qty,
+      cost: it.cost,
+      expiry: '',
+      tax: it.taxable,
+      total: it.qty * it.cost,
+    })));
     setSaved(false);
-    toast({ title: 'Purchase loaded', description: `${found.invoiceNo} · ${found.items?.length || 0} items` });
+    toast({ title: 'Purchase loaded', description: `${found.invoiceNo} · ${items.length} items` });
   };
 
   // ===== Load an existing purchase order into the form =====
   const loadOrderIntoForm = (row: PurchaseOrderListRow) => {
+    // Always close the popup first so the form is visible immediately.
+    setListPopupMode('none');
+    setFindPartNo('');
+    setOnHand(0);
+    setBin('');
+
     const found = existingOrders.find(o => o.id === row.id);
     if (!found) {
-      toast({ title: 'Order not found', variant: 'destructive' });
+      // Fallback: use the row data directly.
+      const rowAny = row as any;
+      setInvoiceNo(rowAny.invoiceNo || row.invoiceNo || `PO-${Date.now().toString().slice(-6)}`);
+      setSupplier(rowAny.supplier || rowAny.transactionType?.replace(/^\d+-/, '') || '');
+      setDate(rowAny.date || new Date().toISOString().split('T')[0]);
+      setPaidAmount(rowAny.paid || 0);
+      const items = Array.isArray(rowAny.items) ? rowAny.items : [];
+      setLines(items.map((it: any, i: number) => ({
+        id: `line-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 6)}`,
+        partNo: it.sku || it.partNo || '',
+        details: `${it.emoji || '📦'} ${it.name || it.details || ''}`,
+        emoji: it.emoji || '📦',
+        quantity: it.qty || it.quantity || 1,
+        cost: it.cost || 0,
+        expiry: '',
+        tax: it.taxable ?? it.tax ?? true,
+        total: (it.qty || it.quantity || 1) * (it.cost || 0),
+      })));
+      setSaved(false);
+      toast({ title: 'Purchase order loaded', description: `${rowAny.invoiceNo || row.invoiceNo} · ${items.length} items` });
       return;
     }
     setInvoiceNo(found.invoiceNo);
     setSupplier(found.supplier || found.transactionType.replace(/^\d+-/, ''));
     setDate(found.date || new Date().toISOString().split('T')[0]);
     setPaidAmount(found.paid);
-    if (found.items && found.items.length > 0) {
-      setLines(found.items.map(it => ({
-        id: `line-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        partNo: it.sku,
-        details: `${it.emoji} ${it.name}`,
-        emoji: it.emoji,
-        quantity: it.qty,
-        cost: it.cost,
-        expiry: '',
-        tax: it.taxable,
-        total: it.qty * it.cost,
-      })));
-    }
-    setFindPartNo('');
-    setListPopupMode('none');
-    setOnHand(0);
-    setBin('');
+    const items = (found.items && found.items.length > 0) ? found.items : [];
+    setLines(items.map((it, i) => ({
+      id: `line-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 6)}`,
+      partNo: it.sku,
+      details: `${it.emoji} ${it.name}`,
+      emoji: it.emoji,
+      quantity: it.qty,
+      cost: it.cost,
+      expiry: '',
+      tax: it.taxable,
+      total: it.qty * it.cost,
+    })));
     setSaved(false);
-    toast({ title: 'Purchase order loaded', description: `${found.invoiceNo} · ${found.items?.length || 0} items` });
+    toast({ title: 'Purchase order loaded', description: `${found.invoiceNo} · ${items.length} items` });
   };
 
   const addProductToLine = (product: Product) => {

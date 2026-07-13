@@ -128,6 +128,10 @@ export function PurchaseListPopup({
     }
     if (onSelect) onSelect(row);
     else toast({ title: 'Selected', description: `${row.transactionType} · ${row.invoiceNo}` });
+    // ALWAYS close the popup after Select — the parent's onSelect handler
+    // may also close it, but this ensures the popup closes even if the
+    // handler throws or returns early.
+    onClose();
   };
 
   const handlePrint = () => {
@@ -333,8 +337,8 @@ export function PurchaseListPopup({
           animate={{ scale: 1, y: 0 }}
           exit={{ scale: 0.95, y: 20 }}
           onClick={(e) => e.stopPropagation()}
-          className="rounded-lg shadow-2xl overflow-hidden flex flex-col"
-          style={{ width: '900px', height: '560px', maxHeight: '90vh', fontFamily: 'Arial, Helvetica, sans-serif' }}
+          className="rounded-lg shadow-2xl overflow-hidden flex flex-col w-full"
+          style={{ width: '100%', maxWidth: '900px', maxHeight: '90vh', fontFamily: 'Arial, Helvetica, sans-serif' }}
         >
           {/* Title Bar */}
           <div className="flex-shrink-0 flex items-center justify-between px-3 h-7 text-white" style={{ backgroundColor: TEAL_HEADER }}>
