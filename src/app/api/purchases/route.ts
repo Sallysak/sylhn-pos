@@ -1,13 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { requireAuth, requirePermission } from "@/lib/auth";
+import { PurchaseSchema, validate, validationError } from "@/lib/validation";
+import { rateLimitApiRead, rateLimitApiWrite, rateLimitResponse, getClientIp } from "@/lib/rate-limit";
 
 export async function GET(req: NextRequest) {
+  try { await requireAuth(); } catch (e) { return e as Response; }
+
+  const ip = getClientIp(req);
+  const rl = rateLimitApiRead(ip);
+  if (!rl.allowed) return rateLimitResponse(rl);
+
   try {
     const { searchParams } = new URL(req.url);
-    const type = searchParams.get("type"); // purchase | order
+    const type = searchParams.get("type");
     const status = searchParams.get("status");
     const supplierId = searchParams.get("supplierId");
-    const limit = parseInt(searchParams.get("limit") || "100", 10);
+    const limit = Math.min(parseInt(searchParams.get("limit") || "100", 10), 1000);
 
     const where: any = {};
     if (type) where.type = type;
@@ -28,27 +37,43 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  let user;
   try {
-    const body = await req.json();
-    const refNo = body.refNo || `PUR-${Date.now()}`;
+    user = await requireAuth();
+    requirePermission(user.role, "purchase");
+  } catch (e) { return e as Response; }
+
+  const ip = getClientIp(req);
+  const rl = rateLimitApiWrite(ip);
+  if (!rl.allowed) return rateLimitResponse(rl);
+
+  let body: unknown;
+  try { body = await req.json(); } catch { return validationError("Invalid JSON body"); }
+
+  const result = validate(PurchaseSchema, body);
+  if (!result.success) return validationError(result.error);
+  const p = result.data;
+
+  try {
+    const refNo = p.refNo || `PUR-${Date.now()}`;
 
     const purchase = await db.purchase.create({
       data: {
         refNo,
-        type: body.type || "purchase",
-        supplierId: body.supplierId || null,
-        supplierName: body.supplierName || "",
-        status: body.status || "received",
-        subtotal: Number(body.subtotal) || 0,
-        discount: Number(body.discount) || 0,
-        taxAmount: Number(body.taxAmount) || 0,
-        total: Number(body.total) || 0,
-        amountPaid: Number(body.amountPaid) || 0,
-        notes: body.notes || "",
-        createdBy: body.createdBy || "system",
-        receivedAt: body.receivedAt ? new Date(body.receivedAt) : (body.status === "received" ? new Date() : null),
+        type: p.type || "purchase",
+        supplierId: p.supplierId || null,
+        supplierName: p.supplierName || "",
+        status: p.status || "received",
+        subtotal: Number(p.subtotal) || 0,
+        discount: Number(p.discount) || 0,
+        taxAmount: Number(p.taxAmount) || 0,
+        total: Number(p.total) || 0,
+        amountPaid: Number(p.amountPaid) || 0,
+        notes: p.notes || "",
+        createdBy: p.createdBy,
+        receivedAt: p.receivedAt ? new Date(p.receivedAt as string) : (p.status === "received" ? new Date() : null),
         items: {
-          create: (body.items || []).map((item: any) => ({
+          create: p.items.map((item) => ({
             productId: item.productId || null,
             partNo: item.partNo,
             details: item.details,
@@ -56,7 +81,7 @@ export async function POST(req: NextRequest) {
             cost: Number(item.cost) || 0,
             tax: item.tax !== false,
             total: Number(item.total) || 0,
-            expiryDate: item.expiryDate ? new Date(item.expiryDate) : null,
+            expiryDate: item.expiryDate ? new Date(item.expiryDate as string) : null,
           })),
         },
       },

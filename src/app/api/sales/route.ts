@@ -1,14 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { requireAuth, requirePermission } from "@/lib/auth";
+import { SaleSchema, validate, validationError } from "@/lib/validation";
+import { rateLimitApiRead, rateLimitApiWrite, rateLimitResponse, getClientIp } from "@/lib/rate-limit";
 
 // GET /api/sales — list sales (with optional date filter)
 export async function GET(req: NextRequest) {
+  try { await requireAuth(); } catch (e) { return e as Response; }
+
+  const ip = getClientIp(req);
+  const rl = rateLimitApiRead(ip);
+  if (!rl.allowed) return rateLimitResponse(rl);
+
   try {
     const { searchParams } = new URL(req.url);
     const dateFrom = searchParams.get("dateFrom");
     const dateTo = searchParams.get("dateTo");
     const cashier = searchParams.get("cashier");
-    const limit = parseInt(searchParams.get("limit") || "100", 10);
+    const limit = Math.min(parseInt(searchParams.get("limit") || "100", 10), 1000);
 
     const where: any = {};
     if (dateFrom || dateTo) {
@@ -33,31 +42,45 @@ export async function GET(req: NextRequest) {
 
 // POST /api/sales — create a new sale
 export async function POST(req: NextRequest) {
+  let user;
   try {
-    const body = await req.json();
+    user = await requireAuth();
+    requirePermission(user.role, "sales");
+  } catch (e) { return e as Response; }
 
-    // Generate invoice number if not provided
-    const invoiceNumber = body.invoiceNumber || `INV-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  const ip = getClientIp(req);
+  const rl = rateLimitApiWrite(ip);
+  if (!rl.allowed) return rateLimitResponse(rl);
+
+  let body: unknown;
+  try { body = await req.json(); } catch { return validationError("Invalid JSON body"); }
+
+  const result = validate(SaleSchema, body);
+  if (!result.success) return validationError(result.error);
+  const s = result.data;
+
+  try {
+    const invoiceNumber = s.invoiceNumber || `INV-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
     const sale = await db.sale.create({
       data: {
         invoiceNumber,
-        customerName: body.customerName || "",
-        cashierName: body.cashierName || "Unknown",
-        subtotal: Number(body.subtotal) || 0,
-        discount: Number(body.discount) || 0,
-        discountPct: Number(body.discountPct) || 0,
-        taxRate: Number(body.taxRate) || 0,
-        taxAmount: Number(body.taxAmount) || 0,
-        total: Number(body.total) || 0,
-        amountPaid: Number(body.amountPaid) || 0,
-        change: Number(body.change) || 0,
-        paymentMethod: body.paymentMethod || "cash",
-        paymentRef: body.paymentRef || "",
-        status: body.status || "completed",
-        notes: body.notes || "",
+        customerName: s.customerName || "",
+        cashierName: s.cashierName,
+        subtotal: Number(s.subtotal) || 0,
+        discount: Number(s.discount) || 0,
+        discountPct: Number(s.discountPct) || 0,
+        taxRate: Number(s.taxRate) || 0,
+        taxAmount: Number(s.taxAmount) || 0,
+        total: Number(s.total) || 0,
+        amountPaid: Number(s.amountPaid) || 0,
+        change: Number(s.change) || 0,
+        paymentMethod: s.paymentMethod || "cash",
+        paymentRef: s.paymentRef || "",
+        status: s.status || "completed",
+        notes: s.notes || "",
         items: {
-          create: (body.items || []).map((item: any) => ({
+          create: s.items.map((item) => ({
             productId: item.productId || null,
             sku: item.sku,
             name: item.name,

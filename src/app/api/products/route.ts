@@ -1,8 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { requireAuth, requirePermission } from "@/lib/auth";
+import { ProductSchema, ProductBulkSchema, validate, validationError } from "@/lib/validation";
+import { rateLimitApiRead, rateLimitApiWrite, rateLimitResponse, getClientIp } from "@/lib/rate-limit";
 
-// GET /api/products — list all products
-export async function GET() {
+// GET /api/products — list all products (requires auth + stock permission)
+export async function GET(req: NextRequest) {
+  try {
+    await requireAuth();
+  } catch (e) {
+    return e as Response;
+  }
+
+  const ip = getClientIp(req);
+  const rl = rateLimitApiRead(ip);
+  if (!rl.allowed) return rateLimitResponse(rl);
+
   try {
     const products = await db.product.findMany({
       where: { active: true },
@@ -16,15 +29,35 @@ export async function GET() {
   }
 }
 
-// POST /api/products — bulk upsert (for sync) or single create
+// POST /api/products — bulk upsert (sync) or single create
 export async function POST(req: NextRequest) {
+  let user;
   try {
-    const body = await req.json();
+    user = await requireAuth();
+    requirePermission(user.role, "stock");
+  } catch (e) {
+    return e as Response;
+  }
 
+  const ip = getClientIp(req);
+  const rl = rateLimitApiWrite(ip);
+  if (!rl.allowed) return rateLimitResponse(rl);
+
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return validationError("Invalid JSON body");
+  }
+
+  try {
     // Bulk upsert (sync from client localStorage)
-    if (Array.isArray(body.products)) {
+    if (Array.isArray((body as any)?.products)) {
+      const result = validate(ProductBulkSchema, body);
+      if (!result.success) return validationError(result.error);
+
       const results: any[] = [];
-      for (const p of body.products) {
+      for (const p of result.data.products) {
         const data = {
           sku: p.sku,
           barcode: p.barcode || "",
@@ -39,8 +72,8 @@ export async function POST(req: NextRequest) {
           reorderLevel: Number(p.reorderLevel) || 5,
           taxable: p.taxable !== false,
           batchNumber: p.batchNumber || "",
-          expiryDate: p.expiryDate ? new Date(p.expiryDate) : null,
-          receivedDate: p.receivedDate ? new Date(p.receivedDate) : null,
+          expiryDate: p.expiryDate ? new Date(p.expiryDate as string) : null,
+          receivedDate: p.receivedDate ? new Date(p.receivedDate as string) : null,
           supplier: p.supplier || "",
           groupId: p.groupId || null,
           active: p.active !== false,
@@ -56,29 +89,29 @@ export async function POST(req: NextRequest) {
     }
 
     // Single create
-    if (body.name && body.sku) {
-      const product = await db.product.create({
-        data: {
-          sku: body.sku,
-          barcode: body.barcode || "",
-          name: body.name,
-          emoji: body.emoji || "📦",
-          category: body.category || "other",
-          description: body.description || "",
-          price: Number(body.price) || 0,
-          costPrice: Number(body.costPrice) || 0,
-          quantity: Number(body.quantity) || 0,
-          unit: body.unit || "each",
-          reorderLevel: Number(body.reorderLevel) || 5,
-          taxable: body.taxable !== false,
-          supplier: body.supplier || "",
-          groupId: body.groupId || null,
-        },
-      });
-      return NextResponse.json({ success: true, product });
-    }
+    const result = validate(ProductSchema, body);
+    if (!result.success) return validationError(result.error);
+    const p = result.data;
 
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    const product = await db.product.create({
+      data: {
+        sku: p.sku,
+        barcode: p.barcode || "",
+        name: p.name,
+        emoji: p.emoji || "📦",
+        category: p.category || "other",
+        description: p.description || "",
+        price: Number(p.price) || 0,
+        costPrice: Number(p.costPrice) || 0,
+        quantity: Number(p.quantity) || 0,
+        unit: p.unit || "each",
+        reorderLevel: Number(p.reorderLevel) || 5,
+        taxable: p.taxable !== false,
+        supplier: p.supplier || "",
+        groupId: p.groupId || null,
+      },
+    });
+    return NextResponse.json({ success: true, product });
   } catch (e) {
     console.error("POST /api/products error:", e);
     return NextResponse.json({ error: "Failed to create product" }, { status: 500 });

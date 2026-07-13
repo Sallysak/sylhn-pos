@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { requireAuth, requirePermission } from "@/lib/auth";
+import { rateLimitApiRead, rateLimitApiWrite, rateLimitResponse, getClientIp } from "@/lib/rate-limit";
 
 // GET /api/sales/[id] — get one sale by ID or invoice number
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try { await requireAuth(); } catch (e) { return e as Response; }
+
+  const ip = getClientIp(req);
+  const rl = rateLimitApiRead(ip);
+  if (!rl.allowed) return rateLimitResponse(rl);
+
   try {
     const { id } = await params;
-    // Try by ID first, then by invoice number
     let sale = await db.sale.findUnique({
       where: { id },
       include: { items: true },
@@ -24,14 +31,25 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   }
 }
 
-// PUT /api/sales/[id] — update (e.g. void)
+// PUT /api/sales/[id] — update (void needs canVoid permission)
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  let user;
+  try { user = await requireAuth(); } catch (e) { return e as Response; }
+
+  const ip = getClientIp(req);
+  const rl = rateLimitApiWrite(ip);
+  if (!rl.allowed) return rateLimitResponse(rl);
+
+  let body: any;
+  try { body = await req.json(); } catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
+
   try {
     const { id } = await params;
-    const body = await req.json();
 
     if (body.status === "voided") {
-      // Voiding: restore stock
+      // Voiding requires canVoid permission
+      try { requirePermission(user.role, "canVoid"); } catch (e) { return e as Response; }
+
       const sale = await db.sale.findUnique({
         where: { id },
         include: { items: true },
@@ -64,7 +82,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         data: {
           status: "voided",
           voidedAt: new Date(),
-          voidedBy: body.voidedBy || "system",
+          voidedBy: user.username,
         },
         include: { items: true },
       });
@@ -74,10 +92,10 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     const updated = await db.sale.update({
       where: { id },
       data: {
-        ...(body.customerName !== undefined && { customerName: body.customerName }),
-        ...(body.notes !== undefined && { notes: body.notes }),
-        ...(body.paymentMethod && { paymentMethod: body.paymentMethod }),
-        ...(body.paymentRef !== undefined && { paymentRef: body.paymentRef }),
+        ...(body.customerName !== undefined && { customerName: String(body.customerName).slice(0, 200) }),
+        ...(body.notes !== undefined && { notes: String(body.notes).slice(0, 2000) }),
+        ...(body.paymentMethod && { paymentMethod: String(body.paymentMethod).slice(0, 32) }),
+        ...(body.paymentRef !== undefined && { paymentRef: String(body.paymentRef).slice(0, 128) }),
       },
       include: { items: true },
     });
@@ -90,6 +108,12 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
 // DELETE /api/sales/[id] — hard delete (admin only)
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try { await requirePermission((await requireAuth()).role, "canVoid"); } catch (e) { return e as Response; }
+
+  const ip = getClientIp(req);
+  const rl = rateLimitApiWrite(ip);
+  if (!rl.allowed) return rateLimitResponse(rl);
+
   try {
     const { id } = await params;
     await db.sale.delete({ where: { id } });

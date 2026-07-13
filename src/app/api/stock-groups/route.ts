@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { requireAuth, requirePermission } from "@/lib/auth";
+import { StockGroupSchema, validate, validationError } from "@/lib/validation";
+import { rateLimitApiRead, rateLimitApiWrite, rateLimitResponse, getClientIp } from "@/lib/rate-limit";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  try { await requireAuth(); } catch (e) { return e as Response; }
+
+  const ip = getClientIp(req);
+  const rl = rateLimitApiRead(ip);
+  if (!rl.allowed) return rateLimitResponse(rl);
+
   try {
     const groups = await db.stockGroup.findMany({
       include: { products: true },
@@ -15,19 +24,33 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  let user;
   try {
-    const body = await req.json();
+    user = await requireAuth();
+    requirePermission(user.role, "stock");
+  } catch (e) { return e as Response; }
 
-    if (Array.isArray(body.groups)) {
+  const ip = getClientIp(req);
+  const rl = rateLimitApiWrite(ip);
+  if (!rl.allowed) return rateLimitResponse(rl);
+
+  let body: unknown;
+  try { body = await req.json(); } catch { return validationError("Invalid JSON body"); }
+
+  try {
+    if (Array.isArray((body as any)?.groups)) {
+      const arr = (body as any).groups;
       const results: any[] = [];
-      for (const g of body.groups) {
+      for (const g of arr.slice(0, 200)) {
+        const r = validate(StockGroupSchema, g);
+        if (!r.success) continue;
         const data = {
-          name: g.name,
-          icon: g.icon || "📦",
-          color: g.color || "#10b981",
-          description: g.description || "",
+          name: r.data.name,
+          icon: r.data.icon || "📦",
+          color: r.data.color || "#10b981",
+          description: r.data.description || "",
         };
-        const existing = await db.stockGroup.findFirst({ where: { name: g.name } });
+        const existing = await db.stockGroup.findFirst({ where: { name: r.data.name } });
         if (existing) {
           results.push(await db.stockGroup.update({ where: { id: existing.id }, data }));
         } else {
@@ -37,12 +60,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, count: results.length });
     }
 
+    const result = validate(StockGroupSchema, body);
+    if (!result.success) return validationError(result.error);
+    const g = result.data;
+
     const group = await db.stockGroup.create({
       data: {
-        name: body.name,
-        icon: body.icon || "📦",
-        color: body.color || "#10b981",
-        description: body.description || "",
+        name: g.name,
+        icon: g.icon || "📦",
+        color: g.color || "#10b981",
+        description: g.description || "",
       },
     });
     return NextResponse.json({ success: true, group });

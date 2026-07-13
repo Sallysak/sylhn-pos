@@ -131,6 +131,7 @@ export function AdminLogin({ onSuccess, onCancel, adminOnly = false }: { onSucce
   const [attempts, setAttempts] = useState(0);
   const [locked, setLocked] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const users = useMemo(() => {
     try {
@@ -163,34 +164,103 @@ export function AdminLogin({ onSuccess, onCancel, adminOnly = false }: { onSucce
     setTimeout(() => window.location.reload(), 400);
   };
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     if (locked) return;
     if (!username || !password) { setError('Enter username and password'); return; }
+    setError('');
+    setSubmitting(true);
 
-    const user = users.find(u => u.username === username && u.password === password);
+    try {
+      // Primary path: authenticate against the server (hashed passwords,
+      // rate-limited, sets httpOnly session cookie).
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+        credentials: 'include',
+      });
+      const data = await res.json();
+
+      if (res.ok && data.success && data.user) {
+        // Role check for adminOnly mode
+        if (adminOnly && data.user.role !== 'admin' && data.user.role !== 'manager') {
+          setError('Insufficient privileges. Admin or Manager access required.');
+          return;
+        }
+        // Cache the user (without password) for the UI to read role/permissions
+        try {
+          localStorage.setItem(SESSION_KEY, JSON.stringify(data.user));
+        } catch { /* ignore */ }
+        toast({ title: `Welcome, ${data.user.fullName}`, description: `Logged in as ${ROLE_CONFIG[data.user.role as UserRole]?.label || data.user.role}` });
+        onSuccess(data.user as SystemUser);
+        return;
+      }
+
+      // Server rejected the login
+      if (res.status === 429) {
+        setLocked(true);
+        setError('Too many login attempts. Account locked for 30 seconds.');
+        setTimeout(() => { setLocked(false); setAttempts(0); setError(''); }, 30000);
+        return;
+      }
+
+      // Fall back to local (offline) auth if server is unreachable
+      if (res.status >= 500) {
+        return localFallbackLogin();
+      }
+
+      // 401 / 403 etc. — invalid credentials
+      throw new Error(data.error || 'Invalid credentials');
+    } catch (err) {
+      // Network error → try offline fallback
+      const msg = (err as Error).message || '';
+      if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('network')) {
+        return localFallbackLogin();
+      }
+      const newAttempts = attempts + 1;
+      setAttempts(newAttempts);
+      if (newAttempts >= 3) {
+        setLocked(true);
+        setError(`Account locked after 3 failed attempts. Try again in 30 seconds. (${msg})`);
+        setTimeout(() => { setLocked(false); setAttempts(0); setError(''); }, 30000);
+      } else {
+        setError(`Invalid credentials. ${3 - newAttempts} attempt(s) remaining. ${msg}`);
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Offline fallback: check against localStorage-cached users (for when
+  // the server is unreachable). This still uses plaintext comparison
+  // locally, which is acceptable as a degraded mode for a local PWA.
+  const localFallbackLogin = () => {
+    const user = users.find((u: any) =>
+      u.username === username && u.password === password && u.active !== false
+    );
     if (!user) {
       const newAttempts = attempts + 1;
       setAttempts(newAttempts);
       if (newAttempts >= 3) {
         setLocked(true);
-        setError('Account locked after 3 failed attempts. Try again in 30 seconds.');
+        setError('Account locked after 3 failed attempts (offline mode). Try again in 30 seconds.');
         setTimeout(() => { setLocked(false); setAttempts(0); setError(''); }, 30000);
       } else {
-        setError(`Invalid credentials. ${3 - newAttempts} attempt(s) remaining.`);
+        setError(`Offline: invalid credentials. ${3 - newAttempts} attempt(s) remaining.`);
       }
       return;
     }
-
-    if (!user.active) { setError('Account is deactivated. Contact administrator.'); return; }
-    if (adminOnly && user.role !== 'admin' && user.role !== 'manager') { setError('Insufficient privileges. Admin or Manager access required.'); return; }
-
-    // Update last login
-    const updated = users.map(u => u.id === user.id ? { ...u, lastLogin: new Date().toISOString() } : u);
-    localStorage.setItem(USERS_KEY, JSON.stringify(updated));
-    localStorage.setItem(SESSION_KEY, JSON.stringify(user));
-
-    toast({ title: `Welcome, ${user.fullName}`, description: `Logged in as ${ROLE_CONFIG[user.role].label}` });
-    onSuccess(user);
+    if (adminOnly && user.role !== 'admin' && user.role !== 'manager') {
+      setError('Insufficient privileges. Admin or Manager access required.');
+      return;
+    }
+    const safeUser = { ...user, password: undefined };
+    try { localStorage.setItem(SESSION_KEY, JSON.stringify(safeUser)); } catch { /* ignore */ }
+    toast({
+      title: `Welcome, ${user.fullName}`,
+      description: `Logged in offline as ${ROLE_CONFIG[user.role as UserRole]?.label || user.role}`,
+    });
+    onSuccess(safeUser as SystemUser);
   };
 
   return (
@@ -228,8 +298,8 @@ export function AdminLogin({ onSuccess, onCancel, adminOnly = false }: { onSucce
                 <button onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"><Eye className="h-4 w-4" /></button>
               </div>
             </div>
-            <button onClick={handleLogin} disabled={locked} className="w-full h-11 rounded-xl bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-700 hover:to-pink-700 text-white text-sm font-bold transition shadow-lg shadow-rose-500/30 disabled:opacity-50 flex items-center justify-center gap-2">
-              <KeyRound className="h-4 w-4" /> {locked ? 'Locked — Wait...' : 'Sign In'}
+            <button onClick={handleLogin} disabled={locked || submitting} className="w-full h-11 rounded-xl bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-700 hover:to-pink-700 text-white text-sm font-bold transition shadow-lg shadow-rose-500/30 disabled:opacity-50 flex items-center justify-center gap-2">
+              <KeyRound className="h-4 w-4" /> {locked ? 'Locked — Wait...' : submitting ? 'Signing in...' : 'Sign In'}
             </button>
           </div>
 
@@ -355,7 +425,7 @@ export function AdminPanel({ currentUser, onBack }: { currentUser: SystemUser; o
     u.role.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleSaveUser = (user: SystemUser) => {
+  const handleSaveUser = async (user: SystemUser) => {
     if (editingUser) {
       setUsers(prev => prev.map(u => u.id === user.id ? user : u));
       logAction('User Updated', 'Admin', `Updated user: ${user.username} (${user.fullName})`);
@@ -365,6 +435,28 @@ export function AdminPanel({ currentUser, onBack }: { currentUser: SystemUser; o
       logAction('User Created', 'Admin', `Created user: ${user.username} (${user.fullName}) as ${ROLE_CONFIG[user.role].label}`);
       toast({ title: 'User created', description: `${user.fullName} (${ROLE_CONFIG[user.role].label})` });
     }
+
+    // Persist to server (password gets hashed server-side)
+    try {
+      await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          username: user.username,
+          password: user.password || 'changeme123', // require a password
+          fullName: user.fullName,
+          role: user.role,
+          phone: user.phone,
+          email: user.email,
+          permissions: user.permissions,
+          active: user.active,
+        }),
+      });
+    } catch (e) {
+      console.warn('Server user save failed (offline?):', e);
+    }
+
     setShowUserForm(false);
     setEditingUser(null);
   };

@@ -1,9 +1,21 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { requireRole, hashPassword } from "@/lib/auth";
+import { rateLimitSeed, rateLimitResponse } from "@/lib/rate-limit";
+import { headers } from "next/headers";
 
 // POST /api/seed — seed the database with initial demo data
-// Idempotent: clears existing data first.
-export async function POST() {
+// Admin-only + heavily rate-limited (3/hour) since it's destructive.
+export async function POST(req: Request) {
+  try { await requireRole("admin"); } catch (e) { return e as Response; }
+
+  // Rate limit
+  const h = await headers();
+  const fwd = h.get("x-forwarded-for");
+  const ip = fwd ? fwd.split(",")[0].trim() : "127.0.0.1";
+  const rl = rateLimitSeed(ip);
+  if (!rl.allowed) return rateLimitResponse(rl, "Seed rate limit exceeded.");
+
   try {
     // Wipe (order matters for FK constraints)
     await db.stockHistory.deleteMany();
@@ -19,15 +31,17 @@ export async function POST() {
     await db.heldOrder.deleteMany();
     await db.auditLog.deleteMany();
 
-    // ===== Users =====
-    const admin = await db.systemUser.create({
+    // Hash the default passwords
+    const [adminPwd, managerPwd, cashierPwd] = await Promise.all([
+      hashPassword("admin123"),
+      hashPassword("manager123"),
+      hashPassword("cashier123"),
+    ]);
+
+    await db.systemUser.create({
       data: {
-        username: "admin",
-        password: "admin123",
-        fullName: "System Administrator",
-        role: "admin",
-        phone: "+233592766044",
-        email: "admin@sylhn.com",
+        username: "admin", password: adminPwd, fullName: "System Administrator",
+        role: "admin", phone: "+233592766044", email: "admin@sylhn.com",
         permissions: JSON.stringify({
           pos: true, sales: true, stock: true, purchase: true, accounts: true,
           telephone: true, maintenance: true, financeOps: true,
@@ -36,15 +50,10 @@ export async function POST() {
         }),
       },
     });
-
     await db.systemUser.create({
       data: {
-        username: "manager",
-        password: "manager123",
-        fullName: "Store Manager",
-        role: "manager",
-        phone: "+233 24 111 2222",
-        email: "manager@sylhn.com",
+        username: "manager", password: managerPwd, fullName: "Store Manager",
+        role: "manager", phone: "+233 24 111 2222", email: "manager@sylhn.com",
         permissions: JSON.stringify({
           pos: true, sales: true, stock: true, purchase: true, accounts: true,
           telephone: true, maintenance: false, financeOps: true,
@@ -53,15 +62,10 @@ export async function POST() {
         }),
       },
     });
-
     await db.systemUser.create({
       data: {
-        username: "cashier",
-        password: "cashier123",
-        fullName: "Sarah Johnson",
-        role: "cashier",
-        phone: "+233 24 333 4444",
-        email: "sarah@sylhn.com",
+        username: "cashier", password: cashierPwd, fullName: "Sarah Johnson",
+        role: "cashier", phone: "+233 24 333 4444", email: "sarah@sylhn.com",
         permissions: JSON.stringify({
           pos: true, sales: true, stock: false, purchase: false, accounts: false,
           telephone: true, maintenance: false, financeOps: false,
@@ -71,7 +75,7 @@ export async function POST() {
       },
     });
 
-    // ===== Stock Groups =====
+    // Stock groups
     const groupNames = [
       { name: "Fresh Produce", icon: "🥬", color: "#22c55e" },
       { name: "Chilled & Dairy", icon: "🥛", color: "#3b82f6" },
@@ -88,14 +92,14 @@ export async function POST() {
       groupNames.map(g => db.stockGroup.create({ data: g }))
     );
 
-    // ===== Suppliers =====
+    // Suppliers
     const suppliers = await Promise.all([
       db.supplier.create({ data: { name: "Accra Wholesale Ltd", phone: "+233 30 222 1111", email: "sales@accrawholesale.com", address: "Industrial Area, Accra" } }),
       db.supplier.create({ data: { name: "Kumasi Foods Distribution", phone: "+233 51 333 4444", email: "info@kumasifoods.com", address: "Adum, Kumasi" } }),
       db.supplier.create({ data: { name: "Fresh Produce Co.", phone: "+233 24 555 6666", email: "orders@freshproduce.com", address: "Tema, Greater Accra" } }),
     ]);
 
-    // ===== Products (sample) =====
+    // Products
     const sampleProducts = [
       { sku: "APL-001", name: "Apples (Royal Gala)", emoji: "🍎", category: "fruits", price: 35, costPrice: 25, quantity: 80, unit: "kg", groupId: groups[0].id, supplier: suppliers[2].id, taxable: true },
       { sku: "BNB-001", name: "Bananas", emoji: "🍌", category: "fruits", price: 12, costPrice: 7, quantity: 120, unit: "kg", groupId: groups[0].id, supplier: suppliers[2].id, taxable: true },
@@ -108,18 +112,11 @@ export async function POST() {
       { sku: "RCE-001", name: "Rice 5kg Bag", emoji: "🍚", category: "pantry", price: 95, costPrice: 75, quantity: 35, unit: "bag", groupId: groups[7].id, supplier: suppliers[1].id, taxable: true },
       { sku: "OIL-001", name: "Cooking Oil 1L", emoji: "🫒", category: "pantry", price: 38, costPrice: 28, quantity: 60, unit: "bottle", groupId: groups[7].id, supplier: suppliers[0].id, taxable: true },
     ];
-    const products = await Promise.all(
-      sampleProducts.map(p => db.product.create({ data: p as any }))
-    );
+    await Promise.all(sampleProducts.map(p => db.product.create({ data: p as any })));
 
     return NextResponse.json({
       success: true,
-      seeded: {
-        users: 3,
-        groups: groups.length,
-        suppliers: suppliers.length,
-        products: products.length,
-      },
+      seeded: { users: 3, groups: groups.length, suppliers: suppliers.length, products: sampleProducts.length },
     });
   } catch (e) {
     console.error("POST /api/seed error:", e);

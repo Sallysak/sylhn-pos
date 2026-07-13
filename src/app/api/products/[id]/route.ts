@@ -1,8 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { requireAuth, requirePermission } from "@/lib/auth";
+import { ProductUpdateSchema, validate, validationError } from "@/lib/validation";
+import { rateLimitApiRead, rateLimitApiWrite, rateLimitResponse, getClientIp } from "@/lib/rate-limit";
 
 // GET /api/products/[id] — get one product
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try { await requireAuth(); } catch (e) { return e as Response; }
+
+  const ip = getClientIp(req);
+  const rl = rateLimitApiRead(ip);
+  if (!rl.allowed) return rateLimitResponse(rl);
+
   try {
     const { id } = await params;
     const product = await db.product.findUnique({
@@ -19,30 +28,46 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
 // PUT /api/products/[id] — update
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  let user;
+  try {
+    user = await requireAuth();
+    requirePermission(user.role, "stock");
+  } catch (e) { return e as Response; }
+
+  const ip = getClientIp(req);
+  const rl = rateLimitApiWrite(ip);
+  if (!rl.allowed) return rateLimitResponse(rl);
+
+  let body: unknown;
+  try { body = await req.json(); } catch { return validationError("Invalid JSON body"); }
+
+  const result = validate(ProductUpdateSchema, body);
+  if (!result.success) return validationError(result.error);
+
   try {
     const { id } = await params;
-    const body = await req.json();
+    const updates = result.data;
     const product = await db.product.update({
       where: { id },
       data: {
-        ...(body.sku && { sku: body.sku }),
-        ...(body.barcode !== undefined && { barcode: body.barcode }),
-        ...(body.name && { name: body.name }),
-        ...(body.emoji && { emoji: body.emoji }),
-        ...(body.category && { category: body.category }),
-        ...(body.description !== undefined && { description: body.description }),
-        ...(body.price !== undefined && { price: Number(body.price) }),
-        ...(body.costPrice !== undefined && { costPrice: Number(body.costPrice) }),
-        ...(body.quantity !== undefined && { quantity: Number(body.quantity) }),
-        ...(body.unit && { unit: body.unit }),
-        ...(body.reorderLevel !== undefined && { reorderLevel: Number(body.reorderLevel) }),
-        ...(body.taxable !== undefined && { taxable: body.taxable }),
-        ...(body.batchNumber !== undefined && { batchNumber: body.batchNumber }),
-        ...(body.expiryDate !== undefined && { expiryDate: body.expiryDate ? new Date(body.expiryDate) : null }),
-        ...(body.receivedDate !== undefined && { receivedDate: body.receivedDate ? new Date(body.receivedDate) : null }),
-        ...(body.supplier !== undefined && { supplier: body.supplier }),
-        ...(body.groupId !== undefined && { groupId: body.groupId || null }),
-        ...(body.active !== undefined && { active: body.active }),
+        ...(updates.sku !== undefined && { sku: updates.sku }),
+        ...(updates.barcode !== undefined && { barcode: updates.barcode }),
+        ...(updates.name !== undefined && { name: updates.name }),
+        ...(updates.emoji !== undefined && { emoji: updates.emoji }),
+        ...(updates.category !== undefined && { category: updates.category }),
+        ...(updates.description !== undefined && { description: updates.description }),
+        ...(updates.price !== undefined && { price: Number(updates.price) }),
+        ...(updates.costPrice !== undefined && { costPrice: Number(updates.costPrice) }),
+        ...(updates.quantity !== undefined && { quantity: Number(updates.quantity) }),
+        ...(updates.unit !== undefined && { unit: updates.unit }),
+        ...(updates.reorderLevel !== undefined && { reorderLevel: Number(updates.reorderLevel) }),
+        ...(updates.taxable !== undefined && { taxable: updates.taxable }),
+        ...(updates.batchNumber !== undefined && { batchNumber: updates.batchNumber }),
+        ...(updates.expiryDate !== undefined && { expiryDate: updates.expiryDate ? new Date(updates.expiryDate as string) : null }),
+        ...(updates.receivedDate !== undefined && { receivedDate: updates.receivedDate ? new Date(updates.receivedDate as string) : null }),
+        ...(updates.supplier !== undefined && { supplier: updates.supplier }),
+        ...(updates.groupId !== undefined && { groupId: updates.groupId || null }),
+        ...(updates.active !== undefined && { active: updates.active }),
       },
     });
     return NextResponse.json({ success: true, product });
@@ -52,8 +77,18 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   }
 }
 
-// DELETE /api/products/[id] — soft delete (set active=false)
+// DELETE /api/products/[id] — soft delete (set active=false) or hard delete with ?force=true
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  let user;
+  try {
+    user = await requireAuth();
+    requirePermission(user.role, "canDeleteProducts");
+  } catch (e) { return e as Response; }
+
+  const ip = getClientIp(req);
+  const rl = rateLimitApiWrite(ip);
+  if (!rl.allowed) return rateLimitResponse(rl);
+
   try {
     const { id } = await params;
     const force = req.nextUrl.searchParams.get("force") === "true";

@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { requireAuth, requirePermission } from "@/lib/auth";
+import { SupplierSchema, validate, validationError } from "@/lib/validation";
+import { rateLimitApiRead, rateLimitApiWrite, rateLimitResponse, getClientIp } from "@/lib/rate-limit";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  try { await requireAuth(); } catch (e) { return e as Response; }
+
+  const ip = getClientIp(req);
+  const rl = rateLimitApiRead(ip);
+  if (!rl.allowed) return rateLimitResponse(rl);
+
   try {
     const suppliers = await db.supplier.findMany({
       where: { active: true },
@@ -16,25 +25,37 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  let user;
   try {
-    const body = await req.json();
+    user = await requireAuth();
+    requirePermission(user.role, "purchase");
+  } catch (e) { return e as Response; }
 
-    if (Array.isArray(body.suppliers)) {
-      // Bulk upsert (sync)
+  const ip = getClientIp(req);
+  const rl = rateLimitApiWrite(ip);
+  if (!rl.allowed) return rateLimitResponse(rl);
+
+  let body: unknown;
+  try { body = await req.json(); } catch { return validationError("Invalid JSON body"); }
+
+  try {
+    if (Array.isArray((body as any)?.suppliers)) {
+      const arr = (body as any).suppliers;
       const results: any[] = [];
-      for (const s of body.suppliers) {
+      for (const s of arr.slice(0, 500)) {
+        const r = validate(SupplierSchema, s);
+        if (!r.success) continue;
         const data = {
-          name: s.name,
-          contact: s.contact || "",
-          phone: s.phone || "",
-          email: s.email || "",
-          address: s.address || "",
-          balance: Number(s.balance) || 0,
-          products: typeof s.products === "string" ? s.products : JSON.stringify(s.products || []),
-          active: s.active !== false,
+          name: r.data.name,
+          contact: r.data.contact || "",
+          phone: r.data.phone || "",
+          email: r.data.email || "",
+          address: r.data.address || "",
+          balance: Number(r.data.balance) || 0,
+          products: typeof r.data.products === "string" ? r.data.products : JSON.stringify(r.data.products || []),
+          active: r.data.active !== false,
         };
-        // Try update by name (suppliers don't always have IDs from client)
-        const existing = await db.supplier.findFirst({ where: { name: s.name } });
+        const existing = await db.supplier.findFirst({ where: { name: r.data.name } });
         if (existing) {
           results.push(await db.supplier.update({ where: { id: existing.id }, data }));
         } else {
@@ -44,15 +65,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, count: results.length });
     }
 
+    const result = validate(SupplierSchema, body);
+    if (!result.success) return validationError(result.error);
+    const s = result.data;
+
     const supplier = await db.supplier.create({
       data: {
-        name: body.name,
-        contact: body.contact || "",
-        phone: body.phone || "",
-        email: body.email || "",
-        address: body.address || "",
-        balance: Number(body.balance) || 0,
-        products: typeof body.products === "string" ? body.products : JSON.stringify(body.products || []),
+        name: s.name,
+        contact: s.contact || "",
+        phone: s.phone || "",
+        email: s.email || "",
+        address: s.address || "",
+        balance: Number(s.balance) || 0,
+        products: typeof s.products === "string" ? s.products : JSON.stringify(s.products || []),
       },
     });
     return NextResponse.json({ success: true, supplier });

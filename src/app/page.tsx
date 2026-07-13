@@ -917,12 +917,12 @@ export default function POSPage() {
         { label: "Admin Panel", icon: Shield, action: () => setView("admin-login") },
         { separator: true },
         { label: "About SYLHN POS", icon: Store, action: () => setView("maintenance") },
-        { label: "Exit", icon: Power, action: () => { setLoggedInUser(null); setView("login"); toast({ title: "Goodbye!", description: "Shift ended" }) } },
+        { label: "Exit", icon: Power, action: () => { fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {}); try { localStorage.removeItem('sylhn-current-user'); } catch {} setLoggedInUser(null); setView("login"); toast({ title: "Goodbye!", description: "Shift ended" }) } },
       ] : [
         { label: "Admin Panel", icon: Shield, action: () => setView("admin-login") },
         { separator: true },
         { label: "About SYLHN POS", icon: Store, action: () => setView("maintenance") },
-        { label: "Exit", icon: Power, action: () => { setLoggedInUser(null); setView("login"); toast({ title: "Goodbye!", description: "Shift ended" }) } },
+        { label: "Exit", icon: Power, action: () => { fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {}); try { localStorage.removeItem('sylhn-current-user'); } catch {} setLoggedInUser(null); setView("login"); toast({ title: "Goodbye!", description: "Shift ended" }) } },
       ],
     },
   ].filter(m => m.items.length > 0); // Hide empty menus
@@ -1120,7 +1120,7 @@ export default function POSPage() {
                 <div className="text-[9px] text-emerald-100/70 capitalize">{loggedInUser ? loggedInUser.role : 'Cashier'}</div>
               </div>
             </div>
-            <button onClick={() => { setLoggedInUser(null); setView("login"); toast({ title: "Logged out", description: "You have been signed out" }); }} className="h-8 px-3 rounded-lg bg-rose-500/20 hover:bg-rose-500/40 text-white text-xs font-bold flex items-center gap-1.5 transition" title="Sign out">
+            <button onClick={() => { fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {}); try { localStorage.removeItem('sylhn-current-user'); } catch {} setLoggedInUser(null); setView("login"); toast({ title: "Logged out", description: "You have been signed out" }); }} className="h-8 px-3 rounded-lg bg-rose-500/20 hover:bg-rose-500/40 text-white text-xs font-bold flex items-center gap-1.5 transition" title="Sign out">
               <LogOut className="h-4 w-4" /> <span className="hidden sm:inline">Logout</span>
             </button>
           </div>
