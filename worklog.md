@@ -2212,3 +2212,52 @@ Stage Summary:
 - Fix: always close the popup first, always set lines (with a fallback to row data if the lookup fails), and always call onClose() in the popup's handleSelect.
 - All three selection flows tested and working: Purchases List, Purchase Order List, and all sample transactions load their items correctly.
 - Build passes, lint passes (1 pre-existing warning).
+
+---
+Task ID: fix-supplier-system-select-not-loading
+Agent: Main (Super Z)
+Task: Apply same fixes to the supplier system — items selected from the Suppliers List / Stock List / New Supplier popup not loading into the Supplier Form when clicking Select/Save.
+
+Work Log:
+- Analyzed src/components/supplier-form.tsx data flow:
+  * SupplierListPopup.handleSelect() → onSelect(supplier) → handleSelectSupplier()
+  * StockListMiniPopup.handleSelect() → onSelect(product) → addProductToLine() + setShowStockList(false)
+  * NewSupplierPopup.handleSave() → onSave(form) → handleSaveNewSupplier()
+- Same root cause as the purchase form: handleSelect in popups did NOT call onClose() after onSelect(), so if the parent's handler threw or returned early, the popup stayed open covering the form.
+
+- FIXED SupplierListPopup.handleSelect():
+  * Added "No supplier selected" toast if no row is selected
+  * Added onClose() call after onSelect(supplier) — popup ALWAYS closes after Select
+
+- FIXED StockListMiniPopup.handleSelect():
+  * Added "No product selected" toast if no row is selected
+  * Added onClose() call after onSelect(product) — popup ALWAYS closes after Select
+
+- FIXED NewSupplierPopup.handleSave():
+  * Added onClose() call after onSave(form) — popup ALWAYS closes after Save
+
+- HARDENED handleSelectSupplier() (parent form):
+  * Moved setShowSupplierList(false) to the TOP of the function — popup closes first, before setting any other state
+
+- HARDENED handleSaveNewSupplier() (parent form):
+  * Moved setShowNewSupplier(false) + setShowSupplierList(false) to the TOP — popups close first
+
+- FIXED stale fixed widths on all three popups (mobile compatibility):
+  * StockListMiniPopup: width: '650px' → width: '100%', maxWidth: '650px', maxHeight: '85vh' + w-full + responsive padding (pt-4 sm:pt-20 p-4)
+  * SupplierListPopup: width: '550px' → width: '100%', maxWidth: '550px', maxHeight: '85vh' + w-full + responsive padding
+  * NewSupplierPopup: width: '680px' → width: '100%', maxWidth: '680px', maxHeight: '85vh' + w-full
+
+- Added type="button" to the NewSupplierPopup Save button (line 600) to prevent any default submit behavior.
+
+- VERIFIED via agent-browser interactive testing:
+  * Suppliers List → Select "Som Agency" → supplier loaded (Code: 00008 · Accra, Ghana), popup closed, "Supplier selected" toast ✓
+  * Stock List → Select "Red Apples" → product added to line items (FR-001, qty 1, cost 24.00), popup closed ✓
+  * New Supplier → Fill name "Final Test" → Save → supplier added and selected, popup closed, "New supplier added" toast ✓
+  * All three popups close immediately after Select/Save in all cases ✓
+
+Stage Summary:
+- Root cause: same as purchase form — popup handleSelect/handleSave did not call onClose() after the parent callback, so the popup stayed open if the parent's handler returned early or threw.
+- Fix: always call onClose() after onSelect/onSave in all three supplier popups. Also moved setShow* (false) to the top of the parent handlers.
+- Bonus: fixed stale fixed widths on all three popups for mobile compatibility.
+- All three supplier flows tested and working: Suppliers List, Stock List, New Supplier.
+- Build passes, lint passes.

@@ -117,22 +117,26 @@ export function SupplierForm({ onBack, products }: SupplierFormProps) {
 
   // Select a supplier from the list
   const handleSelectSupplier = (supplier: Supplier) => {
+    // Always close the popup first so the form is visible immediately,
+    // even if setting state below throws for any reason.
+    setShowSupplierList(false);
     setSelectedSupplier(supplier);
     setSupplierDetails(supplier.name);
     setTerms(supplier.tradingTerms);
     setTaxInclusive(supplier.taxInclusive);
-    setShowSupplierList(false);
     toast({ title: "Supplier selected", description: `${supplier.name} (${supplier.code})` });
   };
 
   // Add new supplier
   const handleSaveNewSupplier = (newSupplier: Supplier) => {
+    // Always close the popups first.
+    setShowNewSupplier(false);
+    setShowSupplierList(false);
     setSuppliers(prev => [...prev, newSupplier]);
     setSelectedSupplier(newSupplier);
     setSupplierDetails(newSupplier.name);
     setTerms(newSupplier.tradingTerms);
-    setShowNewSupplier(false);
-    setShowSupplierList(false);
+    setTaxInclusive(newSupplier.taxInclusive);
     toast({ title: "New supplier added", description: `${newSupplier.name} (${newSupplier.code})` });
   };
 
@@ -386,11 +390,22 @@ function StockListMiniPopup({ products, searchText, onSelect, onClose }: {
     return products.filter(p => p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q) || p.barcode.includes(q));
   }, [products, query, searchText]);
 
-  const handleSelect = () => { if (filtered[selectedIndex]) onSelect(filtered[selectedIndex]); };
+  const handleSelect = () => {
+    const product = filtered[selectedIndex];
+    if (!product) {
+      toast({ title: 'No product selected', variant: 'destructive' });
+      return;
+    }
+    onSelect(product);
+    // ALWAYS close the popup after Select — the parent's onSelect handler
+    // may also close it, but this ensures the popup closes even if the
+    // handler throws or returns early.
+    onClose();
+  };
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/40 flex items-start justify-center pt-20 z-50" onClick={onClose}>
-      <motion.div initial={{ scale: 0.95, y: -20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: -20 }} transition={{ type: "spring", damping: 25, stiffness: 300 }} onClick={(e) => e.stopPropagation()} className="bg-white rounded-lg shadow-2xl overflow-hidden flex flex-col" style={{ width: '650px', maxHeight: '400px', fontFamily: 'Arial, Helvetica, sans-serif' }}>
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/40 flex items-start justify-center pt-4 sm:pt-20 z-50 p-4" onClick={onClose}>
+      <motion.div initial={{ scale: 0.95, y: -20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: -20 }} transition={{ type: "spring", damping: 25, stiffness: 300 }} onClick={(e) => e.stopPropagation()} className="bg-white rounded-lg shadow-2xl overflow-hidden flex flex-col w-full" style={{ width: '100%', maxWidth: '650px', maxHeight: '85vh', fontFamily: 'Arial, Helvetica, sans-serif' }}>
         <div className="flex-shrink-0 flex items-center justify-between px-3 h-7 text-white" style={{ backgroundColor: '#5B9BD5' }}>
           <span className="text-xs font-bold">Stock List</span>
           <button onClick={onClose} className="h-5 w-5 rounded hover:bg-white/25 flex items-center justify-center transition"><X className="h-3.5 w-3.5" /></button>
@@ -447,11 +462,20 @@ function SupplierListPopup({ suppliers, searchText, onSelect, onNew, onClose }: 
     return suppliers.filter(s => s.name.toLowerCase().includes(q) || s.code.includes(q));
   }, [suppliers, query, searchText]);
 
-  const handleSelect = () => { if (filtered[selectedIndex]) onSelect(filtered[selectedIndex]); };
+  const handleSelect = () => {
+    const supplier = filtered[selectedIndex];
+    if (!supplier) {
+      toast({ title: 'No supplier selected', variant: 'destructive' });
+      return;
+    }
+    onSelect(supplier);
+    // ALWAYS close the popup after Select.
+    onClose();
+  };
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/40 flex items-start justify-center pt-20 z-50" onClick={onClose}>
-      <motion.div initial={{ scale: 0.95, y: -20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: -20 }} transition={{ type: "spring", damping: 25, stiffness: 300 }} onClick={(e) => e.stopPropagation()} className="bg-white rounded-lg shadow-2xl overflow-hidden flex flex-col" style={{ width: '550px', maxHeight: '400px', fontFamily: 'Arial, Helvetica, sans-serif' }}>
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/40 flex items-start justify-center pt-4 sm:pt-20 z-50 p-4" onClick={onClose}>
+      <motion.div initial={{ scale: 0.95, y: -20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: -20 }} transition={{ type: "spring", damping: 25, stiffness: 300 }} onClick={(e) => e.stopPropagation()} className="bg-white rounded-lg shadow-2xl overflow-hidden flex flex-col w-full" style={{ width: '100%', maxWidth: '550px', maxHeight: '85vh', fontFamily: 'Arial, Helvetica, sans-serif' }}>
         {/* Title Bar */}
         <div className="flex-shrink-0 flex items-center justify-between px-3 h-7 text-white" style={{ backgroundColor: '#5B9BD5' }}>
           <span className="text-xs font-bold">Suppliers List</span>
@@ -507,6 +531,10 @@ function NewSupplierPopup({ onSave, onClose }: { onSave: (s: Supplier) => void; 
   const handleSave = () => {
     if (!form.name) { toast({ title: "Supplier name is required", variant: "destructive" }); return; }
     onSave(form);
+    // ALWAYS close the popup after Save — the parent's onSave handler
+    // may also close it, but this ensures the popup closes even if the
+    // handler throws or returns early.
+    onClose();
   };
 
   const field = (label: string, key: keyof Supplier, type = "text", placeholder = "") => (
@@ -518,7 +546,7 @@ function NewSupplierPopup({ onSave, onClose }: { onSave: (s: Supplier) => void; 
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[60]" onClick={onClose}>
-      <motion.div initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }} onClick={(e) => e.stopPropagation()} className="bg-white rounded-lg shadow-2xl overflow-hidden flex flex-col" style={{ width: '680px', maxHeight: '550px', fontFamily: 'Arial, Helvetica, sans-serif' }}>
+      <motion.div initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }} onClick={(e) => e.stopPropagation()} className="bg-white rounded-lg shadow-2xl overflow-hidden flex flex-col w-full" style={{ width: '100%', maxWidth: '680px', maxHeight: '85vh', fontFamily: 'Arial, Helvetica, sans-serif' }}>
         {/* Title Bar */}
         <div className="flex-shrink-0 flex items-center justify-between px-3 h-7 text-white" style={{ backgroundColor: BLUE }}>
           <span className="text-xs font-bold">New Supplier</span>
@@ -566,7 +594,7 @@ function NewSupplierPopup({ onSave, onClose }: { onSave: (s: Supplier) => void; 
         {/* Action Buttons */}
         <div className="flex-shrink-0 px-3 py-1.5 flex items-center justify-end gap-2 border-t border-slate-300" style={{ backgroundColor: '#F0F0F0' }}>
           <button onClick={onClose} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1 transition" style={{ backgroundColor: '#F44336' }}><X className="h-3 w-3" /> Close (Esc)</button>
-          <button onClick={handleSave} disabled={!form.name} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1 transition disabled:opacity-50" style={{ backgroundColor: BLUE }}><Save className="h-3 w-3" /> Save (F2)</button>
+          <button type="button" onClick={handleSave} disabled={!form.name} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1 transition disabled:opacity-50" style={{ backgroundColor: BLUE }}><Save className="h-3 w-3" /> Save (F2)</button>
         </div>
       </motion.div>
     </motion.div>
