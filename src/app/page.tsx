@@ -60,6 +60,7 @@ const FinancialOperations = dynamic(() => import("@/components/financial-operati
 const AdminLogin = dynamic(() => import("@/components/admin-panel").then(m => ({ default: m.AdminLogin })), { ssr: false, loading: loadingFallback });
 const AdminPanel = dynamic(() => import("@/components/admin-panel").then(m => ({ default: m.AdminPanel })), { ssr: false, loading: loadingFallback });
 const OperationsDashboard = dynamic(() => import("@/components/operations-dashboard").then(m => ({ default: m.OperationsDashboard })), { ssr: false, loading: loadingFallback });
+const ReceiptArchive = dynamic(() => import("@/components/receipt-archive").then(m => ({ default: m.ReceiptArchive })), { ssr: false, loading: loadingFallback });
 
 export default function POSPage() {
   // ===== Top-level View State =====
@@ -895,6 +896,7 @@ export default function POSPage() {
         { label: "New Sale", icon: Plus, action: () => { clearCart(); setView("pos"); }, shortcut: "Ctrl+N" },
         { separator: true },
         { label: "📊 Operations Dashboard", icon: TrendingUp, action: () => setView("dashboard") },
+        { label: "🧾 Receipt Archive", icon: FileText, action: () => setView("receipt-archive") },
         { separator: true },
         { label: "Open Cash Drawer", icon: DollarSign, action: handleOpenCash },
         { label: "Switch Register", icon: Store, action: () => toast({ title: "Switch Register", description: "Select another register to switch to" }) },
@@ -914,6 +916,8 @@ export default function POSPage() {
         { label: "Sold Items Report", icon: FileBarChart, action: () => setView("sold-items") },
         { label: "Sales History", icon: History, action: () => setView("sales-history") },
         { label: "Daily Sales Report", icon: TrendingUp, action: () => setView("daily-sales") },
+        { separator: true },
+        { label: "🧾 Receipt Archive", icon: FileText, action: () => setView("receipt-archive") },
       ] : [],
     },
     {
@@ -1019,6 +1023,9 @@ export default function POSPage() {
   // ===== Render Other Views (lazy-loaded for performance) =====
   if (view === "dashboard") {
     return <OperationsDashboard products={products} onBack={() => setView("pos")} dailyTotal={dailyTotal} transactionCount={transactionCount} />;
+  }
+  if (view === "receipt-archive") {
+    return <ReceiptArchive onBack={() => setView("pos")} />;
   }
   if (view === "stock") {
     return <StockManagement onBack={() => { setView("pos"); setOpenStockQtyReport(false); }} products={products} setProducts={setProducts} groups={groups} setGroups={setGroups} history={history} setHistory={setHistory} initialView={initialStockView} openQtyReport={openStockQtyReport} onNavigateToPurchase={() => setView("purchase-form")} />;
