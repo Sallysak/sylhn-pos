@@ -31,6 +31,7 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { initialSuppliers } from "@/components/supplier-form";
+import { InstallButton } from "@/components/install-button";
 
 // ===== Lazy-loaded components (code-split for faster initial load) =====
 // Each form is loaded on-demand only when the user navigates to it.
@@ -150,6 +151,48 @@ export default function POSPage() {
     setNow(new Date());
   }, []);
   /* eslint-enable react-hooks/set-state-in-effect */
+
+  // ===== Cross-device session restore =====
+  // On page load, check if there's a valid server session (httpOnly cookie)
+  // OR a cached localStorage session. This makes login seamless across
+  // mobile and PC — if you're logged in on one device and open the app on
+  // another (with the same server), you stay logged in.
+  useEffect(() => {
+    let cancelled = false;
+    const restoreSession = async () => {
+      // First, try the server session (httpOnly cookie — most secure)
+      try {
+        const res = await fetch('/api/auth/me', { credentials: 'include' });
+        if (!cancelled && res.ok) {
+          const data = await res.json();
+          if (data.user) {
+            // Server session is valid — restore it
+            setLoggedInUser(data.user);
+            setView("pos");
+            return;
+          }
+        }
+      } catch { /* server unreachable — fall through to local */ }
+
+      // Fallback: check localStorage for a cached session (offline mode)
+      if (cancelled) return;
+      try {
+        const cached = localStorage.getItem('sylhn-current-user');
+        if (cached) {
+          const user = JSON.parse(cached);
+          if (user && user.username) {
+            setLoggedInUser(user);
+            setView("pos");
+            return;
+          }
+        }
+      } catch { /* ignore */ }
+
+      // No session found — stay on login screen
+    };
+    restoreSession();
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     if (!now) return;
@@ -1047,11 +1090,15 @@ export default function POSPage() {
   // ===== Login Screen (required to open the software) =====
   if (view === "login") {
     return (
-      <div className="h-screen bg-slate-900">
+      <div className="h-screen bg-slate-900 relative">
         <AdminLogin
           onSuccess={(user) => { setLoggedInUser(user); setView("pos"); toast({ title: `Welcome, ${user.fullName}`, description: `Logged in as ${user.role}` }); }}
           onCancel={() => toast({ title: "Login required", description: "You must log in to use the system" })}
         />
+        {/* Install App button — visible on login screen */}
+        <div className="fixed top-4 right-4 z-[200]">
+          <InstallButton />
+        </div>
       </div>
     );
   }
@@ -1169,6 +1216,7 @@ export default function POSPage() {
                 <div className="text-[9px] text-emerald-100/70 capitalize">{loggedInUser ? loggedInUser.role : 'Cashier'}</div>
               </div>
             </div>
+            <InstallButton />
             <button onClick={() => { fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {}); try { localStorage.removeItem('sylhn-current-user'); } catch {} setLoggedInUser(null); setView("login"); toast({ title: "Logged out", description: "You have been signed out" }); }} className="h-8 px-3 rounded-lg bg-rose-500/20 hover:bg-rose-500/40 text-white text-xs font-bold flex items-center gap-1.5 transition" title="Sign out">
               <LogOut className="h-4 w-4" /> <span className="hidden sm:inline">Logout</span>
             </button>

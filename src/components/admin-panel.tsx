@@ -170,6 +170,18 @@ export function AdminLogin({ onSuccess, onCancel, adminOnly = false }: { onSucce
     setError('');
     setSubmitting(true);
 
+    const failAttempt = (msg: string) => {
+      const newAttempts = attempts + 1;
+      setAttempts(newAttempts);
+      if (newAttempts >= 3) {
+        setLocked(true);
+        setError(`Account locked after 3 failed attempts. Try again in 30 seconds. (${msg})`);
+        setTimeout(() => { setLocked(false); setAttempts(0); setError(''); }, 30000);
+      } else {
+        setError(`Invalid credentials. ${3 - newAttempts} attempt(s) remaining. (${msg})`);
+      }
+    };
+
     try {
       // Primary path: authenticate against the server (hashed passwords,
       // rate-limited, sets httpOnly session cookie).
@@ -179,7 +191,14 @@ export function AdminLogin({ onSuccess, onCancel, adminOnly = false }: { onSucce
         body: JSON.stringify({ username, password }),
         credentials: 'include',
       });
-      const data = await res.json();
+
+      // Network-level failure (server unreachable) → offline fallback
+      // We detect this via status 0 or a TypeError thrown by fetch.
+      if (res.status === 0 || !res.ok && res.status >= 500) {
+        return localFallbackLogin();
+      }
+
+      const data = await res.json().catch(() => ({} as any));
 
       if (res.ok && data.success && data.user) {
         // Role check for adminOnly mode
@@ -188,6 +207,7 @@ export function AdminLogin({ onSuccess, onCancel, adminOnly = false }: { onSucce
           return;
         }
         // Cache the user (without password) for the UI to read role/permissions
+        // and for offline session restore.
         try {
           localStorage.setItem(SESSION_KEY, JSON.stringify(data.user));
         } catch { /* ignore */ }
@@ -196,7 +216,7 @@ export function AdminLogin({ onSuccess, onCancel, adminOnly = false }: { onSucce
         return;
       }
 
-      // Server rejected the login
+      // 429 = rate limited by server
       if (res.status === 429) {
         setLocked(true);
         setError('Too many login attempts. Account locked for 30 seconds.');
@@ -204,28 +224,19 @@ export function AdminLogin({ onSuccess, onCancel, adminOnly = false }: { onSucce
         return;
       }
 
-      // Fall back to local (offline) auth if server is unreachable
-      if (res.status >= 500) {
-        return localFallbackLogin();
-      }
-
-      // 401 / 403 etc. — invalid credentials
-      throw new Error(data.error || 'Invalid credentials');
+      // 401 / 403 = invalid credentials (server responded, so NOT offline)
+      // Do NOT fall back to local — the server explicitly said "invalid".
+      // Just record the failed attempt.
+      failAttempt(data.error || 'Invalid credentials');
     } catch (err) {
-      // Network error → try offline fallback
+      // fetch() throws TypeError when the server is unreachable (network error).
+      // This is the ONLY case where we fall back to offline mode.
       const msg = (err as Error).message || '';
-      if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('network')) {
+      if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('network') || msg.includes('fetch')) {
         return localFallbackLogin();
       }
-      const newAttempts = attempts + 1;
-      setAttempts(newAttempts);
-      if (newAttempts >= 3) {
-        setLocked(true);
-        setError(`Account locked after 3 failed attempts. Try again in 30 seconds. (${msg})`);
-        setTimeout(() => { setLocked(false); setAttempts(0); setError(''); }, 30000);
-      } else {
-        setError(`Invalid credentials. ${3 - newAttempts} attempt(s) remaining. ${msg}`);
-      }
+      // Any other error — treat as a failed attempt (not offline)
+      failAttempt(msg);
     } finally {
       setSubmitting(false);
     }
