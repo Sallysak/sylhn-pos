@@ -1,53 +1,32 @@
 #!/bin/bash
-# SYLHN POS — Keep-alive wrapper for the Next.js dev server.
-# Restarts the server if it dies. Used for long-running preview sessions.
-# Also runs the Startup Guard to verify file integrity before starting.
+# SYLHN POS — Keep-Alive Server Loop
+#
+# This script runs as the FOREGROUND process (replacing `next dev` in package.json).
+# It starts the Next.js dev server in the foreground, and when the server dies
+# (killed by the sandbox OOM killer, signal, or crash), it immediately restarts it.
+#
+# This is the permanent fix for "sandbox is inactive" / 502 errors:
+# the `bun run dev` command now runs THIS script instead of `next dev` directly,
+# so the server is always restarted within 1-2 seconds of dying.
 cd /home/z/my-project
 
 LOG=/home/z/my-project/dev.log
-PIDFILE=/home/z/my-project/dev.pid
 
-# ===== Run Startup Guard — verify all critical files exist =====
-echo "Running Startup Guard..."
-node scripts/startup-guard.js
+echo "[KEEP-ALIVE] Starting permanent server loop..."
 
-# ===== Auto-restore if files are missing and a backup exists =====
-if [ -f "backups/manifest.json" ]; then
-  RESTORE_OUTPUT=$(node scripts/protection-snapshot.js --verify 2>&1)
-  if echo "$RESTORE_OUTPUT" | grep -q "MISSING"; then
-    echo ""
-    echo "⚠  CRITICAL: Missing files detected! Auto-restoring from backup..."
-    node scripts/protection-snapshot.js --restore
-    echo ""
-  fi
-fi
+while true; do
+  echo "[KEEP-ALIVE] [$(date '+%H:%M:%S')] Starting Next.js dev server..."
 
-# Kill any existing dev server
-if [ -f "$PIDFILE" ]; then
-  OLDPID=$(cat "$PIDFILE" 2>/dev/null)
-  if [ -n "$OLDPID" ] && kill -0 "$OLDPID" 2>/dev/null; then
-    kill "$OLDPID" 2>/dev/null
-    sleep 2
-  fi
-fi
-pkill -f "next dev -p 3000" 2>/dev/null
-pkill -f "next-server" 2>/dev/null
-sleep 1
+  # Run next dev in the FOREGROUND (not background) so this script blocks
+  # until the server exits. When it exits (crash/kill), the loop restarts it.
+  ./node_modules/.bin/next dev -p 3000 2>&1 | tee "$LOG"
 
-# Start the dev server in a new session, detached from this shell
-setsid bash -c './node_modules/.bin/next dev -p 3000 > '"$LOG"' 2>&1' < /dev/null &
-SRVPID=$!
-echo "$SRVPID" > "$PIDFILE"
-echo "Started dev server (session leader PID $SRVPID)"
+  EXIT_CODE=${PIPESTATUS[0]}
+  echo "[KEEP-ALIVE] [$(date '+%H:%M:%S')] Server exited with code $EXIT_CODE, restarting in 2s..."
 
-# Wait for it to be ready
-for i in {1..20}; do
-  if curl -sS -o /dev/null http://localhost:3000/ --max-time 3 2>/dev/null; then
-    echo "Server is ready on http://localhost:3000"
-    exit 0
-  fi
-  sleep 1
+  # Kill any stale processes before restarting
+  pkill -9 -f "next-server" 2>/dev/null
+  pkill -9 -f "next dev" 2>/dev/null
+
+  sleep 2
 done
-
-echo "Server did not become ready in 20s"
-exit 1
