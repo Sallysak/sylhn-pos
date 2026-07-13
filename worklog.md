@@ -2372,3 +2372,52 @@ Stage Summary:
 - Every API operation writes to the audit log with user, action, module, severity.
 - 6 new API routes added (customers, telephone-directory, stocktakes, shifts, supplier-payments, audit-logs).
 - Build passes, lint passes, TypeScript passes. Database seeded with relational demo data.
+
+---
+Task ID: mobile-compatibility-redo
+Agent: Main (Super Z)
+Task: Mobile View: Reconfigure the whole application to be compatible and fit well into mobile screens. Apply horizontal scroll across large forms that do not fit on mobile screens. (REDO — previous work was wiped during "restore broken software" phase)
+
+Work Log:
+- Discovered that all previous mobile compatibility work was lost: globals.css had reverted to defaults, popup-window.tsx had no mobile detection, no components had mobile-scroll-x wrappers, all fixed-width popups were back.
+- RESTORED src/app/globals.css with full mobile utility suite:
+  * body: overflow-x: hidden, -webkit-overflow-scrolling: touch, -webkit-text-size-adjust: 100%
+  * 100dvh fix for mobile browser address bar
+  * .scrollbar-thin (4px scrollbar, hidden on desktop)
+  * .mobile-scroll-x (horizontal scroll wrapper with 6px scrollbar, children get min-width: max-content)
+  * .mobile-no-shrink
+  * .scrollbar-hide
+  * Auto-detect wide CSS-grid tables on mobile (grid-cols-[...px...] gets min-width: max-content at <=768px)
+  * shadcn Dialog content → calc(100vw - 16px) at <=767px
+  * .sm:max-w-* overrides at <=767px
+  * input/select/textarea max-width: 100% at <=640px
+
+- RESTORED src/components/popup-window.tsx with mobile detection:
+  * Added useIsMobile() hook via matchMedia(max-width: 767px)
+  * Mobile render path: fixed inset-0 z-[100] full-screen overlay with 12px sticky title bar + scrollable content
+  * Desktop render path unchanged (draggable/resizable window)
+  * Affects 8 dependent components: purchase-menu, purchase-form, supplier-form, telephone-directory, add-telephone-form, stock-quantity-adjustment, stock-adjustment-form, quick-stock-adjustment
+
+- FIXED 19 fixed-width popup styles across 10 files via scripts/fix-mobile-widths.js:
+  * Replaced width: 'NNNpx' → width: '100%', maxWidth: 'NNNpx'
+  * Replaced maxHeight: 'NNNpx' (< 600) → maxHeight: '85vh'
+  * Added w-full className to popup motion.divs
+  * Files: page.tsx (2), purchase-order-list-popup (1), stock-quantity-adjustment (6), stock-management (2), stock-adjustment-form (3), sales-menu (1), quick-stock-adjustment (2), purchase-form (2), purchase-list-popup (1), supplier-form (3)
+
+- WRAPPED 24 tables in mobile-scroll-x across 9 files via scripts/wrap-tables.js:
+  * accounts-reports (12), financial-operations (2), admin-panel (2), sales-reports (2), sold-items-report (1), sales-menu (1), reports (1), maintenance-module (1), stock-management (2)
+
+- STACKED 2-col forms on mobile in 5 files:
+  * grid-cols-2 gap-X → grid-cols-1 sm:grid-cols-2 gap-X
+  * Files: financial-operations, stock-management, admin-panel, reports, maintenance-module
+
+- VERIFIED: npx next build → ✓ Compiled successfully, all 23 API routes present.
+
+Stage Summary:
+- All mobile compatibility work restored after being wiped.
+- PopupWindow renders full-screen on mobile (≤767px) — unblocks 8 dependent popup components.
+- All fixed-width popups now use width: 100% + maxWidth, fitting any screen.
+- All 24 React tables scroll horizontally inside mobile-scroll-x wrappers.
+- 2-col forms stack vertically on mobile.
+- shadcn Dialog modals auto-resize to calc(100vw - 16px) on mobile.
+- Build passes.

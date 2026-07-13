@@ -555,6 +555,7 @@ export function AdminPanel({ currentUser, onBack }: { currentUser: SystemUser; o
                     <button onClick={() => { setEditingUser(null); setShowUserForm(true); }} className="h-9 px-4 rounded-lg bg-gradient-to-r from-rose-600 to-pink-600 text-white text-sm font-bold flex items-center gap-1.5 shadow-md"><Plus className="h-4 w-4" /> Add User</button>
                   </div>
                   <div className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 overflow-hidden">
+                    <div className="mobile-scroll-x">
                     <table className="w-full text-sm">
                       <thead><tr className="bg-slate-800 text-white text-xs uppercase"><th className="text-left px-4 py-2.5">User</th><th className="text-left px-3 py-2.5">Role</th><th className="text-left px-3 py-2.5">Contact</th><th className="text-center px-3 py-2.5">Status</th><th className="text-center px-3 py-2.5">Last Login</th><th className="text-center px-4 py-2.5">Actions</th></tr></thead>
                       <tbody className="divide-y divide-slate-100">
@@ -574,6 +575,7 @@ export function AdminPanel({ currentUser, onBack }: { currentUser: SystemUser; o
                         ))}
                       </tbody>
                     </table>
+                    </div>
                   </div>
                 </div>
               )}
@@ -584,6 +586,7 @@ export function AdminPanel({ currentUser, onBack }: { currentUser: SystemUser; o
                   <div className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 overflow-hidden">
                     <div className="px-5 py-3 bg-blue-50 border-b border-blue-100"><span className="text-sm font-bold text-slate-700">Role Permissions Matrix</span></div>
                     <div className="overflow-auto" style={{ scrollbarWidth: 'thin' }}>
+                      <div className="mobile-scroll-x">
                       <table className="w-full text-sm">
                         <thead><tr className="bg-slate-800 text-white text-xs uppercase"><th className="text-left px-4 py-2.5 sticky left-0 bg-slate-800">Permission</th><th className="text-center px-3 py-2.5">Admin</th><th className="text-center px-3 py-2.5">Manager</th><th className="text-center px-3 py-2.5">Cashier</th><th className="text-center px-3 py-2.5">Stock Keeper</th><th className="text-center px-3 py-2.5">Accountant</th></tr></thead>
                         <tbody className="divide-y divide-slate-100">
@@ -623,6 +626,7 @@ export function AdminPanel({ currentUser, onBack }: { currentUser: SystemUser; o
                           })}
                         </tbody>
                       </table>
+                      </div>
                     </div>
                   </div>
                   <div className="bg-blue-50 rounded-xl p-4 ring-1 ring-blue-200 text-xs text-blue-700">
@@ -637,7 +641,7 @@ export function AdminPanel({ currentUser, onBack }: { currentUser: SystemUser; o
                   <div className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 overflow-hidden">
                     <div className="px-5 py-3 bg-amber-50 border-b border-amber-100"><span className="text-sm font-bold text-slate-700">System Configuration</span></div>
                     <div className="p-5 space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div><label className="text-xs font-semibold text-slate-600 mb-1 block">Company Name</label><input value={settings.companyName} onChange={(e) => setSettings({ ...settings, companyName: e.target.value })} className="w-full h-10 px-3 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-amber-400 text-sm" /></div>
                         <div><label className="text-xs font-semibold text-slate-600 mb-1 block">Currency Symbol</label><input value={settings.currency} onChange={(e) => setSettings({ ...settings, currency: e.target.value })} className="w-full h-10 px-3 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-amber-400 text-sm" /></div>
                         <div><label className="text-xs font-semibold text-slate-600 mb-1 block">Tax Rate (%)</label><input type="number" value={settings.taxRate} onChange={(e) => setSettings({ ...settings, taxRate: parseFloat(e.target.value) || 0 })} className="w-full h-10 px-3 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-amber-400 text-sm font-mono" /></div>
@@ -738,7 +742,7 @@ function UserFormModal({ user, onSave, onClose }: { user: SystemUser | null; onS
       <motion.div initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }} onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col" style={{ maxHeight: '90vh' }}>
         <div className="flex-shrink-0 flex items-center justify-between px-6 py-4 bg-gradient-to-r from-rose-600 to-pink-600 text-white"><h3 className="text-lg font-bold">{user ? 'Edit User' : 'Add User'}</h3><button onClick={onClose} className="h-8 w-8 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center"><X className="h-4 w-4" /></button></div>
         <div className="flex-1 overflow-y-auto p-6 space-y-4" style={{ scrollbarWidth: 'thin' }}>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div><label className="text-xs font-semibold text-slate-600 mb-1 block">Full Name</label><input value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} className="w-full h-10 px-3 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-rose-400 text-sm" /></div>
             <div><label className="text-xs font-semibold text-slate-600 mb-1 block">Username</label><input value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} className="w-full h-10 px-3 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-rose-400 text-sm font-mono" /></div>
             <div><label className="text-xs font-semibold text-slate-600 mb-1 block">Password</label><input value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="w-full h-10 px-3 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-rose-400 text-sm font-mono" /></div>

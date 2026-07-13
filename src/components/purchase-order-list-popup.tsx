@@ -350,7 +350,7 @@ export function PurchaseOrderListPopup({
           exit={{ scale: 0.95, y: 20 }}
           onClick={(e) => e.stopPropagation()}
           className="rounded-lg shadow-2xl overflow-hidden flex flex-col"
-          style={{ width: '900px', height: '560px', maxHeight: '90vh', fontFamily: 'Arial, Helvetica, sans-serif' }}
+          style={{ width: '100%', maxWidth: '900px', maxHeight: '90vh', fontFamily: 'Arial, Helvetica, sans-serif' }}
         >
           {/* Title Bar */}
           <div className="flex-shrink-0 flex items-center justify-between px-3 h-7 text-white" style={{ backgroundColor: GREEN_HEADER }}>

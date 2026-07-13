@@ -2328,7 +2328,7 @@ function StockListPopup({ products, searchText, onSelect, onClose, onNew }: {
         transition={{ type: "spring", damping: 25, stiffness: 300 }}
         onClick={(e) => e.stopPropagation()}
         className="bg-white rounded-lg shadow-2xl overflow-hidden flex flex-col"
-        style={{ width: '700px', maxHeight: '450px', fontFamily: 'Arial, Helvetica, sans-serif' }}
+        style={{ width: '100%', maxWidth: '700px', maxHeight: '85vh', fontFamily: 'Arial, Helvetica, sans-serif' }}
       >
         {/* Title Bar */}
         <div className="flex-shrink-0 flex items-center justify-between px-3 h-7 text-white" style={{ backgroundColor: '#5B9BD5' }}>

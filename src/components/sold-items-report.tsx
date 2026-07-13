@@ -284,6 +284,7 @@ export function SoldItemsReport({ onBack }: SoldItemsReportProps) {
 
           {/* Report Table — grouped by category */}
           <div className="px-8 pb-6">
+            <div className="mobile-scroll-x">
             <table className="w-full text-xs" style={{ borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ backgroundColor: '#E6F2FF' }}>
@@ -312,6 +313,7 @@ export function SoldItemsReport({ onBack }: SoldItemsReportProps) {
                 </tfoot>
               )}
             </table>
+            </div>
           </div>
         </div>
       </div>

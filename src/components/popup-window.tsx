@@ -20,6 +20,22 @@ interface PopupWindowProps {
 
 type WindowState = "normal" | "maximized" | "minimized";
 
+/** Mobile breakpoint — below this width, render as full-screen overlay. */
+const MOBILE_BREAKPOINT = 768;
+
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`);
+    const update = () => setIsMobile(mql.matches);
+    update();
+    mql.addEventListener("change", update);
+    return () => mql.removeEventListener("change", update);
+  }, []);
+  return isMobile;
+}
+
 export function PopupWindow({
   title,
   titleBarColor = "#5B9BD5",
@@ -32,6 +48,7 @@ export function PopupWindow({
   minWidth = 500,
   minHeight = 350,
 }: PopupWindowProps) {
+  const isMobile = useIsMobile();
   const [windowState, setWindowState] = useState<WindowState>("normal");
   const [position, setPosition] = useState({ x: initialX ?? -1, y: initialY ?? -1 });
   const [size, setSize] = useState({ width: initialWidth, height: initialHeight });
@@ -120,6 +137,42 @@ export function PopupWindow({
   const toggleMinimize = () => {
     setWindowState(prev => prev === "minimized" ? "normal" : "minimized");
   };
+
+  // ============ MOBILE RENDER PATH ============
+  // On mobile, render a full-screen overlay with a sticky title bar + scrollable content.
+  // No dragging or resizing — that desktop UX doesn't work on touch.
+  if (isMobile) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 12 }}
+        transition={{ duration: 0.18 }}
+        className="fixed inset-0 z-[100] flex flex-col bg-white"
+        style={{ paddingTop: "env(safe-area-inset-top)" }}
+      >
+        <div
+          className="flex items-center justify-between flex-shrink-0 h-12 px-3 text-white select-none"
+          style={{ backgroundColor: titleBarColor }}
+        >
+          <div className="flex items-center gap-2 text-sm font-bold min-w-0">
+            <span className="truncate">{title}</span>
+          </div>
+          <button
+            onClick={onClose}
+            className="h-9 w-9 hover:bg-white/25 active:bg-white/35 flex items-center justify-center text-white transition rounded-md flex-shrink-0"
+            title="Close"
+            aria-label="Close"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 overscroll-contain">
+          {children}
+        </div>
+      </motion.div>
+    );
+  }
 
   if (windowState === "minimized") {
     return (

@@ -338,6 +338,7 @@ export function FinancialOperations({ onBack, dailyTotal, initialTab = "expenses
                 {/* Expenses table */}
                 <div className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 overflow-hidden">
                   <div className="max-h-80 overflow-auto" style={{ scrollbarWidth: 'thin' }}>
+                    <div className="mobile-scroll-x">
                     <table className="w-full text-sm">
                       <thead className="sticky top-0"><tr className="bg-slate-800 text-white text-xs uppercase"><th className="text-left px-4 py-2">Date</th><th className="text-left px-3 py-2">Category</th><th className="text-left px-3 py-2">Description</th><th className="text-left px-3 py-2">Vendor</th><th className="text-left px-3 py-2">Payment</th><th className="text-right px-3 py-2">Amount</th><th className="text-center px-4 py-2">Actions</th></tr></thead>
                       <tbody className="divide-y divide-slate-100">
@@ -359,6 +360,7 @@ export function FinancialOperations({ onBack, dailyTotal, initialTab = "expenses
                         <tfoot><tr className="bg-slate-100 font-bold"><td colSpan={5} className="px-4 py-3 text-slate-800">Total Expenses</td><td className="px-3 py-3 text-right font-mono text-rose-700 text-base">{formatGHS(expenseStats.total)}</td><td></td></tr></tfoot>
                       )}
                     </table>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -367,7 +369,7 @@ export function FinancialOperations({ onBack, dailyTotal, initialTab = "expenses
             {/* ===== CASH RECONCILIATION TAB ===== */}
             {tab === 'cash-recon' && (
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   {/* Left: Denomination counter */}
                   <div className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 overflow-hidden">
                     <div className="px-5 py-3 bg-emerald-50 border-b border-emerald-100"><span className="text-sm font-bold text-slate-700">Cash Count</span></div>
@@ -457,6 +459,7 @@ export function FinancialOperations({ onBack, dailyTotal, initialTab = "expenses
                 {/* Transactions table */}
                 <div className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 overflow-hidden">
                   <div className="max-h-80 overflow-auto" style={{ scrollbarWidth: 'thin' }}>
+                    <div className="mobile-scroll-x">
                     <table className="w-full text-sm">
                       <thead className="sticky top-0"><tr className="bg-slate-800 text-white text-xs uppercase"><th className="text-left px-4 py-2">Date</th><th className="text-left px-3 py-2">Provider</th><th className="text-left px-3 py-2">Type</th><th className="text-left px-3 py-2">Transaction ID</th><th className="text-left px-3 py-2">Customer</th><th className="text-right px-3 py-2">Amount</th></tr></thead>
                       <tbody className="divide-y divide-slate-100">
@@ -477,6 +480,7 @@ export function FinancialOperations({ onBack, dailyTotal, initialTab = "expenses
                         })}
                       </tbody>
                     </table>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -513,13 +517,13 @@ function ExpenseFormModal({ expense, onSave, onClose }: { expense: Expense | nul
       <motion.div initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }} onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-rose-600 to-pink-600 text-white"><h3 className="text-lg font-bold">{expense ? 'Edit Expense' : 'Record Expense'}</h3><button onClick={onClose} className="h-8 w-8 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center"><X className="h-4 w-4" /></button></div>
         <div className="p-6 space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div><label className="text-xs font-semibold text-slate-600 mb-1 block">Date</label><input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} className="w-full h-10 px-3 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-rose-400 text-sm" /></div>
             <div><label className="text-xs font-semibold text-slate-600 mb-1 block">Amount (GHC)</label><input type="number" step="0.01" value={form.amount || ''} onChange={(e) => setForm({ ...form, amount: parseFloat(e.target.value) || 0 })} className="w-full h-10 px-3 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-rose-400 text-sm font-mono" /></div>
           </div>
           <div><label className="text-xs font-semibold text-slate-600 mb-1 block">Category</label><select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="w-full h-10 px-3 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-rose-400 text-sm">{EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
           <div><label className="text-xs font-semibold text-slate-600 mb-1 block">Description</label><input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="What was this expense for?" className="w-full h-10 px-3 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-rose-400 text-sm" /></div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div><label className="text-xs font-semibold text-slate-600 mb-1 block">Payment Method</label><select value={form.paymentMethod} onChange={(e) => setForm({ ...form, paymentMethod: e.target.value })} className="w-full h-10 px-3 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-rose-400 text-sm">{['Cash', 'MTN MoMo', 'Vodafone Cash', 'AirtelTigo Money', 'Bank Transfer', 'Cheque'].map(m => <option key={m} value={m}>{m}</option>)}</select></div>
             <div><label className="text-xs font-semibold text-slate-600 mb-1 block">Vendor / Payee</label><input value={form.vendor} onChange={(e) => setForm({ ...form, vendor: e.target.value })} placeholder="Who was paid?" className="w-full h-10 px-3 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-rose-400 text-sm" /></div>
           </div>
@@ -543,7 +547,7 @@ function MomoFormModal({ onSave, onClose }: { onSave: (t: MobileMoneyTransaction
       <motion.div initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }} onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-amber-500 to-orange-500 text-white"><h3 className="text-lg font-bold">Record MoMo Transaction</h3><button onClick={onClose} className="h-8 w-8 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center"><X className="h-4 w-4" /></button></div>
         <div className="p-6 space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div><label className="text-xs font-semibold text-slate-600 mb-1 block">Provider</label><select value={form.provider} onChange={(e) => setForm({ ...form, provider: e.target.value })} className="w-full h-10 px-3 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-amber-400 text-sm">{MOMO_PROVIDERS.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
             <div><label className="text-xs font-semibold text-slate-600 mb-1 block">Type</label><select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as any })} className="w-full h-10 px-3 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-amber-400 text-sm"><option value="received">Received (Payment)</option><option value="sent">Sent (Withdrawal)</option><option value="float">Float Top-up</option></select></div>
           </div>

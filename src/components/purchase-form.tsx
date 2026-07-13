@@ -807,7 +807,7 @@ function StockListMiniPopup({ products, searchText, onSelect, onClose }: {
       className="fixed inset-0 bg-black/40 flex items-start justify-center pt-20 z-50" onClick={onClose}>
       <motion.div initial={{ scale: 0.95, y: -20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: -20 }}
         transition={{ type: "spring", damping: 25, stiffness: 300 }} onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-lg shadow-2xl overflow-hidden flex flex-col" style={{ width: '650px', maxHeight: '400px', fontFamily: 'Arial, Helvetica, sans-serif' }}>
+        className="w-full bg-white rounded-lg shadow-2xl overflow-hidden flex flex-col" style={{ width: '100%', maxWidth: '650px', maxHeight: '85vh', fontFamily: 'Arial, Helvetica, sans-serif' }}>
         <div className="flex-shrink-0 flex items-center justify-between px-3 h-7 text-white" style={{ backgroundColor: '#5B9BD5' }}>
           <span className="text-xs font-bold">Stock List</span>
           <button onClick={onClose} className="h-5 w-5 rounded hover:bg-white/25 flex items-center justify-center transition"><X className="h-3.5 w-3.5" /></button>

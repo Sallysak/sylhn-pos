@@ -614,7 +614,7 @@ function QuickAdjustStockSearch({
         exit={{ scale: 0.95, y: -20 }}
         onClick={(e) => e.stopPropagation()}
         className="rounded-lg shadow-2xl overflow-hidden flex flex-col"
-        style={{ width: '680px', maxHeight: '480px', fontFamily: 'Arial, Helvetica, sans-serif' }}
+        style={{ width: '100%', maxWidth: '680px', maxHeight: '85vh', fontFamily: 'Arial, Helvetica, sans-serif' }}
       >
         {/* Title bar */}
         <div className="flex-shrink-0 flex items-center justify-between px-3 h-7 text-white" style={{ backgroundColor: '#059669' }}>

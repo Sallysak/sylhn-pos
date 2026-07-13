@@ -558,6 +558,7 @@ function AddModifyStock({ products, setProducts, groups, setHistory }: {
 
       {/* Table */}
       <div className="flex-1 overflow-auto min-h-0" style={{ scrollbarWidth: 'thin' }}>
+        <div className="mobile-scroll-x">
         <table className="w-full text-sm">
           <thead className="sticky top-0 bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs uppercase tracking-wide z-10 shadow-md">
             <tr>
@@ -634,6 +635,7 @@ function AddModifyStock({ products, setProducts, groups, setHistory }: {
             })}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* Form Modal */}
@@ -703,7 +705,7 @@ function ProductForm({ product, groups, onSave, onClose }: {
         </div>
 
         <ScrollArea className="flex-1">
-          <div className="p-6 grid grid-cols-2 gap-4">
+          <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FormField label="Product Name" icon={<Tag className="h-3.5 w-3.5" />} full>
               <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="form-input" placeholder="e.g. Fresh Tomatoes" />
             </FormField>
@@ -1252,7 +1254,7 @@ function GroupForm({ group, onSave, onClose }: {
           </div>
 
           {/* Icon + Color side by side */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1.5 block">Icon</label>
               <button
@@ -2223,7 +2225,7 @@ function StockSearchView({ products, groups, history }: {
                   <div className="font-bold text-slate-800 text-lg">{selectedProduct.name}</div>
                   <div className="text-xs text-slate-400 font-mono">{selectedProduct.sku}</div>
                 </div>
-                <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                   <DetailRow label="Part No." value={selectedProduct.barcode} />
                   <DetailRow label="Group" value={groups.find(g => g.id === selectedProduct.groupId)?.name || '-'} />
                   <DetailRow label="Retail GHC" value={selectedProduct.price.toFixed(2)} highlight />
@@ -2814,7 +2816,7 @@ export function StockQtyReportModal({ products, groups, onClose }: {
               </FormRow>
 
               {/* From / To Part No. */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormRow label="From Part No.">
                   <input value={fromPartNo} onChange={(e) => setFromPartNo(e.target.value)} placeholder="e.g. 941563812092" className="qty-form-input" />
                 </FormRow>
@@ -2886,7 +2888,7 @@ export function StockQtyReportModal({ products, groups, onClose }: {
               </FormRow>
 
               {/* Checkboxes */}
-              <div className="grid grid-cols-2 gap-3 pt-2 border-t border-emerald-200/50 mt-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-emerald-200/50 mt-3">
                 <CheckboxRow label="Consignment Out" checked={consignmentOut} onChange={setConsignmentOut} />
                 <CheckboxRow label="Consignment In" checked={consignmentIn} onChange={setConsignmentIn} />
                 <CheckboxRow label="Include Zero Qty" checked={includeZeroQty} onChange={setIncludeZeroQty} />
@@ -3026,6 +3028,7 @@ function QtyReportViewer({ report, onClose }: { report: ReportData; onClose: () 
 
         {/* Table */}
         <ScrollArea className="flex-1 min-h-0">
+          <div className="mobile-scroll-x">
           <table className="w-full text-xs">
             <thead className="sticky top-0 bg-slate-700 text-white text-[10px] uppercase tracking-wide z-10">
               <tr>
@@ -3052,6 +3055,7 @@ function QtyReportViewer({ report, onClose }: { report: ReportData; onClose: () 
               ))}
             </tbody>
           </table>
+          </div>
         </ScrollArea>
 
         {/* Summary */}
@@ -3819,7 +3823,7 @@ function StocktakeDashboard({
         exit={{ scale: 0.95, y: 20 }}
         onClick={(e) => e.stopPropagation()}
         className="bg-white rounded-lg shadow-2xl overflow-hidden flex flex-col"
-        style={{ width: '720px', maxHeight: '85vh', fontFamily: 'Arial, Helvetica, sans-serif' }}
+        style={{ width: '100%', maxWidth: '720px', maxHeight: '85vh', fontFamily: 'Arial, Helvetica, sans-serif' }}
       >
         {/* Title bar */}
         <div className="flex-shrink-0 flex items-center justify-between px-4 h-9 text-white" style={{ background: 'linear-gradient(to right, #7C3AED, #DB2777)' }}>
@@ -4768,7 +4772,7 @@ function ProductVarianceDrillDown({
         exit={{ scale: 0.95, y: 20 }}
         onClick={(e) => e.stopPropagation()}
         className="bg-white rounded-lg shadow-2xl overflow-hidden flex flex-col"
-        style={{ width: '680px', maxHeight: '85vh', fontFamily: 'Arial, Helvetica, sans-serif' }}
+        style={{ width: '100%', maxWidth: '680px', maxHeight: '85vh', fontFamily: 'Arial, Helvetica, sans-serif' }}
       >
         {/* Title bar */}
         <div className="flex-shrink-0 flex items-center justify-between px-4 h-9 text-white" style={{ background: 'linear-gradient(to right, #B45309, #D97706)' }}>

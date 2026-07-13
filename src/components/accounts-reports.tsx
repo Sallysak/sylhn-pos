@@ -502,6 +502,7 @@ export function AccountsReports({ onBack, products, groups, history, dailyTotal,
                 </div>
                 <div className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 overflow-hidden">
                   <div className="px-5 py-3 bg-slate-50 border-b border-slate-200"><span className="text-sm font-bold text-slate-700">Sales Summary</span></div>
+                  <div className="mobile-scroll-x">
                   <table className="w-full text-sm">
                     <thead><tr className="bg-slate-100 text-xs uppercase text-slate-600"><th className="text-left px-4 py-2 font-semibold">Metric</th><th className="text-right px-4 py-2 font-semibold">Amount (GHC)</th></tr></thead>
                     <tbody className="divide-y divide-slate-100">
@@ -511,6 +512,7 @@ export function AccountsReports({ onBack, products, groups, history, dailyTotal,
                       <tr className="bg-slate-50"><td className="px-4 py-3 font-bold text-slate-800">Net Profit</td><td className="px-4 py-3 text-right font-mono font-bold text-blue-700 text-base">{formatGHS(dailySalesData.grossProfit)}</td></tr>
                     </tbody>
                   </table>
+                  </div>
                 </div>
               </div>
             )}
@@ -528,6 +530,7 @@ export function AccountsReports({ onBack, products, groups, history, dailyTotal,
                 <div className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 overflow-hidden">
                   <div className="px-5 py-3 bg-emerald-50 border-b border-emerald-100"><span className="text-sm font-bold text-slate-700">Daily Sales Detail ({dailySalesDetail.length} line items)</span></div>
                   <div className="max-h-96 overflow-auto" style={{ scrollbarWidth: 'thin' }}>
+                    <div className="mobile-scroll-x">
                     <table className="w-full text-sm">
                       <thead className="sticky top-0"><tr className="bg-slate-800 text-white text-xs uppercase"><th className="text-left px-3 py-2">Date</th><th className="text-left px-2 py-2">Time</th><th className="text-left px-2 py-2">Part No</th><th className="text-left px-3 py-2">Description</th><th className="text-center px-2 py-2">Qty</th><th className="text-right px-3 py-2">Price</th><th className="text-right px-3 py-2">Amount</th><th className="text-left px-3 py-2">Ref</th></tr></thead>
                       <tbody className="divide-y divide-slate-100">
@@ -548,6 +551,7 @@ export function AccountsReports({ onBack, products, groups, history, dailyTotal,
                         <tfoot><tr className="bg-slate-100 font-bold"><td colSpan={4} className="px-3 py-3 text-slate-800">TOTALS</td><td className="px-2 py-3 text-center font-mono">{dailyDetailStats.totalQty}</td><td></td><td className="px-3 py-3 text-right font-mono text-emerald-700 text-base">{formatGHS(dailyDetailStats.totalAmount)}</td><td></td></tr></tfoot>
                       )}
                     </table>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -564,6 +568,7 @@ export function AccountsReports({ onBack, products, groups, history, dailyTotal,
                 </div>
                 <div className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 overflow-hidden">
                   <div className="px-5 py-3 bg-blue-50 border-b border-blue-100"><span className="text-sm font-bold text-slate-700">Monthly Sales Summary ({monthlySummary.length} months)</span></div>
+                  <div className="mobile-scroll-x">
                   <table className="w-full text-sm">
                     <thead><tr className="bg-slate-800 text-white text-xs uppercase"><th className="text-left px-4 py-2">Month</th><th className="text-center px-3 py-2">Transactions</th><th className="text-center px-3 py-2">Items Sold</th><th className="text-right px-3 py-2">Revenue</th><th className="text-right px-3 py-2">Cost</th><th className="text-right px-3 py-2">Profit</th><th className="text-right px-3 py-2">VAT</th><th className="text-right px-4 py-2">Margin %</th></tr></thead>
                     <tbody className="divide-y divide-slate-100">
@@ -596,6 +601,7 @@ export function AccountsReports({ onBack, products, groups, history, dailyTotal,
                       </tr></tfoot>
                     )}
                   </table>
+                  </div>
                 </div>
               </div>
             )}
@@ -612,6 +618,7 @@ export function AccountsReports({ onBack, products, groups, history, dailyTotal,
                           <span className="text-sm font-bold text-slate-700">{m.label}</span>
                           <span className="text-xs text-slate-500">{m.rows.length} items · <span className="font-mono font-bold text-emerald-600">{formatGHS(m.totals.amount)}</span></span>
                         </div>
+                        <div className="mobile-scroll-x">
                         <table className="w-full text-xs">
                           <thead><tr className="bg-slate-50 text-slate-500 text-[10px] uppercase"><th className="text-left px-3 py-1.5">Date</th><th className="text-left px-2 py-1.5">Part No</th><th className="text-left px-3 py-1.5">Description</th><th className="text-center px-2 py-1.5">Qty</th><th className="text-right px-3 py-1.5">Price</th><th className="text-right px-3 py-1.5">Amount</th></tr></thead>
                           <tbody className="divide-y divide-slate-50">
@@ -628,6 +635,7 @@ export function AccountsReports({ onBack, products, groups, history, dailyTotal,
                           </tbody>
                           <tfoot><tr className="bg-slate-100 font-bold"><td colSpan={3} className="px-3 py-2 text-slate-700">Month Total</td><td className="px-2 py-2 text-center font-mono">{m.totals.qty}</td><td></td><td className="px-3 py-2 text-right font-mono text-emerald-700">{formatGHS(m.totals.amount)}</td></tr></tfoot>
                         </table>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -640,6 +648,7 @@ export function AccountsReports({ onBack, products, groups, history, dailyTotal,
               <div className="space-y-4">
                 <div className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 overflow-hidden">
                   <div className="px-5 py-3 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-slate-200"><span className="text-sm font-bold text-slate-700">Profit & Loss Statement</span></div>
+                  <div className="mobile-scroll-x">
                   <table className="w-full text-sm">
                     <tbody className="divide-y divide-slate-100">
                       <tr><td className="px-5 py-3 font-bold text-slate-700 bg-slate-50" colSpan={2}>Revenue</td></tr>
@@ -653,6 +662,7 @@ export function AccountsReports({ onBack, products, groups, history, dailyTotal,
                       <tr><td className="px-5 py-2.5 text-slate-500 italic">Profit Margin</td><td className="px-5 py-2.5 text-right font-mono text-slate-500">{pnlData.margin.toFixed(1)}%</td></tr>
                     </tbody>
                   </table>
+                  </div>
                 </div>
               </div>
             )}
@@ -667,6 +677,7 @@ export function AccountsReports({ onBack, products, groups, history, dailyTotal,
                 </div>
                 <div className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 overflow-hidden">
                   <div className="px-5 py-3 bg-amber-50 border-b border-amber-100"><span className="text-sm font-bold text-slate-700">VAT Breakdown</span></div>
+                  <div className="mobile-scroll-x">
                   <table className="w-full text-sm">
                     <thead><tr className="bg-slate-100 text-xs uppercase text-slate-600"><th className="text-left px-4 py-2">Category</th><th className="text-center px-4 py-2">Items</th><th className="text-right px-4 py-2">Revenue</th><th className="text-right px-4 py-2">VAT Rate</th><th className="text-right px-4 py-2">VAT Amount</th></tr></thead>
                     <tbody className="divide-y divide-slate-100">
@@ -675,6 +686,7 @@ export function AccountsReports({ onBack, products, groups, history, dailyTotal,
                       <tr className="bg-slate-50 font-bold"><td className="px-4 py-3 text-slate-800">Total</td><td className="px-4 py-3 text-center font-mono">{vatData.taxableCount + vatData.nonTaxableCount}</td><td className="px-4 py-3 text-right font-mono text-slate-800">{formatGHS(vatData.taxableRevenue + vatData.nonTaxableRevenue)}</td><td className="px-4 py-3"></td><td className="px-4 py-3 text-right font-mono text-amber-700">{formatGHS(vatData.vatCollected)}</td></tr>
                     </tbody>
                   </table>
+                  </div>
                 </div>
               </div>
             )}
@@ -690,6 +702,7 @@ export function AccountsReports({ onBack, products, groups, history, dailyTotal,
                 <div className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 overflow-hidden">
                   <div className="px-5 py-3 bg-cyan-50 border-b border-cyan-100"><span className="text-sm font-bold text-slate-700">Stock Value by Product ({products.length} items)</span></div>
                   <div className="max-h-96 overflow-auto" style={{ scrollbarWidth: 'thin' }}>
+                    <div className="mobile-scroll-x">
                     <table className="w-full text-sm">
                       <thead className="sticky top-0"><tr className="bg-slate-800 text-white text-xs uppercase"><th className="text-left px-4 py-2">Product</th><th className="text-center px-3 py-2">Stock</th><th className="text-right px-3 py-2">Cost</th><th className="text-right px-3 py-2">Price</th><th className="text-right px-4 py-2">Stock Value</th></tr></thead>
                       <tbody className="divide-y divide-slate-100">
@@ -699,6 +712,7 @@ export function AccountsReports({ onBack, products, groups, history, dailyTotal,
                       </tbody>
                       <tfoot><tr className="bg-slate-100 font-bold"><td className="px-4 py-3 text-slate-800" colSpan={4}>Total Stock Value</td><td className="px-4 py-3 text-right font-mono text-cyan-700 text-base">{formatGHS(stockValue)}</td></tr></tfoot>
                     </table>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -710,6 +724,7 @@ export function AccountsReports({ onBack, products, groups, history, dailyTotal,
                 <div className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 overflow-hidden">
                   <div className="px-5 py-3 bg-purple-50 border-b border-purple-100"><span className="text-sm font-bold text-slate-700">Cost Price Analysis ({products.length} products)</span></div>
                   <div className="max-h-96 overflow-auto" style={{ scrollbarWidth: 'thin' }}>
+                    <div className="mobile-scroll-x">
                     <table className="w-full text-sm">
                       <thead className="sticky top-0"><tr className="bg-slate-800 text-white text-xs uppercase"><th className="text-left px-4 py-2">Product</th><th className="text-right px-3 py-2">Cost</th><th className="text-right px-3 py-2">Price</th><th className="text-right px-3 py-2">Markup</th><th className="text-right px-3 py-2">Margin %</th><th className="text-right px-4 py-2">Profit/Unit</th></tr></thead>
                       <tbody className="divide-y divide-slate-100">
@@ -722,6 +737,7 @@ export function AccountsReports({ onBack, products, groups, history, dailyTotal,
                         })}
                       </tbody>
                     </table>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -733,6 +749,7 @@ export function AccountsReports({ onBack, products, groups, history, dailyTotal,
                 <div className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 overflow-hidden">
                   <div className="px-5 py-3 bg-rose-50 border-b border-rose-100"><span className="text-sm font-bold text-slate-700">Top 20 Products by Revenue</span></div>
                   <div className="max-h-96 overflow-auto" style={{ scrollbarWidth: 'thin' }}>
+                    <div className="mobile-scroll-x">
                     <table className="w-full text-sm">
                       <thead className="sticky top-0"><tr className="bg-slate-800 text-white text-xs uppercase"><th className="text-left px-4 py-2">#</th><th className="text-left px-3 py-2">Product</th><th className="text-center px-3 py-2">Sold</th><th className="text-right px-3 py-2">Revenue</th><th className="text-right px-3 py-2">Cost</th><th className="text-right px-3 py-2">Profit</th><th className="text-center px-4 py-2">Turnover</th></tr></thead>
                       <tbody className="divide-y divide-slate-100">
@@ -741,6 +758,7 @@ export function AccountsReports({ onBack, products, groups, history, dailyTotal,
                         ))}
                       </tbody>
                     </table>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -759,6 +777,7 @@ export function AccountsReports({ onBack, products, groups, history, dailyTotal,
                 {/* Group table */}
                 <div className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 overflow-hidden">
                   <div className="px-5 py-3 bg-indigo-50 border-b border-indigo-100"><span className="text-sm font-bold text-slate-700">Stock Group Analysis ({stockGroupData.length} groups)</span></div>
+                  <div className="mobile-scroll-x">
                   <table className="w-full text-sm">
                     <thead><tr className="bg-slate-800 text-white text-xs uppercase"><th className="text-left px-4 py-2">Group</th><th className="text-center px-3 py-2">Items</th><th className="text-center px-3 py-2">Stock</th><th className="text-center px-3 py-2">Low</th><th className="text-center px-3 py-2">Out</th><th className="text-right px-3 py-2">Stock Cost</th><th className="text-right px-3 py-2">Stock Value</th><th className="text-right px-4 py-2">Profit</th></tr></thead>
                     <tbody className="divide-y divide-slate-100">
@@ -788,6 +807,7 @@ export function AccountsReports({ onBack, products, groups, history, dailyTotal,
                       </tr>
                     </tfoot>
                   </table>
+                  </div>
                 </div>
               </div>
             )}
@@ -798,6 +818,7 @@ export function AccountsReports({ onBack, products, groups, history, dailyTotal,
                 <div className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 overflow-hidden">
                   <div className="px-5 py-3 bg-indigo-50 border-b border-indigo-100 flex items-center justify-between"><span className="text-sm font-bold text-slate-700">General Ledger ({ledgerEntries.length} entries)</span></div>
                   <div className="max-h-96 overflow-auto" style={{ scrollbarWidth: 'thin' }}>
+                    <div className="mobile-scroll-x">
                     <table className="w-full text-sm">
                       <thead className="sticky top-0"><tr className="bg-slate-800 text-white text-xs uppercase"><th className="text-left px-4 py-2">Date</th><th className="text-left px-3 py-2">Account</th><th className="text-left px-3 py-2">Description</th><th className="text-left px-3 py-2">Ref</th><th className="text-right px-3 py-2">Debit</th><th className="text-right px-4 py-2">Credit</th></tr></thead>
                       <tbody className="divide-y divide-slate-100">
@@ -806,6 +827,7 @@ export function AccountsReports({ onBack, products, groups, history, dailyTotal,
                         ))}
                       </tbody>
                     </table>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -816,6 +838,7 @@ export function AccountsReports({ onBack, products, groups, history, dailyTotal,
               <div className="space-y-4">
                 <div className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 overflow-hidden">
                   <div className="px-5 py-3 bg-teal-50 border-b border-teal-100"><span className="text-sm font-bold text-slate-700">Trial Balance</span></div>
+                  <div className="mobile-scroll-x">
                   <table className="w-full text-sm">
                     <thead><tr className="bg-slate-800 text-white text-xs uppercase"><th className="text-left px-4 py-2">Account</th><th className="text-right px-4 py-2">Debit (GHC)</th><th className="text-right px-4 py-2">Credit (GHC)</th></tr></thead>
                     <tbody className="divide-y divide-slate-100">
@@ -828,6 +851,7 @@ export function AccountsReports({ onBack, products, groups, history, dailyTotal,
                       <tr><td className="px-4 py-2 text-xs text-slate-400 italic" colSpan={3}>{trialBalance.totalDebit === trialBalance.totalCredit ? '✓ Balanced' : '⚠ Not balanced — check entries'}</td></tr>
                     </tfoot>
                   </table>
+                  </div>
                 </div>
               </div>
             )}

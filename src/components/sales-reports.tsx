@@ -150,11 +150,13 @@ export function DailySalesReport({ onBack, dailyTotal, transactionCount }: { onB
               <div className="bg-slate-50 rounded-lg p-2 text-center"><div className="text-[9px] text-slate-500 uppercase">Card</div><div className="text-sm font-bold text-slate-700 font-mono">{totals.card.toFixed(2)}</div></div>
               <div className="bg-slate-50 rounded-lg p-2 text-center"><div className="text-[9px] text-slate-500 uppercase">MoMo</div><div className="text-sm font-bold text-slate-700 font-mono">{totals.momo.toFixed(2)}</div></div>
             </div>
+            <div className="mobile-scroll-x">
             <table className="w-full text-[10px]" style={{ borderCollapse: 'collapse' }}>
               <thead><tr style={{ backgroundColor: '#E6E6FA' }}><th className="px-2 py-1.5 text-left font-bold border border-slate-400">Time</th><th className="px-2 py-1.5 text-left font-bold border border-slate-400">Invoice</th><th className="px-2 py-1.5 text-left font-bold border border-slate-400">Customer</th><th className="px-2 py-1.5 text-right font-bold border border-slate-400">Items</th><th className="px-2 py-1.5 text-center font-bold border border-slate-400">Method</th><th className="px-2 py-1.5 text-right font-bold border border-slate-400">Total GHC</th></tr></thead>
               <tbody>{filtered.map((t, i) => (<tr key={t.id} style={{ backgroundColor: i % 2 === 1 ? '#F8F8F8' : '#FFFFFF' }}><td className="px-2 py-1 border border-slate-400">{t.time}</td><td className="px-2 py-1 border border-slate-400 font-mono">{t.invoiceNo}</td><td className="px-2 py-1 border border-slate-400">{t.customer}</td><td className="px-2 py-1 text-right border border-slate-400">{t.items}</td><td className="px-2 py-1 text-center border border-slate-400">{t.method}</td><td className="px-2 py-1 text-right font-semibold border border-slate-400">{t.total.toFixed(2)}</td></tr>))}</tbody>
               <tfoot><tr style={{ backgroundColor: '#E6E6FA' }}><td colSpan={3} className="px-2 py-1.5 font-bold text-slate-900 border border-slate-400">TOTAL</td><td className="px-2 py-1.5 text-right font-bold text-slate-900 border border-slate-400">{totals.items}</td><td className="px-2 py-1.5 border border-slate-400"></td><td className="px-2 py-1.5 text-right font-bold text-slate-900 border border-slate-400">{totals.total.toFixed(2)}</td></tr></tfoot>
             </table>
+            </div>
           </div>
           <div className="px-6 py-2 border-t border-slate-200 text-center text-[9px] text-slate-400">{COMPANY.name} · {COMPANY.address} · {COMPANY.contact} · Generated: {dateStr} {timeStr}</div>
         </div>
@@ -248,12 +250,14 @@ export function SalesHistory({ onBack }: { onBack: () => void }) {
       </div>
       <div className="flex-1 overflow-hidden">
         <ScrollArea className="h-full">
+          <div className="mobile-scroll-x">
           <table className="w-full text-xs">
             <thead className="sticky top-0 bg-slate-800 text-white text-[10px] uppercase z-10"><tr><th className="text-left px-3 py-2 font-semibold">Date</th><th className="text-left px-3 py-2 font-semibold">Time</th><th className="text-left px-3 py-2 font-semibold">Invoice</th><th className="text-left px-3 py-2 font-semibold">Customer</th><th className="text-right px-3 py-2 font-semibold">Items</th><th className="text-right px-3 py-2 font-semibold">Total GHC</th><th className="text-center px-3 py-2 font-semibold">Method</th><th className="text-left px-3 py-2 font-semibold">Cashier</th><th className="text-center px-3 py-2 font-semibold">Status</th></tr></thead>
             <tbody className="divide-y divide-slate-100">
               {filtered.map(t => (<tr key={t.id} className="hover:bg-blue-50/50"><td className="px-3 py-2 text-slate-600">{t.date}</td><td className="px-3 py-2 text-slate-500 font-mono">{t.time}</td><td className="px-3 py-2 font-mono font-semibold text-slate-800">{t.invoiceNo}</td><td className="px-3 py-2 text-slate-700">{t.customer}</td><td className="px-3 py-2 text-right font-mono text-slate-700">{t.items}</td><td className="px-3 py-2 text-right font-mono font-semibold text-slate-800">{t.total.toFixed(2)}</td><td className="px-3 py-2 text-center text-slate-600">{t.method}</td><td className="px-3 py-2 text-slate-600">{t.cashier}</td><td className="px-3 py-2 text-center"><span className={cn("px-2 py-0.5 rounded text-[9px] font-bold uppercase", statusColors[t.status])}>{t.status}</span></td></tr>))}
             </tbody>
           </table>
+          </div>
           {filtered.length === 0 && <div className="text-center py-16 text-slate-400 text-sm">No transactions found</div>}
         </ScrollArea>
       </div>

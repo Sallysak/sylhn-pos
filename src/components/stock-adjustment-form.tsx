@@ -597,7 +597,7 @@ export function StockAdjustmentForm({
         <AnimatePresence>
           {scanMode && (
             <motion.div initial={{ opacity: 0, y: 50, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 50, scale: 0.9 }}
-              className="fixed bottom-4 right-4 z-[80] bg-white rounded-xl shadow-2xl ring-2 ring-rose-400 overflow-hidden" style={{ width: '300px' }}>
+              className="w-full fixed bottom-4 right-4 z-[80] bg-white rounded-xl shadow-2xl ring-2 ring-rose-400 overflow-hidden" style={{ width: '100%', maxWidth: '300px' }}>
               <div className="flex items-center justify-between px-3 py-2 bg-gradient-to-r from-rose-600 to-rose-500 text-white">
                 <div className="flex items-center gap-2"><ScanLine className="h-4 w-4 animate-pulse" /><span className="text-xs font-bold">Scanner Active</span></div>
                 <button onClick={() => setScanMode(false)} className="h-5 w-5 rounded bg-white/20 hover:bg-white/30 flex items-center justify-center"><X className="h-3 w-3 text-white" /></button>
@@ -644,7 +644,7 @@ function StockSearchPopup({ products, groups, searchText, onSelect, onClose }: {
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/50 flex items-start justify-center pt-16 z-[60]" onClick={onClose}>
       <motion.div initial={{ scale: 0.95, y: -20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: -20 }} onClick={(e) => e.stopPropagation()}
-        className="rounded-lg shadow-2xl overflow-hidden flex flex-col" style={{ width: '680px', maxHeight: '480px', fontFamily: 'Arial, Helvetica, sans-serif' }}>
+        className="w-full rounded-lg shadow-2xl overflow-hidden flex flex-col" style={{ width: '100%', maxWidth: '680px', maxHeight: '85vh', fontFamily: 'Arial, Helvetica, sans-serif' }}>
         <div className="flex-shrink-0 flex items-center justify-between px-3 h-7 text-white" style={{ backgroundColor: HEADER_DARK_BLUE }}>
           <span className="text-xs font-bold">Select Product to Adjust</span>
           <button onClick={onClose} className="h-5 w-5 rounded bg-red-600 hover:bg-red-700 flex items-center justify-center"><X className="h-3 w-3 text-white" /></button>

@@ -118,5 +118,150 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* Prevent horizontal overflow on mobile */
+    overflow-x: hidden;
+    /* Smooth scrolling on mobile */
+    -webkit-overflow-scrolling: touch;
+    /* Prevent text size adjustment on orientation change */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+  /* Fix 100vh on mobile browsers (accounts for address bar) */
+  html {
+    height: 100%;
+  }
+  body {
+    min-height: 100%;
+  }
+  /* Use 100dvh (dynamic viewport height) where supported */
+  @supports (height: 100dvh) {
+    .h-screen {
+      height: 100dvh !important;
+    }
+    .min-h-screen {
+      min-height: 100dvh !important;
+    }
+  }
+  /* Radix ScrollArea: ensure it works on mobile */
+  [data-radix-scroll-area-viewport] {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* ============================================================
+     MOBILE COMPATIBILITY UTILITIES
+     ============================================================ */
+
+  /* Thin scrollbar for horizontally scrollable menu bars on mobile */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    height: 4px;
+    width: 4px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(255, 255, 255, 0.5);
+  }
+  /* Hide scrollbar on desktop (only show on touch devices) */
+  @media (hover: hover) and (pointer: fine) {
+    .scrollbar-thin::-webkit-scrollbar {
+      display: none;
+    }
+    .scrollbar-thin {
+      scrollbar-width: none;
+    }
+  }
+
+  /* Horizontal scroll wrapper for wide tables / grid-tables.
+     Use: <div className="mobile-scroll-x"><table>...</table></div> */
+  .mobile-scroll-x {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(100, 116, 139, 0.4) transparent;
+    width: 100%;
+    max-width: 100%;
+  }
+  .mobile-scroll-x > * {
+    min-width: max-content;
+    flex-shrink: 0;
+  }
+  .mobile-no-shrink {
+    min-width: max-content;
+    flex-shrink: 0;
+  }
+  .mobile-scroll-x::-webkit-scrollbar {
+    height: 6px;
+  }
+  .mobile-scroll-x::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .mobile-scroll-x::-webkit-scrollbar-thumb {
+    background-color: rgba(100, 116, 139, 0.4);
+    border-radius: 3px;
+  }
+  .mobile-scroll-x::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(100, 116, 139, 0.6);
+  }
+
+  /* Hide horizontal scrollbar completely */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Auto-detect wide CSS-grid "tables" on mobile */
+  @media (max-width: 768px) {
+    [class*="grid-cols-["][class*="px"] {
+      min-width: max-content;
+      flex-shrink: 0;
+    }
+  }
+
+  /* On mobile (<768px) make shadcn Dialog overlays full-screen */
+  @media (max-width: 767px) {
+    [data-radix-dialog-content] {
+      width: calc(100vw - 16px) !important;
+      max-width: calc(100vw - 16px) !important;
+      max-height: 90dvh !important;
+      margin: 8px auto !important;
+      top: 4px !important;
+      bottom: auto !important;
+      left: 0 !important;
+      right: 0 !important;
+      transform: none !important;
+    }
+    [data-radix-dialog-overlay] {
+      inset: 0 !important;
+    }
+    .sm\:max-w-lg,
+    .sm\:max-w-md,
+    .sm\:max-w-xl,
+    .sm\:max-w-2xl,
+    .sm\:max-w-3xl,
+    .sm\:max-w-4xl,
+    .sm\:max-w-5xl,
+    .sm\:max-w-6xl {
+      max-width: calc(100vw - 16px) !important;
+      width: 100% !important;
+    }
+  }
+
+  /* Make sure inputs and selects never overflow horizontally on mobile */
+  @media (max-width: 640px) {
+    input, select, textarea {
+      max-width: 100%;
+    }
   }
 }

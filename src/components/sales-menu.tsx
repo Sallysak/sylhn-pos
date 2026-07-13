@@ -242,7 +242,7 @@ function InvoiceListReportDialog({ invoices, onClose }: { invoices: Invoice[]; o
         className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]" onClick={onClose}>
         <motion.div initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }}
           onClick={(e) => e.stopPropagation()}
-          className="rounded-lg shadow-2xl overflow-hidden flex flex-col" style={{ width: '480px', backgroundColor: '#0078D7', fontFamily: 'Arial, Helvetica, sans-serif' }}>
+          className="w-full rounded-lg shadow-2xl overflow-hidden flex flex-col" style={{ width: '100%', maxWidth: '480px', backgroundColor: '#0078D7', fontFamily: 'Arial, Helvetica, sans-serif' }}>
           {/* Title Bar */}
           <div className="flex items-center justify-between px-3 py-1.5">
             <span className="text-xs font-bold text-white">Invoice List Report</span>
@@ -368,6 +368,7 @@ function InvoiceReportViewer({ data, reportType, status, fromDate, toDate, onClo
             </div>
 
             {/* Table */}
+            <div className="mobile-scroll-x">
             <table className="w-full text-[10px]" style={{ borderCollapse: 'collapse' }}>
               <thead><tr style={{ backgroundColor: '#E6E6FA' }}>
                 <th className="px-2 py-1.5 text-left font-bold text-slate-800 border border-slate-400">Date</th>
@@ -400,6 +401,7 @@ function InvoiceReportViewer({ data, reportType, status, fromDate, toDate, onClo
                 </tr>
               </tfoot>
             </table>
+            </div>
 
             {/* Footer */}
             <div className="text-center text-[9px] text-slate-400 mt-4 pt-2 border-t border-slate-200">

@@ -1428,7 +1428,7 @@ export function StockQuantityAdjustment({
             exit={{ opacity: 0, y: 50, scale: 0.9 }}
             transition={{ type: 'spring', damping: 20, stiffness: 300 }}
             className="fixed bottom-4 right-4 z-[80] bg-white rounded-xl shadow-2xl ring-2 ring-rose-400 overflow-hidden"
-            style={{ width: '340px', fontFamily: 'Arial, Helvetica, sans-serif' }}
+            style={{ width: '100%', maxWidth: '340px', fontFamily: 'Arial, Helvetica, sans-serif' }}
           >
             {/* Header */}
             <div className="flex items-center justify-between px-3 py-2 bg-gradient-to-r from-rose-600 to-rose-500 text-white">
@@ -1616,7 +1616,7 @@ function StockSearchMiniPopup({
         exit={{ scale: 0.95, y: -20 }}
         onClick={(e) => e.stopPropagation()}
         className="rounded-lg shadow-2xl overflow-hidden flex flex-col"
-        style={{ width: '780px', maxHeight: '560px', fontFamily: 'Arial, Helvetica, sans-serif' }}
+        style={{ width: '100%', maxWidth: '780px', maxHeight: '85vh', fontFamily: 'Arial, Helvetica, sans-serif' }}
       >
         {/* Title bar — light blue with dark blue text (matches reference) */}
         <div className="flex-shrink-0 flex items-center justify-between px-3 h-7" style={{ backgroundColor: '#5B9BD5' }}>
@@ -1800,7 +1800,7 @@ function ProductHistoryPopup({ product, history, onClose }: {
         exit={{ scale: 0.95, y: 20 }}
         onClick={(e) => e.stopPropagation()}
         className="bg-white rounded-lg shadow-2xl overflow-hidden flex flex-col"
-        style={{ width: '600px', maxHeight: '70vh', fontFamily: 'Arial, Helvetica, sans-serif' }}
+        style={{ width: '100%', maxWidth: '600px', maxHeight: '70vh', fontFamily: 'Arial, Helvetica, sans-serif' }}
       >
         {/* Title bar */}
         <div className="flex-shrink-0 flex items-center justify-between px-4 h-8 text-white" style={{ backgroundColor: '#2196F3' }}>
@@ -2045,7 +2045,7 @@ function CompareWithLastStocktakeReport({
         exit={{ scale: 0.95, y: 20 }}
         onClick={(e) => e.stopPropagation()}
         className="bg-white rounded-lg shadow-2xl overflow-hidden flex flex-col"
-        style={{ width: '900px', maxHeight: '85vh', fontFamily: 'Arial, Helvetica, sans-serif' }}
+        style={{ width: '100%', maxWidth: '900px', maxHeight: '85vh', fontFamily: 'Arial, Helvetica, sans-serif' }}
       >
         {/* Title bar */}
         <div className="flex-shrink-0 flex items-center justify-between px-4 h-9 text-white" style={{ backgroundColor: HEADER_DARK_BLUE }}>
@@ -2239,7 +2239,7 @@ function AuditTrailPopup({
         exit={{ scale: 0.95, y: 20 }}
         onClick={(e) => e.stopPropagation()}
         className="bg-white rounded-lg shadow-2xl overflow-hidden flex flex-col"
-        style={{ width: '780px', maxHeight: '85vh', fontFamily: 'Arial, Helvetica, sans-serif' }}
+        style={{ width: '100%', maxWidth: '780px', maxHeight: '85vh', fontFamily: 'Arial, Helvetica, sans-serif' }}
       >
         {/* Title bar */}
         <div className="flex-shrink-0 flex items-center justify-between px-4 h-9 text-white" style={{ background: 'linear-gradient(to right, #6B7280, #4B5563)' }}>

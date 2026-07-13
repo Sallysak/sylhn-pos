@@ -273,6 +273,7 @@ function UserManagement({ users, setUsers }: {
       </div>
 
       <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
+        <div className="mobile-scroll-x">
         <table className="w-full text-sm">
           <thead className="sticky top-0 bg-slate-800 text-white text-[11px] uppercase tracking-wide z-10">
             <tr>
@@ -326,6 +327,7 @@ function UserManagement({ users, setUsers }: {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* User Form Modal */}
@@ -354,7 +356,7 @@ function UserFormModal({ user, onSave, onClose }: { user: SystemUser | null; onS
           <div><label className="text-xs font-semibold text-slate-600 mb-1 block">Full Name</label><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. John Doe" className="w-full h-10 px-3 rounded-lg border border-slate-200 focus:border-slate-500 outline-none text-sm" /></div>
           <div><label className="text-xs font-semibold text-slate-600 mb-1 block">Username</label><input value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} placeholder="e.g. jdoe" className="w-full h-10 px-3 rounded-lg border border-slate-200 focus:border-slate-500 outline-none text-sm font-mono" /></div>
           <div><label className="text-xs font-semibold text-slate-600 mb-1 block">Email</label><input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="user@sylhn.com" className="w-full h-10 px-3 rounded-lg border border-slate-200 focus:border-slate-500 outline-none text-sm" /></div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div><label className="text-xs font-semibold text-slate-600 mb-1 block">Role</label><select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as SystemUser["role"] })} className="w-full h-10 px-3 rounded-lg border border-slate-200 focus:border-slate-500 outline-none text-sm"><option value="admin">Admin</option><option value="manager">Manager</option><option value="cashier">Cashier</option></select></div>
             <div><label className="text-xs font-semibold text-slate-600 mb-1 block">PIN (4-8 digits)</label><input value={form.pin} onChange={(e) => setForm({ ...form, pin: e.target.value.replace(/\D/g, '').slice(0, 8) })} placeholder="1234" className="w-full h-10 px-3 rounded-lg border border-slate-200 focus:border-slate-500 outline-none text-sm font-mono" /></div>
           </div>
@@ -437,7 +439,7 @@ function BackupRestore() {
             <div className="flex items-start gap-3 mb-3"><div className="h-11 w-11 rounded-xl bg-amber-100 flex items-center justify-center"><Upload className="h-5 w-5 text-amber-600" /></div><div className="flex-1"><div className="font-bold text-slate-800">Restore from Backup</div><div className="text-xs text-slate-500 mt-0.5">Select a backup file to restore all data</div></div></div>
             <input ref={fileInputRef} type="file" accept=".json" onChange={handleFileSelect} className="hidden" />
             <Button onClick={() => fileInputRef.current?.click()} disabled={restoring} variant="outline" className="w-full border-amber-300 text-amber-700 hover:bg-amber-100">{restoring ? <><RefreshCw className="h-4 w-4 animate-spin" /> Loading...</> : <><Upload className="h-4 w-4" /> Select Backup File (.json)</>}</Button>
-            {restorePreview && (<div className="mt-3 p-3 rounded-lg bg-white ring-1 ring-amber-300"><div className="text-xs font-bold text-slate-700 mb-2 flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-amber-600" /> Backup Preview</div><div className="grid grid-cols-2 gap-2 text-xs mb-3"><div className="bg-slate-50 rounded px-2 py-1"><span className="text-slate-500">Date:</span> <span className="font-semibold">{restorePreview.date}</span></div><div className="bg-slate-50 rounded px-2 py-1"><span className="text-slate-500">Products:</span> <span className="font-semibold">{restorePreview.products}</span></div><div className="bg-slate-50 rounded px-2 py-1"><span className="text-slate-500">Groups:</span> <span className="font-semibold">{restorePreview.groups}</span></div><div className="bg-slate-50 rounded px-2 py-1"><span className="text-slate-500">Txns:</span> <span className="font-semibold">{restorePreview.transactions}</span></div></div><div className="flex gap-2"><button onClick={() => { setRestorePreview(null); pendingRestoreDataRef.current = null; if (fileInputRef.current) fileInputRef.current.value = ""; }} className="flex-1 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold">Cancel</button><button onClick={handleConfirmRestore} className="flex-1 h-8 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold flex items-center justify-center gap-1"><CheckCircle2 className="h-3.5 w-3.5" /> Confirm Restore</button></div><div className="mt-1 text-[9px] text-rose-500 text-center">⚠ This will overwrite current data</div></div>)}
+            {restorePreview && (<div className="mt-3 p-3 rounded-lg bg-white ring-1 ring-amber-300"><div className="text-xs font-bold text-slate-700 mb-2 flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-amber-600" /> Backup Preview</div><div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs mb-3"><div className="bg-slate-50 rounded px-2 py-1"><span className="text-slate-500">Date:</span> <span className="font-semibold">{restorePreview.date}</span></div><div className="bg-slate-50 rounded px-2 py-1"><span className="text-slate-500">Products:</span> <span className="font-semibold">{restorePreview.products}</span></div><div className="bg-slate-50 rounded px-2 py-1"><span className="text-slate-500">Groups:</span> <span className="font-semibold">{restorePreview.groups}</span></div><div className="bg-slate-50 rounded px-2 py-1"><span className="text-slate-500">Txns:</span> <span className="font-semibold">{restorePreview.transactions}</span></div></div><div className="flex gap-2"><button onClick={() => { setRestorePreview(null); pendingRestoreDataRef.current = null; if (fileInputRef.current) fileInputRef.current.value = ""; }} className="flex-1 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold">Cancel</button><button onClick={handleConfirmRestore} className="flex-1 h-8 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold flex items-center justify-center gap-1"><CheckCircle2 className="h-3.5 w-3.5" /> Confirm Restore</button></div><div className="mt-1 text-[9px] text-rose-500 text-center">⚠ This will overwrite current data</div></div>)}
           </div>
           <div className="bg-white rounded-xl p-5 ring-1 ring-slate-200"><div className="font-bold text-slate-800 mb-3 flex items-center gap-2"><HardDrive className="h-4 w-4 text-slate-500" /> Backup History ({backupHistory.length})</div>{backupHistory.length === 0 ? <div className="text-center py-6 text-slate-400 text-xs">No backups yet</div> : <div className="space-y-2">{backupHistory.map((b, i) => (<div key={i} className="flex items-center gap-3 p-2 rounded-lg bg-slate-50 hover:bg-slate-100"><Database className="h-5 w-5 text-slate-400 flex-shrink-0" /><div className="flex-1 min-w-0"><div className="text-xs font-mono text-slate-700 truncate">{b.name}</div><div className="text-[10px] text-slate-400">{b.size} · {b.date} · 📁 {b.path}</div></div><button onClick={() => { saveBackupHistory(backupHistory.filter((_, j) => j !== i)); toast({ title: "Record removed" }); }} className="h-7 w-7 rounded-md bg-rose-100 text-rose-600 hover:bg-rose-200 flex items-center justify-center flex-shrink-0"><Trash2 className="h-3.5 w-3.5" /></button></div>))}</div>}</div>
           <div className="bg-slate-50 rounded-xl p-4 ring-1 ring-slate-200"><div className="text-xs font-bold text-slate-700 mb-1">📌 How Backup Works</div><div className="text-[11px] text-slate-500 space-y-0.5"><div>• <strong>Backup</strong>: Downloads JSON to Downloads folder</div><div>• <strong>Restore</strong>: Upload backup JSON to restore</div><div>• <strong>Location</strong>: C:\Users\YourName\Downloads</div></div></div>
@@ -557,7 +559,7 @@ function CashierShift({ cashier, dailyTotal, transactionCount }: { cashier: stri
           </div>
 
           {/* Actions */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {shiftActive ? (
               <>
                 {shiftPaused ? (
@@ -575,7 +577,7 @@ function CashierShift({ cashier, dailyTotal, transactionCount }: { cashier: stri
           {endTime && (
             <div className="bg-slate-50 rounded-xl p-4 ring-1 ring-slate-200">
               <div className="text-sm font-bold text-slate-700 mb-2">Shift Summary</div>
-              <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                 <div className="bg-white rounded px-2 py-1"><span className="text-slate-500">Start:</span> <span className="font-semibold">{shiftStartStr}</span></div>
                 <div className="bg-white rounded px-2 py-1"><span className="text-slate-500">End:</span> <span className="font-semibold">{endTime}</span></div>
                 <div className="bg-white rounded px-2 py-1"><span className="text-slate-500">Duration:</span> <span className="font-semibold font-mono text-rose-600">{formatDuration(elapsedSeconds)}</span></div>

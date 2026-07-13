@@ -121,7 +121,7 @@ export function Reports({ onBack, products, groups, history }: ReportsProps) {
           </div>
 
           <ScrollArea className="flex-1">
-            <div className="grid grid-cols-2 gap-3 p-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4">
               {filteredTypes.map(rt => (
                 <motion.button
                   key={rt.id}
@@ -315,6 +315,7 @@ function ReportViewer({ report, onClose, onPrint, onPDF, onExcel, onCSV }: {
 
         {/* Table */}
         <ScrollArea className="flex-1">
+          <div className="mobile-scroll-x">
           <table className="w-full text-xs">
             <thead className="sticky top-0 bg-slate-800 text-white text-[11px] uppercase tracking-wide z-10">
               <tr>
@@ -341,6 +342,7 @@ function ReportViewer({ report, onClose, onPrint, onPDF, onExcel, onCSV }: {
               ))}
             </tbody>
           </table>
+          </div>
         </ScrollArea>
 
         {/* Summary Footer */}
