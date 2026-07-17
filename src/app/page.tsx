@@ -1341,7 +1341,7 @@ export default function POSPage() {
 
   // ===== Render POS =====
   return (
-    <div className="h-screen w-screen overflow-hidden bg-gradient-to-br from-slate-100 via-emerald-50 to-slate-100 flex flex-col font-sans pb-[72px] lg:pb-0">
+    <div className="min-h-screen w-full bg-gradient-to-br from-slate-100 via-emerald-50 to-slate-100 flex flex-col font-sans pb-[72px] lg:pb-0 lg:h-screen lg:overflow-hidden">
       {/* ===== Header Bar with Menu ===== */}
       <header className="flex-shrink-0 bg-gradient-to-r from-emerald-700 via-emerald-600 to-teal-600 text-white shadow-lg z-30">
         <div className="flex items-center px-4 py-2 gap-4">
@@ -1496,9 +1496,9 @@ export default function POSPage() {
       </nav>
 
       {/* ===== Main Content ===== */}
-      <main className="flex-1 flex flex-col lg:flex-row overflow-hidden p-2 sm:p-3 gap-2 sm:gap-3">
+      <main className="flex-1 flex flex-col lg:flex-row lg:overflow-hidden p-2 sm:p-3 gap-2 sm:gap-3">
         {/* ===== Left Panel: Product Grid ===== */}
-        <section className="flex-1 flex flex-col bg-white rounded-2xl shadow-lg ring-1 ring-slate-200/60 overflow-hidden min-w-0 min-h-0">
+        <section className="flex-1 flex flex-col bg-white rounded-2xl shadow-lg ring-1 ring-slate-200/60 lg:overflow-hidden min-w-0 min-h-0">
           <div className="flex-shrink-0 flex items-center justify-between px-3 sm:px-5 py-2 bg-gradient-to-r from-slate-50 to-white border-b border-slate-200">
             <div className="flex items-center gap-2 sm:gap-3 min-w-0">
               <div className="flex items-center gap-2">
@@ -1542,8 +1542,9 @@ export default function POSPage() {
             </div>
           </div>
 
-          <ScrollArea className="flex-1">
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 p-4">
+          {/* Product Grid — native scroll (not ScrollArea) for mobile */}
+          <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 no-scrollbar lg:overflow-y-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 p-3 sm:p-4">
               {filteredProducts.map((product, idx) => {
                 const inCart = cart.find(item => item.productId === product.id);
                 const lowStock = product.stock <= product.reorderLevel;
@@ -1605,12 +1606,12 @@ export default function POSPage() {
                 <div className="text-xs mt-1">Try a different category or search term</div>
               </div>
             )}
-          </ScrollArea>
+          </div>
         </section>
 
         {/* ===== Right Panel: Cart + Keypad + Functions ===== */}
         <section className={cn(
-          "flex flex-col bg-white rounded-2xl shadow-lg ring-1 ring-slate-200/60 overflow-hidden transition-all duration-300",
+          "flex flex-col bg-white rounded-2xl shadow-lg ring-1 ring-slate-200/60 lg:overflow-hidden transition-all duration-300",
           showSidebar ? "lg:w-[38%] lg:min-w-[380px] w-full min-h-0 flex-1 lg:flex-none" : "w-0 min-w-0 lg:w-0"
         )}>
           <AnimatePresence>
