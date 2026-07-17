@@ -1320,7 +1320,20 @@ export default function POSPage() {
     );
   }
   if (view === "admin-panel") {
-    return <AdminPanel currentUser={adminUser} onBack={() => setView("pos")} />;
+    // If adminUser is null (user navigated here directly without going through
+    // admin-login), use the loggedInUser instead, or redirect to admin-login
+    const adminUserForPanel = adminUser || (loggedInUser ? {
+      id: loggedInUser.id,
+      username: loggedInUser.username,
+      fullName: loggedInUser.fullName,
+      role: loggedInUser.role,
+      permissions: loggedInUser.permissions || {},
+    } : null);
+    if (!adminUserForPanel) {
+      setView("admin-login");
+      return null;
+    }
+    return <AdminPanel currentUser={adminUserForPanel} onBack={() => setView("pos")} />;
   }
 
   // ===== Login Screen (required to open the software) =====
