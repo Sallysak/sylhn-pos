@@ -53,10 +53,20 @@ export function PrinterPairing({ open, onClose }: PrinterPairingProps) {
         });
       }
     } catch (e: any) {
-      console.error("Bluetooth connect error:", e);
+      // Silent — don't log to console. Show user-friendly message instead.
+      let msg = "Could not connect to printer.";
+      if (e?.name === "NotAllowedError" || e?.message?.includes("permissions policy")) {
+        msg = "Bluetooth is blocked in this environment (iframe/preview). To pair a printer, open the app directly at its URL (not in an embedded preview). On mobile, use Chrome or Edge and tap the address bar to enable Bluetooth.";
+      } else if (e?.name === "NotFoundError") {
+        msg = "No Bluetooth printer found. Make sure it's powered on and in pairing mode.";
+      } else if (e?.message?.includes("not supported")) {
+        msg = "Web Bluetooth not supported. Use Chrome or Edge on desktop/Android.";
+      } else {
+        msg = e?.message || msg;
+      }
       toast({
         title: "Connection Failed",
-        description: e?.message || "Could not connect to printer. Make sure it's powered on and in range.",
+        description: msg,
         variant: "destructive",
       });
     } finally {

@@ -195,6 +195,20 @@ export async function connectPrinter(): Promise<PrinterDevice | null> {
   if (!(await isBluetoothSupported())) {
     throw new Error("Web Bluetooth not supported in this browser. Use Chrome or Edge on desktop/Android.");
   }
+  // Check if Bluetooth is allowed by permissions policy (blocked in iframes)
+  if (typeof document !== "undefined") {
+    try {
+      const permissions = (document as any).permissions;
+      if (permissions && permissions.query) {
+        const result = await permissions.query({ name: "bluetooth" as any });
+        if (result.state === "denied") {
+          throw new Error("Bluetooth is disallowed by permissions policy. Open the app directly (not in an iframe/preview).");
+        }
+      }
+    } catch {
+      // permissions.query for bluetooth may not be supported — continue anyway
+    }
+  }
   // @ts-ignore — Web Bluetooth types not in standard lib
   const device = await navigator.bluetooth.requestDevice({
     filters: [{ services: [PRINTER_SERVICE_UUIDS[0]] }, { services: [PRINTER_SERVICE_UUIDS[1]] }],
