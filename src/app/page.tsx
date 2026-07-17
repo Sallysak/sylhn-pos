@@ -1757,41 +1757,43 @@ export default function POSPage() {
                                 color: isSelected ? '#1565C0' : '#424242',
                               }}
                             >
-                              {/* === MOBILE LAYOUT (compact card) === */}
-                              <div className="lg:hidden">
-                                {/* Row 1: # + emoji + name + total */}
-                                <div className="flex items-center gap-1">
-                                  <span className="text-[8px] font-mono text-slate-400 w-3 flex-shrink-0">{index + 1}</span>
+                              {/* === MOBILE LAYOUT (grid matching headers) === */}
+                              <div className="lg:hidden grid grid-cols-[1fr_auto_auto_auto] gap-1 items-center">
+                                {/* Col 1: # + emoji + name + SKU */}
+                                <div className="min-w-0 flex items-center gap-1">
+                                  <span className="text-[8px] font-mono text-slate-400 flex-shrink-0">{index + 1}</span>
                                   <span className="text-sm flex-shrink-0">{item.emoji}</span>
-                                  <div className="flex-1 min-w-0">
+                                  <div className="min-w-0">
                                     <div className="font-semibold text-[11px] truncate">{item.name}</div>
-                                    <div className="text-[8px] font-mono text-slate-400 truncate">{item.sku} · {formatGHS(item.price)}/{item.unit}</div>
+                                    <div className="text-[8px] font-mono text-slate-400 truncate">{item.sku} · {formatGHS(item.price)}</div>
                                   </div>
-                                  <div className="font-mono font-bold text-[11px] flex-shrink-0">{formatGHS(lineFinal)}</div>
                                 </div>
-                                {/* Row 2: qty controls + disc input + remove */}
-                                <div className="flex items-center gap-2 mt-0.5 pl-4">
-                                  <div className="flex items-center gap-0.5 flex-shrink-0">
-                                    <button onClick={(e) => { e.stopPropagation(); onUpdateQuantity(index, item.quantity - 1); }} className="h-5 w-5 rounded bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition">
-                                      <Minus className="h-2.5 w-2.5" />
-                                    </button>
-                                    <span className="w-6 text-center font-mono font-semibold text-[10px]">{item.quantity.toFixed(item.unit === 'kg' ? 2 : 0)}</span>
-                                    <button onClick={(e) => { e.stopPropagation(); onUpdateQuantity(index, item.quantity + 1); }} className="h-5 w-5 rounded bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition">
-                                      <Plus className="h-2.5 w-2.5" />
-                                    </button>
-                                  </div>
-                                  {/* Glowing discount input */}
+                                {/* Col 2: Qty controls */}
+                                <div className="flex items-center gap-0.5 justify-center w-10 flex-shrink-0">
+                                  <button onClick={(e) => { e.stopPropagation(); onUpdateQuantity(index, item.quantity - 1); }} className="h-5 w-5 rounded bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition">
+                                    <Minus className="h-2.5 w-2.5" />
+                                  </button>
+                                  <span className="w-5 text-center font-mono font-semibold text-[10px]">{item.quantity.toFixed(item.unit === 'kg' ? 2 : 0)}</span>
+                                  <button onClick={(e) => { e.stopPropagation(); onUpdateQuantity(index, item.quantity + 1); }} className="h-5 w-5 rounded bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition">
+                                    <Plus className="h-2.5 w-2.5" />
+                                  </button>
+                                </div>
+                                {/* Col 3: Discount input */}
+                                <div className="flex items-center justify-center w-10 flex-shrink-0">
                                   <input
                                     type="number"
                                     value={item.discount || ''}
                                     onClick={(e) => { e.stopPropagation(); setSelectedCartIndex(index); }}
                                     onChange={(e) => applyDiscount(index, parseFloat(e.target.value) || 0)}
-                                    className="w-9 h-5 text-center text-[9px] font-mono font-bold rounded border-2 border-violet-400 bg-violet-50 outline-none focus:border-violet-600 focus:ring-2 focus:ring-violet-400/40 transition"
+                                    className="w-8 h-5 text-center text-[9px] font-mono font-bold rounded border-2 border-violet-400 bg-violet-50 outline-none focus:border-violet-600 focus:ring-2 focus:ring-violet-400/40 transition"
                                     placeholder="0"
                                   />
-                                  <span className="text-[8px] font-bold text-violet-600 flex-shrink-0">%</span>
-                                  <button onClick={(e) => { e.stopPropagation(); onRemoveLine(index); }} className="ml-auto h-5 w-5 rounded-md bg-rose-100 text-rose-600 hover:bg-rose-200 flex items-center justify-center transition flex-shrink-0">
-                                    <Trash2 className="h-2.5 w-2.5" />
+                                </div>
+                                {/* Col 4: Total + remove */}
+                                <div className="flex items-center justify-end gap-1 w-14 flex-shrink-0">
+                                  <span className="font-mono font-bold text-[11px]">{formatGHS(lineFinal)}</span>
+                                  <button onClick={(e) => { e.stopPropagation(); onRemoveLine(index); }} className="h-4 w-4 rounded-md bg-rose-100 text-rose-600 hover:bg-rose-200 flex items-center justify-center transition">
+                                    <Trash2 className="h-2 w-2" />
                                   </button>
                                 </div>
                               </div>
