@@ -1555,8 +1555,8 @@ export default function POSPage() {
             </div>
           </div>
 
-          {/* Product Grid — grows naturally on mobile, scrolls on desktop */}
-          <div className="flex-1 lg:overflow-y-auto lg:overflow-x-hidden lg:min-h-0 no-scrollbar" style={{ WebkitOverflowScrolling: 'touch' }}>
+          {/* Product Grid — scrolls on mobile (max-h) and desktop */}
+          <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 max-h-[40vh] lg:max-h-none no-scrollbar" style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 p-3 sm:p-4">
               {filteredProducts.map((product, idx) => {
                 const inCart = cart.find(item => item.productId === product.id);
