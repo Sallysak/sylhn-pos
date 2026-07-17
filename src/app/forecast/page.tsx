@@ -44,21 +44,41 @@ export default function ForecastPage() {
   const [days, setDays] = useState(30);
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
   const [creatingPOs, setCreatingPOs] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
 
   const fetchForecast = useCallback(async (forecastDays: number, save = false) => {
     setLoading(true);
     try {
+      // First check if we're authenticated
+      const meRes = await fetch("/api/auth/me", { credentials: "include" });
+      const meData = await meRes.json();
+      if (!meData.user) {
+        // Not logged in — redirect to main app
+        window.location.href = "/";
+        return;
+      }
+
       const res = await fetch(`/api/ai-forecast?days=${forecastDays}${save ? "&save=true" : ""}`, { credentials: "include" });
+      if (res.status === 401) {
+        window.location.href = "/";
+        return;
+      }
       if (!res.ok) {
-        toast({ title: "Failed to load forecast", variant: "destructive" });
+        const errData = await res.json().catch(() => ({ error: "Unknown error" }));
+        toast({ title: "Failed to load forecast", description: errData.error || `HTTP ${res.status}`, variant: "destructive" });
         return;
       }
       const json = await res.json();
+      if (!json.success) {
+        toast({ title: "Forecast error", description: json.error || "Unknown error", variant: "destructive" });
+        return;
+      }
       setData(json);
     } catch (e: any) {
-      toast({ title: "Network error", description: e?.message || "", variant: "destructive" });
+      toast({ title: "Network error", description: e?.message || "Check your connection", variant: "destructive" });
     } finally {
       setLoading(false);
+      setAuthChecked(true);
     }
   }, [toast]);
 
@@ -135,14 +155,36 @@ export default function ForecastPage() {
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-violet-50 flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="h-12 w-12 animate-spin text-violet-600 mx-auto mb-4" />
-          <div className="text-sm font-semibold text-slate-700">Generating AI Demand Forecast...</div>
-          <div className="text-xs text-slate-500 mt-1">Analyzing 90 days of sales history with day-of-week seasonality</div>
+          <div className="text-sm font-semibold text-slate-700">
+            {authChecked ? "Loading forecast..." : "Checking authentication..."}
+          </div>
+          <div className="text-xs text-slate-500 mt-1">
+            {authChecked ? "Analyzing 90 days of sales history" : "Redirecting if not logged in"}
+          </div>
         </div>
       </div>
     );
   }
 
-  if (!data) return null;
+  if (!data) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-violet-50 flex items-center justify-center">
+        <div className="text-center">
+          <AlertTriangle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
+          <div className="text-sm font-semibold text-slate-700 mb-2">No forecast data available</div>
+          <div className="text-xs text-slate-500 mb-4">Make sure you're logged in and have sales data</div>
+          <div className="flex gap-2 justify-center">
+            <button onClick={() => fetchForecast(days)} className="h-10 px-4 rounded-xl bg-violet-600 text-white text-sm font-bold flex items-center gap-2">
+              <RefreshCw className="h-4 w-4" /> Retry
+            </button>
+            <a href="/" className="h-10 px-4 rounded-xl bg-slate-200 text-slate-700 text-sm font-bold flex items-center gap-2">
+              <ArrowLeft className="h-4 w-4" /> Back to POS
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const { summary, aiSummary, forecasts, accuracy } = data;
 
