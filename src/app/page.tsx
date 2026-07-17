@@ -1729,8 +1729,8 @@ export default function POSPage() {
                     <div className="text-right w-14">Total</div>
                   </div>
 
-                  {/* Items List — grows naturally on mobile, scrolls on desktop */}
-                  <div className="flex-1 lg:overflow-y-auto lg:overflow-x-hidden lg:min-h-0 no-scrollbar" style={{ WebkitOverflowScrolling: 'touch' }}>
+                  {/* Items List — scrolls on mobile (max-h) and desktop */}
+                  <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 max-h-[35vh] lg:max-h-none no-scrollbar" style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
                     <div className="divide-y divide-slate-100">
                       <AnimatePresence mode="popLayout">
                         {cart.map((item, index) => {
