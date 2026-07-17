@@ -1354,7 +1354,7 @@ export default function POSPage() {
 
   // ===== Render POS =====
   return (
-    <div className="h-screen w-full bg-gradient-to-br from-slate-100 via-emerald-50 to-slate-100 flex flex-col font-sans pb-[72px] lg:pb-0 overflow-hidden">
+    <div className="min-h-screen w-full bg-gradient-to-br from-slate-100 via-emerald-50 to-slate-100 flex flex-col font-sans pb-[72px] lg:pb-0 lg:h-screen lg:overflow-hidden">
       {/* ===== Header Bar with Menu ===== */}
       <header className="flex-shrink-0 bg-gradient-to-r from-emerald-700 via-emerald-600 to-teal-600 text-white shadow-lg z-30">
         <div className="flex items-center px-4 py-2 gap-4">
@@ -1509,9 +1509,9 @@ export default function POSPage() {
       </nav>
 
       {/* ===== Main Content ===== */}
-      <main className="flex-1 flex flex-col lg:flex-row overflow-hidden p-2 sm:p-3 gap-2 sm:gap-3 min-h-0">
-        {/* ===== Left Panel: Product Grid — 38vh on mobile, flex-1 on desktop ===== */}
-        <section className="flex flex-col bg-white rounded-2xl shadow-lg ring-1 ring-slate-200/60 overflow-hidden min-w-0 min-h-0 h-[35vh] lg:h-full lg:flex-1">
+      <main className="flex-1 flex flex-col lg:flex-row lg:overflow-hidden p-2 sm:p-3 gap-2 sm:gap-3">
+        {/* ===== Left Panel: Product Grid — on top on mobile, left on desktop ===== */}
+        <section className="flex flex-col bg-white rounded-2xl shadow-lg ring-1 ring-slate-200/60 lg:overflow-hidden min-w-0 min-h-0 lg:flex-1">
           <div className="flex-shrink-0 flex items-center justify-between px-3 sm:px-5 py-2 bg-gradient-to-r from-slate-50 to-white border-b border-slate-200">
             <div className="flex items-center gap-2 sm:gap-3 min-w-0">
               <div className="flex items-center gap-2">
@@ -1555,8 +1555,8 @@ export default function POSPage() {
             </div>
           </div>
 
-          {/* Product Grid — native scroll, vertical only, works on mobile + desktop */}
-          <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 no-scrollbar" style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
+          {/* Product Grid — grows naturally on mobile, scrolls on desktop */}
+          <div className="flex-1 lg:overflow-y-auto lg:overflow-x-hidden lg:min-h-0 no-scrollbar" style={{ WebkitOverflowScrolling: 'touch' }}>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 p-3 sm:p-4">
               {filteredProducts.map((product, idx) => {
                 const inCart = cart.find(item => item.productId === product.id);
@@ -1622,10 +1622,10 @@ export default function POSPage() {
           </div>
         </section>
 
-        {/* ===== Right Panel: Cart — takes remaining height on mobile, 38% sidebar on desktop ===== */}
+        {/* ===== Right Panel: Cart — below products on mobile, sidebar on desktop ===== */}
         <section className={cn(
-          "flex flex-col bg-white rounded-2xl shadow-lg ring-1 ring-slate-200/60 overflow-hidden transition-all duration-300 min-h-0",
-          showSidebar ? "lg:w-[38%] lg:min-w-[380px] w-full flex-1 lg:flex-none" : "w-0 min-w-0 lg:w-0"
+          "flex flex-col bg-white rounded-2xl shadow-lg ring-1 ring-slate-200/60 lg:overflow-hidden transition-all duration-300",
+          showSidebar ? "lg:w-[38%] lg:min-w-[380px] w-full lg:flex-none" : "w-0 min-w-0 lg:w-0"
         )}>
           <AnimatePresence>
             {showSidebar && (
@@ -1633,7 +1633,7 @@ export default function POSPage() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="flex flex-col w-full lg:h-full min-h-0"
+                className="flex flex-col w-full lg:h-full"
               >
                 {/* Cart Header */}
                 <div className="flex-shrink-0 flex items-center justify-between px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-500 text-white">
@@ -1710,7 +1710,7 @@ export default function POSPage() {
                 </div>
 
                 {/* Cart Items Table */}
-                <div className="flex-1 flex flex-col min-h-0 lg:overflow-hidden">
+                <div className="flex-1 flex flex-col lg:overflow-hidden lg:min-h-0">
                   {/* Desktop Table Header — light blue, hidden on mobile */}
                   <div className="hidden lg:grid flex-shrink-0 grid-cols-[120px_1fr_50px_80px_45px_80px] gap-1 px-2 py-1 text-[10px] font-bold text-slate-700 border-b border-slate-400" style={{ backgroundColor: '#ADD8E6' }}>
                     <div>Part No.</div>
@@ -1729,8 +1729,8 @@ export default function POSPage() {
                     <div className="text-right w-14">Total</div>
                   </div>
 
-                  {/* Items List — native scroll, works on both mobile and desktop */}
-                  <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 no-scrollbar" style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
+                  {/* Items List — grows naturally on mobile, scrolls on desktop */}
+                  <div className="flex-1 lg:overflow-y-auto lg:overflow-x-hidden lg:min-h-0 no-scrollbar" style={{ WebkitOverflowScrolling: 'touch' }}>
                     <div className="divide-y divide-slate-100">
                       <AnimatePresence mode="popLayout">
                         {cart.map((item, index) => {
@@ -1875,40 +1875,29 @@ export default function POSPage() {
                   </div>
                 </div>
 
-                {/* Function Buttons — compact on mobile, full on desktop */}
+                {/* Function Buttons — all visible */}
                 <div className="flex-shrink-0 grid grid-cols-4 gap-1 p-1.5 bg-slate-100">
                   <button
                     onClick={() => setShowFindProduct(true)}
-                    className="col-span-4 lg:col-span-4 h-9 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold text-xs flex items-center justify-center gap-1.5 hover:from-blue-700 hover:to-indigo-700 transition shadow-sm"
+                    className="col-span-4 h-9 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold text-xs flex items-center justify-center gap-1.5 hover:from-blue-700 hover:to-indigo-700 transition shadow-sm"
                   >
                     <Search className="h-3.5 w-3.5" />
                     FIND PRODUCT
                     <kbd className="ml-1 px-1 py-0.5 rounded bg-white/20 text-[9px] font-mono hidden lg:inline">F1</kbd>
                   </button>
-                  {/* Desktop-only function buttons (hidden on mobile to save space) */}
-                  <div className="hidden lg:contents">
-                    <FuncBtn icon={<Pause className="h-3 w-3" />} label="Save" sub="F2" onClick={handleSave} variant="amber" />
-                    <FuncBtn icon={<Printer className="h-3 w-3" />} label="Print" sub="F3" onClick={handlePrint} variant="slate" />
-                    <FuncBtn icon={<RotateCcw className="h-3 w-3" />} label="Void" sub="F4" onClick={handleVoid} variant="rose" />
-                    <FuncBtn icon={<DollarSign className="h-3 w-3" />} label="Cash" sub="" onClick={handleOpenCash} variant="slate" />
-                    <FuncBtn icon={<Trash2 className="h-3 w-3" />} label="Del Line" sub="Del" onClick={() => selectedCartIndex !== null ? removeLine(selectedCartIndex) : toast({ title: "Select a line first", variant: "destructive" })} variant="slate" />
-                    <FuncBtn icon={<Check className="h-3 w-3" />} label="Enter" sub="↵" onClick={handleKeypadEnter} variant="emerald" />
-                    <button
-                      onClick={() => setShowCartPreview(true)}
-                      className="col-span-1 h-9 rounded-lg bg-gradient-to-r from-violet-600 to-purple-600 text-white font-bold text-[10px] flex items-center justify-center gap-0.5 hover:from-violet-700 hover:to-purple-700 transition shadow-sm"
-                    >
-                      <Eye className="h-3 w-3" />
-                      PREVIEW
-                      <kbd className="ml-0.5 px-0.5 py-0.5 rounded bg-white/20 text-[8px] font-mono">F6</kbd>
-                    </button>
-                  </div>
-                  {/* Mobile: PREVIEW + PAY NOW (full width) */}
+                  <FuncBtn icon={<Pause className="h-3 w-3" />} label="Save" sub="F2" onClick={handleSave} variant="amber" />
+                  <FuncBtn icon={<Printer className="h-3 w-3" />} label="Print" sub="F3" onClick={handlePrint} variant="slate" />
+                  <FuncBtn icon={<RotateCcw className="h-3 w-3" />} label="Void" sub="F4" onClick={handleVoid} variant="rose" />
+                  <FuncBtn icon={<DollarSign className="h-3 w-3" />} label="Cash" sub="" onClick={handleOpenCash} variant="slate" />
+                  <FuncBtn icon={<Trash2 className="h-3 w-3" />} label="Del Line" sub="Del" onClick={() => selectedCartIndex !== null ? removeLine(selectedCartIndex) : toast({ title: "Select a line first", variant: "destructive" })} variant="slate" />
+                  <FuncBtn icon={<Check className="h-3 w-3" />} label="Enter" sub="↵" onClick={handleKeypadEnter} variant="emerald" />
                   <button
                     onClick={() => setShowCartPreview(true)}
-                    className="lg:hidden col-span-1 h-9 rounded-lg bg-gradient-to-r from-violet-600 to-purple-600 text-white font-bold text-[10px] flex items-center justify-center gap-0.5 transition shadow-sm"
+                    className="col-span-1 h-9 rounded-lg bg-gradient-to-r from-violet-600 to-purple-600 text-white font-bold text-[10px] flex items-center justify-center gap-0.5 hover:from-violet-700 hover:to-purple-700 transition shadow-sm"
                   >
                     <Eye className="h-3 w-3" />
                     PREVIEW
+                    <kbd className="ml-0.5 px-0.5 py-0.5 rounded bg-white/20 text-[8px] font-mono hidden lg:inline">F6</kbd>
                   </button>
                   <button
                     onClick={handlePay}
@@ -1920,8 +1909,8 @@ export default function POSPage() {
                   </button>
                 </div>
 
-                {/* Numeric Keypad — hidden on mobile (use touch + Find Product instead) */}
-                <div className="hidden lg:block flex-shrink-0 p-1.5 bg-slate-800">
+                {/* Numeric Keypad — always visible */}
+                <div className="flex-shrink-0 p-1.5 bg-slate-800">
                   <div className="flex gap-1 mb-1">
                     {(["qty", "price", "barcode"] as const).map(mode => (
                       <button
