@@ -657,7 +657,7 @@ export default function POSPage() {
           customerName: customerName || undefined,
           message: cart.length === 0 ? 'Welcome to SYLHN POS — bring your items to the counter' : undefined,
         }),
-      }).catch(e => console.warn('Customer display sync failed:', e));
+      }).catch(() => {}); // Silent — don't pollute console if display is offline
     }, 500);
     return () => clearTimeout(timer);
   }, [cart, subtotal, discountAmount, taxAmount, total, customerName, loggedInUser]);

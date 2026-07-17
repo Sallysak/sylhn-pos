@@ -85,13 +85,15 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
         setError("Live detection not supported. Use manual entry, or tap 'Capture' below.");
       }
     } catch (e: any) {
-      console.error("Camera error:", e);
+      // Don't log to console — handle silently to avoid console noise
       if (e?.name === "NotAllowedError") {
-        setError("Camera permission denied. Please allow camera access in your browser settings.");
+        setError("Camera permission denied. This usually happens when:\n• The browser blocked camera access\n• The site runs in an iframe without camera permission\n• You're on HTTP (not HTTPS)\n\nUse manual entry below — type or paste the barcode/SKU.");
       } else if (e?.name === "NotFoundError") {
         setError("No camera found on this device. Use manual entry.");
+      } else if (e?.name === "NotReadableError") {
+        setError("Camera is in use by another app. Close it and try again, or use manual entry.");
       } else {
-        setError(e?.message || "Could not access camera");
+        setError(e?.message || "Could not access camera. Use manual entry.");
       }
       setManualMode(true);
       setScanning(false);
@@ -175,12 +177,13 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
     return () => stopCamera();
   }, [stopCamera]);
 
-  // Auto-start camera on mount (if supported and not in manual mode)
+  // Don't auto-start camera on mount — it causes NotAllowedError in iframe/HTTP contexts.
+  // Instead, default to manual mode and let the user tap "Start Camera" if they want to scan.
+  // This prevents console errors and provides a better UX (no jarring permission prompt on open).
   useEffect(() => {
-    if (!manualMode && supported) {
-      startCamera();
-    }
-  }, [manualMode, supported, startCamera]);
+    // Default to manual mode — user can switch to camera mode with the button
+    setManualMode(true);
+  }, []);
 
   const handleManualSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -301,7 +304,7 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
             {supported && (
               <button
                 type="button"
-                onClick={() => { setManualMode(false); setManualValue(""); setError(""); }}
+                onClick={() => { setManualMode(false); setManualValue(""); setError(""); startCamera(); }}
                 className="w-full mt-3 h-10 rounded-xl bg-white/10 text-white text-xs font-semibold flex items-center justify-center gap-2 hover:bg-white/20 transition"
               >
                 <Camera className="h-3.5 w-3.5" />
@@ -316,10 +319,21 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
       <div className="flex-shrink-0 p-4 bg-black/40 backdrop-blur" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 12px)" }}>
         <div className="flex items-center justify-center gap-3">
           <button
-            onClick={() => setManualMode(!manualMode)}
+            onClick={() => {
+              if (manualMode) {
+                // Switching to camera mode — start the camera
+                setManualMode(false);
+                setError("");
+                startCamera();
+              } else {
+                // Switching to manual mode — stop camera
+                stopCamera();
+                setManualMode(true);
+              }
+            }}
             className="h-10 px-4 rounded-xl bg-white/15 hover:bg-white/25 text-white text-xs font-semibold flex items-center gap-2 transition"
           >
-            <Keyboard className="h-3.5 w-3.5" />
+            {manualMode ? <Camera className="h-3.5 w-3.5" /> : <Keyboard className="h-3.5 w-3.5" />}
             {manualMode ? "Camera" : "Manual"}
           </button>
           {scanning && !manualMode && (
