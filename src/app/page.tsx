@@ -14,7 +14,7 @@ import {
   Phone, Truck, Users, Database, Wrench, Shield,
   FileBarChart2, BookOpen, PhoneCall, Archive, Settings2, Lock,
   FileSearch, Copy, Image as ImageIcon, Tags,
-  Smartphone, RefreshCw,
+  Smartphone, RefreshCw, Sparkles,
 } from "lucide-react";
 import {
   products as INITIAL_PRODUCTS, categories, paymentMethods, quickCashAmounts,
@@ -36,6 +36,7 @@ import { MobileNav } from "@/components/mobile-nav";
 import { BarcodeScanner } from "@/components/barcode-scanner";
 import { ManagerApproval } from "@/components/manager-approval";
 import { PrinterPairing } from "@/components/printer-pairing";
+import { AiAssistant } from "@/components/ai-assistant";
 import { queueSale, flushQueue, onQueueChange, isOnline, getQueueSize } from "@/lib/offline-queue";
 
 // ===== Lazy-loaded components (code-split for faster initial load) =====
@@ -130,6 +131,8 @@ export default function POSPage() {
   const [mobileCartOpen, setMobileCartOpen] = useState(false);
   // Premium: Bluetooth printer pairing modal
   const [showPrinterPairing, setShowPrinterPairing] = useState(false);
+  // Premium: AI Business Assistant
+  const [showAiAssistant, setShowAiAssistant] = useState(false);
   const [dailyTotal, setDailyTotal] = useState(() => {
     if (typeof window !== 'undefined') { try { return parseFloat(localStorage.getItem('sylhn-daily-total') || '0') || 0; } catch {} }
     return 0;
@@ -1451,6 +1454,14 @@ export default function POSPage() {
               </div>
             </div>
             <InstallButton />
+            {/* Premium: AI Assistant button — opens the chat panel */}
+            <button
+              onClick={() => setShowAiAssistant(true)}
+              className="h-8 px-3 rounded-lg bg-gradient-to-r from-violet-500/30 to-indigo-500/30 hover:from-violet-500/50 hover:to-indigo-500/50 text-white text-xs font-bold flex items-center gap-1.5 transition ring-1 ring-white/20"
+              title="Ask AI Assistant"
+            >
+              <Sparkles className="h-4 w-4" /> <span className="hidden sm:inline">AI</span>
+            </button>
             <button onClick={() => { fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {}); try { localStorage.removeItem('sylhn-current-user'); } catch {} setLoggedInUser(null); setView("login"); toast({ title: "Logged out", description: "You have been signed out" }); }} className="h-8 px-3 rounded-lg bg-rose-500/20 hover:bg-rose-500/40 text-white text-xs font-bold flex items-center gap-1.5 transition" title="Sign out">
               <LogOut className="h-4 w-4" /> <span className="hidden sm:inline">Logout</span>
             </button>
@@ -2079,6 +2090,20 @@ export default function POSPage() {
 
       {/* ===== Premium: Printer Pairing Modal ===== */}
       <PrinterPairing open={showPrinterPairing} onClose={() => setShowPrinterPairing(false)} />
+
+      {/* ===== Premium: AI Business Assistant ===== */}
+      <AiAssistant open={showAiAssistant} onClose={() => setShowAiAssistant(false)} />
+
+      {/* ===== Premium: AI Floating Button (always visible on desktop, above mobile FAB) ===== */}
+      <button
+        onClick={() => setShowAiAssistant(true)}
+        className="hidden lg:flex fixed bottom-6 right-6 z-30 h-14 w-14 rounded-full bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-600 hover:from-violet-700 hover:via-purple-700 hover:to-indigo-700 text-white shadow-xl items-center justify-center transition hover:scale-110 group"
+        title="Ask AI Assistant"
+        aria-label="Open AI Assistant"
+      >
+        <Sparkles className="h-6 w-6 group-hover:scale-110 transition" />
+        <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-emerald-400 ring-2 ring-white animate-pulse" />
+      </button>
 
       {/* ===== Cash Drawer Animation ===== */}
       <AnimatePresence>
