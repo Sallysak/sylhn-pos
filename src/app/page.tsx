@@ -2432,18 +2432,18 @@ function FindProductModal({ products, onAdd, onClose }: {
         className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[92vh] overflow-hidden flex flex-col"
       >
         {/* Header */}
-        <div className="flex-shrink-0 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="h-11 w-11 rounded-xl bg-white/15 backdrop-blur flex items-center justify-center ring-1 ring-white/20">
-              <Search className="h-6 w-6" />
+        <div className="flex-shrink-0 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <div className="h-9 w-9 sm:h-11 sm:w-11 rounded-xl bg-white/15 backdrop-blur flex items-center justify-center ring-1 ring-white/20 flex-shrink-0">
+              <Search className="h-5 w-5 sm:h-6 sm:w-6" />
             </div>
-            <div>
-              <div className="text-lg font-bold">Find Product</div>
-              <div className="text-xs text-blue-100/90">Search by name, SKU, barcode, or supplier</div>
+            <div className="min-w-0">
+              <div className="text-base sm:text-lg font-bold truncate">Find Product</div>
+              <div className="text-[10px] sm:text-xs text-blue-100/90 truncate hidden sm:block">Search by name, SKU, barcode, or supplier</div>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <kbd className="px-2 py-1 rounded-md bg-white/15 text-[10px] font-mono">F1 to open</kbd>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <kbd className="hidden sm:inline-block px-2 py-1 rounded-md bg-white/15 text-[10px] font-mono">F1 to open</kbd>
             <button onClick={onClose} className="h-9 w-9 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center transition">
               <X className="h-5 w-5" />
             </button>
@@ -2451,9 +2451,9 @@ function FindProductModal({ products, onAdd, onClose }: {
         </div>
 
         {/* Search Bar + Group Filters */}
-        <div className="flex-shrink-0 px-6 py-3 bg-slate-50 border-b border-slate-200 space-y-2.5">
+        <div className="flex-shrink-0 px-3 sm:px-6 py-2.5 sm:py-3 bg-slate-50 border-b border-slate-200 space-y-2 sm:space-y-2.5">
           <div className="relative">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+            <Search className="absolute left-3 sm:left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-slate-400" />
             <input
               ref={inputRef}
               value={query}
@@ -2463,8 +2463,8 @@ function FindProductModal({ products, onAdd, onClose }: {
                   selectProduct(filtered[0].id);
                 }
               }}
-              placeholder="Type to search products... (Enter to select first result)"
-              className="w-full h-12 pl-11 pr-4 rounded-xl bg-white text-slate-800 text-base shadow-sm outline-none ring-2 ring-transparent focus:ring-blue-400 border border-slate-200 transition"
+              placeholder="Search products... (Enter to select)"
+              className="w-full h-11 sm:h-12 pl-10 sm:pl-11 pr-4 rounded-xl bg-white text-slate-800 text-sm sm:text-base shadow-sm outline-none ring-2 ring-transparent focus:ring-blue-400 border border-slate-200 transition"
             />
             {query && (
               <button
@@ -2475,13 +2475,14 @@ function FindProductModal({ products, onAdd, onClose }: {
               </button>
             )}
           </div>
-          <div className="flex items-center gap-1.5 flex-wrap">
+          {/* Group filters — horizontal scroll on mobile */}
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
             {stockGroups.map(g => (
               <button
                 key={g.id}
                 onClick={() => setGroupFilter(g.id)}
                 className={cn(
-                  "flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition",
+                  "flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition flex-shrink-0",
                   groupFilter === g.id
                     ? "bg-blue-600 text-white shadow-sm"
                     : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-100"
@@ -2491,16 +2492,18 @@ function FindProductModal({ products, onAdd, onClose }: {
                 {g.name}
               </button>
             ))}
-            <div className="ml-auto text-xs text-slate-500 font-medium">
-              {filtered.length} of {products.length} products
+            <div className="ml-auto text-xs text-slate-500 font-medium flex-shrink-0 pl-2">
+              {filtered.length} of {products.length}
             </div>
           </div>
         </div>
 
-        {/* Body: Product List + Detail Panel */}
-        <div className="flex-1 overflow-hidden grid grid-cols-3 gap-0">
-          {/* Left: Product List (2 cols) */}
-          <div className="col-span-2 overflow-y-auto border-r border-slate-200">
+        {/* Body: Product List + Detail Panel
+            Mobile: stack vertically (list on top, detail slides up from bottom)
+            Desktop: side-by-side 3-col grid */}
+        <div className="flex-1 overflow-hidden flex flex-col lg:grid lg:grid-cols-3 lg:gap-0">
+          {/* Left: Product List — full width on mobile, 2 cols on desktop */}
+          <div className="flex-1 overflow-y-auto lg:col-span-2 lg:border-r border-slate-200" style={{ maxHeight: selectedProduct ? '40vh' : 'none' }}>
             {filtered.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 text-slate-400">
                 <Search className="h-12 w-12 mb-3 opacity-40" />
@@ -2531,35 +2534,39 @@ function FindProductModal({ products, onAdd, onClose }: {
                         }
                       }}
                       className={cn(
-                        "w-full flex items-center gap-3 px-4 py-2.5 text-left transition cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-blue-400",
+                        "w-full flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-2.5 text-left transition cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-blue-400 mobile-product-card",
                         isSelected ? "ring-2 ring-blue-400 ring-inset" : "hover:bg-slate-50"
                       )}
                     >
                       {/* Emoji */}
-                      <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center text-2xl flex-shrink-0">
+                      <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center text-xl sm:text-2xl flex-shrink-0">
                         {product.emoji}
                       </div>
                       {/* Info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-slate-800 text-sm truncate">{product.name}</span>
+                      <div className="flex-1 min-w-0 overflow-hidden">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="font-semibold text-slate-800 text-xs sm:text-sm truncate">{product.name}</span>
                           {product.taxable && (
-                            <span className="px-1 py-0.5 rounded bg-amber-100 text-amber-700 text-[9px] font-bold">VAT</span>
+                            <span className="px-1 py-0.5 rounded bg-amber-100 text-amber-700 text-[8px] sm:text-[9px] font-bold flex-shrink-0">VAT</span>
                           )}
                           {lowStock && (
-                            <span className="px-1 py-0.5 rounded bg-rose-100 text-rose-700 text-[9px] font-bold">LOW</span>
+                            <span className="px-1 py-0.5 rounded bg-rose-100 text-rose-700 text-[8px] sm:text-[9px] font-bold flex-shrink-0">LOW</span>
                           )}
                         </div>
-                        <div className="text-[11px] text-slate-400 font-mono flex items-center gap-2">
+                        <div className="text-[10px] sm:text-[11px] text-slate-400 font-mono truncate">
                           <span>{product.sku}</span>
-                          <span>·</span>
-                          <span>{product.barcode}</span>
+                          {product.barcode && (
+                            <>
+                              <span className="mx-1">·</span>
+                              <span>{product.barcode}</span>
+                            </>
+                          )}
                         </div>
                       </div>
                       {/* Price + Stock */}
                       <div className="text-right flex-shrink-0">
-                        <div className="font-bold text-blue-600 text-sm">{formatGHS(product.price)}</div>
-                        <div className="text-[10px] text-slate-400">/{product.unit} · Stock: {product.stock}</div>
+                        <div className="font-bold text-blue-600 text-xs sm:text-sm">{formatGHS(product.price)}</div>
+                        <div className="text-[9px] sm:text-[10px] text-slate-400 whitespace-nowrap">/{product.unit} · {product.stock}</div>
                       </div>
                       {/* Quick Add Button */}
                       <button
@@ -2576,76 +2583,77 @@ function FindProductModal({ products, onAdd, onClose }: {
             )}
           </div>
 
-          {/* Right: Product Detail Panel (1 col) */}
-          <div className="overflow-y-auto bg-slate-50">
+          {/* Right: Product Detail Panel
+              Mobile: slides up from below the list (full width, border-top)
+              Desktop: 1-col side panel (right of list) */}
+          <div className="flex-shrink-0 lg:flex-1 overflow-y-auto bg-slate-50 border-t-2 lg:border-t-0 border-blue-200 lg:col-span-1" style={{ maxHeight: '50vh' }}>
             {selectedProduct ? (
               <motion.div
                 key={selectedProduct.id}
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                className="p-5 space-y-4"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-3 sm:p-5 space-y-3 sm:space-y-4"
               >
                 {/* Product Card */}
-                <div className="bg-white rounded-xl p-4 shadow-sm ring-1 ring-slate-200 text-center">
-                  <div className="h-24 w-24 mx-auto rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center text-6xl mb-3">
+                <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm ring-1 ring-slate-200 flex items-center gap-3 sm:block sm:text-center">
+                  {/* Mobile: horizontal layout; Desktop: stacked */}
+                  <div className="h-16 w-16 sm:h-24 sm:w-24 sm:mx-auto rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center text-4xl sm:text-6xl mb-0 sm:mb-3 flex-shrink-0">
                     {selectedProduct.emoji}
                   </div>
-                  <div className="font-bold text-slate-800 text-base">{selectedProduct.name}</div>
-                  <div className="text-xs text-slate-400 font-mono mt-0.5">{selectedProduct.sku}</div>
-                  <div className="text-2xl font-bold text-blue-600 mt-2">{formatGHS(selectedProduct.price)}</div>
-                  <div className="text-xs text-slate-500">per {selectedProduct.unit}</div>
+                  <div className="flex-1 sm:flex-none min-w-0">
+                    <div className="font-bold text-slate-800 text-sm sm:text-base truncate">{selectedProduct.name}</div>
+                    <div className="text-[10px] sm:text-xs text-slate-400 font-mono mt-0.5 truncate">{selectedProduct.sku}</div>
+                    <div className="text-lg sm:text-2xl font-bold text-blue-600 mt-1 sm:mt-2">{formatGHS(selectedProduct.price)}</div>
+                    <div className="text-[10px] sm:text-xs text-slate-500">per {selectedProduct.unit}</div>
+                  </div>
                 </div>
 
-                {/* Product Details */}
-                <div className="bg-white rounded-xl p-4 shadow-sm ring-1 ring-slate-200 space-y-2 text-xs">
-                  <div className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Product Details</div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Group</span>
-                    <span className="font-semibold text-slate-800">{stockGroups.find(g => g.id === selectedProduct.groupId)?.name}</span>
+                {/* Product Details — 2-column grid on mobile for compact layout */}
+                <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm ring-1 ring-slate-200 grid grid-cols-2 sm:grid-cols-1 gap-x-3 gap-y-1.5 sm:gap-y-2 text-xs">
+                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-0.5 col-span-2 sm:col-span-1">Details</div>
+                  <div className="flex justify-between items-center min-w-0">
+                    <span className="text-slate-500 text-[11px]">Group</span>
+                    <span className="font-semibold text-slate-800 text-[11px] truncate ml-2 text-right">{stockGroups.find(g => g.id === selectedProduct.groupId)?.name || "—"}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Barcode</span>
-                    <span className="font-mono text-slate-700">{selectedProduct.barcode}</span>
+                  <div className="flex justify-between items-center min-w-0">
+                    <span className="text-slate-500 text-[11px]">Barcode</span>
+                    <span className="font-mono text-slate-700 text-[11px] truncate ml-2 text-right">{selectedProduct.barcode || "—"}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Supplier</span>
-                    <span className="font-semibold text-slate-800">{selectedProduct.supplier}</span>
+                  <div className="flex justify-between items-center min-w-0">
+                    <span className="text-slate-500 text-[11px]">Supplier</span>
+                    <span className="font-semibold text-slate-800 text-[11px] truncate ml-2 text-right">{selectedProduct.supplier || "—"}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Batch</span>
-                    <span className="font-mono text-slate-700">{selectedProduct.batchNumber}</span>
+                  <div className="flex justify-between items-center min-w-0">
+                    <span className="text-slate-500 text-[11px]">Batch</span>
+                    <span className="font-mono text-slate-700 text-[11px] truncate ml-2 text-right">{selectedProduct.batchNumber || "—"}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Cost Price</span>
-                    <span className="font-mono text-slate-700">{formatGHS(selectedProduct.costPrice)}</span>
+                  <div className="flex justify-between items-center min-w-0">
+                    <span className="text-slate-500 text-[11px]">Cost</span>
+                    <span className="font-mono text-slate-700 text-[11px] ml-2">{formatGHS(selectedProduct.costPrice)}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">In Stock</span>
-                    <span className={cn("font-bold", selectedProduct.stock === 0 ? "text-rose-600" : selectedProduct.stock <= selectedProduct.reorderLevel ? "text-amber-600" : "text-emerald-600")}>
+                  <div className="flex justify-between items-center min-w-0">
+                    <span className="text-slate-500 text-[11px]">Stock</span>
+                    <span className={cn("font-bold text-[11px]", selectedProduct.stock === 0 ? "text-rose-600" : selectedProduct.stock <= selectedProduct.reorderLevel ? "text-amber-600" : "text-emerald-600")}>
                       {selectedProduct.stock} {selectedProduct.unit}
                     </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Reorder Level</span>
-                    <span className="font-mono text-slate-700">{selectedProduct.reorderLevel}</span>
+                  <div className="flex justify-between items-center min-w-0">
+                    <span className="text-slate-500 text-[11px]">Reorder</span>
+                    <span className="font-mono text-slate-700 text-[11px]">{selectedProduct.reorderLevel}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Expiry Date</span>
-                    <span className="font-mono text-slate-700">{selectedProduct.expiryDate}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Taxable (VAT)</span>
-                    <span className="font-semibold text-slate-800">{selectedProduct.taxable ? "Yes" : "No"}</span>
+                  <div className="flex justify-between items-center min-w-0">
+                    <span className="text-slate-500 text-[11px]">Expiry</span>
+                    <span className="font-mono text-slate-700 text-[11px] truncate ml-2 text-right">{selectedProduct.expiryDate || "—"}</span>
                   </div>
                 </div>
 
                 {/* Quantity Selector */}
-                <div className="bg-white rounded-xl p-4 shadow-sm ring-1 ring-slate-200">
-                  <div className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Quantity to Add</div>
+                <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm ring-1 ring-slate-200">
+                  <div className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Quantity to Add</div>
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => setQuantity(q => Math.max(1, q - 1))}
-                      className="h-10 w-10 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition"
+                      className="h-10 w-10 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition flex-shrink-0"
                     >
                       <Minus className="h-4 w-4" />
                     </button>
@@ -2655,11 +2663,11 @@ function FindProductModal({ products, onAdd, onClose }: {
                       onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
                       min={1}
                       max={selectedProduct.stock}
-                      className="flex-1 h-10 text-center text-lg font-bold font-mono border-2 border-slate-200 focus:border-blue-400 rounded-lg outline-none"
+                      className="flex-1 h-10 text-center text-base sm:text-lg font-bold font-mono border-2 border-slate-200 focus:border-blue-400 rounded-lg outline-none min-w-0"
                     />
                     <button
                       onClick={() => setQuantity(q => Math.min(selectedProduct.stock, q + 1))}
-                      className="h-10 w-10 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition"
+                      className="h-10 w-10 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition flex-shrink-0"
                     >
                       <Plus className="h-4 w-4" />
                     </button>
@@ -2677,7 +2685,7 @@ function FindProductModal({ products, onAdd, onClose }: {
                   </div>
                   <div className="mt-2 p-2 rounded-lg bg-blue-50 flex justify-between items-center">
                     <span className="text-xs font-semibold text-slate-600">Subtotal</span>
-                    <span className="text-lg font-bold font-mono text-blue-600">{formatGHS(selectedProduct.price * quantity)}</span>
+                    <span className="text-base sm:text-lg font-bold font-mono text-blue-600">{formatGHS(selectedProduct.price * quantity)}</span>
                   </div>
                 </div>
 
@@ -2686,33 +2694,33 @@ function FindProductModal({ products, onAdd, onClose }: {
                   onClick={handleAddToCart}
                   disabled={selectedProduct.stock === 0}
                   className={cn(
-                    "w-full h-12 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition shadow-md",
+                    "w-full h-11 sm:h-12 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition shadow-md",
                     selectedProduct.stock === 0
                       ? "bg-slate-200 text-slate-400 cursor-not-allowed"
                       : "bg-gradient-to-r from-emerald-600 to-teal-600 text-white hover:shadow-lg"
                   )}
                 >
-                  <ShoppingCart className="h-5 w-5" />
+                  <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5" />
                   ADD {quantity} TO CART
                   <span className="ml-1 px-2 py-0.5 rounded bg-white/20 text-xs font-mono">{formatGHS(selectedProduct.price * quantity)}</span>
                 </button>
-                <div className="text-center text-[10px] text-slate-400">
+                <div className="text-center text-[10px] text-slate-400 hidden sm:block">
                   Tip: Double-click any product for quick add (1 unit)
                 </div>
               </motion.div>
             ) : (
-              <div className="flex flex-col items-center justify-center h-full text-slate-400 p-6 text-center">
+              <div className="hidden lg:flex flex-col items-center justify-center h-full text-slate-400 p-6 text-center">
                 <Search className="h-12 w-12 mb-3 opacity-30" />
                 <div className="text-sm font-medium">Select a product</div>
-                <div className="text-xs mt-1">Click any product from the list to view details and add a custom quantity to the cart</div>
+                <div className="text-xs mt-1">Click any product from the list to view details</div>
               </div>
             )}
           </div>
         </div>
 
         {/* Footer */}
-        <div className="flex-shrink-0 px-6 py-2.5 bg-white border-t border-slate-200 flex items-center justify-between">
-          <div className="flex items-center gap-3 text-xs text-slate-500">
+        <div className="flex-shrink-0 px-3 sm:px-6 py-2 sm:py-2.5 bg-white border-t border-slate-200 flex items-center justify-between">
+          <div className="hidden sm:flex items-center gap-3 text-xs text-slate-500">
             <span className="flex items-center gap-1">
               <kbd className="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 font-mono text-[10px]">↑↓</kbd>
               Navigate
@@ -2726,7 +2734,7 @@ function FindProductModal({ products, onAdd, onClose }: {
               Close
             </span>
           </div>
-          <Button variant="outline" size="sm" onClick={onClose}>
+          <Button variant="outline" size="sm" onClick={onClose} className="ml-auto">
             Close (Esc)
           </Button>
         </div>
