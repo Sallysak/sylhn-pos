@@ -1,15 +1,16 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  ArrowLeft, FileText, DollarSign, Users, X, Monitor, Printer, Folder,
-  FileBarChart2, BarChart3, TrendingUp, CreditCard, User, Package,
-  ShoppingCart, Calendar, Search, Check,
+  ArrowLeft, FileText, DollarSign, Users, X, Printer, Folder,
+  BarChart3, TrendingUp, CreditCard, User, Package,
+  ShoppingCart, Calendar, Search, Check, Download, Filter,
+  FileSpreadsheet, FileBarChart, Loader2, ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { COMPANY, CURRENCY, formatGHS } from "@/lib/pos-data";
@@ -19,396 +20,636 @@ interface SalesMenuProps {
   onBack: () => void;
 }
 
-// Sample invoice data
-interface Invoice {
+interface SaleRecord {
   id: string;
-  date: string;
-  invoiceNo: string;
-  client: string;
-  qty: number;
-  tax: number;
-  amount: number;
-  paid: number;
-  due: number;
-  status: "paid" | "outstanding";
+  invoiceNumber: string;
+  customerName: string;
+  cashierName: string;
+  subtotal: number;
+  discount: number;
+  taxAmount: number;
+  total: number;
+  amountPaid: number;
+  change: number;
+  paymentMethod: string;
+  status: string;
+  createdAt: string;
+  items: Array<{
+    sku: string;
+    name: string;
+    emoji: string;
+    quantity: number;
+    price: number;
+    total: number;
+  }>;
+  pointsEarned: number;
+  pointsRedeemed: number;
+  grossProfit: number;
+  costOfGoods: number;
 }
 
-const sampleInvoices: Invoice[] = [
-  { id: "inv1", date: "2026-01-15", invoiceNo: "INV-001", client: "Ama Osei", qty: 1, tax: 0.25, amount: 2.50, paid: 2.75, due: -0.25, status: "paid" },
-  { id: "inv2", date: "2026-01-17", invoiceNo: "INV-002", client: "Kwame Mensah", qty: 6, tax: 5.81, amount: 83.00, paid: 72.50, due: 10.50, status: "outstanding" },
-  { id: "inv3", date: "2026-01-18", invoiceNo: "INV-003", client: "Akosua Frimpong", qty: 1, tax: 0.00, amount: 0.00, paid: 0.00, due: 0.00, status: "paid" },
-  { id: "inv4", date: "2026-01-25", invoiceNo: "INV-004", client: "Yao Adjei", qty: 13, tax: 0.23, amount: 7.50, paid: 7.50, due: 0.00, status: "paid" },
-  { id: "inv5", date: "2026-01-26", invoiceNo: "INV-005", client: "Ama Osei", qty: 4, tax: 0.00, amount: 0.00, paid: 0.00, due: 0.00, status: "paid" },
-  { id: "inv6", date: "2026-02-03", invoiceNo: "INV-006", client: "Kwame Mensah", qty: 2, tax: 1.50, amount: 35.00, paid: 30.00, due: 5.00, status: "outstanding" },
-  { id: "inv7", date: "2026-02-10", invoiceNo: "INV-007", client: "Akosua Frimpong", qty: 5, tax: 4.20, amount: 60.00, paid: 60.00, due: 0.00, status: "paid" },
-  { id: "inv8", date: "2026-02-15", invoiceNo: "INV-008", client: "Yao Adjei", qty: 3, tax: 2.10, amount: 30.00, paid: 15.00, due: 15.00, status: "outstanding" },
-  { id: "inv9", date: "2026-03-01", invoiceNo: "INV-009", client: "Ama Osei", qty: 8, tax: 6.40, amount: 90.00, paid: 90.00, due: 0.00, status: "paid" },
-  { id: "inv10", date: "2026-03-05", invoiceNo: "INV-010", client: "Walk-in Customer", qty: 2, tax: 1.20, amount: 18.00, paid: 0.00, due: 18.00, status: "outstanding" },
-];
+type ReportType =
+  | "invoice-list" | "sales-summary" | "sold-items" | "sales-by-client"
+  | "sales-by-product" | "sales-by-cashier" | "sales-tax" | "payment-methods"
+  | "profit-analysis" | "loyalty-points";
+
+const REPORT_CONFIG: Record<ReportType, { label: string; icon: any; color: string; bg: string }> = {
+  "invoice-list":      { label: "Invoice List Report",      icon: FileText,    color: "text-blue-600",    bg: "bg-blue-50" },
+  "sales-summary":     { label: "Summary Sales Report",     icon: BarChart3,   color: "text-emerald-600", bg: "bg-emerald-50" },
+  "sold-items":        { label: "Sold Items Report",        icon: ShoppingCart,color: "text-purple-600",  bg: "bg-purple-50" },
+  "sales-by-client":   { label: "Sales by Client",          icon: Users,       color: "text-cyan-600",    bg: "bg-cyan-50" },
+  "sales-by-product":  { label: "Sales by Product",         icon: Package,     color: "text-amber-600",   bg: "bg-amber-50" },
+  "sales-by-cashier":  { label: "Staff Sales Report",       icon: User,        color: "text-rose-600",    bg: "bg-rose-50" },
+  "sales-tax":         { label: "Sales Tax Report",         icon: DollarSign,  color: "text-indigo-600",  bg: "bg-indigo-50" },
+  "payment-methods":   { label: "Payment Methods Report",   icon: CreditCard,  color: "text-teal-600",    bg: "bg-teal-50" },
+  "profit-analysis":   { label: "Profit Analysis Report",   icon: TrendingUp,  color: "text-green-600",   bg: "bg-green-50" },
+  "loyalty-points":    { label: "Loyalty Points Report",    icon: CreditCard,  color: "text-violet-600",  bg: "bg-violet-50" },
+};
 
 export function SalesMenu({ onBack }: SalesMenuProps) {
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<"menu" | "reports">("menu");
-  const [showInvoiceListReport, setShowInvoiceListReport] = useState(false);
+  const [activeReport, setActiveReport] = useState<ReportType | null>(null);
 
-  // Sales Menu grid items
-  const menuItems = [
-    { id: "1", label: "List of Clients", icon: Users },
-    { id: "2", label: "Invoices List Report", icon: FileText, action: () => setShowInvoiceListReport(true) },
-    { id: "3", label: "Summary Sales Report", icon: BarChart3 },
-    { id: "4", label: "Aged Clients Report", icon: TrendingUp },
-    { id: "5", label: "Client's Statement", icon: FileText },
-    { id: "6", label: "Sales Analysis Report", icon: BarChart3 },
-    { id: "7", label: "Back Orders Report", icon: Package },
-    { id: "8", label: "Sales Tax Report", icon: DollarSign },
-    { id: "9", label: "Bank Deposit", icon: CreditCard },
-    { id: "a", label: "Sale Payments Report", icon: DollarSign },
-    { id: "b", label: "Sales by Client", icon: Users },
-    { id: "c", label: "Sales by Product", icon: Package },
-    { id: "d", label: "Client Sales/Product", icon: TrendingUp },
-    { id: "e", label: "Product Sales/Client", icon: BarChart3 },
-    { id: "f", label: "Staff Sales Report", icon: User },
-    { id: "g", label: "Loyalty Points Report", icon: CreditCard },
-    { id: "o", label: "Sales Sources Report", icon: BarChart3 },
-    { id: "s", label: "Sold Items Report", icon: ShoppingCart },
-    { id: "w", label: "Cashflow Report", icon: DollarSign },
-    { id: "x", label: "Sales by Supplier", icon: Package },
-  ];
-
-  const sidebarItems = [
-    { id: "invoicing", label: "Invoicing", icon: FileText, color: "blue" },
-    { id: "payments", label: "Payments Received", icon: DollarSign, color: "green" },
-    { id: "clients", label: "Add/Modify Clients", icon: Users, color: "blue" },
-    { id: "close", label: "Close (Esc)", icon: X, color: "red", action: onBack },
-  ];
+  const menuItems: { type: ReportType }[] = (Object.keys(REPORT_CONFIG) as ReportType[]).map(type => ({ type }));
 
   return (
-    <div className="h-screen flex flex-col bg-slate-100">
-      <PopupWindow title="Sales Menu" titleBarColor="#4A6FA5" initialWidth={800} initialHeight={560} minWidth={600} minHeight={400} onClose={onBack}>
-        <div className="h-full flex flex-col" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
-          {/* Tab Navigation */}
-          <div className="flex-shrink-0 flex" style={{ backgroundColor: '#5D7EB8' }}>
-            <button
-              onClick={() => setActiveTab("menu")}
-              className={cn("px-6 py-1.5 text-xs font-bold text-white transition", activeTab === "menu" ? "bg-white/20" : "hover:bg-white/10")}
-            >
-              Sales Menu
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+      {/* Header */}
+      <header className="flex-shrink-0 bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-700 text-white shadow-lg sticky top-0 z-30">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button onClick={onBack} className="h-9 w-9 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center transition">
+              <ArrowLeft className="h-4 w-4" />
             </button>
-            <button
-              onClick={() => setActiveTab("reports")}
-              className={cn("px-6 py-1.5 text-xs font-bold text-white transition border-l border-white/20", activeTab === "reports" ? "bg-white/20" : "hover:bg-white/10")}
-            >
-              Sales Reports
-            </button>
-          </div>
-
-          {/* Main Content: Sidebar + Grid */}
-          <div className="flex-1 flex overflow-hidden">
-            {/* Left Sidebar */}
-            <div className="flex-shrink-0 w-36 bg-slate-200 border-r border-slate-300 p-2 space-y-1">
-              {sidebarItems.map(item => (
-                <button
-                  key={item.id}
-                  onClick={() => item.action ? item.action() : toast({ title: item.label })}
-                  className={cn("w-full flex items-center gap-1.5 px-2 py-1.5 rounded text-[10px] font-semibold transition",
-                    item.color === "red" ? "text-red-600 hover:bg-red-100" : item.color === "green" ? "text-green-600 hover:bg-green-100" : "text-blue-600 hover:bg-blue-100"
-                  )}
-                >
-                  <item.icon className="h-3.5 w-3.5" />
-                  {item.label}
-                </button>
-              ))}
+            <div>
+              <h1 className="text-lg font-bold flex items-center gap-2">
+                <FileBarChart className="h-5 w-5" />
+                Sales Reports Center
+              </h1>
+              <div className="text-[10px] text-blue-100/80">{COMPANY.name} · Advanced Reporting & Analytics</div>
             </div>
-
-            {/* Grid of Report Options */}
-            <div className="flex-1 overflow-y-auto p-3 bg-white">
-              <div className="grid grid-cols-4 gap-2">
-                {menuItems.map(item => (
-                  <button
-                    key={item.id}
-                    onClick={() => item.action ? item.action() : toast({ title: item.label, description: "Report generation" })}
-                    className="flex flex-col items-center gap-1.5 p-3 rounded-lg border border-slate-200 bg-slate-50 hover:bg-blue-50 hover:border-blue-300 transition group"
-                  >
-                    <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center group-hover:bg-blue-200 transition">
-                      <item.icon className="h-5 w-5 text-blue-600" />
-                    </div>
-                    <span className="text-[9px] font-semibold text-slate-700 text-center leading-tight">{item.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Status Bar */}
-          <div className="flex-shrink-0 px-4 py-1 text-[9px] text-white text-center" style={{ backgroundColor: '#2C3E50' }}>
-            {COMPANY.name} · {COMPANY.address} · {COMPANY.contact}
           </div>
         </div>
+      </header>
 
-        {/* Invoice List Report Dialog */}
-        <AnimatePresence>
-          {showInvoiceListReport && (
-            <InvoiceListReportDialog
-              invoices={sampleInvoices}
-              onClose={() => setShowInvoiceListReport(false)}
-            />
-          )}
-        </AnimatePresence>
-      </PopupWindow>
+      <main className="max-w-7xl mx-auto px-4 py-6">
+        {/* Report Cards Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          {menuItems.map(({ type }) => {
+            const config = REPORT_CONFIG[type];
+            const Icon = config.icon;
+            return (
+              <motion.button
+                key={type}
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={() => setActiveReport(type)}
+                className="bg-white rounded-2xl shadow-lg ring-1 ring-slate-200 p-4 flex flex-col items-center gap-2 hover:shadow-xl transition group"
+              >
+                <div className={cn("h-12 w-12 rounded-xl flex items-center justify-center transition group-hover:scale-110", config.bg)}>
+                  <Icon className={cn("h-6 w-6", config.color)} />
+                </div>
+                <span className="text-xs font-bold text-slate-700 text-center leading-tight">{config.label}</span>
+              </motion.button>
+            );
+          })}
+        </div>
+
+        {/* Quick Stats Banner */}
+        <QuickStatsBanner />
+      </main>
+
+      {/* Report Viewer Modal */}
+      <AnimatePresence>
+        {activeReport && (
+          <ReportViewer
+            reportType={activeReport}
+            onClose={() => setActiveReport(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
 
-// ===== Invoice List Report Filter Dialog =====
-function InvoiceListReportDialog({ invoices, onClose }: { invoices: Invoice[]; onClose: () => void }) {
-  const { toast } = useToast();
-  const [location, setLocation] = useState("all");
-  const [type, setType] = useState("invoice");
-  const [refNo, setRefNo] = useState("");
-  const [clientName, setClientName] = useState("");
-  const [reportType, setReportType] = useState("totals");
-  const [status, setStatus] = useState("all");
-  const [fromDate, setFromDate] = useState("2026-01-01");
-  const [toDate, setToDate] = useState("2026-12-31");
-  const [generatedReport, setGeneratedReport] = useState<Invoice[] | null>(null);
+// ===== Quick Stats Banner =====
+function QuickStatsBanner() {
+  const [stats, setStats] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
-  const handleScreen = () => {
-    const filtered = invoices.filter(inv => {
-      if (fromDate && inv.date < fromDate) return false;
-      if (toDate && inv.date > toDate) return false;
-      if (status === "paid" && inv.status !== "paid") return false;
-      if (status === "outstanding" && inv.status !== "outstanding") return false;
-      if (clientName && !inv.client.toLowerCase().includes(clientName.toLowerCase())) return false;
-      if (refNo && !inv.invoiceNo.toLowerCase().includes(refNo.toLowerCase())) return false;
-      return true;
-    });
-    setGeneratedReport(filtered);
-    toast({ title: "Report generated", description: `${filtered.length} invoices` });
-  };
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/dashboard", { credentials: "include" });
+        if (res.ok) {
+          const data = await res.json();
+          setStats(data.salesSummary);
+        }
+      } catch { /* ignore */ }
+      finally { setLoading(false); }
+    })();
+  }, []);
 
-  const handlePrint = () => {
-    const filtered = generatedReport || invoices;
-    const printWin = window.open('', '_blank', 'width=800,height=600');
-    if (!printWin) return;
-    const fmtDate = (iso: string) => { const [y, m, d] = iso.split('-'); return `${parseInt(m)}/${parseInt(d)}/${y}`; };
-    const rows = filtered.map((inv, i) => `
-      <tr style="background:${i % 2 === 1 ? '#F8F8F8' : '#FFFFFF'}">
-        <td style="border:1px solid #999;padding:3px 6px">${fmtDate(inv.date)}</td>
-        <td style="border:1px solid #999;padding:3px 6px;text-align:right">${inv.qty.toFixed(2)}</td>
-        <td style="border:1px solid #999;padding:3px 6px;text-align:right">${inv.tax.toFixed(2)}</td>
-        <td style="border:1px solid #999;padding:3px 6px;text-align:right">${inv.amount.toFixed(2)}</td>
-        <td style="border:1px solid #999;padding:3px 6px;text-align:right">${inv.paid.toFixed(2)}</td>
-        <td style="border:1px solid #999;padding:3px 6px;text-align:right;color:${inv.due > 0 ? '#FF0000' : '#000'}">${inv.due.toFixed(2)}</td>
-      </tr>`).join('');
-    const totals = filtered.reduce((a, i) => ({ qty: a.qty + i.qty, tax: a.tax + i.tax, amount: a.amount + i.amount, paid: a.paid + i.paid, due: a.due + i.due }), { qty: 0, tax: 0, amount: 0, paid: 0, due: 0 });
-    printWin.document.write(`<!DOCTYPE html><html><head><title>Invoice List Report</title>
-      <style>body{font-family:Arial;margin:20px}.header{text-align:center;border-bottom:2px solid #333;padding-bottom:10px;margin-bottom:15px}h1{font-size:18px;margin:0}.info{font-size:12px;color:#666}h2{text-align:center;font-size:14px;margin:10px 0}table{width:100%;border-collapse:collapse;font-size:11px}th{background:#E6E6FA;border:1px solid #999;padding:4px 6px}.totals{margin-top:15px;font-size:11px}@media print{thead{display:table-header-group}tr{page-break-inside:avoid}}</style>
-      </head><body>
-      <div class="header"><h1>${COMPANY.name}</h1><div class="info">${COMPANY.address} · ${COMPANY.contact}</div></div>
-      <h2>${reportType === 'totals' ? 'Totals' : reportType === 'summary' ? 'Summary' : 'Detailed'} Invoice Report</h2>
-      <p style="text-align:center;font-size:11px">For The Period ${fmtDate(fromDate)} - ${fmtDate(toDate)}${status !== 'all' ? ` · Status: ${status}` : ''}</p>
-      <table><thead><tr><th>Date</th><th style="text-align:right">Qty</th><th style="text-align:right">TAX GHC</th><th style="text-align:right">Amount GHC</th><th style="text-align:right">Paid GHC</th><th style="text-align:right">Due GHC</th></tr></thead>
-      <tbody>${rows}</tbody></table>
-      <table class="totals"><tr style="font-weight:bold;border-top:2px solid #333"><td>TOTAL</td><td style="text-align:right">${totals.qty.toFixed(2)}</td><td style="text-align:right">${totals.tax.toFixed(2)}</td><td style="text-align:right">${totals.amount.toFixed(2)}</td><td style="text-align:right">${totals.paid.toFixed(2)}</td><td style="text-align:right;color:${totals.due > 0 ? '#FF0000' : '#000'}">${totals.due.toFixed(2)}</td></tr></table>
-      </body></html>`);
-    printWin.document.close();
-    setTimeout(() => { printWin.focus(); printWin.print(); }, 300);
-    toast({ title: "Printing (F3)" });
-  };
+  if (loading || !stats) {
+    return <div className="mt-6 h-24 rounded-2xl bg-white/5 animate-pulse" />;
+  }
 
-  const handleFile = () => {
-    import("xlsx").then((XLSX) => {
-      const filtered = generatedReport || invoices;
-      const data: (string | number)[][] = [];
-      data.push([COMPANY.name, "Accra Warehouse", COMPANY.address]);
-      data.push([`${reportType === 'totals' ? 'Totals' : reportType === 'summary' ? 'Summary' : 'Detailed'} Invoice Report`]);
-      data.push([`For The Period ${fromDate} - ${toDate}`]);
-      data.push([]);
-      data.push(["Date", "Qty", "TAX GHC", "Amount GHC", "Paid GHC", "Due GHC", "Status"]);
-      filtered.forEach(inv => data.push([inv.date, inv.qty, inv.tax, inv.amount, inv.paid, inv.due, inv.status]));
-      const totals = filtered.reduce((a, i) => ({ qty: a.qty + i.qty, tax: a.tax + i.tax, amount: a.amount + i.amount, paid: a.paid + i.paid, due: a.due + i.due }), { qty: 0, tax: 0, amount: 0, paid: 0, due: 0 });
-      data.push(["TOTAL", totals.qty, totals.tax, totals.amount, totals.paid, totals.due, ""]);
-      const ws = XLSX.utils.aoa_to_sheet(data);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Invoice Report");
-      XLSX.writeFile(wb, `invoice-report-${new Date().toISOString().split('T')[0]}.xlsx`);
-      toast({ title: "Excel exported" });
-    });
-  };
+  const cards = [
+    { label: "Today's Revenue", value: stats.today.revenue, sub: `${stats.today.transactionCount} sales`, color: "from-emerald-500 to-teal-600" },
+    { label: "Today's Profit", value: stats.today.grossProfit, sub: `COGS: ${formatGHS(stats.today.costOfGoods)}`, color: "from-blue-500 to-indigo-600" },
+    { label: "This Week", value: stats.weekToDate.revenue, sub: `${stats.weekToDate.transactionCount} sales`, color: "from-purple-500 to-violet-600" },
+    { label: "This Month", value: stats.monthToDate.revenue, sub: `${stats.monthToDate.transactionCount} sales`, color: "from-amber-500 to-orange-600" },
+  ];
 
   return (
-    <>
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]" onClick={onClose}>
-        <motion.div initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }}
-          onClick={(e) => e.stopPropagation()}
-          className="w-full rounded-lg shadow-2xl overflow-hidden flex flex-col" style={{ width: '100%', maxWidth: '480px', backgroundColor: '#0078D7', fontFamily: 'Arial, Helvetica, sans-serif' }}>
-          {/* Title Bar */}
-          <div className="flex items-center justify-between px-3 py-1.5">
-            <span className="text-xs font-bold text-white">Invoice List Report</span>
-            <button onClick={onClose} className="h-5 w-5 rounded bg-red-600 hover:bg-red-700 flex items-center justify-center"><X className="h-3 w-3 text-white" /></button>
-          </div>
-
-          {/* Filter Fields */}
-          <div className="px-4 py-3 space-y-2">
-            {[
-              { label: "Location", type: "select", value: location, set: setLocation, options: ["All Locations", "Main Store", "Warehouse"] },
-              { label: "Type", type: "select", value: type, set: setType, options: ["Invoice", "Quote", "Order"] },
-            ].map(f => (
-              <div key={f.label} className="flex items-center gap-3">
-                <label className="text-[10px] text-white font-semibold w-24 text-right">{f.label}</label>
-                <select value={f.value} onChange={(e) => f.set(e.target.value)} className="flex-1 h-6 text-[10px] border border-white/40 rounded px-1 bg-white text-slate-800 outline-none">
-                  {f.options.map(o => <option key={o} value={o.toLowerCase().replace(/\s/g, '-')}>{o}</option>)}
-                </select>
-              </div>
-            ))}
-            <div className="flex items-center gap-3">
-              <label className="text-[10px] text-white font-semibold w-24 text-right">Reference No.</label>
-              <input value={refNo} onChange={(e) => setRefNo(e.target.value)} className="flex-1 h-6 text-[10px] border border-white/40 rounded px-1 bg-white text-slate-800 outline-none" />
-            </div>
-            <div className="flex items-center gap-3">
-              <label className="text-[10px] text-white font-semibold w-24 text-right">Client Name</label>
-              <input value={clientName} onChange={(e) => setClientName(e.target.value)} className="flex-1 h-6 text-[10px] border border-white/40 rounded px-1 bg-white text-slate-800 outline-none" />
-            </div>
-            <div className="flex items-center gap-3">
-              <label className="text-[10px] text-white font-semibold w-24 text-right">Report Type</label>
-              <select value={reportType} onChange={(e) => setReportType(e.target.value)} className="flex-1 h-6 text-[10px] border border-white/40 rounded px-1 bg-white text-slate-800 outline-none">
-                <option value="totals">Totals</option>
-                <option value="summary">Summary</option>
-                <option value="detailed">Detailed</option>
-              </select>
-            </div>
-            <div className="flex items-center gap-3">
-              <label className="text-[10px] text-white font-semibold w-24 text-right">Status</label>
-              <select value={status} onChange={(e) => setStatus(e.target.value)} className="flex-1 h-6 text-[10px] border border-white/40 rounded px-1 bg-white text-slate-800 outline-none">
-                <option value="all">All</option>
-                <option value="outstanding">Outstanding</option>
-                <option value="paid">Paid</option>
-              </select>
-            </div>
-            <div className="flex items-center gap-3">
-              <label className="text-[10px] text-white font-semibold w-24 text-right">From Date</label>
-              <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="flex-1 h-6 text-[10px] border border-white/40 rounded px-1 bg-white text-slate-800 outline-none" />
-            </div>
-            <div className="flex items-center gap-3">
-              <label className="text-[10px] text-white font-semibold w-24 text-right">To Date</label>
-              <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="flex-1 h-6 text-[10px] border border-white/40 rounded px-1 bg-white text-slate-800 outline-none" />
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex items-center justify-center gap-2 px-4 py-3 border-t border-white/20">
-            <button onClick={handleScreen} className="h-8 px-4 rounded bg-white/20 hover:bg-white/30 text-white text-[10px] font-semibold flex items-center gap-1.5 transition"><Monitor className="h-3.5 w-3.5" /> Screen</button>
-            <button onClick={handlePrint} className="h-8 px-4 rounded bg-white/20 hover:bg-white/30 text-white text-[10px] font-semibold flex items-center gap-1.5 transition"><Printer className="h-3.5 w-3.5" /> Printer <kbd className="text-[7px] bg-white/20 px-0.5 rounded">F3</kbd></button>
-            <button onClick={handleFile} className="h-8 px-4 rounded bg-white/20 hover:bg-white/30 text-white text-[10px] font-semibold flex items-center gap-1.5 transition"><Folder className="h-3.5 w-3.5" /> File</button>
-            <button onClick={onClose} className="h-8 px-4 rounded bg-red-600 hover:bg-red-700 text-white text-[10px] font-semibold flex items-center gap-1.5 transition"><X className="h-3.5 w-3.5" /> Close <kbd className="text-[7px] bg-white/20 px-0.5 rounded">Esc</kbd></button>
-          </div>
+    <div className="mt-6 grid grid-cols-2 lg:grid-cols-4 gap-3">
+      {cards.map((card, i) => (
+        <motion.div
+          key={i}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: i * 0.1 }}
+          className={cn("rounded-2xl p-4 bg-gradient-to-br text-white shadow-lg", card.color)}
+        >
+          <div className="text-[10px] uppercase font-bold tracking-wider opacity-80">{card.label}</div>
+          <div className="text-xl font-bold font-mono mt-1">{formatGHS(card.value)}</div>
+          <div className="text-[10px] opacity-80 mt-0.5">{card.sub}</div>
         </motion.div>
-      </motion.div>
-
-      {/* Generated Report Viewer */}
-      <AnimatePresence>
-        {generatedReport && (
-          <InvoiceReportViewer
-            data={generatedReport}
-            reportType={reportType}
-            status={status}
-            fromDate={fromDate}
-            toDate={toDate}
-            onClose={() => setGeneratedReport(null)}
-          />
-        )}
-      </AnimatePresence>
-    </>
+      ))}
+    </div>
   );
 }
 
-// ===== Invoice Report Viewer (Screen output) =====
-function InvoiceReportViewer({ data, reportType, status, fromDate, toDate, onClose }: {
-  data: Invoice[]; reportType: string; status: string; fromDate: string; toDate: string; onClose: () => void;
-}) {
-  const fmtDate = (iso: string) => { const [y, m, d] = iso.split('-'); return `${parseInt(m)}/${parseInt(d)}/${y}`; };
-  const fmtNum = (n: number) => n.toFixed(2);
-  const now = new Date();
-  const dateStr = `${now.getMonth() + 1}/${now.getDate()}/${now.getFullYear()}`;
-  const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+// ===== Report Viewer (the main report modal) =====
+function ReportViewer({ reportType, onClose }: { reportType: ReportType; onClose: () => void }) {
+  const { toast } = useToast();
+  const config = REPORT_CONFIG[reportType];
+  const Icon = config.icon;
 
-  const totals = data.reduce((a, i) => ({ qty: a.qty + i.qty, tax: a.tax + i.tax, amount: a.amount + i.amount, paid: a.paid + i.paid, due: a.due + i.due }), { qty: 0, tax: 0, amount: 0, paid: 0, due: 0 });
+  // Filters
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [paymentFilter, setPaymentFilter] = useState("all");
+  const [cashierFilter, setCashierFilter] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
 
-  const title = reportType === "totals" ? "Totals" : reportType === "summary" ? "Summary" : "Detailed";
-  const statusText = status === "paid" ? " · Status: Paid" : status === "outstanding" ? " · Status: Outstanding" : "";
+  // Data
+  const [sales, setSales] = useState<SaleRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showFilters, setShowFilters] = useState(true);
+
+  const fetchSales = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (dateFrom) params.set("dateFrom", dateFrom);
+      if (dateTo) params.set("dateTo", dateTo);
+      params.set("limit", "1000");
+      const res = await fetch(`/api/sales?${params}`, { credentials: "include" });
+      if (!res.ok) return;
+      const data = await res.json();
+      setSales(data.sales || []);
+    } catch { /* ignore */ }
+    finally { setLoading(false); }
+  }, [dateFrom, dateTo]);
+
+  useEffect(() => { fetchSales(); }, [fetchSales]);
+
+  // Apply filters
+  const filteredSales = useMemo(() => {
+    let result = sales;
+    if (statusFilter !== "all") result = result.filter(s => s.status === statusFilter);
+    if (paymentFilter !== "all") result = result.filter(s => s.paymentMethod === paymentFilter);
+    if (cashierFilter !== "all") result = result.filter(s => s.cashierName === cashierFilter);
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(s =>
+        s.invoiceNumber?.toLowerCase().includes(q) ||
+        s.customerName?.toLowerCase().includes(q) ||
+        s.cashierName?.toLowerCase().includes(q)
+      );
+    }
+    return result;
+  }, [sales, statusFilter, paymentFilter, cashierFilter, searchQuery]);
+
+  // Unique cashiers for filter dropdown
+  const cashiers = useMemo(() => [...new Set(sales.map(s => s.cashierName))].filter(Boolean), [sales]);
+
+  // Compute report data based on type
+  const reportData = useMemo(() => {
+    switch (reportType) {
+      case "invoice-list":
+        return filteredSales.map(s => ({
+          "Invoice #": s.invoiceNumber,
+          "Date": new Date(s.createdAt).toLocaleDateString("en-GB"),
+          "Customer": s.customerName || "Walk-in",
+          "Cashier": s.cashierName,
+          "Subtotal": s.subtotal,
+          "Discount": s.discount,
+          "Tax": s.taxAmount,
+          "Total": s.total,
+          "Paid": s.amountPaid,
+          "Method": s.paymentMethod,
+          "Status": s.status,
+        }));
+
+      case "sales-summary": {
+        const totalRev = filteredSales.reduce((s, x) => s + x.total, 0);
+        const totalTax = filteredSales.reduce((s, x) => s + x.taxAmount, 0);
+        const totalDisc = filteredSales.reduce((s, x) => s + x.discount, 0);
+        const totalProfit = filteredSales.reduce((s, x) => s + (x.grossProfit || 0), 0);
+        return [{
+          "Period": `${dateFrom || "All"} to ${dateTo || "Today"}`,
+          "Transactions": filteredSales.length,
+          "Gross Sales": filteredSales.reduce((s, x) => s + x.subtotal, 0),
+          "Discounts Given": totalDisc,
+          "Tax Collected": totalTax,
+          "Net Revenue": totalRev,
+          "Cost of Goods": filteredSales.reduce((s, x) => s + (x.costOfGoods || 0), 0),
+          "Gross Profit": totalProfit,
+          "Avg Transaction": filteredSales.length > 0 ? totalRev / filteredSales.length : 0,
+          "Profit Margin %": totalRev > 0 ? (totalProfit / totalRev) * 100 : 0,
+        }];
+      }
+
+      case "sold-items": {
+        const itemAgg: Record<string, any> = {};
+        for (const sale of filteredSales) {
+          for (const item of sale.items || []) {
+            const key = item.sku;
+            if (!itemAgg[key]) {
+              itemAgg[key] = { "SKU": item.sku, "Product": item.name, "Qty Sold": 0, "Revenue": 0, "Emoji": item.emoji };
+            }
+            itemAgg[key]["Qty Sold"] += item.quantity;
+            itemAgg[key]["Revenue"] += item.total;
+          }
+        }
+        return Object.values(itemAgg).sort((a, b) => b["Revenue"] - a["Revenue"]);
+      }
+
+      case "sales-by-client": {
+        const clientAgg: Record<string, any> = {};
+        for (const sale of filteredSales) {
+          const key = sale.customerName || "Walk-in";
+          if (!clientAgg[key]) {
+            clientAgg[key] = { "Customer": key, "Transactions": 0, "Total Spent": 0, "Items": 0, "Tax Paid": 0 };
+          }
+          clientAgg[key]["Transactions"] += 1;
+          clientAgg[key]["Total Spent"] += sale.total;
+          clientAgg[key]["Items"] += (sale.items?.length || 0);
+          clientAgg[key]["Tax Paid"] += sale.taxAmount;
+        }
+        return Object.values(clientAgg).sort((a, b) => b["Total Spent"] - a["Total Spent"]);
+      }
+
+      case "sales-by-product": {
+        const prodAgg: Record<string, any> = {};
+        for (const sale of filteredSales) {
+          for (const item of sale.items || []) {
+            const key = item.sku;
+            if (!prodAgg[key]) {
+              prodAgg[key] = { "SKU": item.sku, "Product": item.name, "Qty": 0, "Revenue": 0, "Avg Price": 0, "Sales Count": 0 };
+            }
+            prodAgg[key]["Qty"] += item.quantity;
+            prodAgg[key]["Revenue"] += item.total;
+            prodAgg[key]["Sales Count"] += 1;
+          }
+        }
+        Object.values(prodAgg).forEach((p: any) => { p["Avg Price"] = p["Qty"] > 0 ? p["Revenue"] / p["Qty"] : 0; });
+        return Object.values(prodAgg).sort((a, b) => b["Revenue"] - a["Revenue"]);
+      }
+
+      case "sales-by-cashier": {
+        const cashierAgg: Record<string, any> = {};
+        for (const sale of filteredSales) {
+          const key = sale.cashierName || "Unknown";
+          if (!cashierAgg[key]) {
+            cashierAgg[key] = { "Cashier": key, "Transactions": 0, "Total Sales": 0, "Items Sold": 0, "Tax Collected": 0, "Profit": 0 };
+          }
+          cashierAgg[key]["Transactions"] += 1;
+          cashierAgg[key]["Total Sales"] += sale.total;
+          cashierAgg[key]["Items Sold"] += (sale.items?.length || 0);
+          cashierAgg[key]["Tax Collected"] += sale.taxAmount;
+          cashierAgg[key]["Profit"] += (sale.grossProfit || 0);
+        }
+        return Object.values(cashierAgg).sort((a, b) => b["Total Sales"] - a["Total Sales"]);
+      }
+
+      case "sales-tax": {
+        const taxAgg: Record<string, any> = {};
+        for (const sale of filteredSales) {
+          const key = sale.paymentMethod;
+          if (!taxAgg[key]) taxAgg[key] = { "Payment Method": key, "Transactions": 0, "Subtotal": 0, "Tax": 0, "Total": 0 };
+          taxAgg[key]["Transactions"] += 1;
+          taxAgg[key]["Subtotal"] += sale.subtotal;
+          taxAgg[key]["Tax"] += sale.taxAmount;
+          taxAgg[key]["Total"] += sale.total;
+        }
+        return Object.values(taxAgg);
+      }
+
+      case "payment-methods": {
+        const payAgg: Record<string, any> = {};
+        for (const sale of filteredSales) {
+          const key = sale.paymentMethod;
+          if (!payAgg[key]) payAgg[key] = { "Method": key, "Count": 0, "Amount": 0, "% of Total": 0 };
+          payAgg[key]["Count"] += 1;
+          payAgg[key]["Amount"] += sale.amountPaid;
+        }
+        const total = Object.values(payAgg).reduce((s: number, x: any) => s + x["Amount"], 0);
+        Object.values(payAgg).forEach((p: any) => { p["% of Total"] = total > 0 ? (p["Amount"] / total) * 100 : 0; });
+        return Object.values(payAgg).sort((a, b) => b["Amount"] - a["Amount"]);
+      }
+
+      case "profit-analysis": {
+        return filteredSales.map(s => ({
+          "Invoice": s.invoiceNumber,
+          "Date": new Date(s.createdAt).toLocaleDateString("en-GB"),
+          "Revenue": s.subtotal,
+          "COGS": s.costOfGoods || 0,
+          "Gross Profit": s.grossProfit || 0,
+          "Margin %": s.subtotal > 0 ? ((s.grossProfit || 0) / s.subtotal) * 100 : 0,
+          "Items": s.items?.length || 0,
+        })).sort((a, b) => b["Gross Profit"] - a["Gross Profit"]);
+      }
+
+      case "loyalty-points": {
+        return filteredSales.filter(s => s.pointsEarned > 0 || s.pointsRedeemed > 0).map(s => ({
+          "Invoice": s.invoiceNumber,
+          "Date": new Date(s.createdAt).toLocaleDateString("en-GB"),
+          "Customer": s.customerName || "Walk-in",
+          "Points Earned": s.pointsEarned,
+          "Points Redeemed": s.pointsRedeemed,
+          "Net Points": s.pointsEarned - s.pointsRedeemed,
+          "Sale Total": s.total,
+        }));
+      }
+
+      default:
+        return [];
+    }
+  }, [filteredSales, reportType, dateFrom, dateTo]);
+
+  // Summary stats for the report
+  const summary = useMemo(() => {
+    if (reportData.length === 0) return null;
+    const numericCols = Object.keys(reportData[0]).filter(k => typeof reportData[0][k] === "number");
+    const sums: Record<string, number> = {};
+    for (const col of numericCols) {
+      sums[col] = reportData.reduce((s, row) => s + (typeof row[col] === "number" ? row[col] : 0), 0);
+    }
+    return { count: reportData.length, sums };
+  }, [reportData]);
+
+  // Export functions
+  const exportCSV = () => {
+    if (reportData.length === 0) return;
+    const headers = Object.keys(reportData[0]);
+    const csv = [
+      headers.join(","),
+      ...reportData.map(row => headers.map(h => {
+        const val = row[h];
+        if (typeof val === "number") return val.toFixed(2);
+        return `"${String(val).replace(/"/g, '""')}"`;
+      }).join(","))
+    ].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${reportType}-report-${new Date().toISOString().split("T")[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast({ title: "CSV Exported", description: `${reportData.length} rows` });
+  };
+
+  const exportExcel = () => {
+    if (reportData.length === 0) return;
+    // Use the xlsx library (already in dependencies)
+    import("xlsx").then((XLSX) => {
+      const ws = XLSX.utils.json_to_sheet(reportData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Report");
+      XLSX.writeFile(wb, `${reportType}-report-${new Date().toISOString().split("T")[0]}.xlsx`);
+      toast({ title: "Excel Exported", description: `${reportData.length} rows` });
+    });
+  };
+
+  const exportPDF = () => {
+    if (reportData.length === 0) return;
+    const printWin = window.open("", "_blank", "width=900,height=700");
+    if (!printWin) { toast({ title: "Popup blocked", variant: "destructive" }); return; }
+
+    const headers = Object.keys(reportData[0]);
+    const rows = reportData.map(row =>
+      `<tr>${headers.map(h => {
+        const val = row[h];
+        const formatted = typeof val === "number" ? val.toFixed(2) : val;
+        const align = typeof val === "number" ? "right" : "left";
+        return `<td style="text-align:${align};padding:4px 8px;border:1px solid #ddd">${formatted}</td>`;
+      }).join("")}</tr>`
+    ).join("");
+
+    const summaryHtml = summary ? `
+      <div style="margin-bottom:20px;padding:12px;background:#f0f4f8;border-radius:8px">
+        <strong>Summary:</strong> ${summary.count} records |
+        ${Object.entries(summary.sums).map(([k, v]) => `${k}: <strong>${typeof v === "number" && v % 1 !== 0 ? v.toFixed(2) : v}</strong>`).join(" | ")}
+      </div>` : "";
+
+    printWin.document.write(`<!DOCTYPE html><html><head><title>${config.label}</title>
+      <style>
+        body{font-family:Arial,sans-serif;margin:20px;color:#1e293b}
+        h1{font-size:18px;color:#1e40af;margin-bottom:4px}
+        .meta{font-size:11px;color:#64748b;margin-bottom:16px}
+        table{width:100%;border-collapse:collapse;font-size:11px}
+        th{background:#1e40af;color:white;padding:6px 8px;text-align:left;font-weight:bold}
+        tr:nth-child(even){background:#f8fafc}
+        .footer{margin-top:20px;font-size:10px;color:#94a3b8;text-align:center}
+      </style></head><body>
+      <h1>${config.label}</h1>
+      <div class="meta">${COMPANY.name} · ${COMPANY.address} · ${COMPANY.contact}<br>
+      Generated: ${new Date().toLocaleString("en-GB")} | Period: ${dateFrom || "All"} to ${dateTo || "Today"} | Records: ${reportData.length}</div>
+      ${summaryHtml}
+      <table><thead><tr>${headers.map(h => `<th>${h}</th>`).join("")}</tr></thead>
+      <tbody>${rows}</tbody></table>
+      <div class="footer">SYLHN POS · Advanced Reports · Generated by ${COMPANY.name}</div>
+      </body></html>`);
+    printWin.document.close();
+    setTimeout(() => { printWin.focus(); printWin.print(); }, 300);
+    toast({ title: "PDF Print Ready", description: "Check the print dialog" });
+  };
+
+  const columns = reportData.length > 0 ? Object.keys(reportData[0]) : [];
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-[70]" onClick={onClose}>
-      <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}
-        onClick={(e) => e.stopPropagation()} className="bg-white rounded-lg shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
-        {/* Close button */}
-        <div className="flex items-center justify-between px-4 py-1.5 bg-slate-100 border-b border-slate-300">
-          <span className="text-xs font-bold text-slate-700">Invoice Report Preview</span>
-          <button onClick={onClose} className="h-6 w-6 rounded bg-rose-100 hover:bg-rose-200 flex items-center justify-center"><X className="h-3.5 w-3.5 text-rose-600" /></button>
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.95, y: 30 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.95, y: 30 }}
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[95vh] overflow-hidden flex flex-col"
+      >
+        {/* Header */}
+        <div className="flex-shrink-0 bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-700 text-white px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-white/15 flex items-center justify-center flex-shrink-0">
+              <Icon className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-sm sm:text-base font-bold truncate">{config.label}</div>
+              <div className="text-[10px] text-blue-100/80 truncate">{reportData.length} records | {dateFrom || "All"} → {dateTo || "Today"}</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {/* Export buttons */}
+            <button onClick={exportCSV} disabled={reportData.length === 0} className="h-8 px-2.5 rounded-lg bg-white/15 hover:bg-white/25 disabled:opacity-40 text-white text-[10px] font-bold flex items-center gap-1 transition" title="Export to CSV">
+              <Download className="h-3.5 w-3.5" /> CSV
+            </button>
+            <button onClick={exportExcel} disabled={reportData.length === 0} className="h-8 px-2.5 rounded-lg bg-white/15 hover:bg-white/25 disabled:opacity-40 text-white text-[10px] font-bold flex items-center gap-1 transition" title="Export to Excel">
+              <FileSpreadsheet className="h-3.5 w-3.5" /> Excel
+            </button>
+            <button onClick={exportPDF} disabled={reportData.length === 0} className="h-8 px-2.5 rounded-lg bg-white/15 hover:bg-white/25 disabled:opacity-40 text-white text-[10px] font-bold flex items-center gap-1 transition" title="Print / Export to PDF">
+              <Printer className="h-3.5 w-3.5" /> PDF
+            </button>
+            <button onClick={() => setShowFilters(!showFilters)} className="h-8 px-2.5 rounded-lg bg-white/15 hover:bg-white/25 text-white text-[10px] font-bold flex items-center gap-1 transition" title="Toggle filters">
+              <Filter className="h-3.5 w-3.5" /> Filters
+            </button>
+            <button onClick={onClose} className="h-8 w-8 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center transition">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
-        <ScrollArea className="flex-1">
-          <div className="p-6">
-            {/* Company Header */}
-            <div className="text-center border-b-2 border-slate-800 pb-2 mb-3">
-              <div className="text-base font-bold text-slate-900">{COMPANY.name}</div>
-              <div className="text-[11px] text-slate-600">Accra Warehouse</div>
-              <div className="text-[10px] text-slate-500">{COMPANY.address} · {COMPANY.contact}</div>
-            </div>
-            <div className="flex justify-end text-[10px] text-slate-500 mb-2">
-              <div className="text-right"><div>{dateStr}</div><div>{timeStr}</div><div className="font-semibold text-slate-700">Page 1</div></div>
-            </div>
+        {/* Filter Bar */}
+        <AnimatePresence>
+          {showFilters && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="flex-shrink-0 overflow-hidden"
+            >
+              <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-1.5">
+                  <Calendar className="h-3.5 w-3.5 text-slate-400" />
+                  <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-8 px-2 text-xs rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-blue-400" />
+                  <span className="text-xs text-slate-400">to</span>
+                  <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-8 px-2 text-xs rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-blue-400" />
+                </div>
+                <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="h-8 px-2 text-xs rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-blue-400 bg-white">
+                  <option value="all">All Status</option>
+                  <option value="completed">Completed</option>
+                  <option value="voided">Voided</option>
+                  <option value="refunded">Refunded</option>
+                </select>
+                <select value={paymentFilter} onChange={(e) => setPaymentFilter(e.target.value)} className="h-8 px-2 text-xs rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-blue-400 bg-white">
+                  <option value="all">All Methods</option>
+                  <option value="cash">Cash</option>
+                  <option value="card">Card</option>
+                  <option value="momo">MoMo</option>
+                  <option value="wallet">Wallet</option>
+                </select>
+                {cashiers.length > 0 && (
+                  <select value={cashierFilter} onChange={(e) => setCashierFilter(e.target.value)} className="h-8 px-2 text-xs rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-blue-400 bg-white">
+                    <option value="all">All Cashiers</option>
+                    {cashiers.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                )}
+                <div className="relative flex-1 min-w-[150px]">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                  <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search invoice, customer..." className="w-full h-8 pl-8 pr-3 text-xs rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-blue-400" />
+                </div>
+                <Button size="sm" variant="outline" onClick={fetchSales} className="h-8 text-xs">
+                  <Loader2 className={cn("h-3.5 w-3.5", loading && "animate-spin")} /> Refresh
+                </Button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-            {/* Title */}
-            <div className="text-center mb-4">
-              <h1 className="text-sm font-bold text-slate-900">{title} Invoice Report</h1>
-              <p className="text-[11px] text-slate-600">For The Period {fmtDate(fromDate)} - {fmtDate(toDate)}{statusText}</p>
-            </div>
+        {/* Summary Bar */}
+        {summary && (
+          <div className="flex-shrink-0 px-4 py-2 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-slate-200 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px]">
+            <Badge variant="secondary" className="bg-blue-100 text-blue-700">{summary.count} records</Badge>
+            {Object.entries(summary.sums).slice(0, 5).map(([k, v]) => (
+              <span key={k} className="text-slate-600">
+                <strong className="text-slate-800">{k}:</strong> {typeof v === "number" && v % 1 !== 0 ? formatGHS(v) : v}
+              </span>
+            ))}
+          </div>
+        )}
 
-            {/* Table */}
-            <div className="mobile-scroll-x">
-            <table className="w-full text-[10px]" style={{ borderCollapse: 'collapse' }}>
-              <thead><tr style={{ backgroundColor: '#E6E6FA' }}>
-                <th className="px-2 py-1.5 text-left font-bold text-slate-800 border border-slate-400">Date</th>
-                <th className="px-2 py-1.5 text-right font-bold text-slate-800 border border-slate-400">Qty</th>
-                <th className="px-2 py-1.5 text-right font-bold text-slate-800 border border-slate-400">TAX GHC</th>
-                <th className="px-2 py-1.5 text-right font-bold text-slate-800 border border-slate-400">Amount GHC</th>
-                <th className="px-2 py-1.5 text-right font-bold text-slate-800 border border-slate-400">Paid GHC</th>
-                <th className="px-2 py-1.5 text-right font-bold text-slate-800 border border-slate-400">Due GHC</th>
-              </tr></thead>
+        {/* Data Table */}
+        <div className="flex-1 overflow-auto min-h-0">
+          {loading ? (
+            <div className="flex items-center justify-center h-full py-20">
+              <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+              <span className="ml-3 text-sm text-slate-500">Loading report data...</span>
+            </div>
+          ) : reportData.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full py-20 text-slate-400">
+              <FileBarChart className="h-12 w-12 mb-3 opacity-30" />
+              <div className="text-sm font-medium">No data for this report</div>
+              <div className="text-xs mt-1">Try adjusting the date range or filters</div>
+            </div>
+          ) : (
+            <table className="w-full text-xs">
+              <thead className="sticky top-0 z-10">
+                <tr className="bg-slate-800 text-white">
+                  {columns.map(col => (
+                    <th key={col} className="px-3 py-2 text-left font-bold whitespace-nowrap">
+                      {col}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
               <tbody>
-                {data.map((inv, i) => (
-                  <tr key={inv.id} style={{ backgroundColor: i % 2 === 1 ? '#F8F8F8' : '#FFFFFF' }}>
-                    <td className="px-2 py-1 border border-slate-400">{fmtDate(inv.date)}</td>
-                    <td className="px-2 py-1 text-right border border-slate-400">{inv.qty.toFixed(2)}</td>
-                    <td className="px-2 py-1 text-right border border-slate-400">{fmtNum(inv.tax)}</td>
-                    <td className="px-2 py-1 text-right border border-slate-400">{fmtNum(inv.amount)}</td>
-                    <td className="px-2 py-1 text-right border border-slate-400">{fmtNum(inv.paid)}</td>
-                    <td className="px-2 py-1 text-right font-semibold border border-slate-400" style={{ color: inv.due > 0 ? '#FF0000' : '#000' }}>{fmtNum(inv.due)}</td>
+                {reportData.map((row, i) => (
+                  <tr key={i} className={cn("border-b border-slate-100 hover:bg-blue-50 transition", i % 2 === 1 && "bg-slate-50")}>
+                    {columns.map(col => {
+                      const val = row[col];
+                      const isNum = typeof val === "number";
+                      return (
+                        <td key={col} className={cn("px-3 py-1.5 whitespace-nowrap", isNum ? "text-right font-mono" : "text-left")}>
+                          {isNum ? (val % 1 !== 0 ? formatGHS(val) : val) : val}
+                        </td>
+                      );
+                    })}
                   </tr>
                 ))}
               </tbody>
-              <tfoot>
-                <tr style={{ backgroundColor: '#E6E6FA' }}>
-                  <td className="px-2 py-1.5 font-bold text-slate-900 border border-slate-400">TOTAL</td>
-                  <td className="px-2 py-1.5 text-right font-bold text-slate-900 border border-slate-400">{totals.qty.toFixed(2)}</td>
-                  <td className="px-2 py-1.5 text-right font-bold text-slate-900 border border-slate-400">{fmtNum(totals.tax)}</td>
-                  <td className="px-2 py-1.5 text-right font-bold text-slate-900 border border-slate-400">{fmtNum(totals.amount)}</td>
-                  <td className="px-2 py-1.5 text-right font-bold text-slate-900 border border-slate-400">{fmtNum(totals.paid)}</td>
-                  <td className="px-2 py-1.5 text-right font-bold border border-slate-400" style={{ color: totals.due > 0 ? '#FF0000' : '#000' }}>{fmtNum(totals.due)}</td>
-                </tr>
-              </tfoot>
+              {/* Summary row */}
+              {summary && (
+                <tfoot className="sticky bottom-0">
+                  <tr className="bg-slate-200 font-bold">
+                    {columns.map(col => {
+                      const val = summary.sums[col];
+                      return (
+                        <td key={col} className={cn("px-3 py-2 whitespace-nowrap", typeof val === "number" ? "text-right font-mono" : "text-left")}>
+                          {typeof val === "number" ? (val % 1 !== 0 ? formatGHS(val) : val) : (col === columns[0] ? "TOTAL" : "")}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                </tfoot>
+              )}
             </table>
-            </div>
+          )}
+        </div>
 
-            {/* Footer */}
-            <div className="text-center text-[9px] text-slate-400 mt-4 pt-2 border-t border-slate-200">
-              {COMPANY.name} · {COMPANY.address} · {COMPANY.contact}
-            </div>
-          </div>
-        </ScrollArea>
+        {/* Footer */}
+        <div className="flex-shrink-0 px-4 py-2 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-[10px] text-slate-500">
+          <span>{COMPANY.name} · Generated {new Date().toLocaleString("en-GB")}</span>
+          <span>{reportData.length} records | {columns.length} columns</span>
+        </div>
       </motion.div>
     </motion.div>
   );
