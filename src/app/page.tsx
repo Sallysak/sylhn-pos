@@ -1624,8 +1624,8 @@ export default function POSPage() {
 
         {/* ===== Right Panel: Cart ===== */}
         <section className={cn(
-          "flex flex-col bg-white rounded-2xl shadow-lg ring-1 ring-slate-200/60 lg:overflow-hidden transition-all duration-300",
-          showSidebar ? "lg:w-[38%] lg:min-w-[380px] w-full lg:flex-none" : "w-0 min-w-0 lg:w-0"
+          "flex flex-col bg-white rounded-2xl shadow-lg ring-1 ring-slate-200/60 overflow-hidden transition-all duration-300",
+          showSidebar ? "lg:w-[38%] lg:min-w-[380px] w-full lg:flex-none max-h-[70vh] lg:max-h-none" : "w-0 min-w-0 lg:w-0"
         )}>
           <AnimatePresence>
             {showSidebar && (
@@ -1633,7 +1633,7 @@ export default function POSPage() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="flex flex-col w-full lg:h-full"
+                className="flex flex-col w-full h-full"
               >
                 {/* Cart Header */}
                 <div className="flex-shrink-0 flex items-center justify-between px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-500 text-white">
@@ -1709,8 +1709,8 @@ export default function POSPage() {
                   </button>
                 </div>
 
-                {/* Cart Items Table */}
-                <div className="flex-1 flex flex-col lg:overflow-hidden lg:min-h-0">
+                {/* Cart Items Table — items scroll between header and totals */}
+                <div className="flex-1 flex flex-col overflow-hidden min-h-0">
                   {/* Desktop Table Header — light blue, hidden on mobile */}
                   <div className="hidden lg:grid flex-shrink-0 grid-cols-[120px_1fr_50px_80px_45px_80px] gap-1 px-2 py-1 text-[10px] font-bold text-slate-700 border-b border-slate-400" style={{ backgroundColor: '#ADD8E6' }}>
                     <div>Part No.</div>
@@ -1729,8 +1729,8 @@ export default function POSPage() {
                     <div className="text-right w-14">Total</div>
                   </div>
 
-                  {/* Items List — grows naturally on mobile, scrolls on desktop */}
-                  <div className="flex-1 lg:overflow-y-auto lg:overflow-x-hidden lg:min-h-0 no-scrollbar" style={{ WebkitOverflowScrolling: 'touch' }}>
+                  {/* Items List — scrolls independently (the white area) */}
+                  <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 no-scrollbar" style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
                     <div className="divide-y divide-slate-100">
                       <AnimatePresence mode="popLayout">
                         {cart.map((item, index) => {
