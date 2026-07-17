@@ -7,6 +7,7 @@ import {
   Package, AlertTriangle, Clock, BarChart3, Activity, RefreshCw,
   Search, Printer, RotateCcw, X, Calendar, AlertCircle, CheckCircle2,
   Star, Boxes, Percent, FileText, ChevronRight, ArrowUpRight, ArrowDownRight,
+  Plus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -264,6 +265,7 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
       if (res.ok) {
         toast({ title: "Sale refunded", description: `${sale.invoiceNumber} — stock restored`, variant: "destructive" });
         fetchSales();
+        fetchDashboard();
         setSelectedSale(null);
       } else {
         const data = await res.json();
@@ -272,6 +274,121 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
     } catch (e) {
       toast({ title: "Refund failed", description: "Network error", variant: "destructive" });
     }
+  };
+
+  // ===== Premium: Create Purchase Order for a single low-stock product =====
+  const handleCreatePO = async (product: any, suggestedQty: number, supplierId: string | null, supplierName: string | null, supplierCost: number | null) => {
+    if (!confirm(`Create purchase order for ${suggestedQty} × ${product.name} @ GHS ${(supplierCost || product.costPrice).toFixed(2)}?`)) return;
+    try {
+      const cost = supplierCost || product.costPrice;
+      const total = +(cost * suggestedQty).toFixed(2);
+      const res = await fetch('/api/purchases', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          type: 'purchase',
+          supplierId: supplierId || null,
+          supplierName: supplierName || 'Unassigned',
+          status: 'received',  // auto-receive so stock increments immediately
+          subtotal: total,
+          taxAmount: 0,
+          total,
+          amountPaid: 0,  // unpaid — supplier balance will be incremented
+          notes: `Auto-generated PO from low-stock reorder (suggested ${suggestedQty} units)`,
+          createdBy: 'Operations Dashboard',
+          receivedAt: new Date().toISOString(),
+          items: [{
+            productId: product.id,
+            partNo: product.sku,
+            details: product.name,
+            emoji: product.emoji,
+            quantity: suggestedQty,
+            cost,
+            tax: false,
+            total,
+          }],
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast({
+          title: 'Purchase Order Created',
+          description: `${data.purchase.refNo} — ${suggestedQty} × ${product.name} @ GHS ${cost.toFixed(2)} = GHS ${total.toFixed(2)}${supplierId ? ` (${supplierName})` : ''}`,
+        });
+        fetchDashboard();  // refresh low-stock list
+      } else {
+        toast({ title: 'Failed to create PO', description: data.error || '', variant: 'destructive' });
+      }
+    } catch (e: any) {
+      toast({ title: 'Network error', description: e?.message || '', variant: 'destructive' });
+    }
+  };
+
+  // ===== Premium: Create PO for ALL low-stock items (one PO per supplier) =====
+  const handleCreateAllPOs = async () => {
+    if (!confirm(`Create purchase orders for ALL ${reorderProducts.length} low-stock items? This will group items by their preferred supplier.`)) return;
+    // Group by supplier
+    const bySupplier: Record<string, { items: any[]; supplierId: string | null; supplierName: string }> = {};
+    for (const p of reorderProducts) {
+      const supplierId = (p as any).preferredSupplierId || 'unassigned';
+      if (!bySupplier[supplierId]) {
+        bySupplier[supplierId] = {
+          supplierId: (p as any).preferredSupplierId || null,
+          supplierName: (p as any).preferredSupplierName || 'Unassigned',
+          items: [],
+        };
+      }
+      bySupplier[supplierId].items.push(p);
+    }
+
+    let successCount = 0;
+    let totalCost = 0;
+    for (const group of Object.values(bySupplier)) {
+      const items = group.items.map((p: any) => ({
+        productId: p.id,
+        partNo: p.sku,
+        details: p.name,
+        emoji: p.emoji,
+        quantity: p.suggestedQty,
+        cost: p.preferredSupplierCost || p.costPrice,
+        tax: false,
+        total: +((p.preferredSupplierCost || p.costPrice) * p.suggestedQty).toFixed(2),
+      }));
+      const groupTotal = items.reduce((s: number, i: any) => s + i.total, 0);
+      totalCost += groupTotal;
+      try {
+        const res = await fetch('/api/purchases', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            type: 'purchase',
+            supplierId: group.supplierId,
+            supplierName: group.supplierName,
+            status: 'received',
+            subtotal: groupTotal,
+            taxAmount: 0,
+            total: groupTotal,
+            amountPaid: 0,
+            notes: `Bulk reorder from low-stock dashboard — ${items.length} items`,
+            createdBy: 'Operations Dashboard',
+            receivedAt: new Date().toISOString(),
+            items,
+          }),
+        });
+        const data = await res.json();
+        if (res.ok && data.success) successCount++;
+      } catch (e) {
+        console.error('PO creation failed:', e);
+      }
+    }
+    toast({
+      title: `${successCount} PO(s) created`,
+      description: successCount > 0 ? `Total restock cost: GHS ${totalCost.toFixed(2)} — ${Object.keys(bySupplier).length} suppliers` : 'No POs created (check console)',
+      variant: successCount > 0 ? 'default' : 'destructive',
+    });
+    fetchDashboard();
   };
 
   // ===== Print receipt =====
@@ -573,9 +690,19 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
                 </div>
               </div>
               <div className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 p-4 sm:p-6">
-                <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-4">
-                  <AlertTriangle className="h-4 w-4 text-amber-500" /> Reorder Suggestions
-                </h2>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-amber-500" /> Reorder Suggestions
+                  </h2>
+                  {reorderProducts.length > 0 && (
+                    <Button
+                      onClick={handleCreateAllPOs}
+                      className="h-8 px-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-[11px] font-semibold"
+                    >
+                      <Plus className="h-3 w-3 mr-1" /> Create All POs (by supplier)
+                    </Button>
+                  )}
+                </div>
                 {reorderProducts.length === 0 ? (
                   <div className="text-center py-12 text-slate-400 text-sm">
                     <CheckCircle2 className="h-8 w-8 mx-auto mb-2 text-emerald-400" /> All products well stocked
@@ -591,6 +718,8 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
                           <th className="text-right py-2 px-2 font-semibold text-slate-600">Suggested Qty</th>
                           <th className="text-right py-2 px-2 font-semibold text-slate-600">Unit Cost</th>
                           <th className="text-right py-2 px-2 font-semibold text-slate-600">Reorder Cost</th>
+                          <th className="text-right py-2 px-2 font-semibold text-slate-600">Supplier</th>
+                          <th className="text-center py-2 px-2 font-semibold text-slate-600">Action</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -610,6 +739,27 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
                             <td className="py-2 px-2 text-right font-mono font-bold text-amber-600">{(p as any).suggestedQty}</td>
                             <td className="py-2 px-2 text-right font-mono text-slate-600">{formatGHS(p.costPrice)}</td>
                             <td className="py-2 px-2 text-right font-mono font-bold text-slate-800">{formatGHS((p as any).reorderCost)}</td>
+                            <td className="py-2 px-2 text-[10px] text-slate-600">
+                              {(p as any).preferredSupplierName ? (
+                                <div>
+                                  <div className="font-semibold">{(p as any).preferredSupplierName}</div>
+                                  {(p as any).preferredSupplierCost && (
+                                    <div className="text-slate-400 font-mono">GHS {(p as any).preferredSupplierCost.toFixed(2)} · {(p as any).leadTimeDays || 0}d lead</div>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="text-slate-400 italic">Unassigned</span>
+                              )}
+                            </td>
+                            <td className="py-2 px-2 text-center">
+                              <button
+                                onClick={() => handleCreatePO(p, (p as any).suggestedQty, (p as any).preferredSupplierId || null, (p as any).preferredSupplierName || null, (p as any).preferredSupplierCost || null)}
+                                className="h-7 px-2 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-700 text-[10px] font-semibold flex items-center gap-1 mx-auto transition"
+                                title={`Create PO: ${(p as any).suggestedQty} × ${p.name}`}
+                              >
+                                <Plus className="h-3 w-3" /> Create PO
+                              </button>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -617,6 +767,7 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
                         <tr className="border-t-2 border-slate-300 bg-slate-50">
                           <td colSpan={5} className="py-3 px-2 text-right font-bold text-slate-700">Total Estimated Cost:</td>
                           <td className="py-3 px-2 text-right font-mono font-bold text-rose-600">{formatGHS(totalReorderCost)}</td>
+                          <td colSpan={2}></td>
                         </tr>
                       </tfoot>
                     </table>

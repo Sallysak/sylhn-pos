@@ -73,11 +73,52 @@ const BLUE = "#0078D7";
 
 export function SupplierForm({ onBack, products }: SupplierFormProps) {
   const { toast } = useToast();
+  // Premium fix: start with bundled initialSuppliers for instant render,
+  // then fetch from /api/suppliers on mount and replace the list.
   const [suppliers, setSuppliers] = useState<Supplier[]>(initialSuppliers);
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [supplierDetails, setSupplierDetails] = useState("");
   const [showSupplierList, setShowSupplierList] = useState(false);
   const [showNewSupplier, setShowNewSupplier] = useState(false);
+
+  // Premium fix: fetch suppliers from /api/suppliers on mount
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/suppliers', { credentials: 'include' });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+        const serverSuppliers: Supplier[] = (data.suppliers || []).map((s: any) => ({
+          id: s.id,
+          code: s.code,
+          name: s.name,
+          contactName: s.contactName || '',
+          phone: s.phone || '',
+          mobile: s.mobile || '',
+          email: s.email || '',
+          fax: s.fax || '',
+          address: s.address || '',
+          city: s.city || '',
+          state: s.state || '',
+          country: s.country || 'Ghana',
+          businessNo: s.businessNo || '',
+          tradingTerms: s.tradingTerms || 'Net 30',
+          creditLimit: s.creditLimit || 0,
+          balance: s.balance || 0,
+          taxInclusive: s.taxInclusive || false,
+          notes: s.notes || '',
+        }));
+        if (serverSuppliers.length > 0) {
+          setSuppliers(serverSuppliers);
+        }
+      } catch (e) {
+        console.warn('Failed to fetch suppliers from server:', e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // Form fields
   const [invoiceNo, setInvoiceNo] = useState(`PUR-${Date.now().toString().slice(-6)}`);
@@ -127,8 +168,8 @@ export function SupplierForm({ onBack, products }: SupplierFormProps) {
     toast({ title: "Supplier selected", description: `${supplier.name} (${supplier.code})` });
   };
 
-  // Add new supplier
-  const handleSaveNewSupplier = (newSupplier: Supplier) => {
+  // Add new supplier — Premium fix: persist to /api/suppliers
+  const handleSaveNewSupplier = async (newSupplier: Supplier) => {
     // Always close the popups first.
     setShowNewSupplier(false);
     setShowSupplierList(false);
@@ -137,7 +178,44 @@ export function SupplierForm({ onBack, products }: SupplierFormProps) {
     setSupplierDetails(newSupplier.name);
     setTerms(newSupplier.tradingTerms);
     setTaxInclusive(newSupplier.taxInclusive);
-    toast({ title: "New supplier added", description: `${newSupplier.name} (${newSupplier.code})` });
+    toast({ title: "New supplier added locally", description: `${newSupplier.name} (${newSupplier.code})` });
+
+    // Persist to server (best-effort)
+    try {
+      const res = await fetch('/api/suppliers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          name: newSupplier.name,
+          contactName: newSupplier.contactName || '',
+          phone: newSupplier.phone || '',
+          mobile: newSupplier.mobile || '',
+          email: newSupplier.email || '',
+          fax: newSupplier.fax || '',
+          address: newSupplier.address || '',
+          city: newSupplier.city || '',
+          state: newSupplier.state || '',
+          country: newSupplier.country || 'Ghana',
+          businessNo: newSupplier.businessNo || '',
+          tradingTerms: newSupplier.tradingTerms || 'Net 30',
+          creditLimit: newSupplier.creditLimit || 0,
+          taxInclusive: newSupplier.taxInclusive || false,
+          notes: newSupplier.notes || '',
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success && data.supplier?.id) {
+        // Replace the optimistic temp-id entry with the real server entry
+        setSuppliers(prev => prev.map(s => s.id === newSupplier.id ? { ...newSupplier, id: data.supplier.id, code: data.supplier.code } : s));
+        setSelectedSupplier({ ...newSupplier, id: data.supplier.id, code: data.supplier.code });
+        toast({ title: "Supplier synced to server", description: `${data.supplier.code} — ${data.supplier.name}` });
+      } else {
+        toast({ title: "Supplier saved locally (server sync failed)", description: data.error || `HTTP ${res.status}`, variant: "destructive" });
+      }
+    } catch (e: any) {
+      toast({ title: "Supplier saved locally (network error)", description: e?.message || '', variant: "destructive" });
+    }
   };
 
   // Add product to lines

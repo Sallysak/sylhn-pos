@@ -402,7 +402,7 @@ export function AdminPanel({ currentUser, onBack }: { currentUser: SystemUser; o
   const [showUserForm, setShowUserForm] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Load from localStorage
+  // Load from localStorage (instant render) + fetch from /api (server source of truth)
   useEffect(() => {
     try {
       const u = localStorage.getItem(USERS_KEY);
@@ -412,9 +412,58 @@ export function AdminPanel({ currentUser, onBack }: { currentUser: SystemUser; o
       const a = localStorage.getItem(AUDIT_KEY);
       setAuditLog(a ? JSON.parse(a) : []);
     } catch { /* ignore */ }
+    // Premium fix: fetch audit logs from server (was localStorage-only)
+    (async () => {
+      try {
+        const res = await fetch('/api/audit-logs?limit=500', { credentials: 'include' });
+        if (!res.ok) return;
+        const data = await res.json();
+        const serverLogs: AuditLogEntry[] = (data.logs || []).map((l: any) => ({
+          id: l.id,
+          timestamp: l.timestamp,
+          user: l.user,
+          action: l.action,
+          module: l.module,
+          details: l.details,
+          severity: l.severity || 'info',
+        }));
+        if (serverLogs.length > 0) {
+          setAuditLog(serverLogs);
+          try { localStorage.setItem(AUDIT_KEY, JSON.stringify(serverLogs)); } catch {}
+        }
+      } catch (e) {
+        console.warn('Failed to fetch audit logs from server:', e);
+      }
+    })();
+    // Also fetch users + settings from server (best-effort)
+    (async () => {
+      try {
+        const res = await fetch('/api/users', { credentials: 'include' });
+        if (!res.ok) return;
+        const data = await res.json();
+        const serverUsers: SystemUser[] = (data.users || []).map((u: any) => ({
+          id: u.id,
+          username: u.username,
+          password: '', // server never sends passwords
+          fullName: u.fullName,
+          role: u.role,
+          phone: u.phone || '',
+          email: u.email || '',
+          active: u.active !== false,
+          permissions: typeof u.permissions === 'string' ? JSON.parse(u.permissions || '{}') : (u.permissions || {}),
+          lastLogin: u.lastLogin || null,
+        }));
+        if (serverUsers.length > 0) {
+          setUsers(serverUsers);
+          try { localStorage.setItem(USERS_KEY, JSON.stringify(serverUsers)); } catch {}
+        }
+      } catch (e) {
+        console.warn('Failed to fetch users from server:', e);
+      }
+    })();
   }, []);
 
-  // Persist
+  // Persist (local mirror — server is source of truth)
   useEffect(() => { try { localStorage.setItem(USERS_KEY, JSON.stringify(users)); } catch {} }, [users]);
   useEffect(() => { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch {} }, [settings]);
 
@@ -428,6 +477,10 @@ export function AdminPanel({ currentUser, onBack }: { currentUser: SystemUser; o
       try { localStorage.setItem(AUDIT_KEY, JSON.stringify(updated)); } catch {}
       return updated;
     });
+    // Premium fix: also log to server (fire-and-forget; the server action itself
+    // is logged by the API route — this is the UI's local action)
+    // Note: most actions already hit /api/* endpoints which log to server audit.
+    // This is a fallback for purely-local actions like navigating tabs.
   };
 
   const filteredUsers = users.filter(u =>

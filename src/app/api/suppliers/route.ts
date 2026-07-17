@@ -3,6 +3,8 @@ import { db } from "@/lib/db";
 import { requireAuth, requirePermission } from "@/lib/auth";
 import { SupplierSchema, validate, validationError } from "@/lib/validation";
 import { rateLimitApiRead, rateLimitApiWrite, rateLimitResponse, getClientIp } from "@/lib/rate-limit";
+import { auditLog } from "@/lib/audit";
+import { generateSupplierCode } from "@/lib/identifiers";
 
 export async function GET(req: NextRequest) {
   try { await requireAuth(); } catch (e) { return e as Response; }
@@ -12,10 +14,14 @@ export async function GET(req: NextRequest) {
   if (!rl.allowed) return rateLimitResponse(rl);
 
   try {
+    const { searchParams } = new URL(req.url);
+    const active = searchParams.get("active");
+    const limit = Math.min(parseInt(searchParams.get("limit") || "500", 10), 1000);
+
     const suppliers = await db.supplier.findMany({
-      where: { active: true },
+      where: active === "true" ? { active: true } : active === "false" ? { active: false } : undefined,
       include: {
-        products: { include: { product: true } },
+        products: { include: { product: { select: { id: true, sku: true, name: true, emoji: true } } } },
         purchases: {
           take: 10,
           orderBy: { createdAt: "desc" },
@@ -27,6 +33,7 @@ export async function GET(req: NextRequest) {
         },
       },
       orderBy: { name: "asc" },
+      take: limit,
     });
     return NextResponse.json({ suppliers });
   } catch (e) {
@@ -58,10 +65,20 @@ export async function POST(req: NextRequest) {
         if (!r.success) continue;
         const data = {
           name: r.data.name,
-          contactName: r.data.contact || "",
+          contactName: r.data.contactName || r.data.contact || "",
           phone: r.data.phone || "",
+          mobile: r.data.mobile || "",
           email: r.data.email || "",
+          fax: r.data.fax || "",
           address: r.data.address || "",
+          city: r.data.city || "",
+          state: r.data.state || "",
+          country: r.data.country || "Ghana",
+          businessNo: r.data.businessNo || "",
+          tradingTerms: r.data.tradingTerms || "Net 30",
+          creditLimit: Number(r.data.creditLimit) || 0,
+          taxInclusive: Boolean(r.data.taxInclusive),
+          notes: r.data.notes || "",
           balance: Number(r.data.balance) || 0,
           active: r.data.active !== false,
         };
@@ -69,11 +86,21 @@ export async function POST(req: NextRequest) {
         if (existing) {
           results.push(await db.supplier.update({ where: { id: existing.id }, data }));
         } else {
-          results.push(await db.supplier.create({
-            data: { ...data, code: `SUP-${Date.now().toString().slice(-5)}` },
-          }));
+          const code = await generateSupplierCode();
+          results.push(await db.supplier.create({ data: { ...data, code } }));
         }
       }
+      // Audit bulk upsert
+      await auditLog({
+        userId: user.uid,
+        user: user.username,
+        action: "BULK_UPSERT",
+        module: "supplier",
+        details: `Bulk upserted ${results.length} suppliers`,
+        severity: "info",
+        ipAddress: ip,
+        userAgent: req.headers.get("user-agent") || "",
+      });
       return NextResponse.json({ success: true, count: results.length });
     }
 
@@ -81,28 +108,41 @@ export async function POST(req: NextRequest) {
     if (!result.success) return validationError(result.error);
     const s = result.data;
 
+    // Premium fix: accept the full supplier schema (was only saving 5 fields)
+    const code = s.code || await generateSupplierCode();
     const supplier = await db.supplier.create({
       data: {
-        code: `SUP-${Date.now().toString().slice(-5)}`,
+        code,
         name: s.name,
-        contactName: s.contact || "",
+        contactName: s.contactName || s.contact || "",
         phone: s.phone || "",
+        mobile: s.mobile || "",
         email: s.email || "",
+        fax: s.fax || "",
         address: s.address || "",
+        city: s.city || "",
+        state: s.state || "",
+        country: s.country || "Ghana",
+        businessNo: s.businessNo || "",
+        tradingTerms: s.tradingTerms || "Net 30",
+        creditLimit: Number(s.creditLimit) || 0,
+        taxInclusive: Boolean(s.taxInclusive),
+        notes: s.notes || "",
         balance: Number(s.balance) || 0,
+        active: s.active !== false,
       },
       include: { products: true, purchases: true },
     });
 
-    await db.auditLog.create({
-      data: {
-        userId: user.uid,
-        user: user.username,
-        action: "CREATE",
-        module: "supplier",
-        details: `Supplier ${supplier.code} (${supplier.name}) created`,
-        severity: "info",
-      },
+    await auditLog({
+      userId: user.uid,
+      user: user.username,
+      action: "CREATE",
+      module: "supplier",
+      details: `Supplier ${supplier.code} (${supplier.name}) created — terms: ${supplier.tradingTerms}, credit limit: GHS ${supplier.creditLimit}`,
+      severity: "info",
+      ipAddress: ip,
+      userAgent: req.headers.get("user-agent") || "",
     });
 
     return NextResponse.json({ success: true, supplier });

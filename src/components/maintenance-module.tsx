@@ -452,8 +452,8 @@ function BackupRestore() {
 // ===== Cashier Shift Tab =====
 function CashierShift({ cashier, dailyTotal, transactionCount }: { cashier: string; dailyTotal: number; transactionCount: number; }) {
   const { toast } = useToast();
-  const [shiftStartMs] = useState(Date.now());
-  const [shiftStartStr] = useState(new Date().toLocaleString('en-GB'));
+  const [shiftStartMs, setShiftStartMs] = useState(Date.now());
+  const [shiftStartStr, setShiftStartStr] = useState(new Date().toLocaleString('en-GB'));
   const [openingFloat, setOpeningFloat] = useState("100.00");
   const [shiftActive, setShiftActive] = useState(true);
   const [shiftPaused, setShiftPaused] = useState(false);
@@ -461,6 +461,52 @@ function CashierShift({ cashier, dailyTotal, transactionCount }: { cashier: stri
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [pausedAccumulated, setPausedAccumulated] = useState(0);
   const [pauseStartMs, setPauseStartMs] = useState<number | null>(null);
+  // Premium fix: track server-side shift ID for proper close
+  const [serverShiftId, setServerShiftId] = useState<string | null>(null);
+  const [actualCash, setActualCash] = useState("");
+
+  // Premium fix: on mount, check if there's an open shift on the server.
+  // If yes, resume it; if no, open a new one (with the default float).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const listRes = await fetch('/api/shifts?status=open', { credentials: 'include' });
+        if (!listRes.ok) return;
+        const data = await listRes.json();
+        const openShifts = data.shifts || [];
+        if (cancelled) return;
+        if (openShifts.length > 0) {
+          // Resume the most recent open shift
+          const s = openShifts[0];
+          setServerShiftId(s.id);
+          setShiftStartMs(new Date(s.openedAt).getTime());
+          setShiftStartStr(new Date(s.openedAt).toLocaleString('en-GB'));
+          setOpeningFloat(String(s.openingFloat || 0));
+          setShiftActive(true);
+        } else {
+          // Open a new shift on the server with the default float
+          const openRes = await fetch('/api/shifts', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ action: 'open', openingFloat: parseFloat(openingFloat) || 0 }),
+          });
+          if (openRes.ok) {
+            const openData = await openRes.json();
+            if (openData.shift?.id) {
+              setServerShiftId(openData.shift.id);
+              setShiftStartMs(new Date(openData.shift.openedAt).getTime());
+              setShiftStartStr(new Date(openData.shift.openedAt).toLocaleString('en-GB'));
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to sync shift with server:', e);
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Live clock: tick every second when shift is active and not paused
   useEffect(() => {
@@ -496,20 +542,84 @@ function CashierShift({ cashier, dailyTotal, transactionCount }: { cashier: stri
     toast({ title: "▶ Shift Resumed", description: `${cashier}'s shift has been resumed. Timer running.` });
   };
 
-  const handleEndShift = () => {
+  // Premium fix: End Shift now POSTs to /api/shifts (close action)
+  // — server computes expected cash, records variance, audits the close.
+  const handleEndShift = async () => {
     if (!shiftActive) return;
-    // Finalize elapsed time
+    const expectedCash = parseFloat(openingFloat) + dailyTotal;
+
+    // Prompt for actual cash if not entered
+    let actual = parseFloat(actualCash);
+    if (!actualCash) {
+      actual = expectedCash; // assume balanced if not entered
+    }
+    if (isNaN(actual)) {
+      toast({ title: 'Invalid actual cash', variant: 'destructive' });
+      return;
+    }
+
+    // Finalize elapsed time locally
     const finalPaused = pausedAccumulated + (pauseStartMs ? Date.now() - pauseStartMs : 0);
     setElapsedSeconds(Math.floor((Date.now() - shiftStartMs - finalPaused) / 1000));
     setShiftActive(false);
     setShiftPaused(false);
     setEndTime(new Date().toLocaleString('en-GB'));
-    const expectedCash = parseFloat(openingFloat) + dailyTotal;
-    toast({ title: "⏹ Shift Ended", description: `${cashier} — ${transactionCount} txns, ${formatGHS(dailyTotal)} sales, expected cash: ${formatGHS(expectedCash)}` });
+
+    // Close on server
+    if (serverShiftId) {
+      try {
+        const res = await fetch('/api/shifts', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ action: 'close', shiftId: serverShiftId, actualCash: actual, notes: '' }),
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          const variance = data.variance;
+          const varianceMsg = variance === 0 ? 'balanced' : (variance > 0 ? `+${formatGHS(variance)} over` : `${formatGHS(Math.abs(variance))} short`);
+          toast({
+            title: "⏹ Shift Closed on Server",
+            description: `${cashier} — ${transactionCount} txns, ${formatGHS(dailyTotal)} sales. Cash: ${formatGHS(varianceMsg.includes('over') ? actual : actual)} (expected ${formatGHS(expectedCash)}, ${varianceMsg})`,
+            variant: Math.abs(variance) > 5 ? 'destructive' : 'default',
+          });
+        } else {
+          toast({ title: 'Shift ended locally (server sync failed)', description: data.error || '', variant: 'destructive' });
+        }
+      } catch (e: any) {
+        toast({ title: 'Shift ended locally (network error)', description: e?.message || '', variant: 'destructive' });
+      }
+    } else {
+      toast({ title: "⏹ Shift Ended (local only)", description: `${cashier} — ${transactionCount} txns, ${formatGHS(dailyTotal)} sales, expected cash: ${formatGHS(expectedCash)}` });
+    }
   };
 
-  const handleStartNewShift = () => {
-    window.location.reload(); // Simplest way to reset everything
+  const handleStartNewShift = async () => {
+    // Premium fix: open a new server-side shift
+    try {
+      const res = await fetch('/api/shifts', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ action: 'open', openingFloat: parseFloat(openingFloat) || 0 }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success && data.shift?.id) {
+        setServerShiftId(data.shift.id);
+        setShiftStartMs(new Date(data.shift.openedAt).getTime());
+        setShiftStartStr(new Date(data.shift.openedAt).toLocaleString('en-GB'));
+        setShiftActive(true);
+        setShiftPaused(false);
+        setEndTime(null);
+        setElapsedSeconds(0);
+        setPausedAccumulated(0);
+        setPauseStartMs(null);
+        setActualCash("");
+        toast({ title: "New shift opened on server", description: `Float: ${formatGHS(parseFloat(openingFloat) || 0)}` });
+      } else {
+        toast({ title: 'Could not open shift', description: data.error || '', variant: 'destructive' });
+      }
+    } catch (e: any) {
+      toast({ title: 'Network error', description: e?.message || '', variant: 'destructive' });
+    }
   };
 
   return (
@@ -557,6 +667,18 @@ function CashierShift({ cashier, dailyTotal, transactionCount }: { cashier: stri
             <div className="flex items-center gap-2"><span className="text-lg font-bold text-slate-700">{CURRENCY}</span><input value={openingFloat} onChange={(e) => setOpeningFloat(e.target.value)} disabled={!shiftActive} className="flex-1 h-10 px-3 rounded-lg border-2 border-slate-200 focus:border-emerald-500 outline-none font-mono font-bold text-lg disabled:bg-slate-50" /></div>
             {shiftActive && <div className="mt-2 text-xs text-slate-500">Expected cash at end of shift: <span className="font-bold text-emerald-600">{formatGHS(parseFloat(openingFloat) || 0 + dailyTotal)}</span></div>}
           </div>
+
+          {/* Premium: Actual Cash input for shift reconciliation */}
+          {shiftActive && (
+            <div className="bg-white rounded-xl p-5 ring-1 ring-slate-200">
+              <label className="text-xs font-semibold text-slate-600 mb-1 block">Counted Cash (for shift close)</label>
+              <div className="flex items-center gap-2">
+                <span className="text-lg font-bold text-slate-700">{CURRENCY}</span>
+                <input value={actualCash} onChange={(e) => setActualCash(e.target.value)} placeholder={`Leave blank to assume ${formatGHS((parseFloat(openingFloat) || 0) + dailyTotal)}`} className="flex-1 h-10 px-3 rounded-lg border-2 border-slate-200 focus:border-rose-500 outline-none font-mono font-bold text-lg" />
+              </div>
+              <div className="mt-2 text-xs text-slate-500">Variance over GHS 5 triggers a manager-review alert.</div>
+            </div>
+          )}
 
           {/* Actions */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

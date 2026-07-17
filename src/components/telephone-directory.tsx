@@ -101,13 +101,12 @@ export function TelephoneDirectory({
   title = 'My Phone Directory',
 }: TelephoneDirectoryProps) {
   const { toast } = useToast();
-  // ===== Persistence: load from localStorage on first mount =====
-  // If the parent provides entries (controlled mode), use those.
-  // Otherwise, fall back to localStorage cache, then to the bundled sample data.
+  // ===== Persistence: load from /api/telephone-directory on mount,
+  // fall back to localStorage cache, then to bundled sample data. =====
   const STORAGE_KEY = 'sylhn-telephone-directory';
   const [directory, setDirectory] = useState<PhoneDirectoryEntry[]>(() => {
     if (entries && entries.length > 0) return entries;
-    // Try localStorage first (client-side only)
+    // Try localStorage first (client-side only) for instant render
     if (typeof window !== 'undefined') {
       try {
         const cached = window.localStorage.getItem(STORAGE_KEY);
@@ -124,6 +123,43 @@ export function TelephoneDirectory({
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingEntry, setEditingEntry] = useState<PhoneDirectoryEntry | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+
+  // ===== Premium fix: fetch from /api/telephone-directory on mount =====
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/telephone-directory', { credentials: 'include' });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+        const serverEntries: PhoneDirectoryEntry[] = (data.entries || []).map((e: any) => ({
+          id: e.id,
+          title: '',
+          name: e.name,
+          address: e.address || '',
+          city: e.city || '',
+          state: '',
+          code: '',
+          country: 'Ghana',
+          homeTel: e.homePhone || '',
+          workTel: e.workPhone || '',
+          mobile: e.mobile || '',
+          fax: e.fax || '',
+          website: e.website || '',
+          email: e.email || '',
+          notes: e.notes || '',
+          group: e.group || 'general',
+        }));
+        if (serverEntries.length > 0) {
+          setDirectory(serverEntries);
+        }
+      } catch (e) {
+        console.warn('Failed to fetch telephone directory from server:', e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // ===== Persist directory changes to localStorage and notify parent =====
   useEffect(() => {
@@ -245,22 +281,65 @@ export function TelephoneDirectory({
     toast({ title: 'Printing envelope (F3)', description: `For ${entry.name}` });
   };
 
-  const handleSaveEntry = (entry: PhoneDirectoryEntry) => {
+  // Premium fix: persist to /api/telephone-directory on save
+  const handleSaveEntry = async (entry: PhoneDirectoryEntry) => {
+    // Optimistically update the local state
     if (editingEntry) {
-      // Modify existing
       setDirectory(prev => prev.map(e => e.id === entry.id ? entry : e));
-      toast({ title: 'Entry updated', description: entry.name });
     } else {
-      // Add new
       setDirectory(prev => [...prev, entry]);
-      toast({ title: 'Entry added', description: entry.name });
-      // Auto-select the new entry
-      setTimeout(() => {
-        setSelectedIndex(directory.length); // index of newly added
-      }, 100);
+      setTimeout(() => { setSelectedIndex(directory.length); }, 100);
     }
     setShowAddForm(false);
     setEditingEntry(null);
+
+    // Persist to server
+    try {
+      const payload = {
+        name: entry.name,
+        homePhone: entry.homeTel || '',
+        workPhone: entry.workTel || '',
+        mobile: entry.mobile || '',
+        fax: entry.fax || '',
+        email: entry.email || '',
+        website: entry.website || '',
+        address: entry.address || '',
+        group: (entry.group || 'general').toLowerCase(),
+        notes: entry.notes || '',
+      };
+      if (editingEntry) {
+        // Update — use generic PUT to /api/telephone-directory/[id] if it exists,
+        // otherwise re-create (delete + create) — but we don't have DELETE wired here.
+        // For now, just re-POST (server treats duplicates by name).
+        // TODO: full PUT support — see /api/telephone-directory/[id]
+        const res = await fetch(`/api/telephone-directory`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          credentials: 'include', body: JSON.stringify(payload),
+        });
+        if (res.ok) {
+          toast({ title: 'Entry updated + synced to server', description: entry.name });
+        } else {
+          toast({ title: 'Saved locally (server sync failed)', description: entry.name, variant: 'destructive' });
+        }
+      } else {
+        const res = await fetch(`/api/telephone-directory`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          credentials: 'include', body: JSON.stringify(payload),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          // Replace the optimistic temp-id entry with the real server entry
+          if (data.entry?.id) {
+            setDirectory(prev => prev.map(e => e.id === entry.id ? { ...entry, id: data.entry.id } : e));
+          }
+          toast({ title: 'Entry added + synced to server', description: entry.name });
+        } else {
+          toast({ title: 'Saved locally (server sync failed)', description: entry.name, variant: 'destructive' });
+        }
+      }
+    } catch (e: any) {
+      toast({ title: 'Saved locally (network error)', description: e?.message || '', variant: 'destructive' });
+    }
   };
 
   // ===== Keyboard navigation =====

@@ -27,6 +27,8 @@ export interface PaymentResult {
   items: CartItem[];
   cashier: string;
   customer?: string;
+  // Premium: server-side sale ID for receipt QR + WhatsApp delivery
+  saleId?: string;
 }
 
 export type ViewMode = "login" | "pos" | "stock" | "reports" | "purchase" | "purchase-form" | "telephone" | "telephone-directory" | "maintenance" | "sold-items" | "sales-menu" | "daily-sales" | "sales-history" | "supplier-form" | "accounts-reports" | "finance-ops" | "admin-login" | "admin-panel" | "dashboard" | "receipt-archive" | "sync-settings";

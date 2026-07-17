@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
 import { rateLimitApiRead, rateLimitApiWrite, rateLimitResponse, getClientIp } from "@/lib/rate-limit";
+import { auditLog } from "@/lib/audit";
 
 // GET /api/telephone-directory — list directory entries
 export async function GET(req: NextRequest) {
@@ -15,6 +16,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const search = searchParams.get("search");
     const group = searchParams.get("group");
+    const limit = Math.min(parseInt(searchParams.get("limit") || "500", 10), 1000);
 
     const where: any = {};
     if (group) where.group = group;
@@ -31,6 +33,7 @@ export async function GET(req: NextRequest) {
     const entries = await db.telephoneDirectoryEntry.findMany({
       where,
       orderBy: { name: "asc" },
+      take: limit,
     });
     return NextResponse.json({ entries });
   } catch (e) {
@@ -51,10 +54,14 @@ export async function POST(req: NextRequest) {
   let body: any;
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
 
+  if (!body.name) {
+    return NextResponse.json({ error: "Name is required" }, { status: 400 });
+  }
+
   try {
     const entry = await db.telephoneDirectoryEntry.create({
       data: {
-        name: String(body.name || "").slice(0, 200),
+        name: String(body.name).slice(0, 200),
         homePhone: String(body.homePhone || "").slice(0, 32),
         workPhone: String(body.workPhone || "").slice(0, 32),
         mobile: String(body.mobile || "").slice(0, 32),
@@ -68,15 +75,15 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    await db.auditLog.create({
-      data: {
-        userId: user.uid,
-        user: user.username,
-        action: "CREATE",
-        module: "telephone",
-        details: `Directory entry ${entry.name} created`,
-        severity: "info",
-      },
+    await auditLog({
+      userId: user.uid,
+      user: user.username,
+      action: "CREATE",
+      module: "telephone",
+      details: `Directory entry ${entry.name} created (group: ${entry.group})`,
+      severity: "info",
+      ipAddress: ip,
+      userAgent: req.headers.get("user-agent") || "",
     });
 
     return NextResponse.json({ success: true, entry });
