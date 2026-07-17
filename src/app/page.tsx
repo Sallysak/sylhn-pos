@@ -1770,11 +1770,11 @@ export default function POSPage() {
                                 </div>
                                 {/* Col 2: Qty controls */}
                                 <div className="flex items-center gap-0.5 justify-center w-10 flex-shrink-0">
-                                  <button onClick={(e) => { e.stopPropagation(); onUpdateQuantity(index, item.quantity - 1); }} className="h-5 w-5 rounded bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition">
+                                  <button onClick={(e) => { e.stopPropagation(); updateQuantity(index, -1); }} className="h-5 w-5 rounded bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition">
                                     <Minus className="h-2.5 w-2.5" />
                                   </button>
                                   <span className="w-5 text-center font-mono font-semibold text-[10px]">{item.quantity.toFixed(item.unit === 'kg' ? 2 : 0)}</span>
-                                  <button onClick={(e) => { e.stopPropagation(); onUpdateQuantity(index, item.quantity + 1); }} className="h-5 w-5 rounded bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition">
+                                  <button onClick={(e) => { e.stopPropagation(); updateQuantity(index, 1); }} className="h-5 w-5 rounded bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition">
                                     <Plus className="h-2.5 w-2.5" />
                                   </button>
                                 </div>
@@ -1792,7 +1792,7 @@ export default function POSPage() {
                                 {/* Col 4: Total + remove */}
                                 <div className="flex items-center justify-end gap-1 w-14 flex-shrink-0">
                                   <span className="font-mono font-bold text-[11px]">{formatGHS(lineFinal)}</span>
-                                  <button onClick={(e) => { e.stopPropagation(); onRemoveLine(index); }} className="h-4 w-4 rounded-md bg-rose-100 text-rose-600 hover:bg-rose-200 flex items-center justify-center transition">
+                                  <button onClick={(e) => { e.stopPropagation(); removeLine(index); }} className="h-4 w-4 rounded-md bg-rose-100 text-rose-600 hover:bg-rose-200 flex items-center justify-center transition">
                                     <Trash2 className="h-2 w-2" />
                                   </button>
                                 </div>
