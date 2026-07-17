@@ -2954,7 +2954,7 @@ function CartPreviewModal({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4"
       onClick={onClose}
     >
       <motion.div
@@ -2963,43 +2963,51 @@ function CartPreviewModal({
         exit={{ scale: 0.95, y: 30 }}
         transition={{ type: "spring", damping: 25, stiffness: 300 }}
         onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] overflow-hidden flex flex-col"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[95vh] sm:max-h-[92vh] overflow-hidden flex flex-col"
       >
-        {/* Header */}
-        <div className="flex-shrink-0 bg-gradient-to-r from-violet-600 via-purple-600 to-fuchsia-600 text-white px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="h-11 w-11 rounded-xl bg-white/15 backdrop-blur flex items-center justify-center ring-1 ring-white/20">
-              <Eye className="h-6 w-6" />
+        {/* Header — compact on mobile */}
+        <div className="flex-shrink-0 bg-gradient-to-r from-violet-600 via-purple-600 to-fuchsia-600 text-white px-3 sm:px-6 py-2.5 sm:py-4 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+            <div className="h-8 w-8 sm:h-11 sm:w-11 rounded-lg sm:rounded-xl bg-white/15 backdrop-blur flex items-center justify-center ring-1 ring-white/20 flex-shrink-0">
+              <Eye className="h-4 w-4 sm:h-6 sm:w-6" />
             </div>
-            <div>
-              <div className="text-lg font-bold">Cart Preview</div>
-              <div className="text-xs text-purple-100/90">Review items before payment · Invoice #{invoiceNumber}</div>
+            <div className="min-w-0 flex-1">
+              <div className="text-sm sm:text-lg font-bold truncate">Cart Preview</div>
+              <div className="text-[9px] sm:text-xs text-purple-100/90 truncate">
+                Invoice #{invoiceNumber} · {totalItems} items
+              </div>
             </div>
           </div>
-          <button onClick={onClose} className="h-9 w-9 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center transition">
-            <X className="h-5 w-5" />
+          <button onClick={onClose} className="h-8 w-8 sm:h-9 sm:w-9 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center transition flex-shrink-0">
+            <X className="h-4 w-4 sm:h-5 sm:w-5" />
           </button>
         </div>
 
-        {/* Order Meta */}
-        <div className="flex-shrink-0 px-6 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between flex-wrap gap-2">
-          <div className="flex items-center gap-4 text-xs text-slate-600">
-            <span className="flex items-center gap-1.5">
-              <User className="h-3.5 w-3.5 text-slate-400" />
-              <span className="font-semibold text-slate-700">Cashier:</span> {cashier}
-            </span>
-            <span className="flex items-center gap-1.5">
-              <User className="h-3.5 w-3.5 text-slate-400" />
-              <span className="font-semibold text-slate-700">Customer:</span> {customerName || "Walk-in customer"}
-            </span>
-            <span className="flex items-center gap-1.5">
-              <Calendar className="h-3.5 w-3.5 text-slate-400" />
-              <span className="font-semibold text-slate-700">Date:</span> {new Date().toLocaleDateString('en-GB')}
-            </span>
+        {/* Order Meta — stacked on mobile, row on desktop */}
+        <div className="flex-shrink-0 px-3 sm:px-6 py-2 sm:py-3 bg-slate-50 border-b border-slate-200">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] sm:text-xs text-slate-600">
+              <span className="flex items-center gap-1">
+                <User className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-slate-400 flex-shrink-0" />
+                <span className="font-semibold text-slate-700">Cashier:</span>
+                <span className="truncate max-w-[80px] sm:max-w-none">{cashier}</span>
+              </span>
+              <span className="hidden sm:inline text-slate-300">·</span>
+              <span className="flex items-center gap-1">
+                <User className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-slate-400 flex-shrink-0" />
+                <span className="font-semibold text-slate-700">Customer:</span>
+                <span className="truncate max-w-[100px] sm:max-w-none">{customerName || "Walk-in"}</span>
+              </span>
+              <span className="hidden sm:inline text-slate-300">·</span>
+              <span className="flex items-center gap-1">
+                <Calendar className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-slate-400 flex-shrink-0" />
+                {new Date().toLocaleDateString('en-GB')}
+              </span>
+            </div>
+            <Badge variant="secondary" className="bg-violet-100 text-violet-700 text-[9px] sm:text-xs flex-shrink-0 w-fit">
+              {totalItems} items · {cart.length} lines
+            </Badge>
           </div>
-          <Badge variant="secondary" className="bg-violet-100 text-violet-700">
-            {totalItems} items · {cart.length} lines
-          </Badge>
         </div>
 
         {/* Cart Items */}
@@ -3012,8 +3020,8 @@ function CartPreviewModal({
             </div>
           ) : (
             <>
-              {/* Table Header */}
-              <div className="flex-shrink-0 grid grid-cols-[40px_1fr_80px_90px_70px_90px_40px] gap-2 px-5 py-2 bg-slate-800 text-white text-[10px] font-semibold uppercase tracking-wide">
+              {/* Desktop Table Header (hidden on mobile) */}
+              <div className="hidden sm:flex flex-shrink-0 grid grid-cols-[40px_1fr_80px_90px_70px_90px_40px] gap-2 px-5 py-2 bg-slate-800 text-white text-[10px] font-semibold uppercase tracking-wide">
                 <div className="text-center">#</div>
                 <div>Item</div>
                 <div className="text-center">Qty</div>
@@ -3038,12 +3046,51 @@ function CartPreviewModal({
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
                           exit={{ opacity: 0, height: 0 }}
-                          className="grid grid-cols-[40px_1fr_80px_90px_70px_90px_40px] gap-2 px-5 py-2.5 items-center text-sm transition hover:bg-slate-50"
+                          /* Desktop: 7-col grid | Mobile: card layout */
+                          className="sm:grid sm:grid-cols-[40px_1fr_80px_90px_70px_90px_40px] sm:gap-2 sm:px-5 sm:py-2.5 sm:items-center sm:text-sm px-3 py-2.5 transition hover:bg-slate-50 mobile-product-card"
                         >
+                          {/* === MOBILE LAYOUT (card) === */}
+                          <div className="sm:hidden">
+                            <div className="flex items-start gap-2">
+                              <span className="text-xl flex-shrink-0">{item.emoji}</span>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="font-semibold text-slate-800 text-xs truncate flex-1">{item.name}</div>
+                                  <div className="font-mono font-bold text-slate-900 text-xs flex-shrink-0">{formatGHS(lineFinal)}</div>
+                                </div>
+                                <div className="flex items-center justify-between gap-2 mt-0.5">
+                                  <div className="text-[9px] text-slate-400 font-mono truncate">
+                                    {item.sku} · {formatGHS(item.price)}/{item.unit}
+                                    {item.taxable && <span className="ml-1 px-1 py-0.5 rounded bg-amber-100 text-amber-700 text-[8px] font-bold">VAT</span>}
+                                  </div>
+                                  <div className="flex items-center gap-1 flex-shrink-0">
+                                    <button onClick={() => onUpdateQuantity(index, item.quantity - 1)} className="h-5 w-5 rounded bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition">
+                                      <Minus className="h-2.5 w-2.5" />
+                                    </button>
+                                    <span className="w-7 text-center font-mono font-semibold text-slate-700 text-[10px]">{item.quantity.toFixed(item.unit === 'kg' ? 2 : 0)}</span>
+                                    <button onClick={() => onUpdateQuantity(index, item.quantity + 1)} className="h-5 w-5 rounded bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition">
+                                      <Plus className="h-2.5 w-2.5" />
+                                    </button>
+                                  </div>
+                                </div>
+                                <div className="flex items-center justify-between mt-1">
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-[9px] text-slate-400">Disc%</span>
+                                    <input type="number" value={item.discount || ''} onChange={(e) => onApplyDiscount(index, parseFloat(e.target.value) || 0)} placeholder="0" className="w-10 text-center text-[10px] bg-transparent border-b border-slate-200 focus:border-violet-400 outline-none font-mono" />
+                                  </div>
+                                  <button onClick={() => onRemoveLine(index)} className="h-5 w-5 rounded-md bg-rose-100 text-rose-600 hover:bg-rose-200 flex items-center justify-center transition">
+                                    <Trash2 className="h-2.5 w-2.5" />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* === DESKTOP LAYOUT (grid) === */}
                           {/* Line # */}
-                          <div className="text-center text-[11px] font-mono text-slate-400">{index + 1}</div>
+                          <div className="hidden sm:block text-center text-[11px] font-mono text-slate-400">{index + 1}</div>
                           {/* Item */}
-                          <div className="flex items-center gap-2 min-w-0">
+                          <div className="hidden sm:flex items-center gap-2 min-w-0">
                             <span className="text-2xl flex-shrink-0">{item.emoji}</span>
                             <div className="min-w-0">
                               <div className="font-semibold text-slate-800 truncate">{item.name}</div>
@@ -3054,43 +3101,25 @@ function CartPreviewModal({
                             </div>
                           </div>
                           {/* Qty */}
-                          <div className="flex items-center justify-center gap-1">
-                            <button
-                              onClick={() => onUpdateQuantity(index, item.quantity - 1)}
-                              className="h-6 w-6 rounded bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition"
-                            >
+                          <div className="hidden sm:flex items-center justify-center gap-1">
+                            <button onClick={() => onUpdateQuantity(index, item.quantity - 1)} className="h-6 w-6 rounded bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition">
                               <Minus className="h-3 w-3" />
                             </button>
-                            <span className="w-8 text-center font-mono font-semibold text-slate-700 text-xs">
-                              {item.quantity.toFixed(item.unit === 'kg' ? 2 : 0)}
-                            </span>
-                            <button
-                              onClick={() => onUpdateQuantity(index, item.quantity + 1)}
-                              className="h-6 w-6 rounded bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition"
-                            >
+                            <span className="w-8 text-center font-mono font-semibold text-slate-700 text-xs">{item.quantity.toFixed(item.unit === 'kg' ? 2 : 0)}</span>
+                            <button onClick={() => onUpdateQuantity(index, item.quantity + 1)} className="h-6 w-6 rounded bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition">
                               <Plus className="h-3 w-3" />
                             </button>
                           </div>
                           {/* Price */}
-                          <div className="text-right font-mono text-slate-700 text-xs">{formatGHS(item.price)}</div>
+                          <div className="hidden sm:block text-right font-mono text-slate-700 text-xs">{formatGHS(item.price)}</div>
                           {/* Discount */}
-                          <div className="text-center">
-                            <input
-                              type="number"
-                              value={item.discount || ''}
-                              onChange={(e) => onApplyDiscount(index, parseFloat(e.target.value) || 0)}
-                              placeholder="0"
-                              className="w-12 text-center text-[11px] bg-transparent border-b border-slate-200 focus:border-violet-400 outline-none font-mono"
-                            />
+                          <div className="hidden sm:flex justify-center">
+                            <input type="number" value={item.discount || ''} onChange={(e) => onApplyDiscount(index, parseFloat(e.target.value) || 0)} placeholder="0" className="w-12 text-center text-[11px] bg-transparent border-b border-slate-200 focus:border-violet-400 outline-none font-mono" />
                           </div>
                           {/* Line Total */}
-                          <div className="text-right font-mono font-semibold text-slate-900">{formatGHS(lineFinal)}</div>
+                          <div className="hidden sm:block text-right font-mono font-semibold text-slate-900">{formatGHS(lineFinal)}</div>
                           {/* Remove */}
-                          <button
-                            onClick={() => onRemoveLine(index)}
-                            className="h-7 w-7 rounded-md bg-rose-100 text-rose-600 hover:bg-rose-200 flex items-center justify-center transition mx-auto"
-                            title="Remove line"
-                          >
+                          <button onClick={() => onRemoveLine(index)} className="hidden sm:flex h-7 w-7 rounded-md bg-rose-100 text-rose-600 hover:bg-rose-200 items-center justify-center transition mx-auto" title="Remove line">
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
                         </motion.div>
@@ -3106,86 +3135,65 @@ function CartPreviewModal({
         {/* Totals + Actions */}
         {cart.length > 0 && (
           <div className="flex-shrink-0 border-t border-slate-200 bg-white">
-            {/* Totals Row */}
-            <div className="grid grid-cols-2 gap-0">
-              {/* Left: Discount Controls */}
-              <div className="p-4 bg-slate-50 border-r border-slate-200">
-                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-2">Global Discount</div>
+            {/* Totals — stacked on mobile, 2-col on desktop */}
+            <div className="flex flex-col sm:grid sm:grid-cols-2 gap-0">
+              {/* Discount Controls */}
+              <div className="p-3 sm:p-4 bg-slate-50 sm:border-r border-slate-200 border-b sm:border-b-0">
+                <div className="text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1.5 sm:mb-2">Global Discount</div>
                 <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    value={globalDiscount || ''}
-                    onChange={(e) => onSetGlobalDiscount(parseFloat(e.target.value) || 0)}
-                    placeholder="0"
-                    className="w-20 h-9 px-2 text-center font-mono font-bold border-2 border-slate-200 focus:border-violet-400 rounded-lg outline-none"
-                  />
+                  <input type="number" value={globalDiscount || ''} onChange={(e) => onSetGlobalDiscount(parseFloat(e.target.value) || 0)} placeholder="0" className="w-16 sm:w-20 h-8 sm:h-9 px-2 text-center font-mono font-bold text-sm border-2 border-slate-200 focus:border-violet-400 rounded-lg outline-none" />
                   <span className="text-sm font-semibold text-slate-600">%</span>
                   {globalDiscount > 0 && (
-                    <button
-                      onClick={onClearDiscount}
-                      className="ml-auto px-2 py-1 rounded-md bg-rose-100 text-rose-600 hover:bg-rose-200 text-[10px] font-semibold transition"
-                    >
-                      Clear
-                    </button>
+                    <button onClick={onClearDiscount} className="ml-auto px-2 py-1 rounded-md bg-rose-100 text-rose-600 hover:bg-rose-200 text-[9px] sm:text-[10px] font-semibold transition">Clear</button>
                   )}
                 </div>
-                <div className="mt-2 text-[10px] text-slate-500">
-                  Applies to entire cart subtotal
-                </div>
+                <div className="mt-1.5 text-[9px] sm:text-[10px] text-slate-500">Applies to entire cart subtotal</div>
               </div>
-              {/* Right: Totals */}
-              <div className="p-4 space-y-1">
-                <div className="flex justify-between text-xs text-slate-600">
+              {/* Totals */}
+              <div className="p-3 sm:p-4 space-y-1">
+                <div className="flex justify-between text-[11px] sm:text-xs text-slate-600">
                   <span>Subtotal ({totalItems} items)</span>
                   <span className="font-mono">{formatGHS(subtotal)}</span>
                 </div>
                 {discountAmount > 0 && (
-                  <div className="flex justify-between text-xs text-rose-600">
+                  <div className="flex justify-between text-[11px] sm:text-xs text-rose-600">
                     <span>Discount{globalDiscount > 0 ? ` (${globalDiscount}%)` : ''}</span>
                     <span className="font-mono">-{formatGHS(discountAmount)}</span>
                   </div>
                 )}
-                <div className="flex justify-between text-xs text-slate-600">
+                <div className="flex justify-between text-[11px] sm:text-xs text-slate-600">
                   <span>{TAX_NAME} ({taxRatePercent.toFixed(0)}%)</span>
                   <span className="font-mono">{formatGHS(taxAmount)}</span>
                 </div>
-                <div className="flex justify-between items-baseline pt-1 border-t border-slate-200 mt-1">
-                  <span className="text-sm font-bold text-slate-800">Total Due</span>
-                  <span className="text-2xl font-bold font-mono text-violet-600">{formatGHS(total)}</span>
+                <div className="flex justify-between items-baseline pt-1.5 border-t border-slate-200 mt-1">
+                  <span className="text-xs sm:text-sm font-bold text-slate-800">Total Due</span>
+                  <span className="text-lg sm:text-2xl font-bold font-mono text-violet-600">{formatGHS(total)}</span>
                 </div>
               </div>
             </div>
 
-            {/* Action Buttons */}
-            <div className="px-4 py-3 bg-white border-t border-slate-200 grid grid-cols-4 gap-2">
-              <button
-                onClick={onContinueShopping}
-                className="h-12 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-sm flex items-center justify-center gap-2 transition"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Continue Shopping
+            {/* Action Buttons — 2x2 grid on mobile, 4-col on desktop */}
+            <div className="px-3 sm:px-4 py-2 sm:py-3 bg-white border-t border-slate-200 grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2">
+              <button onClick={onContinueShopping} className="h-10 sm:h-12 rounded-lg sm:rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-[11px] sm:text-sm flex items-center justify-center gap-1 sm:gap-2 transition">
+                <ArrowLeft className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Continue</span>
+                <span className="sm:hidden">Shop</span>
               </button>
-              <button
-                onClick={() => setConfirmClear(true)}
-                className="h-12 rounded-xl bg-rose-100 hover:bg-rose-200 text-rose-700 font-semibold text-sm flex items-center justify-center gap-2 transition"
-              >
-                <Trash2 className="h-4 w-4" />
-                Clear Cart
+              <button onClick={() => setConfirmClear(true)} className="h-10 sm:h-12 rounded-lg sm:rounded-xl bg-rose-100 hover:bg-rose-200 text-rose-700 font-semibold text-[11px] sm:text-sm flex items-center justify-center gap-1 sm:gap-2 transition">
+                <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Clear Cart</span>
+                <span className="sm:hidden">Clear</span>
               </button>
-              <button
-                onClick={() => window.print()}
-                className="h-12 rounded-xl bg-white ring-1 ring-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-sm flex items-center justify-center gap-2 transition"
-              >
-                <Printer className="h-4 w-4" />
-                Print Quote
+              <button onClick={() => window.print()} className="h-10 sm:h-12 rounded-lg sm:rounded-xl bg-white ring-1 ring-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-[11px] sm:text-sm flex items-center justify-center gap-1 sm:gap-2 transition">
+                <Printer className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Print Quote</span>
+                <span className="sm:hidden">Print</span>
               </button>
-              <button
-                onClick={onProceedToPayment}
-                className="h-12 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-sm flex items-center justify-center gap-2 transition shadow-md hover:shadow-lg"
-              >
-                <CreditCard className="h-5 w-5" />
-                PROCEED TO PAYMENT
-                <kbd className="ml-1 px-1.5 py-0.5 rounded bg-white/20 text-[10px] font-mono">F5</kbd>
+              <button onClick={onProceedToPayment} className="h-10 sm:h-12 rounded-lg sm:rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-[11px] sm:text-sm flex items-center justify-center gap-1 sm:gap-2 transition shadow-md">
+                <CreditCard className="h-4 w-4 sm:h-5 sm:w-5" />
+                <span className="hidden sm:inline">PROCEED TO PAYMENT</span>
+                <span className="sm:hidden">PAY</span>
+                <kbd className="hidden sm:inline-block ml-1 px-1.5 py-0.5 rounded bg-white/20 text-[10px] font-mono">F5</kbd>
               </button>
             </div>
           </div>
