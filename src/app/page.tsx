@@ -1354,7 +1354,7 @@ export default function POSPage() {
 
   // ===== Render POS =====
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-slate-100 via-emerald-50 to-slate-100 flex flex-col font-sans pb-[72px] lg:pb-0 lg:h-screen lg:overflow-hidden">
+    <div className="h-screen w-full bg-gradient-to-br from-slate-100 via-emerald-50 to-slate-100 flex flex-col font-sans pb-[72px] lg:pb-0 overflow-hidden">
       {/* ===== Header Bar with Menu ===== */}
       <header className="flex-shrink-0 bg-gradient-to-r from-emerald-700 via-emerald-600 to-teal-600 text-white shadow-lg z-30">
         <div className="flex items-center px-4 py-2 gap-4">
@@ -1509,9 +1509,9 @@ export default function POSPage() {
       </nav>
 
       {/* ===== Main Content ===== */}
-      <main className="flex-1 flex flex-col lg:flex-row lg:overflow-hidden p-2 sm:p-3 gap-2 sm:gap-3">
-        {/* ===== Left Panel: Product Grid ===== */}
-        <section className="flex-1 flex flex-col bg-white rounded-2xl shadow-lg ring-1 ring-slate-200/60 lg:overflow-hidden min-w-0 min-h-0">
+      <main className="flex-1 flex flex-col lg:flex-row overflow-hidden p-2 sm:p-3 gap-2 sm:gap-3 min-h-0">
+        {/* ===== Left Panel: Product Grid — takes 45% on mobile, flex-1 on desktop ===== */}
+        <section className="flex flex-col bg-white rounded-2xl shadow-lg ring-1 ring-slate-200/60 overflow-hidden min-w-0 min-h-0 h-[42vh] lg:h-full lg:flex-1">
           <div className="flex-shrink-0 flex items-center justify-between px-3 sm:px-5 py-2 bg-gradient-to-r from-slate-50 to-white border-b border-slate-200">
             <div className="flex items-center gap-2 sm:gap-3 min-w-0">
               <div className="flex items-center gap-2">
@@ -1622,10 +1622,10 @@ export default function POSPage() {
           </div>
         </section>
 
-        {/* ===== Right Panel: Cart + Keypad + Functions ===== */}
+        {/* ===== Right Panel: Cart — takes remaining height on mobile, 38% sidebar on desktop ===== */}
         <section className={cn(
-          "flex flex-col bg-white rounded-2xl shadow-lg ring-1 ring-slate-200/60 lg:overflow-hidden transition-all duration-300",
-          showSidebar ? "lg:w-[38%] lg:min-w-[380px] w-full min-h-0 flex-1 lg:flex-none" : "w-0 min-w-0 lg:w-0"
+          "flex flex-col bg-white rounded-2xl shadow-lg ring-1 ring-slate-200/60 overflow-hidden transition-all duration-300 min-h-0",
+          showSidebar ? "lg:w-[38%] lg:min-w-[380px] w-full flex-1 lg:flex-none" : "w-0 min-w-0 lg:w-0"
         )}>
           <AnimatePresence>
             {showSidebar && (
