@@ -1496,18 +1496,18 @@ export default function POSPage() {
       </nav>
 
       {/* ===== Main Content ===== */}
-      <main className="flex-1 flex overflow-hidden p-3 gap-3">
-        {/* ===== Left Panel: Product Grid (60%) ===== */}
-        <section className="flex-1 flex flex-col bg-white rounded-2xl shadow-lg ring-1 ring-slate-200/60 overflow-hidden min-w-0">
-          <div className="flex-shrink-0 flex items-center justify-between px-5 py-2 bg-gradient-to-r from-slate-50 to-white border-b border-slate-200">
-            <div className="flex items-center gap-3">
+      <main className="flex-1 flex flex-col lg:flex-row overflow-hidden p-2 sm:p-3 gap-2 sm:gap-3">
+        {/* ===== Left Panel: Product Grid ===== */}
+        <section className="flex-1 flex flex-col bg-white rounded-2xl shadow-lg ring-1 ring-slate-200/60 overflow-hidden min-w-0 min-h-0">
+          <div className="flex-shrink-0 flex items-center justify-between px-3 sm:px-5 py-2 bg-gradient-to-r from-slate-50 to-white border-b border-slate-200">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
               <div className="flex items-center gap-2">
-                <Package className="h-5 w-5 text-emerald-600" />
-                <h2 className="text-base font-bold text-slate-800">
+                <Package className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600" />
+                <h2 className="text-sm sm:text-base font-bold text-slate-800 truncate">
                   {categories.find(c => c.id === activeCategory)?.name || "All Products"}
                 </h2>
               </div>
-              <Badge variant="outline" className="font-mono text-[11px]">
+              <Badge variant="outline" className="font-mono text-[10px] sm:text-[11px] flex-shrink-0">
                 {filteredProducts.length} items
               </Badge>
             </div>
@@ -1608,10 +1608,10 @@ export default function POSPage() {
           </ScrollArea>
         </section>
 
-        {/* ===== Right Panel: Cart + Keypad + Functions (40%) ===== */}
+        {/* ===== Right Panel: Cart + Keypad + Functions ===== */}
         <section className={cn(
           "flex flex-col bg-white rounded-2xl shadow-lg ring-1 ring-slate-200/60 overflow-hidden transition-all duration-300",
-          showSidebar ? "w-[38%] min-w-[380px]" : "w-0 min-w-0"
+          showSidebar ? "lg:w-[38%] lg:min-w-[380px] w-full min-h-0 flex-1 lg:flex-none" : "w-0 min-w-0 lg:w-0"
         )}>
           <AnimatePresence>
             {showSidebar && (
@@ -1697,8 +1697,8 @@ export default function POSPage() {
 
                 {/* Cart Items Table */}
                 <div className="flex-1 overflow-hidden flex flex-col min-h-0">
-                  {/* Table Header — light blue matching reference */}
-                  <div className="flex-shrink-0 grid grid-cols-[120px_1fr_50px_80px_45px_80px] gap-1 px-2 py-1 text-[10px] font-bold text-slate-700 border-b border-slate-400" style={{ backgroundColor: '#ADD8E6' }}>
+                  {/* Desktop Table Header — light blue, hidden on mobile */}
+                  <div className="hidden lg:grid flex-shrink-0 grid-cols-[120px_1fr_50px_80px_45px_80px] gap-1 px-2 py-1 text-[10px] font-bold text-slate-700 border-b border-slate-400" style={{ backgroundColor: '#ADD8E6' }}>
                     <div>Part No.</div>
                     <div>Part Details</div>
                     <div className="text-right">Qty</div>
@@ -1707,7 +1707,16 @@ export default function POSPage() {
                     <div className="text-right">Total GHC</div>
                   </div>
 
-                  <ScrollArea className="flex-1 min-h-0">
+                  {/* Mobile Table Header — compact, visible only on mobile */}
+                  <div className="lg:hidden flex-shrink-0 grid grid-cols-[1fr_auto_auto_auto] gap-1 px-2 py-1 text-[8px] font-bold text-slate-600 border-b border-slate-300 bg-slate-100">
+                    <div># · Item / Part No.</div>
+                    <div className="text-center w-10">Qty</div>
+                    <div className="text-center w-10">Disc%</div>
+                    <div className="text-right w-14">Total</div>
+                  </div>
+
+                  {/* Items List — native scroll (not ScrollArea) for mobile */}
+                  <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 no-scrollbar" style={{ WebkitOverflowScrolling: 'touch' }}>
                     <div className="divide-y divide-slate-100">
                       <AnimatePresence mode="popLayout">
                         {cart.map((item, index) => {
@@ -1725,18 +1734,60 @@ export default function POSPage() {
                               transition={{ duration: 0.2 }}
                               onClick={() => setSelectedCartIndex(index)}
                               className={cn(
-                                "grid grid-cols-[120px_1fr_50px_80px_45px_80px] gap-1 px-2 py-1.5 cursor-pointer transition-colors text-[11px]",
+                                "cursor-pointer transition-colors",
+                                "lg:grid lg:grid-cols-[120px_1fr_50px_80px_45px_80px] lg:gap-1 lg:px-2 lg:py-1.5 lg:text-[11px]",
+                                "px-2 py-1.5",
                               )}
                               style={{
                                 backgroundColor: isSelected ? '#E3F2FD' : (index % 2 === 1 ? '#FAFAFA' : '#FFFFFF'),
                                 color: isSelected ? '#1565C0' : '#424242',
                               }}
                             >
-                              <div className="font-mono truncate">{item.sku}</div>
-                              <div className="truncate">{item.emoji} {item.name}</div>
-                              <div className="text-right font-mono">{item.quantity.toFixed(item.unit === 'kg' ? 2 : 0)}</div>
-                              <div className="text-right font-mono">{formatGHS(item.price)}</div>
-                              <div className="text-center">
+                              {/* === MOBILE LAYOUT (compact card) === */}
+                              <div className="lg:hidden">
+                                {/* Row 1: # + emoji + name + total */}
+                                <div className="flex items-center gap-1">
+                                  <span className="text-[8px] font-mono text-slate-400 w-3 flex-shrink-0">{index + 1}</span>
+                                  <span className="text-sm flex-shrink-0">{item.emoji}</span>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="font-semibold text-[11px] truncate">{item.name}</div>
+                                    <div className="text-[8px] font-mono text-slate-400 truncate">{item.sku} · {formatGHS(item.price)}/{item.unit}</div>
+                                  </div>
+                                  <div className="font-mono font-bold text-[11px] flex-shrink-0">{formatGHS(lineFinal)}</div>
+                                </div>
+                                {/* Row 2: qty controls + disc input + remove */}
+                                <div className="flex items-center gap-2 mt-0.5 pl-4">
+                                  <div className="flex items-center gap-0.5 flex-shrink-0">
+                                    <button onClick={(e) => { e.stopPropagation(); onUpdateQuantity(index, item.quantity - 1); }} className="h-5 w-5 rounded bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition">
+                                      <Minus className="h-2.5 w-2.5" />
+                                    </button>
+                                    <span className="w-6 text-center font-mono font-semibold text-[10px]">{item.quantity.toFixed(item.unit === 'kg' ? 2 : 0)}</span>
+                                    <button onClick={(e) => { e.stopPropagation(); onUpdateQuantity(index, item.quantity + 1); }} className="h-5 w-5 rounded bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition">
+                                      <Plus className="h-2.5 w-2.5" />
+                                    </button>
+                                  </div>
+                                  {/* Glowing discount input */}
+                                  <input
+                                    type="number"
+                                    value={item.discount || ''}
+                                    onClick={(e) => { e.stopPropagation(); setSelectedCartIndex(index); }}
+                                    onChange={(e) => applyDiscount(index, parseFloat(e.target.value) || 0)}
+                                    className="w-9 h-5 text-center text-[9px] font-mono font-bold rounded border-2 border-violet-400 bg-violet-50 outline-none focus:border-violet-600 focus:ring-2 focus:ring-violet-400/40 transition"
+                                    placeholder="0"
+                                  />
+                                  <span className="text-[8px] font-bold text-violet-600 flex-shrink-0">%</span>
+                                  <button onClick={(e) => { e.stopPropagation(); onRemoveLine(index); }} className="ml-auto h-5 w-5 rounded-md bg-rose-100 text-rose-600 hover:bg-rose-200 flex items-center justify-center transition flex-shrink-0">
+                                    <Trash2 className="h-2.5 w-2.5" />
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* === DESKTOP LAYOUT (grid) === */}
+                              <div className="hidden lg:block font-mono truncate">{item.sku}</div>
+                              <div className="hidden lg:block truncate">{item.emoji} {item.name}</div>
+                              <div className="hidden lg:block text-right font-mono">{item.quantity.toFixed(item.unit === 'kg' ? 2 : 0)}</div>
+                              <div className="hidden lg:block text-right font-mono">{formatGHS(item.price)}</div>
+                              <div className="hidden lg:block text-center">
                                 <input
                                   type="number"
                                   value={item.discount || ''}
@@ -1746,7 +1797,7 @@ export default function POSPage() {
                                   placeholder="0"
                                 />
                               </div>
-                              <div className="text-right font-mono font-semibold">{formatGHS(lineFinal)}</div>
+                              <div className="hidden lg:block text-right font-mono font-semibold">{formatGHS(lineFinal)}</div>
                             </motion.div>
                           );
                         })}
@@ -1760,7 +1811,7 @@ export default function POSPage() {
                         </div>
                       )}
                     </div>
-                  </ScrollArea>
+                  </div>
                 </div>
 
                 {/* Held Orders */}
@@ -1791,7 +1842,7 @@ export default function POSPage() {
                           type="number"
                           value={globalDiscount || ''}
                           onChange={(e) => applyGlobalDiscount(parseFloat(e.target.value) || 0)}
-                          className="w-10 text-center bg-transparent border-b border-slate-200 focus:border-emerald-400 outline-none font-mono"
+                          className="w-10 text-center font-mono font-bold rounded border-2 border-violet-400 bg-violet-50 outline-none focus:border-violet-600 focus:ring-2 focus:ring-violet-400/40 transition"
                           placeholder="0"
                         />%
                       </span>
