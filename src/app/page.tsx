@@ -1510,8 +1510,8 @@ export default function POSPage() {
 
       {/* ===== Main Content ===== */}
       <main className="flex-1 flex flex-col lg:flex-row overflow-hidden p-2 sm:p-3 gap-2 sm:gap-3 min-h-0">
-        {/* ===== Left Panel: Product Grid — takes 45% on mobile, flex-1 on desktop ===== */}
-        <section className="flex flex-col bg-white rounded-2xl shadow-lg ring-1 ring-slate-200/60 overflow-hidden min-w-0 min-h-0 h-[42vh] lg:h-full lg:flex-1">
+        {/* ===== Left Panel: Product Grid — 38vh on mobile, flex-1 on desktop ===== */}
+        <section className="flex flex-col bg-white rounded-2xl shadow-lg ring-1 ring-slate-200/60 overflow-hidden min-w-0 min-h-0 h-[35vh] lg:h-full lg:flex-1">
           <div className="flex-shrink-0 flex items-center justify-between px-3 sm:px-5 py-2 bg-gradient-to-r from-slate-50 to-white border-b border-slate-200">
             <div className="flex items-center gap-2 sm:gap-3 min-w-0">
               <div className="flex items-center gap-2">
@@ -1875,29 +1875,40 @@ export default function POSPage() {
                   </div>
                 </div>
 
-                {/* Function Buttons */}
+                {/* Function Buttons — compact on mobile, full on desktop */}
                 <div className="flex-shrink-0 grid grid-cols-4 gap-1 p-1.5 bg-slate-100">
                   <button
                     onClick={() => setShowFindProduct(true)}
-                    className="col-span-4 h-9 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold text-xs flex items-center justify-center gap-1.5 hover:from-blue-700 hover:to-indigo-700 transition shadow-sm"
+                    className="col-span-4 lg:col-span-4 h-9 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold text-xs flex items-center justify-center gap-1.5 hover:from-blue-700 hover:to-indigo-700 transition shadow-sm"
                   >
                     <Search className="h-3.5 w-3.5" />
                     FIND PRODUCT
-                    <kbd className="ml-1 px-1 py-0.5 rounded bg-white/20 text-[9px] font-mono">F1</kbd>
+                    <kbd className="ml-1 px-1 py-0.5 rounded bg-white/20 text-[9px] font-mono hidden lg:inline">F1</kbd>
                   </button>
-                  <FuncBtn icon={<Pause className="h-3 w-3" />} label="Save" sub="F2" onClick={handleSave} variant="amber" />
-                  <FuncBtn icon={<Printer className="h-3 w-3" />} label="Print" sub="F3" onClick={handlePrint} variant="slate" />
-                  <FuncBtn icon={<RotateCcw className="h-3 w-3" />} label="Void" sub="F4" onClick={handleVoid} variant="rose" />
-                  <FuncBtn icon={<DollarSign className="h-3 w-3" />} label="Cash" sub="" onClick={handleOpenCash} variant="slate" />
-                  <FuncBtn icon={<Trash2 className="h-3 w-3" />} label="Del Line" sub="Del" onClick={() => selectedCartIndex !== null ? removeLine(selectedCartIndex) : toast({ title: "Select a line first", variant: "destructive" })} variant="slate" />
-                  <FuncBtn icon={<Check className="h-3 w-3" />} label="Enter" sub="↵" onClick={handleKeypadEnter} variant="emerald" />
+                  {/* Desktop-only function buttons (hidden on mobile to save space) */}
+                  <div className="hidden lg:contents">
+                    <FuncBtn icon={<Pause className="h-3 w-3" />} label="Save" sub="F2" onClick={handleSave} variant="amber" />
+                    <FuncBtn icon={<Printer className="h-3 w-3" />} label="Print" sub="F3" onClick={handlePrint} variant="slate" />
+                    <FuncBtn icon={<RotateCcw className="h-3 w-3" />} label="Void" sub="F4" onClick={handleVoid} variant="rose" />
+                    <FuncBtn icon={<DollarSign className="h-3 w-3" />} label="Cash" sub="" onClick={handleOpenCash} variant="slate" />
+                    <FuncBtn icon={<Trash2 className="h-3 w-3" />} label="Del Line" sub="Del" onClick={() => selectedCartIndex !== null ? removeLine(selectedCartIndex) : toast({ title: "Select a line first", variant: "destructive" })} variant="slate" />
+                    <FuncBtn icon={<Check className="h-3 w-3" />} label="Enter" sub="↵" onClick={handleKeypadEnter} variant="emerald" />
+                    <button
+                      onClick={() => setShowCartPreview(true)}
+                      className="col-span-1 h-9 rounded-lg bg-gradient-to-r from-violet-600 to-purple-600 text-white font-bold text-[10px] flex items-center justify-center gap-0.5 hover:from-violet-700 hover:to-purple-700 transition shadow-sm"
+                    >
+                      <Eye className="h-3 w-3" />
+                      PREVIEW
+                      <kbd className="ml-0.5 px-0.5 py-0.5 rounded bg-white/20 text-[8px] font-mono">F6</kbd>
+                    </button>
+                  </div>
+                  {/* Mobile: PREVIEW + PAY NOW (full width) */}
                   <button
                     onClick={() => setShowCartPreview(true)}
-                    className="col-span-1 h-9 rounded-lg bg-gradient-to-r from-violet-600 to-purple-600 text-white font-bold text-[10px] flex items-center justify-center gap-0.5 hover:from-violet-700 hover:to-purple-700 transition shadow-sm"
+                    className="lg:hidden col-span-1 h-9 rounded-lg bg-gradient-to-r from-violet-600 to-purple-600 text-white font-bold text-[10px] flex items-center justify-center gap-0.5 transition shadow-sm"
                   >
                     <Eye className="h-3 w-3" />
                     PREVIEW
-                    <kbd className="ml-0.5 px-0.5 py-0.5 rounded bg-white/20 text-[8px] font-mono">F6</kbd>
                   </button>
                   <button
                     onClick={handlePay}
@@ -1905,12 +1916,12 @@ export default function POSPage() {
                   >
                     <CreditCard className="h-3.5 w-3.5" />
                     PAY NOW
-                    <kbd className="ml-1 px-1 py-0.5 rounded bg-white/20 text-[9px] font-mono">F5</kbd>
+                    <kbd className="ml-1 px-1 py-0.5 rounded bg-white/20 text-[9px] font-mono hidden lg:inline">F5</kbd>
                   </button>
                 </div>
 
-                {/* Numeric Keypad */}
-                <div className="flex-shrink-0 p-1.5 bg-slate-800">
+                {/* Numeric Keypad — hidden on mobile (use touch + Find Product instead) */}
+                <div className="hidden lg:block flex-shrink-0 p-1.5 bg-slate-800">
                   <div className="flex gap-1 mb-1">
                     {(["qty", "price", "barcode"] as const).map(mode => (
                       <button
