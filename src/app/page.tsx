@@ -3021,7 +3021,7 @@ function CartPreviewModal({
           ) : (
             <>
               {/* Desktop Table Header (hidden on mobile) */}
-              <div className="hidden sm:flex flex-shrink-0 grid grid-cols-[40px_1fr_80px_90px_70px_90px_40px] gap-2 px-5 py-2 bg-slate-800 text-white text-[10px] font-semibold uppercase tracking-wide">
+              <div className="hidden sm:grid flex-shrink-0 grid-cols-[40px_1fr_80px_90px_70px_90px_40px] gap-2 px-5 py-2 bg-slate-800 text-white text-[10px] font-semibold uppercase tracking-wide">
                 <div className="text-center">#</div>
                 <div>Item</div>
                 <div className="text-center">Qty</div>
@@ -3031,8 +3031,16 @@ function CartPreviewModal({
                 <div></div>
               </div>
 
-              {/* Items List */}
-              <ScrollArea className="flex-1 min-h-0">
+              {/* Mobile column header (visible only on mobile) */}
+              <div className="sm:hidden flex-shrink-0 grid grid-cols-[1fr_auto_auto_auto] gap-1 px-3 py-1.5 bg-slate-100 border-b border-slate-200 text-[8px] font-bold text-slate-500 uppercase tracking-wide">
+                <div>Item / Part #</div>
+                <div className="text-center w-12">Qty</div>
+                <div className="text-center w-12">Disc%</div>
+                <div className="text-right w-14">Total</div>
+              </div>
+
+              {/* Items List — native scroll (not ScrollArea) for mobile compatibility */}
+              <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 no-scrollbar" style={{ WebkitOverflowScrolling: 'touch' }}>
                 <div className="divide-y divide-slate-100">
                   <AnimatePresence mode="popLayout">
                     {cart.map((item, index) => {
@@ -3047,42 +3055,47 @@ function CartPreviewModal({
                           animate={{ opacity: 1 }}
                           exit={{ opacity: 0, height: 0 }}
                           /* Desktop: 7-col grid | Mobile: card layout */
-                          className="sm:grid sm:grid-cols-[40px_1fr_80px_90px_70px_90px_40px] sm:gap-2 sm:px-5 sm:py-2.5 sm:items-center sm:text-sm px-3 py-2.5 transition hover:bg-slate-50 mobile-product-card"
+                          className="sm:grid sm:grid-cols-[40px_1fr_80px_90px_70px_90px_40px] sm:gap-2 sm:px-5 sm:py-2.5 sm:items-center sm:text-sm px-3 py-2 transition hover:bg-slate-50 mobile-product-card"
                         >
-                          {/* === MOBILE LAYOUT (card) === */}
+                          {/* === MOBILE LAYOUT (compact card) === */}
                           <div className="sm:hidden">
-                            <div className="flex items-start gap-2">
-                              <span className="text-xl flex-shrink-0">{item.emoji}</span>
+                            {/* Row 1: Emoji + Name + Line Total */}
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-base flex-shrink-0">{item.emoji}</span>
                               <div className="flex-1 min-w-0">
-                                <div className="flex items-center justify-between gap-2">
-                                  <div className="font-semibold text-slate-800 text-xs truncate flex-1">{item.name}</div>
-                                  <div className="font-mono font-bold text-slate-900 text-xs flex-shrink-0">{formatGHS(lineFinal)}</div>
-                                </div>
-                                <div className="flex items-center justify-between gap-2 mt-0.5">
-                                  <div className="text-[9px] text-slate-400 font-mono truncate">
-                                    {item.sku} · {formatGHS(item.price)}/{item.unit}
-                                    {item.taxable && <span className="ml-1 px-1 py-0.5 rounded bg-amber-100 text-amber-700 text-[8px] font-bold">VAT</span>}
-                                  </div>
-                                  <div className="flex items-center gap-1 flex-shrink-0">
-                                    <button onClick={() => onUpdateQuantity(index, item.quantity - 1)} className="h-5 w-5 rounded bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition">
-                                      <Minus className="h-2.5 w-2.5" />
-                                    </button>
-                                    <span className="w-7 text-center font-mono font-semibold text-slate-700 text-[10px]">{item.quantity.toFixed(item.unit === 'kg' ? 2 : 0)}</span>
-                                    <button onClick={() => onUpdateQuantity(index, item.quantity + 1)} className="h-5 w-5 rounded bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition">
-                                      <Plus className="h-2.5 w-2.5" />
-                                    </button>
-                                  </div>
-                                </div>
-                                <div className="flex items-center justify-between mt-1">
-                                  <div className="flex items-center gap-1">
-                                    <span className="text-[9px] text-slate-400">Disc%</span>
-                                    <input type="number" value={item.discount || ''} onChange={(e) => onApplyDiscount(index, parseFloat(e.target.value) || 0)} placeholder="0" className="w-10 text-center text-[10px] bg-transparent border-b border-slate-200 focus:border-violet-400 outline-none font-mono" />
-                                  </div>
-                                  <button onClick={() => onRemoveLine(index)} className="h-5 w-5 rounded-md bg-rose-100 text-rose-600 hover:bg-rose-200 flex items-center justify-center transition">
-                                    <Trash2 className="h-2.5 w-2.5" />
-                                  </button>
+                                <div className="font-semibold text-slate-800 text-[11px] truncate">{item.name}</div>
+                                <div className="text-[8px] text-slate-400 font-mono truncate">
+                                  {item.sku}
+                                  {item.taxable && <span className="ml-1 px-0.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[7px] font-bold">VAT</span>}
                                 </div>
                               </div>
+                              <div className="font-mono font-bold text-slate-900 text-[11px] flex-shrink-0">{formatGHS(lineFinal)}</div>
+                            </div>
+                            {/* Row 2: Price/unit + Qty controls + Disc input + Remove */}
+                            <div className="flex items-center gap-2 mt-1 pl-7">
+                              <span className="text-[8px] text-slate-400 font-mono flex-shrink-0">{formatGHS(item.price)}/{item.unit}</span>
+                              <div className="flex items-center gap-0.5 flex-shrink-0">
+                                <button onClick={() => onUpdateQuantity(index, item.quantity - 1)} className="h-5 w-5 rounded bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition">
+                                  <Minus className="h-2.5 w-2.5" />
+                                </button>
+                                <span className="w-6 text-center font-mono font-semibold text-slate-700 text-[10px]">{item.quantity.toFixed(item.unit === 'kg' ? 2 : 0)}</span>
+                                <button onClick={() => onUpdateQuantity(index, item.quantity + 1)} className="h-5 w-5 rounded bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition">
+                                  <Plus className="h-2.5 w-2.5" />
+                                </button>
+                              </div>
+                              {/* Glowing discount input */}
+                              <input
+                                type="number"
+                                value={item.discount || ''}
+                                onChange={(e) => onApplyDiscount(index, parseFloat(e.target.value) || 0)}
+                                placeholder="0"
+                                className="w-9 h-5 text-center text-[9px] font-mono font-bold rounded border-2 border-violet-300 bg-violet-50 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-300/50 transition"
+                                title="Line discount %"
+                              />
+                              <span className="text-[8px] text-violet-500 font-bold flex-shrink-0">%</span>
+                              <button onClick={() => onRemoveLine(index)} className="ml-auto h-5 w-5 rounded-md bg-rose-100 text-rose-600 hover:bg-rose-200 flex items-center justify-center transition flex-shrink-0">
+                                <Trash2 className="h-2.5 w-2.5" />
+                              </button>
                             </div>
                           </div>
 
@@ -3127,7 +3140,7 @@ function CartPreviewModal({
                     })}
                   </AnimatePresence>
                 </div>
-              </ScrollArea>
+              </div>
             </>
           )}
         </div>
@@ -3141,8 +3154,14 @@ function CartPreviewModal({
               <div className="p-3 sm:p-4 bg-slate-50 sm:border-r border-slate-200 border-b sm:border-b-0">
                 <div className="text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1.5 sm:mb-2">Global Discount</div>
                 <div className="flex items-center gap-2">
-                  <input type="number" value={globalDiscount || ''} onChange={(e) => onSetGlobalDiscount(parseFloat(e.target.value) || 0)} placeholder="0" className="w-16 sm:w-20 h-8 sm:h-9 px-2 text-center font-mono font-bold text-sm border-2 border-slate-200 focus:border-violet-400 rounded-lg outline-none" />
-                  <span className="text-sm font-semibold text-slate-600">%</span>
+                  <input
+                    type="number"
+                    value={globalDiscount || ''}
+                    onChange={(e) => onSetGlobalDiscount(parseFloat(e.target.value) || 0)}
+                    placeholder="0"
+                    className="w-16 sm:w-20 h-8 sm:h-9 px-2 text-center font-mono font-bold text-sm border-2 border-violet-400 bg-violet-50 rounded-lg outline-none focus:border-violet-600 focus:ring-2 focus:ring-violet-400/40 transition shadow-sm"
+                  />
+                  <span className="text-sm font-bold text-violet-600">%</span>
                   {globalDiscount > 0 && (
                     <button onClick={onClearDiscount} className="ml-auto px-2 py-1 rounded-md bg-rose-100 text-rose-600 hover:bg-rose-200 text-[9px] sm:text-[10px] font-semibold transition">Clear</button>
                   )}
