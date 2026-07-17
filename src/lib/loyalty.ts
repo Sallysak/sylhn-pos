@@ -27,6 +27,57 @@ export const TIER_THRESHOLDS = [
   { tier: "bronze",   minSpend: 0,      bonusPct: 0.00 },
 ] as const;
 
+// Premium: human-readable tier perks for UI display
+export const TIER_PERKS: Record<string, {
+  label: string;
+  color: string;
+  gradient: string;
+  icon: string;
+  bonusPct: number;
+  perks: string[];
+  nextTier?: string;
+  nextTierMinSpend?: number;
+}> = {
+  bronze: {
+    label: "Bronze",
+    color: "text-amber-700",
+    gradient: "from-amber-600 to-orange-700",
+    icon: "🥉",
+    bonusPct: 0,
+    perks: ["Earn 1 pt per GHS 1 spent", "Redeem 100 pts for GHS 5 discount", "Birthday surprise gift"],
+    nextTier: "Silver",
+    nextTierMinSpend: 1000,
+  },
+  silver: {
+    label: "Silver",
+    color: "text-slate-600",
+    gradient: "from-slate-400 to-slate-600",
+    icon: "🥈",
+    bonusPct: 0.02,
+    perks: ["Earn 1 pt per GHS 1 + 2% bonus", "Redeem points for discounts", "Priority WhatsApp receipts", "5% off fresh produce"],
+    nextTier: "Gold",
+    nextTierMinSpend: 5000,
+  },
+  gold: {
+    label: "Gold",
+    color: "text-yellow-600",
+    gradient: "from-yellow-400 to-amber-600",
+    icon: "🥇",
+    bonusPct: 0.05,
+    perks: ["Earn 1 pt per GHS 1 + 5% bonus", "Free delivery on orders > GHS 200", "Exclusive monthly deals", "10% off all household items"],
+    nextTier: "Platinum",
+    nextTierMinSpend: 10000,
+  },
+  platinum: {
+    label: "Platinum",
+    color: "text-violet-600",
+    gradient: "from-violet-500 to-purple-700",
+    icon: "💎",
+    bonusPct: 0.10,
+    perks: ["Earn 1 pt per GHS 1 + 10% bonus", "Free delivery (no minimum)", "Personal shopper via WhatsApp", "15% off entire purchase on birthday month", "Invitation to product launches"],
+  },
+};
+
 export interface LoyaltyConfig {
   pointsPerCedi: number;
   redeemRate: number;     // GHS per point

@@ -236,6 +236,10 @@ model SupplierPayment {
   notes       String   @default("")
   createdBy   String?  // userId
   createdAt   DateTime @default(now())
+  // Premium: scheduled payment (auto-reminders for Net 15/30/60 invoices)
+  scheduledFor DateTime?  // when the payment is due (null = already paid)
+  reminderSentAt DateTime?  // last reminder notification timestamp
+  status      String   @default("completed") // completed | scheduled | overdue | cancelled
 
   supplier Supplier      @relation(fields: [supplierId], references: [id], onDelete: Cascade)
   purchase Purchase?     @relation(fields: [purchaseId], references: [id], onDelete: SetNull)
@@ -244,6 +248,8 @@ model SupplierPayment {
   @@index([supplierId])
   @@index([purchaseId])
   @@index([paymentDate])
+  @@index([scheduledFor])
+  @@index([status])
 }
 
 // ============================================================
@@ -278,6 +284,10 @@ model Sale {
   // remain accurate even if product costPrice changes later.
   costOfGoods   Float     @default(0)   // sum(item.costPrice * item.quantity)
   grossProfit   Float     @default(0)   // subtotal - costOfGoods
+  // Multi-currency (premium) — if customer paid in a foreign currency
+  displayCurrency String  @default("GHS")  // currency the customer paid in
+  displayAmountPaid Float @default(0)       // amount in display currency
+  exchangeRate  Float     @default(1)       // exchange rate used (display → base)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   voidedAt      DateTime?

@@ -63,6 +63,7 @@ export async function POST(req: NextRequest) {
 
     const payment = await db.$transaction(async (tx) => {
       // Create the payment record
+      const isScheduled = body.scheduledFor && body.status !== "completed";
       const newPayment = await tx.supplierPayment.create({
         data: {
           supplierId: body.supplierId,
@@ -72,34 +73,40 @@ export async function POST(req: NextRequest) {
           reference: String(body.reference || "").slice(0, 200),
           notes: String(body.notes || "").slice(0, 2000),
           createdBy: user.uid,
-          paymentDate: body.paymentDate ? new Date(body.paymentDate) : new Date(),
+          paymentDate: isScheduled ? new Date(0) : (body.paymentDate ? new Date(body.paymentDate) : new Date()),
+          scheduledFor: body.scheduledFor ? new Date(body.scheduledFor) : null,
+          status: isScheduled ? "scheduled" : "completed",
         },
         include: { supplier: { select: { name: true, code: true } } },
       });
 
-      // Decrement supplier balance (cannot go below 0 — clamp)
-      const supplier = await tx.supplier.findUnique({ where: { id: body.supplierId }, select: { balance: true } });
-      if (supplier) {
-        const newBalance = Math.max(0, supplier.balance - amount);
-        await tx.supplier.update({
-          where: { id: body.supplierId },
-          data: { balance: newBalance },
-        });
-      }
-
-      // If linked to a purchase, increment its amountPaid
-      if (body.purchaseId) {
-        const purchase = await tx.purchase.findUnique({ where: { id: body.purchaseId }, select: { amountPaid: true, total: true, status: true } });
-        if (purchase) {
-          const newAmountPaid = purchase.amountPaid + amount;
-          await tx.purchase.update({
-            where: { id: body.purchaseId },
-            data: {
-              amountPaid: newAmountPaid,
-              // Auto-mark purchase as fully paid if amountPaid >= total
-              ...(newAmountPaid >= purchase.total && purchase.status !== "received" && { status: "received" }),
-            },
+      // Only update supplier balance + purchase amountPaid if NOT scheduled
+      // (scheduled payments don't actually move money yet)
+      if (!isScheduled) {
+        // Decrement supplier balance (cannot go below 0 — clamp)
+        const supplier = await tx.supplier.findUnique({ where: { id: body.supplierId }, select: { balance: true } });
+        if (supplier) {
+          const newBalance = Math.max(0, supplier.balance - amount);
+          await tx.supplier.update({
+            where: { id: body.supplierId },
+            data: { balance: newBalance },
           });
+        }
+
+        // If linked to a purchase, increment its amountPaid
+        if (body.purchaseId) {
+          const purchase = await tx.purchase.findUnique({ where: { id: body.purchaseId }, select: { amountPaid: true, total: true, status: true } });
+          if (purchase) {
+            const newAmountPaid = purchase.amountPaid + amount;
+            await tx.purchase.update({
+              where: { id: body.purchaseId },
+              data: {
+                amountPaid: newAmountPaid,
+                // Auto-mark purchase as fully paid if amountPaid >= total
+                ...(newAmountPaid >= purchase.total && purchase.status !== "received" && { status: "received" }),
+              },
+            });
+          }
         }
       }
 
@@ -107,10 +114,12 @@ export async function POST(req: NextRequest) {
       await auditLogTx(tx, {
         userId: user.uid,
         user: user.username,
-        action: "CREATE",
+        action: isScheduled ? "SCHEDULE" : "CREATE",
         module: "accounts",
-        details: `Supplier payment of GHS ${amount.toFixed(2)} to ${newPayment.supplier.name} (${newPayment.supplier.code})${body.purchaseId ? ` for purchase ${body.purchaseId}` : ""}`,
-        severity: "info",
+        details: isScheduled
+          ? `Scheduled payment of GHS ${amount.toFixed(2)} to ${newPayment.supplier.name} (${newPayment.supplier.code}) for ${new Date(body.scheduledFor).toLocaleDateString()}`
+          : `Supplier payment of GHS ${amount.toFixed(2)} to ${newPayment.supplier.name} (${newPayment.supplier.code})${body.purchaseId ? ` for purchase ${body.purchaseId}` : ""}`,
+        severity: isScheduled ? "info" : "info",
         ipAddress: ip,
         userAgent: req.headers.get("user-agent") || "",
       });

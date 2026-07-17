@@ -697,9 +697,52 @@ export default function POSPage() {
   };
 
   const applyDiscount = (index: number, discount: number) => {
+    const clamped = Math.min(100, Math.max(0, discount));
+    // Premium: discounts > 10% require manager approval
+    const DISCOUNT_THRESHOLD = 10;
+    if (clamped > DISCOUNT_THRESHOLD) {
+      const item = cart[index];
+      if (item) {
+        setApprovalRequest({
+          title: `Apply ${clamped}% Discount`,
+          description: `You're applying a ${clamped}% discount to "${item.name}" which exceeds the ${DISCOUNT_THRESHOLD}% threshold. A manager must approve this.`,
+          action: "discount",
+          amount: clamped,
+          reason: `Line discount ${clamped}% on ${item.name}`,
+          onApproved: () => {
+            setCart(prev => prev.map((it, i) =>
+              i === index ? { ...it, discount: clamped } : it
+            ));
+            toast({ title: `${clamped}% discount applied`, description: "Manager approval granted" });
+          },
+        });
+        return;
+      }
+    }
     setCart(prev => prev.map((item, i) =>
-      i === index ? { ...item, discount: Math.min(100, Math.max(0, discount)) } : item
+      i === index ? { ...item, discount: clamped } : item
     ));
+  };
+
+  // Premium: global discount > 10% also requires manager approval
+  const applyGlobalDiscount = (pct: number) => {
+    const clamped = Math.min(100, Math.max(0, pct));
+    const DISCOUNT_THRESHOLD = 10;
+    if (clamped > DISCOUNT_THRESHOLD) {
+      setApprovalRequest({
+        title: `Apply ${clamped}% Global Discount`,
+        description: `You're applying a ${clamped}% discount to the entire cart which exceeds the ${DISCOUNT_THRESHOLD}% threshold. A manager must approve this.`,
+        action: "discount",
+        amount: clamped,
+        reason: `Global discount ${clamped}% on sale ${invoiceNumber}`,
+        onApproved: () => {
+          setGlobalDiscount(clamped);
+          toast({ title: `${clamped}% global discount applied`, description: "Manager approval granted" });
+        },
+      });
+      return;
+    }
+    setGlobalDiscount(clamped);
   };
 
   const clearCart = () => {
@@ -1685,7 +1728,7 @@ export default function POSPage() {
                         <input
                           type="number"
                           value={globalDiscount || ''}
-                          onChange={(e) => setGlobalDiscount(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))}
+                          onChange={(e) => applyGlobalDiscount(parseFloat(e.target.value) || 0)}
                           className="w-10 text-center bg-transparent border-b border-slate-200 focus:border-emerald-400 outline-none font-mono"
                           placeholder="0"
                         />%

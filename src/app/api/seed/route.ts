@@ -323,6 +323,13 @@ export async function POST(req: Request) {
     await db.systemSetting.create({ data: { key: "loyalty.redeemRate", value: "0.05" } });   // 1 pt = GHS 0.05
     await db.systemSetting.create({ data: { key: "loyalty.minRedeem", value: "100" } });      // min 100 pts to redeem
 
+    // Multi-currency exchange rates (premium)
+    await db.systemSetting.create({ data: { key: "currency.rates", value: JSON.stringify({
+      base: "GHS",
+      rates: { GHS: 1, USD: 0.078, EUR: 0.072, GBP: 0.061, NGN: 122.50, CFA: 47.85 },
+      updatedAt: new Date().toISOString(),
+    }) } });
+
     // ===== Audit the seed itself (after re-creating admin user) =====
     await db.auditLog.create({
       data: {

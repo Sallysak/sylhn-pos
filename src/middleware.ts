@@ -42,6 +42,7 @@ const PUBLIC_API_PATHS = [
   "/api/auth/logout",
   "/api/auth/me",
   "/api/auth/csrf",
+  "/api/customer-display",  // customer-facing display polls this (no auth)
 ];
 
 function isPublicApiPath(pathname: string): boolean {

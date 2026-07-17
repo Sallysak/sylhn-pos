@@ -87,6 +87,10 @@ export const SaleSchema = z.object({
   pointsRedeemed: z.number().int().min(0).max(1_000_000).optional().default(0),
   // Premium: shift id (optional, validated server-side)
   shiftId: z.union([z.string(), z.null()]).optional(),
+  // Premium: multi-currency — the customer paid in a foreign currency
+  displayCurrency: z.string().max(8).optional(),  // e.g. "USD"
+  displayAmountPaid: z.number().min(0).max(10_000_000).optional(),  // amount in foreign currency
+  exchangeRate: z.number().min(0).max(100000).optional(),  // rate used at time of sale
 });
 
 // ===== Suppliers =====
