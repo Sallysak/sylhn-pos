@@ -227,6 +227,40 @@ model AutoReplenishRule {
 }
 
 // ============================================================
+// FORECAST SNAPSHOTS (premium — AI demand forecasting accuracy)
+// ============================================================
+
+// Stores a forecast snapshot so we can compare predictions to actuals later.
+// Each row = one product's forecast at a point in time.
+model ForecastSnapshot {
+  id              String   @id @default(cuid())
+  productId       String
+  forecastDate    DateTime             // when the forecast was generated
+  forecastDays    Int                  // forecast horizon (e.g. 30 days)
+  // Predictions
+  predictedDemand Int                  // units we predicted would sell
+  projectedStockoutDate DateTime?     // when we predicted stock would run out
+  avgDailyVelocity Float              // units/day at time of forecast
+  trend           String               // increasing | decreasing | stable | new
+  urgency         String               // critical | high | medium | low
+  recommendedReorderQty Int
+  confidenceScore Float @default(0.5) // 0-1, how confident we are
+  // Seasonality data (JSON: { mon: 1.2, tue: 0.8, ... })
+  seasonality     String   @default("{}")
+  // Accuracy (filled in later when the forecast period elapses)
+  actualDemand    Int?                 // how many actually sold
+  accuracyPct     Float?               // how close prediction was (0-100)
+  evaluatedAt     DateTime?
+  createdAt       DateTime @default(now())
+
+  product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@index([forecastDate])
+  @@index([evaluatedAt])
+}
+
+// ============================================================
 // CATALOG (Stock)
 // ============================================================
 
@@ -272,10 +306,11 @@ model Product {
   purchaseItems   PurchaseItem[]
   stockHistory    StockHistory[]
   stocktakeItems  StocktakeItem[]
-  // Premium: location stock, transfers, auto-replenish rule
+  // Premium: location stock, transfers, auto-replenish rule, forecast snapshots
   locationStocks  LocationStock[]
   transferItems   StockTransferItem[]
   autoReplenishRule AutoReplenishRule?
+  forecastSnapshots ForecastSnapshot[]
 
   @@index([category])
   @@index([groupId])
