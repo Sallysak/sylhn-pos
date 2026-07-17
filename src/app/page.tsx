@@ -1542,8 +1542,8 @@ export default function POSPage() {
             </div>
           </div>
 
-          {/* Product Grid — native scroll (not ScrollArea) for mobile */}
-          <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 no-scrollbar lg:overflow-y-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
+          {/* Product Grid — native scroll, vertical only, works on mobile + desktop */}
+          <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 no-scrollbar" style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 p-3 sm:p-4">
               {filteredProducts.map((product, idx) => {
                 const inCart = cart.find(item => item.productId === product.id);
@@ -1620,7 +1620,7 @@ export default function POSPage() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="flex flex-col h-full w-full"
+                className="flex flex-col w-full lg:h-full min-h-0"
               >
                 {/* Cart Header */}
                 <div className="flex-shrink-0 flex items-center justify-between px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-500 text-white">
@@ -1697,7 +1697,7 @@ export default function POSPage() {
                 </div>
 
                 {/* Cart Items Table */}
-                <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+                <div className="flex-1 flex flex-col min-h-0 lg:overflow-hidden">
                   {/* Desktop Table Header — light blue, hidden on mobile */}
                   <div className="hidden lg:grid flex-shrink-0 grid-cols-[120px_1fr_50px_80px_45px_80px] gap-1 px-2 py-1 text-[10px] font-bold text-slate-700 border-b border-slate-400" style={{ backgroundColor: '#ADD8E6' }}>
                     <div>Part No.</div>
@@ -1716,8 +1716,8 @@ export default function POSPage() {
                     <div className="text-right w-14">Total</div>
                   </div>
 
-                  {/* Items List — native scroll (not ScrollArea) for mobile */}
-                  <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 no-scrollbar" style={{ WebkitOverflowScrolling: 'touch' }}>
+                  {/* Items List — native scroll, works on both mobile and desktop */}
+                  <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 no-scrollbar" style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
                     <div className="divide-y divide-slate-100">
                       <AnimatePresence mode="popLayout">
                         {cart.map((item, index) => {
