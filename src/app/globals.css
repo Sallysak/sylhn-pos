@@ -264,4 +264,293 @@
       max-width: 100%;
     }
   }
+
+  /* ============================================================
+     PREMIUM MOBILE NAVIGATION SYSTEM
+     - Bottom tab bar (POS, Cart, Reports, More)
+     - Slide-in drawer for "More" menu
+     - Safe-area insets for notched devices
+     - Haptic feedback on supported devices
+     ============================================================ */
+
+  /* Bottom nav container — fixed to viewport bottom */
+  .mobile-bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 40;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    border-top: 1px solid rgb(226 232 240);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    box-shadow: 0 -4px 24px -8px rgba(0, 0, 0, 0.12);
+  }
+
+  .mobile-bottom-nav-inner {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 4px;
+    padding: 6px 8px 4px;
+    max-width: 480px;
+    margin: 0 auto;
+  }
+
+  .mobile-tab {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 6px 4px 4px;
+    border-radius: 10px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: rgb(100 116 139);
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1;
+    position: relative;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .mobile-tab:active {
+    transform: scale(0.92);
+    background: rgb(241 245 249);
+  }
+
+  .mobile-tab.active {
+    color: rgb(5 150 105);
+  }
+
+  .mobile-tab .tab-icon {
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .mobile-tab.active .tab-icon {
+    transform: translateY(-1px);
+  }
+
+  /* Cart badge on bottom nav */
+  .mobile-tab .tab-badge {
+    position: absolute;
+    top: 2px;
+    right: calc(50% - 18px);
+    background: rgb(244 63 94);
+    color: white;
+    font-size: 9px;
+    font-weight: 700;
+    min-width: 16px;
+    height: 16px;
+    border-radius: 999px;
+    padding: 0 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid white;
+    line-height: 1;
+  }
+
+  /* Slide-in drawer (right side) */
+  .mobile-drawer-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    z-index: 50;
+    animation: fadeIn 0.2s ease;
+  }
+
+  .mobile-drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(320px, 85vw);
+    background: white;
+    z-index: 51;
+    box-shadow: -8px 0 32px -8px rgba(0, 0, 0, 0.2);
+    display: flex;
+    flex-direction: column;
+    animation: slideInRight 0.25s cubic-bezier(0.32, 0.72, 0, 1);
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes slideInRight {
+    from { transform: translateX(100%); }
+    to { transform: translateX(0); }
+  }
+
+  @keyframes slideInBottom {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+
+  /* Cart sheet (slides up from bottom) */
+  .mobile-cart-sheet {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    max-height: 85dvh;
+    background: white;
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -8px 40px -8px rgba(0, 0, 0, 0.25);
+    z-index: 52;
+    display: flex;
+    flex-direction: column;
+    animation: slideInBottom 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .mobile-cart-sheet::before {
+    content: "";
+    display: block;
+    width: 36px;
+    height: 4px;
+    background: rgb(203 213 225);
+    border-radius: 999px;
+    margin: 8px auto 4px;
+  }
+
+  /* Hide on desktop */
+  @media (min-width: 1024px) {
+    .mobile-only {
+      display: none !important;
+    }
+  }
+
+  /* Show only on mobile */
+  @media (max-width: 1023px) {
+    .desktop-only {
+      display: none !important;
+    }
+  }
+
+  /* Mobile product card — bigger touch targets */
+  .mobile-product-card {
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .mobile-product-card:active {
+    transform: scale(0.95);
+    transition: transform 0.1s ease;
+  }
+
+  /* Premium: pull-to-refresh hint */
+  .pull-to-refresh {
+    position: absolute;
+    top: -40px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: rgb(100 116 139);
+    font-size: 11px;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .pull-to-refresh.visible {
+    opacity: 1;
+  }
+
+  /* Premium: haptic feedback helper */
+  .haptic-tap {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
+  /* Premium: hide scrollbar but keep scrollable */
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Premium: mobile-friendly number pad */
+  .mobile-keypad {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+
+  .mobile-keypad-btn {
+    height: 56px;
+    border-radius: 12px;
+    background: white;
+    border: 1px solid rgb(226 232 240);
+    font-size: 20px;
+    font-weight: 600;
+    color: rgb(30 41 59);
+    cursor: pointer;
+    transition: all 0.1s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .mobile-keypad-btn:active {
+    background: rgb(241 245 249);
+    transform: scale(0.96);
+  }
+
+  /* Premium: offline indicator */
+  .offline-indicator {
+    position: fixed;
+    top: env(safe-area-inset-top, 0px);
+    left: 0;
+    right: 0;
+    background: rgb(234 88 12);
+    color: white;
+    text-align: center;
+    padding: 6px 12px;
+    font-size: 11px;
+    font-weight: 600;
+    z-index: 60;
+    animation: slideDown 0.3s ease;
+  }
+
+  @keyframes slideDown {
+    from { transform: translateY(-100%); }
+    to { transform: translateY(0); }
+  }
+
+  /* Premium: floating action button (FAB) */
+  .mobile-fab {
+    position: fixed;
+    bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+    right: 16px;
+    z-index: 30;
+    width: 56px;
+    height: 56px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, rgb(5 150 105), rgb(13 148 136));
+    color: white;
+    border: none;
+    box-shadow: 0 8px 24px -4px rgba(5, 150, 105, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .mobile-fab:active {
+    transform: scale(0.92);
+  }
 }

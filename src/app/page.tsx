@@ -32,6 +32,10 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { initialSuppliers } from "@/components/supplier-form";
 import { InstallButton } from "@/components/install-button";
+import { MobileNav } from "@/components/mobile-nav";
+import { BarcodeScanner } from "@/components/barcode-scanner";
+import { ManagerApproval } from "@/components/manager-approval";
+import { queueSale, flushQueue, onQueueChange, isOnline, getQueueSize } from "@/lib/offline-queue";
 
 // ===== Lazy-loaded components (code-split for faster initial load) =====
 // Each form is loaded on-demand only when the user navigates to it.
@@ -109,6 +113,20 @@ export default function POSPage() {
   const [showCashDrawer, setShowCashDrawer] = useState(false);
   const [lowStockNotified, setLowStockNotified] = useState<Set<string>>(new Set());
   const [scannerMode, setScannerMode] = useState(false);
+  // Premium: barcode scanner modal (mobile camera scanner)
+  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
+  // Premium: manager approval modal (for voids > GHS 100)
+  const [approvalRequest, setApprovalRequest] = useState<{
+    title: string;
+    description: string;
+    action: "void" | "refund" | "discount" | "delete";
+    amount?: number;
+    reason?: string;
+    onApproved: () => void;
+  } | null>(null);
+  // Premium: offline queue tracking (for mobile nav badge)
+  const [queueSize, setQueueSize] = useState(0);
+  const [mobileCartOpen, setMobileCartOpen] = useState(false);
   const [dailyTotal, setDailyTotal] = useState(() => {
     if (typeof window !== 'undefined') { try { return parseFloat(localStorage.getItem('sylhn-daily-total') || '0') || 0; } catch {} }
     return 0;
@@ -153,6 +171,20 @@ export default function POSPage() {
     setNow(new Date());
   }, []);
   /* eslint-enable react-hooks/set-state-in-effect */
+
+  // Premium: offline sale queue tracking
+  useEffect(() => {
+    const refreshQueue = async () => {
+      try { setQueueSize(await getQueueSize()); } catch {}
+    };
+    refreshQueue();
+    const unsub = onQueueChange(refreshQueue);
+    // Auto-flush on mount (in case we have queued sales from a previous offline session)
+    if (isOnline()) {
+      setTimeout(() => { flushQueue().catch(() => {}); }, 2000);
+    }
+    return unsub;
+  }, []);
 
   // ===== Cross-device session restore =====
   // On page load, check if there's a valid server session (httpOnly cookie)
@@ -736,6 +768,22 @@ export default function POSPage() {
       toast({ title: "Cart already empty", variant: "destructive" });
       return;
     }
+    // Premium: if void amount > GHS 100, require manager approval
+    const VOID_THRESHOLD = 100;
+    if (total > VOID_THRESHOLD) {
+      setApprovalRequest({
+        title: `Void Sale — ${invoiceNumber}`,
+        description: `You're voiding a sale of GHS ${total.toFixed(2)} which exceeds the GHS ${VOID_THRESHOLD} threshold. A manager must approve this action.`,
+        action: "void",
+        amount: total,
+        reason: `Void of sale ${invoiceNumber}`,
+        onApproved: () => {
+          clearCart();
+          toast({ title: "Transaction voided (F4)", description: "Manager approval granted", variant: "default" });
+        },
+      });
+      return;
+    }
     clearCart();
     toast({ title: "Transaction voided (F4)", variant: "default" });
   };
@@ -865,10 +913,81 @@ export default function POSPage() {
         }
       } else {
         console.warn('Sale recording failed:', await res.text());
-        toast({ title: 'Warning', description: 'Sale completed locally but could not be saved to server', variant: 'destructive' });
+        // Premium: if offline, queue the sale for later sync
+        const salePayload = {
+          invoiceNumber: result.invoiceNumber,
+          customerName: result.customer || '',
+          cashierName: result.cashier,
+          subtotal: result.subtotal,
+          discount: result.discount,
+          taxRate: TAX_RATE,
+          taxAmount: result.tax,
+          total: result.total,
+          amountPaid: result.amountPaid,
+          change: result.change,
+          paymentMethod: result.method,
+          status: 'completed',
+          items: result.items.map(item => ({
+            productId: item.productId,
+            sku: item.sku,
+            name: item.name,
+            price: item.price,
+            quantity: item.quantity,
+            unit: item.unit,
+            discount: item.discount,
+            taxable: item.taxable,
+            total: item.price * item.quantity * (1 - item.discount / 100),
+          })),
+        };
+        try {
+          await queueSale(salePayload);
+          toast({
+            title: 'Sale queued for sync',
+            description: 'You appear to be offline. The sale will be uploaded automatically when you reconnect.',
+            variant: 'default',
+          });
+        } catch (queueErr) {
+          console.error('Failed to queue sale:', queueErr);
+          toast({ title: 'Warning', description: 'Sale completed locally but could not be saved to server', variant: 'destructive' });
+        }
       }
     } catch (e) {
       console.warn('Sale recording error (offline?):', e);
+      // Premium: queue for sync — network is definitely down
+      const salePayload = {
+        invoiceNumber: result.invoiceNumber,
+        customerName: result.customer || '',
+        cashierName: result.cashier,
+        subtotal: result.subtotal,
+        discount: result.discount,
+        taxRate: TAX_RATE,
+        taxAmount: result.tax,
+        total: result.total,
+        amountPaid: result.amountPaid,
+        change: result.change,
+        paymentMethod: result.method,
+        status: 'completed',
+        items: result.items.map(item => ({
+          productId: item.productId,
+          sku: item.sku,
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity,
+          unit: item.unit,
+          discount: item.discount,
+          taxable: item.taxable,
+          total: item.price * item.quantity * (1 - item.discount / 100),
+        })),
+      };
+      try {
+        await queueSale(salePayload);
+        toast({
+          title: 'Sale queued (offline)',
+          description: 'Network unavailable — sale saved locally and will sync automatically.',
+        });
+      } catch (queueErr) {
+        toast({ title: 'Sale could not be saved', description: 'Network error and queue unavailable', variant: 'destructive' });
+      }
     }
   };
 
@@ -1125,7 +1244,7 @@ export default function POSPage() {
 
   // ===== Render POS =====
   return (
-    <div className="h-screen w-screen overflow-hidden bg-gradient-to-br from-slate-100 via-emerald-50 to-slate-100 flex flex-col font-sans">
+    <div className="h-screen w-screen overflow-hidden bg-gradient-to-br from-slate-100 via-emerald-50 to-slate-100 flex flex-col font-sans pb-[72px] lg:pb-0">
       {/* ===== Header Bar with Menu ===== */}
       <header className="flex-shrink-0 bg-gradient-to-r from-emerald-700 via-emerald-600 to-teal-600 text-white shadow-lg z-30">
         <div className="flex items-center px-4 py-2 gap-4">
@@ -1201,9 +1320,10 @@ export default function POSPage() {
                 className="w-full h-9 pl-10 pr-20 rounded-xl bg-white text-slate-800 text-sm shadow-md outline-none ring-2 ring-transparent focus:ring-emerald-300 transition"
               />
               <button
-                onClick={() => setScannerMode(!scannerMode)}
+                onClick={() => setShowBarcodeScanner(true)}
                 className={cn("absolute right-2 top-1/2 -translate-y-1/2 h-6 px-2 rounded-lg flex items-center gap-1 text-[11px] font-medium transition",
-                  scannerMode ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500 hover:bg-slate-200")}
+                  "bg-emerald-100 text-emerald-700 hover:bg-emerald-200")}
+                title="Open barcode scanner (camera)"
               >
                 <ScanLine className="h-3.5 w-3.5" />
                 Scan
@@ -1764,6 +1884,79 @@ export default function POSPage() {
           <ReceiptModal payment={lastPayment} onClose={finishReceipt} />
         )}
       </AnimatePresence>
+
+      {/* ===== Premium: Mobile Bottom Navigation (mobile-only) ===== */}
+      <MobileNav
+        active={view === "pos" ? "pos" : view}
+        onNavigate={(v) => {
+          if (v === "cart") {
+            setMobileCartOpen(true);
+          } else if (v === "dashboard") {
+            setView("dashboard");
+          } else if (v === "reports") {
+            setView("sales-menu");
+          } else if (v === "pos") {
+            setView("pos");
+          } else {
+            setView(v as ViewMode);
+          }
+        }}
+        cartCount={cart.reduce((s, i) => s + i.quantity, 0)}
+        user={loggedInUser ? { fullName: loggedInUser.fullName, role: loggedInUser.role } : null}
+        onLogout={() => {
+          fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
+          try { localStorage.removeItem('sylhn-current-user'); } catch {}
+          setLoggedInUser(null);
+          setView("login");
+          toast({ title: "Logged out", description: "You have been signed out" });
+        }}
+      />
+
+      {/* ===== Premium: Barcode Scanner Modal ===== */}
+      <AnimatePresence>
+        {showBarcodeScanner && (
+          <BarcodeScanner
+            onScan={(code) => {
+              // Look up product by barcode or SKU
+              const product = products.find(p => p.barcode === code || p.sku === code);
+              if (product) {
+                addToCart(product);
+                toast({ title: `Added: ${product.name}`, description: `Scanned: ${code}` });
+              } else {
+                toast({ title: "No product found", description: `Barcode ${code} not in catalog`, variant: "destructive" });
+              }
+            }}
+            onClose={() => setShowBarcodeScanner(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ===== Premium: Manager Approval Modal ===== */}
+      <ManagerApproval
+        open={!!approvalRequest}
+        title={approvalRequest?.title || ""}
+        description={approvalRequest?.description || ""}
+        action={approvalRequest?.action || "void"}
+        amount={approvalRequest?.amount}
+        reason={approvalRequest?.reason}
+        onApproved={() => {
+          if (approvalRequest?.onApproved) approvalRequest.onApproved();
+          setApprovalRequest(null);
+        }}
+        onClose={() => setApprovalRequest(null)}
+      />
+
+      {/* ===== Premium: Mobile Floating Action Button (FAB) for barcode scan ===== */}
+      {view === "pos" && (
+        <button
+          onClick={() => setShowBarcodeScanner(true)}
+          className="mobile-fab mobile-only haptic-tap"
+          aria-label="Scan barcode"
+          title="Scan barcode"
+        >
+          <ScanLine className="h-6 w-6" />
+        </button>
+      )}
 
       {/* ===== Cash Drawer Animation ===== */}
       <AnimatePresence>
