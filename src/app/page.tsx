@@ -35,6 +35,7 @@ import { InstallButton } from "@/components/install-button";
 import { MobileNav } from "@/components/mobile-nav";
 import { BarcodeScanner } from "@/components/barcode-scanner";
 import { ManagerApproval } from "@/components/manager-approval";
+import { PrinterPairing } from "@/components/printer-pairing";
 import { queueSale, flushQueue, onQueueChange, isOnline, getQueueSize } from "@/lib/offline-queue";
 
 // ===== Lazy-loaded components (code-split for faster initial load) =====
@@ -127,6 +128,8 @@ export default function POSPage() {
   // Premium: offline queue tracking (for mobile nav badge)
   const [queueSize, setQueueSize] = useState(0);
   const [mobileCartOpen, setMobileCartOpen] = useState(false);
+  // Premium: Bluetooth printer pairing modal
+  const [showPrinterPairing, setShowPrinterPairing] = useState(false);
   const [dailyTotal, setDailyTotal] = useState(() => {
     if (typeof window !== 'undefined') { try { return parseFloat(localStorage.getItem('sylhn-daily-total') || '0') || 0; } catch {} }
     return 0;
@@ -624,6 +627,54 @@ export default function POSPage() {
   const totalAfterDiscount = subtotal - (subtotal * (globalDiscount / 100));
   const total = totalAfterDiscount + taxAmount;
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+
+  // Premium: auto-sync cart to customer-facing display (/display page polls it).
+  // Debounced — only updates 500ms after the last cart change to avoid spamming.
+  // Lives AFTER subtotal/total/etc are defined (TDZ-safe).
+  useEffect(() => {
+    if (!loggedInUser) return;
+    const timer = setTimeout(() => {
+      fetch('/api/customer-display', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          registerId: 'register-1',
+          items: cart.map(item => ({
+            emoji: item.emoji,
+            name: item.name,
+            price: item.price,
+            quantity: item.quantity,
+            total: item.price * item.quantity * (1 - item.discount / 100),
+          })),
+          subtotal,
+          discount: discountAmount,
+          tax: taxAmount,
+          total,
+          customerName: customerName || undefined,
+          message: cart.length === 0 ? 'Welcome to SYLHN POS — bring your items to the counter' : undefined,
+        }),
+      }).catch(e => console.warn('Customer display sync failed:', e));
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [cart, subtotal, discountAmount, taxAmount, total, customerName, loggedInUser]);
+
+  // Premium: clear customer display when finishing a sale
+  useEffect(() => {
+    if (showReceipt && lastPayment) {
+      fetch('/api/customer-display', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          registerId: 'register-1',
+          items: [],
+          subtotal: 0, discount: 0, tax: 0, total: 0,
+          message: `Thank you! Your sale of ${formatGHS(lastPayment.total || 0)} was completed.`,
+        }),
+      }).catch(() => {});
+    }
+  }, [showReceipt, lastPayment]);
 
   // ===== Cart Actions =====
   const addToCart = useCallback((product: Product) => {
@@ -1991,15 +2042,43 @@ export default function POSPage() {
 
       {/* ===== Premium: Mobile Floating Action Button (FAB) for barcode scan ===== */}
       {view === "pos" && (
-        <button
-          onClick={() => setShowBarcodeScanner(true)}
-          className="mobile-fab mobile-only haptic-tap"
-          aria-label="Scan barcode"
-          title="Scan barcode"
-        >
-          <ScanLine className="h-6 w-6" />
-        </button>
+        <>
+          <button
+            onClick={() => setShowBarcodeScanner(true)}
+            className="mobile-fab mobile-only haptic-tap"
+            aria-label="Scan barcode"
+            title="Scan barcode"
+          >
+            <ScanLine className="h-6 w-6" />
+          </button>
+          {/* Printer pairing FAB (above scan FAB) */}
+          <button
+            onClick={() => setShowPrinterPairing(true)}
+            className="mobile-only haptic-tap fixed z-30"
+            style={{
+              bottom: "calc(144px + env(safe-area-inset-bottom, 0px))",
+              right: "16px",
+              width: "44px",
+              height: "44px",
+              borderRadius: "999px",
+              background: "white",
+              border: "1px solid rgb(226 232 240)",
+              boxShadow: "0 4px 12px -2px rgba(0,0,0,0.1)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "rgb(71 85 105)",
+            }}
+            aria-label="Pair printer"
+            title="Pair Bluetooth printer"
+          >
+            <Printer className="h-5 w-5" />
+          </button>
+        </>
       )}
+
+      {/* ===== Premium: Printer Pairing Modal ===== */}
+      <PrinterPairing open={showPrinterPairing} onClose={() => setShowPrinterPairing(false)} />
 
       {/* ===== Cash Drawer Animation ===== */}
       <AnimatePresence>
@@ -3154,6 +3233,52 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
     return () => { cancelled = true; };
   }, [showQR, payment.saleId, qrSvg]);
 
+  // Premium: print via Bluetooth thermal printer (falls back to window.print)
+  const handleThermalPrint = async () => {
+    if (!payment.saleId) {
+      toast({ title: 'Sale not yet saved to server', variant: 'destructive' });
+      return;
+    }
+    try {
+      // Dynamically import to avoid loading the printer lib on every receipt render
+      const { isPrinterConnected, buildReceiptBytes, printBytes } = await import("@/lib/thermal-printer");
+      if (!isPrinterConnected()) {
+        // Fall back to browser print
+        window.print();
+        return;
+      }
+      const bytes = buildReceiptBytes({
+        companyName: COMPANY.name,
+        companyAddress: COMPANY.address,
+        companyPhone: COMPANY.contact,
+        invoiceNumber: payment.invoiceNumber,
+        cashierName: payment.cashier,
+        customerName: payment.customer,
+        timestamp: new Date(payment.timestamp),
+        items: payment.items.map(item => ({
+          name: item.name,
+          emoji: item.emoji,
+          quantity: item.quantity,
+          price: item.price,
+          total: item.price * item.quantity * (1 - item.discount / 100),
+        })),
+        subtotal: payment.subtotal,
+        discount: payment.discount,
+        taxAmount: payment.tax,
+        total: payment.total,
+        amountPaid: payment.amountPaid,
+        change: payment.change,
+        paymentMethod: payment.method,
+        currencySymbol: CURRENCY,
+      }, 80);
+      await printBytes(bytes);
+      toast({ title: 'Receipt printed', description: 'Sent to thermal printer' });
+    } catch (e: any) {
+      console.warn('Thermal print failed, falling back to browser print:', e);
+      window.print();
+    }
+  };
+
   // Premium: send via WhatsApp
   const handleSendWhatsApp = async () => {
     if (!payment.saleId) {
@@ -3310,8 +3435,9 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
         {/* Premium: action row with Print, QR toggle, WhatsApp, New Sale */}
         <div className="px-4 py-3 border-t border-slate-200 bg-slate-50 grid grid-cols-2 gap-2">
           <button
-            onClick={() => window.print()}
+            onClick={handleThermalPrint}
             className="h-10 rounded-xl bg-white ring-1 ring-slate-200 hover:bg-slate-100 text-slate-700 font-semibold text-xs flex items-center justify-center gap-1.5 transition"
+            title="Print via Bluetooth thermal printer (or browser if not connected)"
           >
             <Printer className="h-4 w-4" />
             Print

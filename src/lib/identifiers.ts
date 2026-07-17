@@ -35,6 +35,11 @@ export function generateStocktakeRefNo(): string {
   return `ST-${ms}-${n.toString().padStart(4, "0")}`;
 }
 
+export function generateStockTransferRefNo(): string {
+  const { ms, n } = nextCounter();
+  return `TRF-${ms}-${n.toString().padStart(4, "0")}`;
+}
+
 // Supplier codes: SUP-00001, SUP-00002, ...
 export async function generateSupplierCode(): Promise<string> {
   // Import lazily to avoid circular deps at module load.

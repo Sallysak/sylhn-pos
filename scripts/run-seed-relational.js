@@ -31,6 +31,12 @@ async function main() {
   await p.cashierShift.deleteMany();
   await p.expense.deleteMany();
   await p.productSupplier.deleteMany();
+  await p.stockTransferItem.deleteMany();
+  await p.stockTransfer.deleteMany();
+  await p.locationStock.deleteMany();
+  await p.autoReplenishRule.deleteMany();
+  await p.register.deleteMany();
+  await p.location.deleteMany();
   await p.product.deleteMany();
   await p.stockGroup.deleteMany();
   await p.telephoneDirectoryEntry.deleteMany();
@@ -39,7 +45,7 @@ async function main() {
   await p.auditLog.deleteMany();
   await p.systemSetting.deleteMany();
   await p.systemUser.deleteMany();
-  console.log("Wiped all tables (including premium: salePayment, loyaltyTransaction).");
+  console.log("Wiped all tables (including premium: registers, locations, transfers, auto-replenish).");
 
   // Users
   const [adminPwd, managerPwd, cashierPwd, stockkeeperPwd, accountantPwd] = await Promise.all([

@@ -49,6 +49,11 @@ model SystemUser {
   customers         Customer[]           @relation("CustomerCreatedBy")
   telephoneEntries  TelephoneDirectoryEntry[]
   backups           BackupRecord[]
+  // Premium: stock transfers, auto-replenish rules, register assignment
+  transfersCreated  StockTransfer[]      @relation("TransferCreatedBy")
+  transfersReceived StockTransfer[]      @relation("TransferReceivedBy")
+  autoReplenishRules AutoReplenishRule[]
+  currentRegister   Register?            @relation("CurrentRegisterCashier")
 
   @@index([role])
   @@index([active])
@@ -82,6 +87,143 @@ model SystemSetting {
   value     String
   updatedAt DateTime @updatedAt
   updatedBy String?
+}
+
+// ============================================================
+// REGISTERS & LOCATIONS (premium — multi-terminal / multi-store)
+// ============================================================
+
+model Register {
+  id          String   @id @default(cuid())
+  name        String   @unique  // "Register 1", "Counter A", etc.
+  code        String   @unique  // short code: REG-01
+  locationId  String?
+  isActive    Boolean  @default(true)
+  // The cashier currently logged into this register (null = available)
+  currentCashierId String?  @unique
+  currentShiftId   String?
+  lastActivityAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  location    Location?     @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  cashier     SystemUser?   @relation("CurrentRegisterCashier", fields: [currentCashierId], references: [id], onDelete: SetNull)
+  shifts      CashierShift[]
+
+  @@index([locationId])
+  @@index([isActive])
+}
+
+model Location {
+  id          String   @id @default(cuid())
+  code        String   @unique  // LOC-MAIN, LOC-WAREHOUSE, LOC-ACCRA
+  name        String             // "Main Store", "Warehouse", "Accra Branch"
+  type        String   @default("store")  // store | warehouse | branch
+  address     String   @default("")
+  city        String   @default("")
+  phone       String   @default("")
+  managerId   String?  // SystemUser id
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  registers     Register[]
+  transfersFrom StockTransfer[] @relation("TransferFrom")
+  transfersTo   StockTransfer[] @relation("TransferTo")
+  stockLevels   LocationStock[]
+
+  @@index([isActive])
+  @@index([type])
+}
+
+// Per-location stock levels (so the same product can have different
+// quantities at different locations)
+model LocationStock {
+  id          String  @id @default(cuid())
+  locationId  String
+  productId   String
+  quantity    Int    @default(0)
+  updatedAt   DateTime @updatedAt
+
+  location  Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([locationId, productId])
+  @@index([locationId])
+  @@index([productId])
+}
+
+// Stock transfer between locations
+model StockTransfer {
+  id           String   @id @default(cuid())
+  refNo        String   @unique  // TRF-...
+  fromLocationId String
+  toLocationId   String
+  status       String   @default("draft")  // draft | in-transit | received | cancelled
+  notes        String   @default("")
+  createdById  String?
+  receivedById String?
+  receivedAt   DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  fromLocation Location @relation("TransferFrom", fields: [fromLocationId], references: [id], onDelete: Cascade)
+  toLocation   Location @relation("TransferTo", fields: [toLocationId], references: [id], onDelete: Cascade)
+  createdBy    SystemUser? @relation("TransferCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  receivedBy   SystemUser? @relation("TransferReceivedBy", fields: [receivedById], references: [id], onDelete: SetNull)
+  items        StockTransferItem[]
+
+  @@index([fromLocationId])
+  @@index([toLocationId])
+  @@index([status])
+}
+
+model StockTransferItem {
+  id              String  @id @default(cuid())
+  transferId      String
+  productId       String
+  quantity        Int
+  // Snapshot at time of transfer (for historical accuracy)
+  productName     String
+  sku             String
+  emoji           String  @default("📦")
+
+  transfer  StockTransfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  product   Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([transferId])
+  @@index([productId])
+}
+
+// ============================================================
+// AUTO-REPLENISHMENT RULES (premium — auto-create POs when low)
+// ============================================================
+
+model AutoReplenishRule {
+  id              String   @id @default(cuid())
+  productId       String
+  // Trigger: when stock drops to/below this level, auto-create a PO
+  triggerLevel    Int      @default(0)
+  // Quantity to order when triggered
+  reorderQty      Int      @default(0)
+  // Preferred supplier to send the PO to (null = use product's preferred)
+  supplierId      String?
+  // Cooldown to prevent spamming POs (hours between triggers for same product)
+  cooldownHours   Int      @default(24)
+  lastTriggeredAt DateTime?
+  triggerCount    Int      @default(0)
+  isActive        Boolean  @default(true)
+  createdBy       String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  product   Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  supplier  Supplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  user      SystemUser? @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+
+  @@unique([productId])
+  @@index([isActive])
+  @@index([supplierId])
 }
 
 // ============================================================
@@ -130,6 +272,10 @@ model Product {
   purchaseItems   PurchaseItem[]
   stockHistory    StockHistory[]
   stocktakeItems  StocktakeItem[]
+  // Premium: location stock, transfers, auto-replenish rule
+  locationStocks  LocationStock[]
+  transferItems   StockTransferItem[]
+  autoReplenishRule AutoReplenishRule?
 
   @@index([category])
   @@index([groupId])
@@ -218,6 +364,8 @@ model Supplier {
   products        ProductSupplier[]
   purchases       Purchase[]
   payments        SupplierPayment[]
+  // Premium: auto-replenish rules
+  autoReplenishRules AutoReplenishRule[]
 
   @@index([name])
   @@index([active])
@@ -288,6 +436,11 @@ model Sale {
   displayCurrency String  @default("GHS")  // currency the customer paid in
   displayAmountPaid Float @default(0)       // amount in display currency
   exchangeRate  Float     @default(1)       // exchange rate used (display → base)
+  // Premium: credit sale (buy now, pay later)
+  isCreditSale  Boolean   @default(false)   // true = customer pays later
+  creditAmountDue Float  @default(0)        // outstanding credit on this sale
+  creditDueDate DateTime?                    // when the credit is due
+  creditSettledAt DateTime?                  // when fully paid
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   voidedAt      DateTime?
@@ -406,14 +559,18 @@ model CashierShift {
   variance     Float?
   status       String    @default("open") // open | closed
   notes        String    @default("")
+  // Premium: register this shift belongs to
+  registerId   String?
 
   cashier    SystemUser  @relation(fields: [cashierId], references: [id], onDelete: Cascade)
+  register   Register?  @relation(fields: [registerId], references: [id], onDelete: SetNull)
   sales      Sale[]
   heldOrders HeldOrder[]
 
   @@index([cashierId])
   @@index([status])
   @@index([openedAt])
+  @@index([registerId])
 }
 
 // ============================================================

@@ -50,6 +50,12 @@ export async function POST(req: Request) {
     await db.cashierShift.deleteMany();
     await db.expense.deleteMany();
     await db.productSupplier.deleteMany();
+    await db.stockTransferItem.deleteMany();
+    await db.stockTransfer.deleteMany();
+    await db.locationStock.deleteMany();
+    await db.autoReplenishRule.deleteMany();
+    await db.register.deleteMany();
+    await db.location.deleteMany();
     await db.product.deleteMany();
     await db.stockGroup.deleteMany();
     await db.telephoneDirectoryEntry.deleteMany();
