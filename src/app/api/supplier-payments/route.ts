@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireAuth, requirePermission } from "@/lib/auth";
 import { rateLimitApiRead, rateLimitApiWrite, rateLimitResponse, getClientIp } from "@/lib/rate-limit";
+import { auditLogTx } from "@/lib/audit";
 
 // GET /api/supplier-payments — list supplier payments
 export async function GET(req: NextRequest) {
@@ -15,6 +16,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const supplierId = searchParams.get("supplierId");
     const purchaseId = searchParams.get("purchaseId");
+    const limit = Math.min(parseInt(searchParams.get("limit") || "200", 10), 1000);
 
     const where: any = {};
     if (supplierId) where.supplierId = supplierId;
@@ -28,6 +30,7 @@ export async function GET(req: NextRequest) {
         user: { select: { id: true, fullName: true, username: true } },
       },
       orderBy: { paymentDate: "desc" },
+      take: limit,
     });
     return NextResponse.json({ payments });
   } catch (e) {
@@ -36,7 +39,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST /api/supplier-payments — record a supplier payment
+// POST /api/supplier-payments — record a supplier payment (transactional)
 export async function POST(req: NextRequest) {
   let user;
   try {
@@ -51,56 +54,73 @@ export async function POST(req: NextRequest) {
   let body: any;
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
 
+  if (!body.supplierId || !body.amount || Number(body.amount) <= 0) {
+    return NextResponse.json({ error: "supplierId and a positive amount are required" }, { status: 400 });
+  }
+
   try {
-    if (!body.supplierId || !body.amount) {
-      return NextResponse.json({ error: "supplierId and amount are required" }, { status: 400 });
-    }
+    const amount = Number(body.amount);
 
-    const payment = await db.supplierPayment.create({
-      data: {
-        supplierId: body.supplierId,
-        purchaseId: body.purchaseId || null,
-        amount: Number(body.amount) || 0,
-        paymentMode: String(body.paymentMode || "cash").slice(0, 32),
-        reference: String(body.reference || "").slice(0, 200),
-        notes: String(body.notes || "").slice(0, 2000),
-        createdBy: user.uid,
-        paymentDate: body.paymentDate ? new Date(body.paymentDate) : new Date(),
-      },
-      include: { supplier: { select: { name: true, code: true } } },
-    });
+    const payment = await db.$transaction(async (tx) => {
+      // Create the payment record
+      const newPayment = await tx.supplierPayment.create({
+        data: {
+          supplierId: body.supplierId,
+          purchaseId: body.purchaseId || null,
+          amount,
+          paymentMode: String(body.paymentMode || "cash").slice(0, 32),
+          reference: String(body.reference || "").slice(0, 200),
+          notes: String(body.notes || "").slice(0, 2000),
+          createdBy: user.uid,
+          paymentDate: body.paymentDate ? new Date(body.paymentDate) : new Date(),
+        },
+        include: { supplier: { select: { name: true, code: true } } },
+      });
 
-    // Update supplier balance (reduce what's owed)
-    await db.supplier.update({
-      where: { id: body.supplierId },
-      data: { balance: { decrement: Number(body.amount) || 0 } },
-    });
-
-    // If linked to a purchase, update its amountPaid
-    if (body.purchaseId) {
-      const purchase = await db.purchase.findUnique({ where: { id: body.purchaseId } });
-      if (purchase) {
-        await db.purchase.update({
-          where: { id: body.purchaseId },
-          data: { amountPaid: { increment: Number(body.amount) || 0 } },
+      // Decrement supplier balance (cannot go below 0 — clamp)
+      const supplier = await tx.supplier.findUnique({ where: { id: body.supplierId }, select: { balance: true } });
+      if (supplier) {
+        const newBalance = Math.max(0, supplier.balance - amount);
+        await tx.supplier.update({
+          where: { id: body.supplierId },
+          data: { balance: newBalance },
         });
       }
-    }
 
-    await db.auditLog.create({
-      data: {
+      // If linked to a purchase, increment its amountPaid
+      if (body.purchaseId) {
+        const purchase = await tx.purchase.findUnique({ where: { id: body.purchaseId }, select: { amountPaid: true, total: true, status: true } });
+        if (purchase) {
+          const newAmountPaid = purchase.amountPaid + amount;
+          await tx.purchase.update({
+            where: { id: body.purchaseId },
+            data: {
+              amountPaid: newAmountPaid,
+              // Auto-mark purchase as fully paid if amountPaid >= total
+              ...(newAmountPaid >= purchase.total && purchase.status !== "received" && { status: "received" }),
+            },
+          });
+        }
+      }
+
+      // Audit log inside the transaction
+      await auditLogTx(tx, {
         userId: user.uid,
         user: user.username,
         action: "CREATE",
         module: "accounts",
-        details: `Supplier payment of ${payment.amount} to ${payment.supplier.name} (${payment.supplier.code})`,
+        details: `Supplier payment of GHS ${amount.toFixed(2)} to ${newPayment.supplier.name} (${newPayment.supplier.code})${body.purchaseId ? ` for purchase ${body.purchaseId}` : ""}`,
         severity: "info",
-      },
+        ipAddress: ip,
+        userAgent: req.headers.get("user-agent") || "",
+      });
+
+      return newPayment;
     });
 
     return NextResponse.json({ success: true, payment });
-  } catch (e) {
+  } catch (e: any) {
     console.error("POST /api/supplier-payments error:", e);
-    return NextResponse.json({ error: "Failed to create payment" }, { status: 500 });
+    return NextResponse.json({ error: e?.message || "Failed to create payment" }, { status: 500 });
   }
 }

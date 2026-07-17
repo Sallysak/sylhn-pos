@@ -11,6 +11,9 @@ export interface Product {
   groupId: string;
   unit: string;
   stock: number;
+  // Premium fix: alias for stock so components can use either `p.stock` (legacy)
+  // or `p.quantity` (matches Prisma shape). Both point to the same value.
+  quantity?: number;
   reorderLevel: number;
   barcode: string;
   emoji: string;
@@ -19,6 +22,8 @@ export interface Product {
   receivedDate: string;   // ISO date
   expiryDate: string;     // ISO date
   supplier: string;
+  // Premium fix: optional active flag for soft-delete parity with Prisma
+  active?: boolean;
   discount?: number;
   image?: string; // Base64 data URL for product picture
 }

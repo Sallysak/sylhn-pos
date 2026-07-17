@@ -9,6 +9,7 @@ import {
 } from "@/lib/auth";
 import { LoginSchema, validate, validationError } from "@/lib/validation";
 import { rateLimitLogin, rateLimitResponse, getClientIp } from "@/lib/rate-limit";
+import { auditLog } from "@/lib/audit";
 
 // POST /api/auth/login — authenticate user, set session cookie
 export async function POST(req: NextRequest) {
@@ -35,9 +36,30 @@ export async function POST(req: NextRequest) {
   try {
     const user = await db.systemUser.findUnique({ where: { username } });
     if (!user) {
+      // Audit failed login (no PII)
+      await auditLog({
+        userId: "",
+        user: username,
+        action: "LOGIN_FAILED",
+        module: "auth",
+        details: `Failed login for unknown username "${username}"`,
+        severity: "warning",
+        ipAddress: ip,
+        userAgent: req.headers.get("user-agent") || "",
+      });
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
     if (!user.active) {
+      await auditLog({
+        userId: user.id,
+        user: user.username,
+        action: "LOGIN_BLOCKED",
+        module: "auth",
+        details: `Login blocked for deactivated account "${user.username}"`,
+        severity: "warning",
+        ipAddress: ip,
+        userAgent: req.headers.get("user-agent") || "",
+      });
       return NextResponse.json({ error: "Account deactivated" }, { status: 403 });
     }
 
@@ -60,6 +82,16 @@ export async function POST(req: NextRequest) {
     }
 
     if (!valid) {
+      await auditLog({
+        userId: user.id,
+        user: user.username,
+        action: "LOGIN_FAILED",
+        module: "auth",
+        details: `Failed login for "${user.username}" (bad password)`,
+        severity: "warning",
+        ipAddress: ip,
+        userAgent: req.headers.get("user-agent") || "",
+      });
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
 
@@ -77,6 +109,18 @@ export async function POST(req: NextRequest) {
     });
     await setSessionCookie(token);
     await setCsrfCookie();
+
+    // Audit successful login
+    await auditLog({
+      userId: user.id,
+      user: user.username,
+      action: "LOGIN",
+      module: "auth",
+      details: `User ${user.username} (${user.role}) logged in`,
+      severity: "info",
+      ipAddress: ip,
+      userAgent: req.headers.get("user-agent") || "",
+    });
 
     // Parse permissions for the client
     let permissions: any = {};

@@ -13,11 +13,41 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { COMPANY, formatGHS, type Product } from "@/lib/pos-data";
+import { COMPANY, formatGHS } from "@/lib/pos-data";
+
+// Premium fix: the original component used `p.quantity` and `p.active` from
+// the Prisma Product shape, but received `Product` typed against pos-data.ts
+// (which uses `p.stock`, no `active`). Now we accept either shape and
+// normalize at the boundary.
+interface DashboardProduct {
+  id: string;
+  sku: string;
+  name: string;
+  emoji: string;
+  category: string;
+  price: number;
+  costPrice: number;
+  unit: string;
+  reorderLevel: number;
+  // Accept either `stock` (pos-data) or `quantity` (Prisma)
+  stock?: number;
+  quantity?: number;
+  active?: boolean;
+  expiryDate?: string | Date | null;
+}
+
+// Normalize to the Prisma shape so all downstream code can use p.quantity
+function normalizeProduct(p: DashboardProduct): DashboardProduct & { quantity: number; active: boolean; expiryDate: string | null } {
+  const qty = (p as any).quantity ?? (p as any).stock ?? 0;
+  const expiry = p.expiryDate
+    ? (p.expiryDate instanceof Date ? p.expiryDate.toISOString() : String(p.expiryDate))
+    : null;
+  return { ...p, quantity: qty, active: p.active !== false, expiryDate: expiry };
+}
 import { useToast } from "@/hooks/use-toast";
 
 interface OperationsDashboardProps {
-  products: Product[];
+  products: DashboardProduct[];
   onBack: () => void;
   dailyTotal?: number;
   transactionCount?: number;
@@ -51,7 +81,7 @@ interface SaleRecord {
   }>;
 }
 
-export function OperationsDashboard({ products, onBack, dailyTotal = 0, transactionCount = 0 }: OperationsDashboardProps) {
+export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal = 0, transactionCount = 0 }: OperationsDashboardProps) {
   const { toast } = useToast();
   const [tab, setTab] = useState<Tab>("overview");
   const [refreshKey, setRefreshKey] = useState(0);
@@ -59,6 +89,26 @@ export function OperationsDashboard({ products, onBack, dailyTotal = 0, transact
   const [loadingSales, setLoadingSales] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSale, setSelectedSale] = useState<SaleRecord | null>(null);
+
+  // Premium fix: normalize all products so `p.quantity` and `p.active` always exist
+  const products = useMemo(() => (rawProducts || []).map(normalizeProduct), [rawProducts]);
+
+  // Premium: fetch the full dashboard payload from the new /api/dashboard endpoint
+  // (sales KPIs + low stock + expiry + hourly + trend + inventory in one call)
+  const [dashboard, setDashboard] = useState<any>(null);
+  const [loadingDashboard, setLoadingDashboard] = useState(true);
+  const fetchDashboard = useCallback(async () => {
+    setLoadingDashboard(true);
+    try {
+      const res = await fetch("/api/dashboard", { credentials: "include" });
+      if (res.ok) setDashboard(await res.json());
+    } catch (e) {
+      console.warn("Failed to fetch dashboard:", e);
+    } finally {
+      setLoadingDashboard(false);
+    }
+  }, []);
+  useEffect(() => { fetchDashboard(); }, [fetchDashboard, refreshKey]);
 
   // ===== Fetch sales from API =====
   const fetchSales = useCallback(async () => {

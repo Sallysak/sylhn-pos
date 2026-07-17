@@ -9,6 +9,7 @@
 
 import { cookies } from "next/headers";
 import crypto from "crypto";
+import { db } from "./db";
 
 // ===== Configuration =====
 const SESSION_COOKIE = "sylhn-session";
@@ -140,6 +141,28 @@ export async function getSession(): Promise<SessionPayload | null> {
 
 export async function getCurrentUser(): Promise<SessionPayload | null> {
   return getSession();
+}
+
+// ===== Full user with permissions (premium) =====
+// Returns the user's stored permissions so /api/auth/me can include them
+// in the response — the frontend no longer needs to trust localStorage for
+// permission checks (security fix).
+export interface FullUser extends SessionPayload {
+  fullName: string;
+  permissions: Record<string, boolean>;
+}
+
+export async function getFullUser(): Promise<FullUser | null> {
+  const session = await getSession();
+  if (!session) return null;
+  const user = await db.systemUser.findUnique({
+    where: { id: session.uid },
+    select: { fullName: true, permissions: true, active: true },
+  });
+  if (!user || !user.active) return null;
+  let perms: Record<string, boolean> = {};
+  try { perms = JSON.parse(user.permissions || "{}"); } catch {}
+  return { ...session, fullName: user.fullName, permissions: perms };
 }
 
 // ===== Authorization =====

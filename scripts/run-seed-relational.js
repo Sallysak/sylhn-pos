@@ -15,11 +15,13 @@ function hashPassword(password) {
 }
 
 async function main() {
-  // Wipe in dependency order
+  // Wipe in dependency order (children first, parents last)
   await p.stocktakeItem.deleteMany();
   await p.stocktake.deleteMany();
   await p.backupRecord.deleteMany();
   await p.supplierPayment.deleteMany();
+  await p.salePayment.deleteMany();
+  await p.loyaltyTransaction.deleteMany();
   await p.purchaseItem.deleteMany();
   await p.purchase.deleteMany();
   await p.stockHistory.deleteMany();
@@ -37,7 +39,7 @@ async function main() {
   await p.auditLog.deleteMany();
   await p.systemSetting.deleteMany();
   await p.systemUser.deleteMany();
-  console.log("Wiped all tables.");
+  console.log("Wiped all tables (including premium: salePayment, loyaltyTransaction).");
 
   // Users
   const [adminPwd, managerPwd, cashierPwd, stockkeeperPwd, accountantPwd] = await Promise.all([
@@ -197,17 +199,60 @@ async function main() {
   await p.systemSetting.create({ data: { key: "taxRate", value: "15" } });
   await p.systemSetting.create({ data: { key: "taxName", value: "VAT" } });
 
+  // Loyalty config (premium defaults)
+  await p.systemSetting.create({ data: { key: "loyalty.pointsPerCedi", value: "1" } });
+  await p.systemSetting.create({ data: { key: "loyalty.redeemRate", value: "0.05" } });
+  await p.systemSetting.create({ data: { key: "loyalty.minRedeem", value: "100" } });
+
+  // Award loyalty points for the sample sale + update customer stats (premium)
+  // (Retroactively simulate what would have happened during the sale)
+  await p.loyaltyTransaction.create({
+    data: {
+      customerId: customer1.id,
+      saleId: sale.id,
+      type: "earn",
+      points: 47,  // 1 pt per GHS 1 spent on subtotal 47
+      balanceAfter: 47,
+      description: "Retroactive earn on seed sale (47 pts @ 1 pt/GHS)",
+    },
+  });
+  await p.customer.update({
+    where: { id: customer1.id },
+    data: {
+      pointsBalance: 47,
+      pointsEarnedYTD: 47,
+      totalSpent: 54.05,
+      visits: 1,
+      lastVisitAt: new Date(),
+      tier: "bronze",
+    },
+  });
+
+  // Audit log for the seed itself
+  await p.auditLog.create({
+    data: {
+      userId: admin.id,
+      user: admin.username,
+      action: "SEED",
+      module: "maintenance",
+      details: "Database re-seeded via run-seed-relational.js with full relational data + loyalty",
+      severity: "critical",
+    },
+  });
+
   console.log("\n=== RELATIONAL INTEGRITY CHECK ===");
   const prodCount = await p.product.count();
   const suppCount = await p.supplier.count();
   const linkCount = await p.productSupplier.count();
   const saleCount = await p.sale.count();
   const saleItemCount = await p.saleItem.count();
+  const salePaymentCount = await p.salePayment.count();
   const purchaseCount = await p.purchase.count();
   const purchaseItemCount = await p.purchaseItem.count();
   const stockHistoryCount = await p.stockHistory.count();
   const linkedStockHistory = await p.stockHistory.count({ where: { OR: [{ saleId: { not: null } }, { purchaseId: { not: null } }, { stocktakeId: { not: null } }] } });
   const customerCount = await p.customer.count();
+  const loyaltyTxnCount = await p.loyaltyTransaction.count();
   const telCount = await p.telephoneDirectoryEntry.count();
   const shiftCount = await p.cashierShift.count();
   const stocktakeCount = await p.stocktake.count();
@@ -215,22 +260,24 @@ async function main() {
   const expenseCount = await p.expense.count();
   const userCount = await p.systemUser.count();
   const auditCount = await p.auditLog.count();
+  const settingCount = await p.systemSetting.count();
 
   console.log("Users: " + userCount);
   console.log("Products: " + prodCount);
   console.log("Suppliers: " + suppCount);
   console.log("Product↔Supplier links: " + linkCount);
-  console.log("Sales: " + saleCount + " (with " + saleItemCount + " items)");
+  console.log("Sales: " + saleCount + " (with " + saleItemCount + " items, " + salePaymentCount + " split payments)");
   console.log("Purchases: " + purchaseCount + " (with " + purchaseItemCount + " items)");
   console.log("Stock history entries: " + stockHistoryCount + " (" + linkedStockHistory + " linked to transactions)");
-  console.log("Customers: " + customerCount);
+  console.log("Customers: " + customerCount + " (with " + loyaltyTxnCount + " loyalty transactions)");
   console.log("Telephone directory entries: " + telCount);
   console.log("Cashier shifts: " + shiftCount);
   console.log("Stocktakes: " + stocktakeCount);
   console.log("Supplier payments: " + paymentCount);
   console.log("Expenses: " + expenseCount);
   console.log("Audit logs: " + auditCount);
-  console.log("\n=== ALL TABLES LINKED AND RELATIONAL ===");
+  console.log("System settings: " + settingCount);
+  console.log("\n=== ALL TABLES LINKED AND RELATIONAL (incl. premium loyalty) ===");
 
   await p.$disconnect();
 }

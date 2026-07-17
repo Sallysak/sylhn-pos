@@ -1,17 +1,22 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { getFullUser } from "@/lib/auth";
 
-// GET /api/auth/me — return current session user
+// GET /api/auth/me — return current session user with permissions
+// Premium fix: previously returned only uid/username/role, so the frontend
+// had to fall back to localStorage-stored permissions (client-editable).
+// Now we return the server-side permissions too.
 export async function GET() {
-  const session = await getSession();
-  if (!session) {
+  const user = await getFullUser();
+  if (!user) {
     return NextResponse.json({ user: null }, { status: 401 });
   }
   return NextResponse.json({
     user: {
-      uid: session.uid,
-      username: session.username,
-      role: session.role,
+      uid: user.uid,
+      username: user.username,
+      role: user.role,
+      fullName: user.fullName,
+      permissions: user.permissions,
     },
   });
 }

@@ -46,16 +46,26 @@ export const SaleItemSchema = z.object({
   productId: z.union([z.string(), z.null()]).optional(),
   sku: z.string().min(1).max(64),
   name: z.string().min(1).max(200),
+  emoji: z.string().max(16).optional().default("📦"),
   price: z.number().min(0).max(1_000_000),
   quantity: z.number().int().min(1).max(100000),
   unit: z.string().max(32).optional().default("each"),
   discount: z.number().min(0).max(100).optional().default(0),
   taxable: z.boolean().optional().default(true),
   total: z.number().min(0).max(10_000_000),
+  costPrice: z.number().min(0).max(1_000_000).optional().default(0),
+});
+
+// Multi-payment split (premium) — each entry represents one payment method
+export const SalePaymentSchema = z.object({
+  method: z.enum(["cash", "card", "wallet", "points", "momo"]),
+  amount: z.number().min(0).max(10_000_000),
+  reference: z.string().max(128).optional().default(""),
 });
 
 export const SaleSchema = z.object({
   invoiceNumber: z.string().max(64).optional(),
+  customerId: z.union([z.string(), z.null()]).optional(),
   customerName: z.string().max(200).optional().default(""),
   cashierName: z.string().min(1).max(200),
   subtotal: z.number().min(0).max(10_000_000),
@@ -71,18 +81,66 @@ export const SaleSchema = z.object({
   status: z.enum(["completed", "voided", "held"]).optional().default("completed"),
   notes: z.string().max(2000).optional().default(""),
   items: z.array(SaleItemSchema).min(1).max(500),
+  // Premium: multi-payment split (optional)
+  payments: z.array(SalePaymentSchema).max(10).optional(),
+  // Premium: loyalty points to redeem for this sale (optional)
+  pointsRedeemed: z.number().int().min(0).max(1_000_000).optional().default(0),
+  // Premium: shift id (optional, validated server-side)
+  shiftId: z.union([z.string(), z.null()]).optional(),
 });
 
 // ===== Suppliers =====
 export const SupplierSchema = z.object({
+  code: z.string().max(32).optional(),
   name: z.string().min(1).max(200),
-  contact: z.string().max(200).optional().default(""),
+  contactName: z.string().max(200).optional().default(""),
+  contact: z.string().max(200).optional().default(""),  // alias for contactName (legacy)
   phone: z.string().max(32).optional().default(""),
+  mobile: z.string().max(32).optional().default(""),
   email: z.string().max(200).optional().default("").or(z.literal("")),
+  fax: z.string().max(64).optional().default(""),
   address: z.string().max(500).optional().default(""),
+  city: z.string().max(100).optional().default(""),
+  state: z.string().max(100).optional().default(""),
+  country: z.string().max(64).optional().default("Ghana"),
+  businessNo: z.string().max(64).optional().default(""),
+  tradingTerms: z.string().max(32).optional().default("Net 30"),
+  creditLimit: z.number().min(0).max(100_000_000).optional().default(0),
   balance: z.number().min(-1_000_000).max(1_000_000).optional().default(0),
+  taxInclusive: z.boolean().optional().default(false),
+  notes: z.string().max(2000).optional().default(""),
   products: z.union([z.string(), z.array(z.any())]).optional(),
   active: z.boolean().optional().default(true),
+});
+
+export const SupplierUpdateSchema = SupplierSchema.partial();
+
+// ===== Customers =====
+export const CustomerSchema = z.object({
+  name: z.string().min(1).max(200),
+  phone: z.string().max(32).optional().default(""),
+  mobile: z.string().max(32).optional().default(""),
+  email: z.string().max(200).optional().default(""),
+  address: z.string().max(500).optional().default(""),
+  city: z.string().max(100).optional().default(""),
+  group: z.enum(["regular", "vip", "wholesale"]).optional().default("regular"),
+  creditLimit: z.number().min(0).max(10_000_000).optional().default(0),
+  balance: z.number().min(-1_000_000).max(1_000_000).optional().default(0),
+  notes: z.string().max(2000).optional().default(""),
+  active: z.boolean().optional().default(true),
+});
+
+export const CustomerUpdateSchema = CustomerSchema.partial();
+
+// ===== Expenses =====
+export const ExpenseSchema = z.object({
+  date: z.union([z.string(), z.date()]).optional(),
+  category: z.enum(["rent", "utilities", "salaries", "marketing", "supplies", "transport", "maintenance", "other"]).optional().default("other"),
+  description: z.string().min(1).max(500),
+  amount: z.number().min(0).max(10_000_000),
+  paymentMode: z.enum(["cash", "card", "mobile-money", "cheque", "bank"]).optional().default("cash"),
+  reference: z.string().max(128).optional().default(""),
+  notes: z.string().max(2000).optional().default(""),
 });
 
 // ===== Stock groups =====

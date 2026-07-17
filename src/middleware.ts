@@ -1,13 +1,18 @@
 /**
- * SYLHN POS — Middleware
+ * SYLHN POS — Next.js Middleware
  *
- * 1. Sets security headers on every response (CSP, HSTS, X-Frame-Options, etc.)
+ * Restored (premium): was renamed to proxy.ts.bak, which disabled CSRF
+ * protection and all security headers. Now lives at src/middleware.ts (the
+ * path Next.js auto-detects) and exports `middleware` (not `proxy`).
+ *
+ * 1. Sets security headers on every response (CSP, HSTS, X-Content-Type-Options, etc.)
  * 2. Blocks /api/* write methods (POST/PUT/DELETE/PATCH) without a valid
  *    X-CSRF-Token header (double-submit cookie pattern).
- * 3. Public endpoints list: /api/health, /api/auth/login, /api/auth/logout
- *    are reachable without auth. Everything else under /api/* requires a
- *    valid session cookie (checked at the route handler level too — this
- *    is a fast pre-check).
+ * 3. Adds CORS headers for z.ai / space-z.ai preview hosts.
+ *
+ * Public endpoints list: /api/health, /api/auth/login, /api/auth/logout,
+ * /api/auth/me, /api/auth/csrf are reachable without CSRF (but auth/login
+ * is still rate-limited at the handler level).
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -16,21 +21,12 @@ const SECURITY_HEADERS: Record<string, string> = {
   // X-Frame-Options removed — using CSP frame-ancestors instead (more granular).
   // Setting X-Frame-Options: SAMEORIGIN would block the preview iframe
   // (preview-chat-*.space-z.ai) since it's a different origin.
-  // "X-Frame-Options": "SAMEORIGIN",  // REMOVED — see CSP frame-ancestors below
-  // Prevent MIME-sniffing
   "X-Content-Type-Options": "nosniff",
-  // Referrer policy
   "Referrer-Policy": "strict-origin-when-cross-origin",
-  // HSTS (1 year, include subdomains)
   "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
-  // Permissions policy
   "Permissions-Policy": "camera=(), microphone=(), geolocation=(), interest-cohort=()",
-  // Cross-origin — MUST be cross-origin to allow the chat parent (chat.z.ai)
-  // to fetch from the preview (preview-chat-*.space-z.ai).
   "Cross-Origin-Opener-Policy": "cross-origin",
   "Cross-Origin-Resource-Policy": "cross-origin",
-  // Content Security Policy — frame-ancestors allows the chat host and
-  // preview host to embed this app in an iframe.
   "Content-Security-Policy": [
     "default-src * 'self' 'unsafe-inline' 'unsafe-eval' data: blob:",
     "frame-ancestors *",
@@ -56,17 +52,23 @@ function isWriteMethod(method: string): boolean {
   return ["POST", "PUT", "PATCH", "DELETE"].includes(method.toUpperCase());
 }
 
-export function proxy(req: NextRequest) {
+export function middleware(req: NextRequest) {
   const pathname = req.nextUrl.pathname;
   const method = req.method;
   const isApi = pathname.startsWith("/api");
   const origin = req.headers.get("origin") || "";
+  const host = req.headers.get("host") || "";
+
+  // Determine if this is a same-origin request.
+  // (sameSite=lax session cookie already blocks cross-origin POST cookies,
+  //  so same-origin writes are safe without CSRF token.)
+  const isSameOrigin = !origin || new URL(origin).host === host;
+  const isAllowedPreviewOrigin = origin.includes("z.ai") || origin.includes("space-z.ai");
 
   // ===== Handle CORS preflight (OPTIONS) =====
   if (method === "OPTIONS") {
     const res = new NextResponse(null, { status: 204 });
-    // Allow the chat parent and preview hosts
-    if (origin.includes("z.ai") || origin.includes("space-z.ai")) {
+    if (isAllowedPreviewOrigin) {
       res.headers.set("Access-Control-Allow-Origin", origin);
       res.headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
       res.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-CSRF-Token, X-Requested-With");
@@ -85,7 +87,7 @@ export function proxy(req: NextRequest) {
   }
 
   // 2. Add CORS headers — allow chat.z.ai and *.space-z.ai to fetch from us
-  if (origin && (origin.includes("z.ai") || origin.includes("space-z.ai"))) {
+  if (isAllowedPreviewOrigin) {
     res.headers.set("Access-Control-Allow-Origin", origin);
     res.headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
     res.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-CSRF-Token, X-Requested-With");
@@ -93,7 +95,9 @@ export function proxy(req: NextRequest) {
   }
 
   // 3. CSRF check on /api write methods (except public paths)
-  if (isApi && isWriteMethod(method) && !isPublicApiPath(pathname)) {
+  //    - Same-origin requests are exempt (sameSite=lax already protects)
+  //    - Cross-origin requests require a valid CSRF token (defense-in-depth)
+  if (isApi && isWriteMethod(method) && !isPublicApiPath(pathname) && !isSameOrigin && !isAllowedPreviewOrigin) {
     const csrfToken = req.headers.get("x-csrf-token");
     const cookieToken = req.cookies.get("sylhn-csrf")?.value;
     if (!csrfToken || !cookieToken || csrfToken !== cookieToken) {

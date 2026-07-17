@@ -369,11 +369,62 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
   };
 
   // ===== Working Action Handlers =====
-  const handleSave = () => {
+  const handleSave = async () => {
     if (lines.length === 0) { toast({ title: "No items to save", variant: "destructive" }); return; }
     if (!supplier) { toast({ title: "Select a supplier first", variant: "destructive" }); return; }
-    setSaved(true);
-    toast({ title: "Purchase saved (F2)", description: `${invoiceNo} · ${lines.length} items · ${formatGHS(totals.grandTotal)}` });
+
+    // Premium fix: actually POST the purchase to the server so it's persisted.
+    // Previously this was a stub that only showed a toast — the purchase was
+    // lost on refresh.
+    const supplierObj = suppliers.find(s => s.name === supplier || `${s.code}-${s.name}` === supplier);
+    const payload = {
+      refNo: invoiceNo,
+      type: 'purchase' as const,
+      supplierId: supplierObj?.id || null,
+      supplierName: supplier || '',
+      status: 'received' as const,
+      subtotal: totals.grandTotal - totals.taxAmount,
+      taxAmount: totals.taxAmount,
+      total: totals.grandTotal,
+      amountPaid: paidAmount,
+      notes: '',
+      createdBy: salesperson,
+      receivedAt: new Date().toISOString(),
+      items: lines.map(l => ({
+        productId: l.productId || null,
+        partNo: l.partNo,
+        details: l.details,
+        quantity: l.quantity,
+        cost: l.cost,
+        tax: l.tax,
+        total: l.total,
+        expiryDate: l.expiry || null,
+      })),
+    };
+
+    try {
+      const res = await fetch('/api/purchases', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
+      setSaved(true);
+      toast({
+        title: "Purchase saved to server",
+        description: `${data.purchase.refNo} · ${lines.length} items · ${formatGHS(totals.grandTotal)} · stock updated`,
+      });
+    } catch (e: any) {
+      toast({
+        title: "Failed to save purchase",
+        description: e?.message || "Network error",
+        variant: "destructive",
+      });
+    }
   };
 
   const handlePrint = () => {

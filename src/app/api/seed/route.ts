@@ -3,11 +3,17 @@ import { db } from "@/lib/db";
 import { requireRole, hashPassword } from "@/lib/auth";
 import { rateLimitSeed, rateLimitResponse } from "@/lib/rate-limit";
 import { headers } from "next/headers";
+import { auditLog } from "@/lib/audit";
 
 // POST /api/seed — seed the database with initial demo data
-// Admin-only + heavily rate-limited (3/hour) since it's destructive.
+// Admin-only + heavily rate-limited (3/hour) + requires explicit confirmation.
+// CRITICAL SAFETY: caller must include `{ confirm: "WIPE_ALL_DATA" }` in the
+// body — prevents accidental wipes via CSRF / XSS.
+const REQUIRED_CONFIRMATION = "WIPE_ALL_DATA";
+
 export async function POST(req: Request) {
-  try { await requireRole("admin"); } catch (e) { return e as Response; }
+  let user;
+  try { user = await requireRole("admin"); } catch (e) { return e as Response; }
 
   // Rate limit
   const h = await headers();
@@ -16,12 +22,25 @@ export async function POST(req: Request) {
   const rl = rateLimitSeed(ip);
   if (!rl.allowed) return rateLimitResponse(rl, "Seed rate limit exceeded.");
 
+  // Require explicit confirmation string
+  let body: any = {};
+  try { body = await req.json(); } catch { /* allow empty */ }
+  if (body.confirm !== REQUIRED_CONFIRMATION) {
+    return NextResponse.json({
+      error: `Confirmation required. Pass { "confirm": "${REQUIRED_CONFIRMATION}" } in the body to wipe all data.`,
+    }, { status: 400 });
+  }
+
   try {
+    // Audit the destructive action BEFORE wiping (so the audit log survives the wipe
+    // — wait, no, the wipe deletes audit logs too. We audit AFTER seeding instead.)
     // Wipe in dependency order (children first, parents last)
     await db.stocktakeItem.deleteMany();
     await db.stocktake.deleteMany();
     await db.backupRecord.deleteMany();
     await db.supplierPayment.deleteMany();
+    await db.salePayment.deleteMany();
+    await db.loyaltyTransaction.deleteMany();
     await db.purchaseItem.deleteMany();
     await db.purchase.deleteMany();
     await db.stockHistory.deleteMany();
@@ -299,6 +318,25 @@ export async function POST(req: Request) {
     await db.systemSetting.create({ data: { key: "taxRate", value: "15" } });
     await db.systemSetting.create({ data: { key: "taxName", value: "VAT" } });
 
+    // Loyalty config (premium defaults — admin can tune via /api/system-settings)
+    await db.systemSetting.create({ data: { key: "loyalty.pointsPerCedi", value: "1" } });
+    await db.systemSetting.create({ data: { key: "loyalty.redeemRate", value: "0.05" } });   // 1 pt = GHS 0.05
+    await db.systemSetting.create({ data: { key: "loyalty.minRedeem", value: "100" } });      // min 100 pts to redeem
+
+    // ===== Audit the seed itself (after re-creating admin user) =====
+    await db.auditLog.create({
+      data: {
+        userId: admin.id,
+        user: admin.username,
+        action: "SEED",
+        module: "maintenance",
+        details: `Database re-seeded by ${user.username} — all tables wiped and demo data restored`,
+        severity: "critical",
+        ipAddress: ip,
+        userAgent: h.get("user-agent") || "",
+      },
+    });
+
     return NextResponse.json({
       success: true,
       seeded: {
@@ -316,7 +354,7 @@ export async function POST(req: Request) {
         stocktakes: 1,
         shifts: 1,
         backups: 1,
-        systemSettings: 4,
+        systemSettings: 7,
       },
     });
   } catch (e) {

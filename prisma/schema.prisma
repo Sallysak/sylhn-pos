@@ -52,6 +52,7 @@ model SystemUser {
 
   @@index([role])
   @@index([active])
+  @@index([username])
 }
 
 model AuditLog {
@@ -72,6 +73,7 @@ model AuditLog {
   @@index([user])
   @@index([module])
   @@index([severity])
+  @@index([action])
 }
 
 model SystemSetting {
@@ -263,11 +265,19 @@ model Sale {
   total         Float
   amountPaid    Float
   change        Float
-  paymentMethod String    @default("cash") // cash | card | wallet
+  paymentMethod String    @default("cash") // cash | card | wallet | points | momo
   paymentRef    String    @default("")
   status        String    @default("completed") // completed | voided | held | refunded
   notes         String    @default("")
   shiftId       String?   // link to the cashier shift this sale belongs to
+  // Loyalty & receipt tracking (premium feature)
+  pointsEarned  Int       @default(0)   // loyalty points awarded for this sale
+  pointsRedeemed Int      @default(0)   // loyalty points used as partial payment
+  receiptEmailedAt DateTime?             // null = not yet emailed
+  // Profit tracking (premium) — captured at sale time so historical reports
+  // remain accurate even if product costPrice changes later.
+  costOfGoods   Float     @default(0)   // sum(item.costPrice * item.quantity)
+  grossProfit   Float     @default(0)   // subtotal - costOfGoods
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   voidedAt      DateTime?
@@ -281,12 +291,17 @@ model Sale {
   shift        CashierShift? @relation(fields: [shiftId], references: [id], onDelete: SetNull)
   items        SaleItem[]
   stockHistory StockHistory[]
+  payments     SalePayment[]
+  loyaltyTxns  LoyaltyTransaction[]
 
   @@index([createdAt])
   @@index([status])
   @@index([cashierId])
   @@index([customerId])
   @@index([shiftId])
+  @@index([paymentMethod])
+  @@index([voidedAt])
+  @@index([refundedAt])
 }
 
 model SaleItem {
@@ -302,12 +317,49 @@ model SaleItem {
   discount  Float   @default(0)
   taxable   Boolean @default(true)
   total     Float
+  // Cost captured at sale time for accurate historical profit (premium)
+  costPrice Float   @default(0)
 
   sale    Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
   product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
 
   @@index([saleId])
   @@index([productId])
+}
+
+// Multi-payment split (premium) — a sale can be paid with cash + momo + points
+model SalePayment {
+  id           String   @id @default(cuid())
+  saleId       String
+  method       String   // cash | card | wallet | points | momo
+  amount       Float
+  reference    String   @default("")  // momo txn ref, card last4, etc.
+  createdAt    DateTime @default(now())
+
+  sale Sale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+  @@index([saleId])
+  @@index([method])
+}
+
+// Loyalty transaction log (premium) — every points award or redemption
+model LoyaltyTransaction {
+  id           String   @id @default(cuid())
+  customerId   String
+  saleId       String?  // null for manual adjustments
+  type         String   // earn | redeem | adjust | expire
+  points       Int      // positive for earn, negative for redeem
+  balanceAfter Int
+  description  String   @default("")
+  createdAt    DateTime @default(now())
+
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  sale     Sale?      @relation(fields: [saleId], references: [id], onDelete: SetNull)
+
+  @@index([customerId])
+  @@index([saleId])
+  @@index([type])
+  @@index([createdAt])
 }
 
 // Held/parked orders — saved carts that can be recalled
@@ -419,28 +471,38 @@ model PurchaseItem {
 
 // Customer model — links to sales and the telephone directory
 model Customer {
-  id           String    @id @default(cuid())
-  name         String
-  phone        String    @default("")
-  mobile       String    @default("")
-  email        String    @default("")
-  address      String    @default("")
-  city         String    @default("")
-  group        String    @default("regular") // regular | vip | wholesale
-  creditLimit  Float     @default(0)
-  balance      Float     @default(0)
-  notes        String    @default("")
-  active       Boolean   @default(true)
-  createdById  String?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id              String    @id @default(cuid())
+  name            String
+  phone           String    @default("")
+  mobile          String    @default("")
+  email           String    @default("")
+  address         String    @default("")
+  city            String    @default("")
+  group           String    @default("regular") // regular | vip | wholesale
+  creditLimit     Float     @default(0)
+  balance         Float     @default(0)
+  notes           String    @default("")
+  active          Boolean   @default(true)
+  // Loyalty & analytics fields (premium feature)
+  pointsBalance   Int       @default(0)        // current redeemable points
+  pointsEarnedYTD Int       @default(0)        // points earned this year (resets Jan 1)
+  totalSpent      Float     @default(0)        // lifetime spend (GHC)
+  visits          Int       @default(0)        // lifetime completed-sale count
+  lastVisitAt     DateTime?                   // last successful sale
+  tier            String    @default("bronze") // bronze | silver | gold | platinum (auto from totalSpent)
+  createdById     String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   createdBy SystemUser? @relation("CustomerCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   sales     Sale[]
+  loyaltyTransactions LoyaltyTransaction[]
 
   @@index([name])
   @@index([phone])
   @@index([active])
+  @@index([tier])
+  @@index([lastVisitAt])
 }
 
 // Telephone directory — separate from customers (directory can include
@@ -475,11 +537,12 @@ model TelephoneDirectoryEntry {
 model Expense {
   id          String   @id @default(cuid())
   date        DateTime @default(now())
-  category    String   // rent | utilities | salaries | marketing | supplies | transport | other
+  category    String   // rent | utilities | salaries | marketing | supplies | transport | maintenance | other
   description String
   amount      Float
-  paymentMode String   @default("cash") // cash | card | mobile-money | cheque
+  paymentMode String   @default("cash") // cash | card | mobile-money | cheque | bank
   reference   String   @default("")
+  notes       String   @default("")
   createdById String?
   createdAt   DateTime @default(now())
 
