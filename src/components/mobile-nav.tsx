@@ -343,7 +343,7 @@ export function MobileNav({ active, onNavigate, cartCount, user, onLogout }: Mob
                       localStorage.setItem("sylhn-dark-mode", "true");
                     }
                   }}
-                  className="w-full h-11 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-sm flex items-center justify-center gap-2 transition haptic-tap"
+                  className="w-full h-11 rounded-xl bg-violet-500/10 hover:bg-violet-500/20 text-violet-700 dark:text-violet-300 font-semibold text-sm flex items-center justify-center gap-2 transition haptic-tap ring-1 ring-violet-200 dark:ring-violet-800"
                 >
                   <Moon className="h-4 w-4" />
                   Toggle Dark Mode

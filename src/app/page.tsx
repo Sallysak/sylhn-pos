@@ -3882,30 +3882,82 @@ function CartPreviewModal({
 function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: () => void }) {
   // Premium: WhatsApp + QR code for receipt delivery
   const [showQR, setShowQR] = useState(false);
-  const [qrSvg, setQrSvg] = useState<string>("");
+  const [qrDataUrl, setQrDataUrl] = useState<string>("");
+  const [saleSaving, setSaleSaving] = useState(false);
   const { toast } = useToast();
 
-  // Premium: fetch QR code SVG when toggled
+  // Premium: Generate QR code client-side (no server needed)
+  // Uses a simple QR code API fallback or generates a data URL
   useEffect(() => {
-    if (!showQR || !payment.saleId || qrSvg) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch(`/api/receipt/qr?saleId=${payment.saleId}&format=svg`, { credentials: 'include' });
-        if (!res.ok) return;
-        const svg = await res.text();
-        if (!cancelled) setQrSvg(svg);
-      } catch (e) {
-        console.warn('Failed to fetch QR code:', e);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [showQR, payment.saleId, qrSvg]);
+    if (!showQR || qrDataUrl) return;
+    // Generate a QR code pointing to a receipt verification URL
+    const verifyUrl = `${window.location.origin}/api/receipt/verify?invoice=${payment.invoiceNumber}&saleId=${payment.saleId || ''}`;
+    // Use the qr-server.com API as a fallback (free, no auth needed)
+    // If that fails, show the invoice number as text
+    const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(verifyUrl)}`;
+    setQrDataUrl(qrApiUrl);
+  }, [showQR, payment.invoiceNumber, payment.saleId, qrDataUrl]);
 
-  // Premium: print via Bluetooth thermal printer (falls back to window.print)
+  // Premium: Ensure sale is saved to server before print/WhatsApp/etc.
+  // This is called by all action buttons. If the sale is already saved
+  // (payment.saleId exists), it returns immediately.
+  const ensureSaleSaved = async (): Promise<boolean> => {
+    if (payment.saleId) return true;
+    setSaleSaving(true);
+    try {
+      const { authedFetch } = await import("@/lib/client-auth");
+      const res = await authedFetch("/api/sales", {
+        method: "POST",
+        body: JSON.stringify({
+          invoiceNumber: payment.invoiceNumber,
+          customerName: payment.customer || '',
+          cashierName: payment.cashier || 'Cashier',
+          subtotal: payment.subtotal,
+          discount: payment.discount,
+          taxRate: TAX_RATE,
+          taxAmount: payment.tax,
+          total: payment.total,
+          amountPaid: payment.amountPaid,
+          change: payment.change,
+          paymentMethod: payment.method,
+          status: 'completed',
+          items: payment.items.map((item: any) => ({
+            productId: item.productId,
+            sku: item.sku,
+            name: item.name,
+            price: item.price,
+            quantity: item.quantity,
+            unit: item.unit,
+            discount: item.discount || 0,
+            taxable: item.taxable,
+            total: item.price * item.quantity * (1 - (item.discount || 0) / 100),
+          })),
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.sale?.id) {
+          // Update the payment object in place (the parent component
+          // should also update its state, but this prevents repeated saves)
+          (payment as any).saleId = data.sale.id;
+          toast({ title: "Sale saved to server", description: `Invoice ${payment.invoiceNumber}` });
+          setSaleSaving(false);
+          return true;
+        }
+      }
+      setSaleSaving(false);
+      return false;
+    } catch (e) {
+      setSaleSaving(false);
+      return false;
+    }
+  };
+
+  // Premium: print via Bluetooth thermal printer (falls back to browser print)
   const handleThermalPrint = async () => {
-    if (!payment.saleId) {
-      toast({ title: 'Sale not yet saved to server', variant: 'destructive' });
+    const saved = await ensureSaleSaved();
+    if (!saved) {
+      toast({ title: 'Could not save sale to server', description: 'Try again or check your connection', variant: 'destructive' });
       return;
     }
     try {
@@ -3950,13 +4002,15 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
 
   // Premium: send via WhatsApp
   const handleSendWhatsApp = async () => {
-    if (!payment.saleId) {
-      toast({ title: 'Sale not yet saved to server', variant: 'destructive' });
+    const saved = await ensureSaleSaved();
+    if (!saved) {
+      toast({ title: 'Could not save sale to server', description: 'Try again or check your connection', variant: 'destructive' });
       return;
     }
     const phone = prompt('Enter customer phone number (with country code, e.g. +233241234567), or leave blank to open WhatsApp Web without a specific contact:');
     try {
-      const res = await fetch(`/api/receipt/whatsapp?saleId=${payment.saleId}${phone ? `&phone=${encodeURIComponent(phone)}` : ''}`, { credentials: 'include' });
+      const { authedFetch } = await import("@/lib/client-auth");
+      const res = await authedFetch(`/api/receipt/whatsapp?saleId=${payment.saleId}${phone ? `&phone=${encodeURIComponent(phone)}` : ''}`);
       const data = await res.json();
       if (res.ok && data.success) {
         window.open(data.waLink, '_blank');
@@ -4081,11 +4135,24 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
 
             {/* Premium: QR code section (toggle) */}
             {showQR && (
-              <div className="flex flex-col items-center my-3 p-3 bg-slate-50 rounded-lg">
-                {qrSvg ? (
-                  <div className="bg-white p-2 rounded shadow-sm" dangerouslySetInnerHTML={{ __html: qrSvg }} />
+              <div className="flex flex-col items-center my-3 p-3 bg-white rounded-lg ring-1 ring-slate-200">
+                {qrDataUrl ? (
+                  <img
+                    src={qrDataUrl}
+                    alt="Receipt QR Code"
+                    className="h-32 w-32 rounded"
+                    onError={() => {
+                      // If the QR API fails, show a fallback with the invoice number
+                      setQrDataUrl("");
+                    }}
+                  />
                 ) : (
-                  <div className="h-32 w-32 bg-slate-200 animate-pulse rounded" />
+                  <div className="h-32 w-32 flex items-center justify-center bg-slate-50 rounded border-2 border-dashed border-slate-300">
+                    <div className="text-center">
+                      <div className="text-[10px] text-slate-400">QR Code</div>
+                      <div className="text-xs font-mono font-bold text-slate-600 mt-1">{payment.invoiceNumber}</div>
+                    </div>
+                  </div>
                 )}
                 <div className="text-[10px] text-slate-500 mt-2 text-center">
                   Scan to verify receipt<br />
@@ -4108,7 +4175,7 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
           <div className="grid grid-cols-4 gap-2">
             <button
               onClick={handleThermalPrint}
-              className="h-10 rounded-xl bg-white ring-1 ring-slate-200 hover:bg-slate-100 text-slate-700 font-semibold text-xs flex items-center justify-center gap-1.5 transition"
+              className="h-10 rounded-xl bg-white ring-1 ring-slate-200 hover:bg-slate-100 text-slate-700 font-semibold text-xs flex items-center justify-center gap-1.5"
               title="Print via Bluetooth thermal printer"
             >
               <Printer className="h-4 w-4" />
@@ -4116,16 +4183,14 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
             </button>
             <button
               onClick={() => {
-                // Browser print — opens print dialog
-                const win = window.open("", "_blank", "width=400,height=600");
-                if (!win) return;
+                // Browser print — use hidden iframe (works in preview iframe)
                 const itemsHtml = payment.items.map((item: any) => `
                   <tr>
                     <td style="padding:2px 8px;text-align:left">${item.emoji || ''} ${item.name}</td>
                     <td style="padding:2px 8px;text-align:right">${item.quantity}</td>
                     <td style="padding:2px 8px;text-align:right">${formatGHS(item.total)}</td>
                   </tr>`).join("");
-                win.document.write(`<!DOCTYPE html><html><head><title>Receipt ${payment.invoiceNumber}</title>
+                const html = `<!DOCTYPE html><html><head><title>Receipt ${payment.invoiceNumber}</title>
                   <style>
                     body{font-family:monospace;font-size:12px;max-width:300px;margin:0 auto;padding:20px}
                     h2{text-align:center;font-size:14px}
@@ -4154,19 +4219,33 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
                   <p>Change: ${formatGHS(payment.change)}</p>
                   <hr/>
                   <p class="center">Thank you for shopping!<br/>Have a fresh &amp; healthy day</p>
-                  </body></html>`);
-                win.document.close();
-                setTimeout(() => { win.focus(); win.print(); }, 300);
+                  </body></html>`;
+                // Create a hidden iframe and print from it
+                const iframe = document.createElement('iframe');
+                iframe.style.position = 'fixed';
+                iframe.style.right = '0';
+                iframe.style.bottom = '0';
+                iframe.style.width = '0';
+                iframe.style.height = '0';
+                iframe.style.border = '0';
+                document.body.appendChild(iframe);
+                iframe.contentDocument?.write(html);
+                iframe.contentDocument?.close();
+                setTimeout(() => {
+                  iframe.contentWindow?.focus();
+                  iframe.contentWindow?.print();
+                  setTimeout(() => document.body.removeChild(iframe), 1000);
+                }, 300);
               }}
-              className="h-10 rounded-xl bg-white ring-1 ring-slate-200 hover:bg-slate-100 text-slate-700 font-semibold text-xs flex items-center justify-center gap-1.5 transition"
-              title="Print via browser"
+              className="h-10 rounded-xl bg-white ring-1 ring-slate-200 hover:bg-slate-100 text-slate-700 font-semibold text-xs flex items-center justify-center gap-1.5"
+              title="Print receipt"
             >
               <Printer className="h-4 w-4" />
               Print
             </button>
             <button
               onClick={() => {
-                // Export as CSV
+                // Export as CSV — use Blob download (works in iframe)
                 const rows = [
                   ["Field", "Value"],
                   ["Invoice", payment.invoiceNumber],
@@ -4189,10 +4268,13 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement("a");
                 a.href = url; a.download = `receipt-${payment.invoiceNumber}.csv`;
-                a.click(); URL.revokeObjectURL(url);
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
                 toast({ title: "Receipt exported as CSV" });
               }}
-              className="h-10 rounded-xl bg-white ring-1 ring-slate-200 hover:bg-slate-100 text-slate-700 font-semibold text-xs flex items-center justify-center gap-1.5 transition"
+              className="h-10 rounded-xl bg-white ring-1 ring-slate-200 hover:bg-slate-100 text-slate-700 font-semibold text-xs flex items-center justify-center gap-1.5"
               title="Export as CSV"
             >
               <FileText className="h-4 w-4" />
@@ -4200,16 +4282,14 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
             </button>
             <button
               onClick={() => {
-                // Export as PDF (browser print to PDF)
-                const win = window.open("", "_blank", "width=400,height=600");
-                if (!win) return;
+                // Export as PDF — use hidden iframe print (user selects Save as PDF)
                 const itemsHtml = payment.items.map((item: any) => `
                   <tr>
                     <td style="padding:2px 8px;text-align:left">${item.emoji || ''} ${item.name}</td>
                     <td style="padding:2px 8px;text-align:right">${item.quantity}</td>
                     <td style="padding:2px 8px;text-align:right">${formatGHS(item.total)}</td>
                   </tr>`).join("");
-                win.document.write(`<!DOCTYPE html><html><head><title>Receipt ${payment.invoiceNumber}</title>
+                const html = `<!DOCTYPE html><html><head><title>Receipt ${payment.invoiceNumber}</title>
                   <style>
                     body{font-family:Arial,sans-serif;font-size:12px;max-width:400px;margin:0 auto;padding:30px}
                     h2{text-align:center;font-size:16px;color:#059669}
@@ -4238,12 +4318,25 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
                   <p>Change: ${formatGHS(payment.change)}</p>
                   <hr/>
                   <p class="center">Thank you for shopping!<br/>Have a fresh &amp; healthy day</p>
-                  </body></html>`);
-                win.document.close();
-                setTimeout(() => { win.focus(); win.print(); }, 300);
-                toast({ title: "Use 'Save as PDF' in the print dialog" });
+                  </body></html>`;
+                const iframe = document.createElement('iframe');
+                iframe.style.position = 'fixed';
+                iframe.style.right = '0';
+                iframe.style.bottom = '0';
+                iframe.style.width = '0';
+                iframe.style.height = '0';
+                iframe.style.border = '0';
+                document.body.appendChild(iframe);
+                iframe.contentDocument?.write(html);
+                iframe.contentDocument?.close();
+                setTimeout(() => {
+                  iframe.contentWindow?.focus();
+                  iframe.contentWindow?.print();
+                  setTimeout(() => document.body.removeChild(iframe), 1000);
+                }, 300);
+                toast({ title: "Select 'Save as PDF' in the print dialog" });
               }}
-              className="h-10 rounded-xl bg-white ring-1 ring-slate-200 hover:bg-slate-100 text-slate-700 font-semibold text-xs flex items-center justify-center gap-1.5 transition"
+              className="h-10 rounded-xl bg-white ring-1 ring-slate-200 hover:bg-slate-100 text-slate-700 font-semibold text-xs flex items-center justify-center gap-1.5"
               title="Export as PDF"
             >
               <FileText className="h-4 w-4" />
@@ -4254,20 +4347,20 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
           <div className="grid grid-cols-3 gap-2">
             <button
               onClick={() => setShowQR(s => !s)}
-              className={`h-10 rounded-xl ring-1 ring-slate-200 hover:bg-slate-100 text-slate-700 font-semibold text-xs flex items-center justify-center gap-1.5 transition ${showQR ? 'bg-emerald-100 ring-emerald-300 text-emerald-700' : 'bg-white'}`}
+              className={`h-10 rounded-xl ring-1 ring-slate-200 hover:bg-slate-100 text-slate-700 font-semibold text-xs flex items-center justify-center gap-1.5 ${showQR ? 'bg-emerald-100 ring-emerald-300 text-emerald-700' : 'bg-white'}`}
             >
               {showQR ? 'Hide QR' : 'Show QR'}
             </button>
             <button
               onClick={handleSendWhatsApp}
-              className="h-10 rounded-xl bg-[#25D366] hover:bg-[#1ebe57] text-white font-semibold text-xs flex items-center justify-center gap-1.5 transition"
+              className="h-10 rounded-xl bg-[#25D366] hover:bg-[#1ebe57] text-white font-semibold text-xs flex items-center justify-center gap-1.5"
             >
               <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/></svg>
               WhatsApp
             </button>
             <button
               onClick={onClose}
-              className="h-10 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold text-xs flex items-center justify-center gap-1.5 hover:shadow-lg transition"
+              className="h-10 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold text-xs flex items-center justify-center gap-1.5 hover:shadow-lg"
             >
               <Check className="h-4 w-4" />
               New Sale
@@ -4381,17 +4474,23 @@ function StandardCalculator({ onClose }: { onClose: () => void }) {
     label: React.ReactNode; onClick: () => void; variant?: "default" | "accent" | "operator" | "equals"; wide?: boolean;
   }) => {
     const variants = {
-      default: "bg-slate-100 hover:bg-slate-200 text-slate-800 active:bg-slate-300",
-      accent: "bg-slate-200 hover:bg-slate-300 text-slate-800 active:bg-slate-400",
-      operator: "gradient-premium-emerald text-white hover:shadow-glow-emerald active:brightness-110",
-      equals: "gradient-premium-emerald text-white hover:shadow-glow-emerald active:brightness-110",
+      default: "bg-slate-100 hover:bg-slate-200 text-slate-800",
+      accent: "bg-slate-200 hover:bg-slate-300 text-slate-800",
+      operator: "gradient-premium-emerald text-white hover:brightness-110",
+      equals: "gradient-premium-emerald text-white hover:brightness-110",
+    };
+    // Use onPointerDown for instant response (no 300ms tap delay).
+    // This fires on both touch AND mouse immediately.
+    const handlePress = (e: React.PointerEvent) => {
+      e.preventDefault();
+      onClick();
     };
     return (
       <button
-        onClick={onClick}
+        onPointerDown={handlePress}
         style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
         className={cn(
-          "h-16 rounded-2xl font-bold text-xl flex items-center justify-center select-none",
+          "h-16 rounded-2xl font-bold text-xl flex items-center justify-center select-none active:brightness-90",
           variants[variant],
           wide && "col-span-2"
         )}

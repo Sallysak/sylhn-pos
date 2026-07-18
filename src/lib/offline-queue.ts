@@ -173,9 +173,19 @@ export async function flushQueue(): Promise<{ synced: number; failed: number; er
     try {
       // Use authedFetch so the Bearer token is sent (needed for cross-origin
       // iframe in preview environment where cookies aren't sent automatically)
-      const { authedFetch } = await import("./client-auth");
-      const res = await authedFetch("/api/sales", {
+      // Static import at the top of the file would create a circular dependency
+      // (client-auth imports from sync which imports from offline-queue), so we
+      // inline the token-fetching logic here.
+      const token = typeof localStorage !== "undefined" ? localStorage.getItem("sylhn-session-token") : null;
+      const csrfMatch = typeof document !== "undefined" ? document.cookie.match(/sylhn-csrf=([^;]+)/) : null;
+      const csrfToken = csrfMatch ? decodeURIComponent(csrfMatch[1]) : "";
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      if (csrfToken) headers["X-CSRF-Token"] = csrfToken;
+      const res = await fetch("/api/sales", {
         method: "POST",
+        headers,
+        credentials: "include",
         body: JSON.stringify(entry.payload),
       });
 
