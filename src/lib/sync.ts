@@ -1,29 +1,58 @@
 /**
- * SYLHN POS — Sync utilities
+ * SYLHN POS — Sync utilities (server-source-of-truth architecture)
  *
- * Syncs localStorage data with the server (Prisma DB) when online.
- * - Push: send local changes to server
- * - Pull: fetch server data to local
- * - Conflict resolution: last-write-wins by timestamp
+ * ARCHITECTURE
+ * ============
+ * The server is the SINGLE SOURCE OF TRUTH for product catalog, stock counts,
+ * stock groups, and suppliers. Clients never push these to the server — they
+ * only pull.
+ *
+ * What clients CAN write to the server:
+ *   - Sales (POST /api/sales) — server transactionally decrements stock
+ *   - Stock adjustments (POST /api/stock-adjustments) — with manager approval
+ *   - Product CRUD (POST /api/products) — only via the Stock Management UI,
+ *     which makes targeted single-record writes (not bulk upserts)
+ *
+ * What clients DO NOT push to the server:
+ *   - The entire products array (was the source of the "lost update" bug)
+ *   - The entire groups array
+ *   - The entire suppliers array
+ *
+ * PULL STRATEGY
+ * =============
+ * - On app load: fetch products/groups/suppliers from server
+ * - On a timer (default 15s): refresh products (for stock count changes
+ *   made by other cashiers)
+ * - After a sale completes: refresh products (so this cashier's screen shows
+ *   the new stock count from the server's transactional update)
+ * - On user demand (Sync Settings page): manual refresh button
+ *
+ * OFFLINE BEHAVIOR
+ * ================
+ * - Sales made offline are queued in IndexedDB (see offline-queue.ts)
+ * - Product list is cached in localStorage ONLY for offline display
+ *   (so the cashier can still see product names/prices when offline)
+ * - When back online: queue flushes + product list refreshes from server
  */
 
 const SYNC_STATE_KEY = "sylhn-sync-state";
-const SYNC_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+const PRODUCT_CACHE_KEY = "sylhn-products-cache";  // offline display only
+const GROUP_CACHE_KEY = "sylhn-groups-cache";
+const SUPPLIER_CACHE_KEY = "sylhn-suppliers-cache";
+const SYNC_INTERVAL_MS = 15 * 1000; // 15 seconds (was 5 min — too slow for multi-cashier)
 
 export interface SyncState {
-  lastPushedAt: string | null;
   lastPulledAt: string | null;
   lastError: string | null;
-  pendingChanges: number;
   online: boolean;
+  productsCount: number;
 }
 
 const DEFAULT_STATE: SyncState = {
-  lastPushedAt: null,
   lastPulledAt: null,
   lastError: null,
-  pendingChanges: 0,
   online: true,
+  productsCount: 0,
 };
 
 // ===== State persistence =====
@@ -48,84 +77,90 @@ export function isOnline(): boolean {
   return typeof navigator === "undefined" ? true : navigator.onLine;
 }
 
-// ===== Push (local → server) =====
-export async function pushChanges(): Promise<{ success: boolean; message: string }> {
-  if (!isOnline()) {
-    setSyncState({ online: false, lastError: "Offline" });
-    return { success: false, message: "Offline" };
-  }
-
+// ===== Cache helpers (offline display only) =====
+export function getCachedProducts<T = any[]>(): T[] | null {
+  if (typeof window === "undefined") return null;
   try {
-    // Push products
-    const productsRaw = localStorage.getItem("sylhn-products");
-    if (productsRaw) {
-      const products = JSON.parse(productsRaw);
-      await fetch("/api/products", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ products }),
-      });
-    }
-
-    // Push stock groups
-    const groupsRaw = localStorage.getItem("sylhn-groups");
-    if (groupsRaw) {
-      const groups = JSON.parse(groupsRaw);
-      await fetch("/api/stock-groups", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ groups }),
-      });
-    }
-
-    // Push suppliers
-    const suppliersRaw = localStorage.getItem("sylhn-suppliers");
-    if (suppliersRaw) {
-      const suppliers = JSON.parse(suppliersRaw);
-      await fetch("/api/suppliers", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ suppliers }),
-      });
-    }
-
-    setSyncState({
-      lastPushedAt: new Date().toISOString(),
-      lastError: null,
-      online: true,
-      pendingChanges: 0,
-    });
-    return { success: true, message: "Synced" };
-  } catch (e) {
-    setSyncState({ lastError: (e as Error).message, online: true });
-    return { success: false, message: (e as Error).message };
-  }
+    const raw = localStorage.getItem(PRODUCT_CACHE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
 }
 
-// ===== Pull (server → local) =====
-export async function pullChanges(): Promise<{ success: boolean; message: string }> {
+export function getCachedGroups<T = any[]>(): T[] | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(GROUP_CACHE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+export function getCachedSuppliers<T = any[]>(): T[] | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(SUPPLIER_CACHE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+function cacheProducts(products: any[]): void {
+  if (typeof window === "undefined") return;
+  try { localStorage.setItem(PRODUCT_CACHE_KEY, JSON.stringify(products)); } catch { /* quota */ }
+}
+
+function cacheGroups(groups: any[]): void {
+  if (typeof window === "undefined") return;
+  try { localStorage.setItem(GROUP_CACHE_KEY, JSON.stringify(groups)); } catch { /* quota */ }
+}
+
+function cacheSuppliers(suppliers: any[]): void {
+  if (typeof window === "undefined") return;
+  try { localStorage.setItem(SUPPLIER_CACHE_KEY, JSON.stringify(suppliers)); } catch { /* quota */ }
+}
+
+// ===== Pull (server → client) =====
+// This is the ONLY sync operation. Server is source of truth.
+// Returns the fresh data so callers can update React state.
+
+export interface PulledData {
+  products: any[];
+  groups?: any[];
+  suppliers?: any[];
+}
+
+export async function pullChanges(options?: { includeGroups?: boolean; includeSuppliers?: boolean }): Promise<{ success: boolean; message: string; data?: PulledData }> {
   if (!isOnline()) {
     setSyncState({ online: false, lastError: "Offline" });
     return { success: false, message: "Offline" };
   }
 
   try {
-    // Pull products (only update local if server has newer)
-    const res = await fetch("/api/products");
-    if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data.products) && data.products.length > 0) {
-        // Merge: keep local if newer (use updatedAt), else take server
-        const localRaw = localStorage.getItem("sylhn-products");
-        const local = localRaw ? JSON.parse(localRaw) : [];
-        const localMap = new Map(local.map((p: any) => [p.id, p]));
-        for (const sp of data.products) {
-          const lp: any = localMap.get(sp.id);
-          if (!lp || new Date(sp.updatedAt) > new Date(lp.updatedAt || 0)) {
-            localMap.set(sp.id, sp);
-          }
-        }
-        localStorage.setItem("sylhn-products", JSON.stringify(Array.from(localMap.values())));
+    // Always pull products (the most frequently-changing data)
+    const productRes = await fetch("/api/products");
+    let products: any[] = [];
+    if (productRes.ok) {
+      const data = await productRes.json();
+      products = Array.isArray(data.products) ? data.products : [];
+      cacheProducts(products);
+    }
+
+    let groups: any[] | undefined;
+    let suppliers: any[] | undefined;
+
+    if (options?.includeGroups) {
+      const groupsRes = await fetch("/api/stock-groups").catch(() => null);
+      if (groupsRes && groupsRes.ok) {
+        const data = await groupsRes.json();
+        groups = Array.isArray(data.groups) ? data.groups : [];
+        cacheGroups(groups);
+      }
+    }
+
+    if (options?.includeSuppliers) {
+      const supRes = await fetch("/api/suppliers").catch(() => null);
+      if (supRes && supRes.ok) {
+        const data = await supRes.json();
+        suppliers = Array.isArray(data.suppliers) ? data.suppliers : [];
+        cacheSuppliers(suppliers);
       }
     }
 
@@ -133,51 +168,107 @@ export async function pullChanges(): Promise<{ success: boolean; message: string
       lastPulledAt: new Date().toISOString(),
       lastError: null,
       online: true,
+      productsCount: products.length,
     });
-    return { success: true, message: "Pulled" };
+    return {
+      success: true,
+      message: "Pulled",
+      data: { products, groups, suppliers },
+    };
   } catch (e) {
     setSyncState({ lastError: (e as Error).message, online: true });
     return { success: false, message: (e as Error).message };
   }
 }
 
-// ===== Auto-sync (debounced) =====
-let syncTimer: ReturnType<typeof setTimeout> | null = null;
-let autoSyncInterval: ReturnType<typeof setInterval> | null = null;
+// ===== pushChanges() — DEPRECATED (no-op) =====
+//
+// Previously this function pushed the entire localStorage products/groups/
+// suppliers arrays to the server, overwriting server state. This caused
+// "lost update" bugs when multiple cashiers were online simultaneously.
+//
+// The server is now the single source of truth. Clients only push:
+//   - Sales (POST /api/sales) — handled in page.tsx
+//   - Targeted product CRUD (POST /api/products with single record) — handled in StockManagement
+//
+// This function is kept for backward compatibility (older code may still
+// call it) but does nothing.
+export async function pushChanges(): Promise<{ success: boolean; message: string }> {
+  if (process.env.NODE_ENV !== "production") {
+    console.warn("[sync] pushChanges() is deprecated and does nothing. The server is the source of truth — use pullChanges() instead.");
+  }
+  return { success: true, message: "No-op (server is source of truth)" };
+}
 
-export function scheduleSync(delay = 3000): void {
-  if (syncTimer) clearTimeout(syncTimer);
-  syncTimer = setTimeout(() => {
-    pushChanges().catch(() => { /* ignore */ });
-    syncTimer = null;
+// ===== Auto-pull (debounced + interval) =====
+let pullTimer: ReturnType<typeof setTimeout> | null = null;
+let autoPullInterval: ReturnType<typeof setInterval> | null = null;
+
+/**
+ * Schedule a debounced pull (3s default). Use this after any local action
+ * that might have changed server state (e.g. completing a sale) so the UI
+ * refreshes with the authoritative server data.
+ */
+export function schedulePull(delay = 3000, onPull?: (data: PulledData) => void): void {
+  if (pullTimer) clearTimeout(pullTimer);
+  pullTimer = setTimeout(async () => {
+    const result = await pullChanges();
+    if (result.success && result.data && onPull) onPull(result.data);
+    pullTimer = null;
   }, delay);
 }
 
-export function startAutoSync(onSync?: (state: SyncState) => void): () => void {
+/**
+ * Start auto-pull on a 15-second interval. Use this once on app mount to keep
+ * the product list fresh (other cashiers' sales will appear within 15s).
+ */
+export function startAutoPull(
+  onPull?: (data: PulledData) => void,
+  onStateChange?: (state: SyncState) => void,
+): () => void {
   if (typeof window === "undefined") return () => {};
 
   // Online/offline listeners
   const onOnline = () => {
     setSyncState({ online: true });
-    pushChanges();
+    // Pull immediately when back online
+    pullChanges().then(r => {
+      if (r.success && r.data && onPull) onPull(r.data);
+      onStateChange?.(getSyncState());
+    });
   };
-  const onOffline = () => setSyncState({ online: false });
+  const onOffline = () => {
+    setSyncState({ online: false });
+    onStateChange?.(getSyncState());
+  };
   window.addEventListener("online", onOnline);
   window.addEventListener("offline", onOffline);
 
-  // Periodic sync
-  autoSyncInterval = setInterval(async () => {
+  // Initial pull (don't wait for the first interval)
+  pullChanges().then(r => {
+    if (r.success && r.data && onPull) onPull(r.data);
+    onStateChange?.(getSyncState());
+  });
+
+  // Periodic pull
+  autoPullInterval = setInterval(async () => {
     if (!isOnline()) return;
-    await pushChanges();
-    onSync?.(getSyncState());
+    const r = await pullChanges();
+    if (r.success && r.data && onPull) onPull(r.data);
+    onStateChange?.(getSyncState());
   }, SYNC_INTERVAL_MS);
 
   return () => {
     window.removeEventListener("online", onOnline);
     window.removeEventListener("offline", onOffline);
-    if (autoSyncInterval) clearInterval(autoSyncInterval);
-    if (syncTimer) clearTimeout(syncTimer);
-    autoSyncInterval = null;
-    syncTimer = null;
+    if (autoPullInterval) clearInterval(autoPullInterval);
+    if (pullTimer) clearTimeout(pullTimer);
+    autoPullInterval = null;
+    pullTimer = null;
   };
 }
+
+// ===== Legacy aliases (for code that imports startAutoSync/scheduleSync) =====
+// These map the old names to the new pull-only functions.
+export const startAutoSync = startAutoPull;
+export const scheduleSync = schedulePull;

@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useState, useEffect, useCallback } from "react";
+import { motion } from "framer-motion";
 import {
-  ArrowLeft, RefreshCw, Cloud, CloudDownload, CloudUpload,
+  ArrowLeft, RefreshCw, CloudDownload,
   Check, AlertCircle, Loader2, Database, Users, Package,
-  Clock, Zap, Info, Wifi, WifiOff,
+  Clock, Info, Wifi, WifiOff, Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -13,60 +13,57 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { COMPANY, formatGHS } from "@/lib/pos-data";
 import { useToast } from "@/hooks/use-toast";
+import { pullChanges, getSyncState, type SyncState } from "@/lib/sync";
 
 interface SyncSettingsProps {
   onBack: () => void;
 }
 
-interface SyncState {
-  autoSync: boolean;
-  lastSyncedAt: string | null;
-  syncing: boolean;
-  online: boolean;
-  pendingChanges: number;
-  lastError: string | null;
+interface Stats {
+  products: number;
+  users: number;
+  sales: number;
+  stockValue: number;
 }
 
-const SYNC_STATE_KEY = "sylhn-sync-state";
+const AUTO_PULL_KEY = "sylhn-auto-pull-enabled";
 
 export function SyncSettings({ onBack }: SyncSettingsProps) {
   const { toast } = useToast();
-  const [state, setState] = useState<SyncState>({
-    autoSync: true,
-    lastSyncedAt: null,
-    syncing: false,
-    online: true,
-    pendingChanges: 0,
+  const [syncState, setSyncState] = useState<SyncState>({
+    lastPulledAt: null,
     lastError: null,
+    online: true,
+    productsCount: 0,
   });
-  const [stats, setStats] = useState({ products: 0, users: 0, sales: 0, stockValue: 0 });
-  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [autoPull, setAutoPull] = useState(true);
+  const [pulling, setPulling] = useState(false);
+  const [stats, setStats] = useState<Stats>({ products: 0, users: 0, sales: 0, stockValue: 0 });
 
-  // Load sync state from localStorage
+  // Load sync state from the sync module
   useEffect(() => {
+    setSyncState(getSyncState());
     try {
-      const cached = localStorage.getItem(SYNC_STATE_KEY);
-      if (cached) {
-        setState(prev => ({ ...prev, ...JSON.parse(cached) }));
-      }
+      const saved = localStorage.getItem(AUTO_PULL_KEY);
+      setAutoPull(saved !== null ? saved === "true" : true);
     } catch { /* ignore */ }
   }, []);
 
-  // Save sync state to localStorage
-  useEffect(() => {
-    try { localStorage.setItem(SYNC_STATE_KEY, JSON.stringify(state)); } catch { /* ignore */ }
-  }, [state]);
-
   // Online/offline detection
   useEffect(() => {
-    const updateOnline = () => setState(prev => ({ ...prev, online: navigator.onLine }));
+    const updateOnline = () => setSyncState(prev => ({ ...prev, online: navigator.onLine }));
     window.addEventListener("online", updateOnline);
     window.addEventListener("offline", updateOnline);
-    setState(prev => ({ ...prev, online: navigator.onLine }));
     return () => {
       window.removeEventListener("online", updateOnline);
       window.removeEventListener("offline", updateOnline);
     };
+  }, []);
+
+  // Refresh sync state every 5 seconds (so the "last pulled" time updates)
+  useEffect(() => {
+    const interval = setInterval(() => setSyncState(getSyncState()), 5000);
+    return () => clearInterval(interval);
   }, []);
 
   // Fetch stats from server
@@ -100,143 +97,52 @@ export function SyncSettings({ onBack }: SyncSettingsProps) {
 
   useEffect(() => { fetchStats(); }, [fetchStats]);
 
-  // ===== Push to server =====
-  const pushToServer = useCallback(async () => {
-    if (state.syncing) return;
-    setState(prev => ({ ...prev, syncing: true, lastError: null }));
+  // ===== Pull from server (the ONLY sync operation) =====
+  const handlePull = useCallback(async () => {
+    if (pulling) return;
+    setPulling(true);
     try {
-      // Push products
-      const productsRaw = localStorage.getItem("sylhn-products");
-      if (productsRaw) {
-        const products = JSON.parse(productsRaw);
-        await fetch("/api/products", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ products }),
+      const result = await pullChanges({ includeGroups: true, includeSuppliers: true });
+      if (result.success) {
+        setSyncState(getSyncState());
+        toast({
+          title: "Pull complete",
+          description: `Loaded ${result.data?.products?.length || 0} products from server`,
         });
+        fetchStats();
+      } else {
+        toast({ title: "Pull failed", description: result.message, variant: "destructive" });
       }
-      // Push stock groups
-      const groupsRaw = localStorage.getItem("sylhn-groups");
-      if (groupsRaw) {
-        const groups = JSON.parse(groupsRaw);
-        await fetch("/api/stock-groups", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ groups }),
-        });
-      }
-      // Push users
-      const usersRaw = localStorage.getItem("sylhn-system-users");
-      if (usersRaw) {
-        const users = JSON.parse(usersRaw);
-        await fetch("/api/users", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ users }),
-        });
-      }
-      setState(prev => ({
-        ...prev,
-        syncing: false,
-        lastSyncedAt: new Date().toISOString(),
-        pendingChanges: 0,
-        lastError: null,
-      }));
-      toast({ title: "Push complete", description: "All local data uploaded to server" });
-      fetchStats();
-    } catch (e) {
-      setState(prev => ({ ...prev, syncing: false, lastError: (e as Error).message }));
-      toast({ title: "Push failed", description: (e as Error).message, variant: "destructive" });
+    } catch (e: any) {
+      toast({ title: "Pull failed", description: e?.message, variant: "destructive" });
+    } finally {
+      setPulling(false);
     }
-  }, [state.syncing, toast, fetchStats]);
+  }, [pulling, toast, fetchStats]);
 
-  // ===== Pull from server =====
-  const pullFromServer = useCallback(async () => {
-    if (state.syncing) return;
-    setState(prev => ({ ...prev, syncing: true, lastError: null }));
-    try {
-      // Pull products
-      const prodRes = await fetch("/api/products", { credentials: "include" });
-      if (prodRes.ok) {
-        const data = await prodRes.json();
-        if (data.products?.length > 0) {
-          localStorage.setItem("sylhn-products", JSON.stringify(data.products));
-        }
-      }
-      // Pull stock groups
-      const groupRes = await fetch("/api/stock-groups", { credentials: "include" });
-      if (groupRes.ok) {
-        const data = await groupRes.json();
-        if (data.groups?.length > 0) {
-          localStorage.setItem("sylhn-groups", JSON.stringify(data.groups));
-        }
-      }
-      // Pull users
-      const userRes = await fetch("/api/users", { credentials: "include" });
-      if (userRes.ok) {
-        const data = await userRes.json();
-        if (data.users?.length > 0) {
-          localStorage.setItem("sylhn-system-users", JSON.stringify(data.users));
-        }
-      }
-      setState(prev => ({
-        ...prev,
-        syncing: false,
-        lastSyncedAt: new Date().toISOString(),
-        lastError: null,
-      }));
-      toast({ title: "Pull complete", description: "Server data loaded locally" });
-      fetchStats();
-    } catch (e) {
-      setState(prev => ({ ...prev, syncing: false, lastError: (e as Error).message }));
-      toast({ title: "Pull failed", description: (e as Error).message, variant: "destructive" });
-    }
-  }, [state.syncing, toast, fetchStats]);
-
-  // ===== Sync Now (push + pull) =====
-  const syncNow = useCallback(async () => {
-    if (state.syncing) return;
-    setState(prev => ({ ...prev, syncing: true, lastError: null }));
-    try {
-      // Push first
-      await pushToServer();
-      // Then pull
-      await pullFromServer();
-      toast({ title: "Sync complete", description: "Data pushed and pulled successfully" });
-    } catch (e) {
-      setState(prev => ({ ...prev, syncing: false, lastError: (e as Error).message }));
-      toast({ title: "Sync failed", description: (e as Error).message, variant: "destructive" });
-    }
-  }, [state.syncing, pushToServer, pullFromServer, toast]);
-
-  // ===== Auto-sync: listen for localStorage changes =====
-  useEffect(() => {
-    if (!state.autoSync) return;
-    const handleStorageChange = () => {
-      setState(prev => ({ ...prev, pendingChanges: prev.pendingChanges + 1 }));
-      // Debounce: wait 2s after the last change before pushing
-      if (debounceTimer.current) clearTimeout(debounceTimer.current);
-      debounceTimer.current = setTimeout(() => {
-        if (navigator.onLine) pushToServer();
-      }, 2000);
-    };
-    window.addEventListener("storage", handleStorageChange);
-    return () => {
-      window.removeEventListener("storage", handleStorageChange);
-      if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    };
-  }, [state.autoSync, pushToServer]);
+  // ===== Auto-pull toggle =====
+  const handleAutoPullToggle = (checked: boolean) => {
+    setAutoPull(checked);
+    try { localStorage.setItem(AUTO_PULL_KEY, String(checked)); } catch { /* ignore */ }
+    toast({
+      title: checked ? "Auto-pull enabled" : "Auto-pull disabled",
+      description: checked
+        ? "Products will refresh from server every 15 seconds"
+        : "You'll need to pull manually — other cashiers' sales won't appear automatically",
+    });
+  };
 
   // ===== Format timestamp =====
   const formatTimestamp = (iso: string | null) => {
     if (!iso) return "Never";
     const d = new Date(iso);
+    const secondsAgo = Math.floor((Date.now() - d.getTime()) / 1000);
+    if (secondsAgo < 60) return `${secondsAgo}s ago`;
+    if (secondsAgo < 3600) return `${Math.floor(secondsAgo / 60)}m ago`;
+    if (secondsAgo < 86400) return `${Math.floor(secondsAgo / 3600)}h ago`;
     return d.toLocaleString("en-GB", {
       day: "2-digit", month: "2-digit", year: "numeric",
-      hour: "2-digit", minute: "2-digit", second: "2-digit",
+      hour: "2-digit", minute: "2-digit",
     });
   };
 
@@ -251,11 +157,11 @@ export function SyncSettings({ onBack }: SyncSettingsProps) {
             </button>
             <div>
               <h1 className="text-base sm:text-lg font-bold tracking-wider">SERVER SYNC</h1>
-              <p className="text-[10px] sm:text-xs text-slate-400">{COMPANY.name} · Data synchronization</p>
+              <p className="text-[10px] sm:text-xs text-slate-400">{COMPANY.name} · Server is source of truth</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {state.online ? (
+            {syncState.online ? (
               <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/30 text-[10px]">
                 <Wifi className="h-3 w-3 mr-1" /> Online
               </Badge>
@@ -276,32 +182,32 @@ export function SyncSettings({ onBack }: SyncSettingsProps) {
           animate={{ opacity: 1, y: 0 }}
           className={cn(
             "bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 p-4 sm:p-5 mb-4",
-            state.syncing && "ring-2 ring-blue-300"
+            pulling && "ring-2 ring-blue-300"
           )}
         >
           <div className="flex items-center gap-3">
-            {state.syncing ? (
+            {pulling ? (
               <Loader2 className="h-6 w-6 text-blue-500 animate-spin flex-shrink-0" />
-            ) : state.lastError ? (
+            ) : syncState.lastError ? (
               <AlertCircle className="h-6 w-6 text-rose-500 flex-shrink-0" />
             ) : (
               <Check className="h-6 w-6 text-emerald-500 flex-shrink-0" />
             )}
             <div className="flex-1 min-w-0">
               <div className="text-sm font-bold text-slate-800">
-                {state.syncing ? "Syncing..." : state.lastError ? "Sync Error" : "All in sync"}
+                {pulling ? "Pulling from server..." : syncState.lastError ? "Sync Error" : "In sync with server"}
               </div>
               <div className="text-xs text-slate-500">
-                {state.syncing
-                  ? "Transferring data to/from server..."
-                  : state.lastError
-                  ? state.lastError
-                  : `Last synced: ${formatTimestamp(state.lastSyncedAt)}`}
+                {pulling
+                  ? "Refreshing product list and stock counts..."
+                  : syncState.lastError
+                  ? syncState.lastError
+                  : `Last pulled: ${formatTimestamp(syncState.lastPulledAt)}`}
               </div>
             </div>
-            {state.pendingChanges > 0 && (
-              <Badge className="bg-amber-100 text-amber-700 text-[10px]">
-                {state.pendingChanges} pending
+            {autoPull && (
+              <Badge className="bg-emerald-100 text-emerald-700 text-[10px]">
+                <Zap className="h-3 w-3 mr-1" /> Auto
               </Badge>
             )}
           </div>
@@ -322,127 +228,81 @@ export function SyncSettings({ onBack }: SyncSettingsProps) {
           </div>
         </motion.div>
 
-        {/* Auto-Sync Toggle */}
+        {/* Architecture notice — explain the new model */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.05 }}
-          className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 p-4 sm:p-5 mb-4"
+          className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 sm:p-5 mb-4"
         >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className={cn(
-                "h-10 w-10 rounded-xl flex items-center justify-center transition",
-                state.autoSync ? "bg-blue-50 text-blue-600" : "bg-slate-100 text-slate-400"
-              )}>
-                <Zap className="h-5 w-5" />
-              </div>
-              <div>
-                <div className="text-sm font-bold text-slate-800">Auto-Sync</div>
-                <div className="text-xs text-slate-500">Automatically push changes to server (2s delay)</div>
+          <div className="flex items-start gap-3">
+            <Info className="h-5 w-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+            <div className="space-y-2">
+              <div className="text-xs font-bold text-emerald-800 uppercase">Server is the source of truth</div>
+              <div className="text-xs text-emerald-700 space-y-1.5">
+                <p>The server holds the authoritative product catalog, stock counts, and sales history.</p>
+                <p>• <strong>Sales</strong> you make are sent to the server immediately (or queued if offline)</p>
+                <p>• <strong>Stock counts</strong> refresh from the server every 15 seconds — so you'll see other cashiers' sales automatically</p>
+                <p>• <strong>Manual pull</strong> below forces an immediate refresh (useful after another cashier restocks)</p>
               </div>
             </div>
-            <Switch
-              checked={state.autoSync}
-              onCheckedChange={(checked) => {
-                setState(prev => ({ ...prev, autoSync: checked }));
-                toast({ title: checked ? "Auto-sync enabled" : "Auto-sync disabled" });
-              }}
-            />
           </div>
         </motion.div>
 
-        {/* Pull from Server */}
+        {/* Auto-Pull Toggle */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
           className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 p-4 sm:p-5 mb-4"
         >
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-start gap-3 flex-1">
-              <div className="h-10 w-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 flex-shrink-0">
-                <CloudDownload className="h-5 w-5" />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className={cn(
+                "h-10 w-10 rounded-xl flex items-center justify-center transition",
+                autoPull ? "bg-emerald-50 text-emerald-600" : "bg-slate-100 text-slate-400"
+              )}>
+                <Zap className="h-5 w-5" />
               </div>
               <div>
-                <div className="text-sm font-bold text-slate-800">Pull from Server</div>
-                <div className="text-xs text-slate-500 mt-0.5">
-                  Replace local data with the server's latest snapshot. Useful when working across multiple devices or after another user made changes.
-                </div>
+                <div className="text-sm font-bold text-slate-800">Auto-Pull (every 15s)</div>
+                <div className="text-xs text-slate-500">Refresh stock counts from server automatically</div>
               </div>
             </div>
-            <Button
-              onClick={pullFromServer}
-              disabled={state.syncing || !state.online}
-              variant="outline"
-              size="sm"
-              className="flex-shrink-0"
-            >
-              {state.syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <CloudDownload className="h-4 w-4" />}
-              Pull
-            </Button>
+            <Switch
+              checked={autoPull}
+              onCheckedChange={handleAutoPullToggle}
+            />
           </div>
         </motion.div>
 
-        {/* Push to Server */}
+        {/* Pull from Server (manual) */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.15 }}
-          className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 p-4 sm:p-5 mb-4"
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-start gap-3 flex-1">
-              <div className="h-10 w-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 flex-shrink-0">
-                <CloudUpload className="h-5 w-5" />
-              </div>
-              <div>
-                <div className="text-sm font-bold text-slate-800">Push to Server</div>
-                <div className="text-xs text-slate-500 mt-0.5">
-                  Upload current local data to the server. Overwrites server data with your local changes.
-                </div>
-              </div>
-            </div>
-            <Button
-              onClick={pushToServer}
-              disabled={state.syncing || !state.online}
-              variant="outline"
-              size="sm"
-              className="flex-shrink-0"
-            >
-              {state.syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <CloudUpload className="h-4 w-4" />}
-              Push
-            </Button>
-          </div>
-        </motion.div>
-
-        {/* Sync Now */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl shadow-lg shadow-blue-500/20 p-4 sm:p-5 mb-4"
+          className="bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl shadow-lg shadow-emerald-500/20 p-4 sm:p-5 mb-4"
         >
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-start gap-3 flex-1">
               <div className="h-10 w-10 rounded-xl bg-white/20 flex items-center justify-center text-white flex-shrink-0">
-                <RefreshCw className="h-5 w-5" />
+                <CloudDownload className="h-5 w-5" />
               </div>
               <div>
-                <div className="text-sm font-bold text-white">Sync Now</div>
-                <div className="text-xs text-blue-100 mt-0.5">
-                  Push current local data to the server, then pull the latest server data back. Two-way sync.
+                <div className="text-sm font-bold text-white">Pull Now</div>
+                <div className="text-xs text-emerald-50 mt-0.5">
+                  Force-refresh products, stock groups, and suppliers from the server. Use this if another cashier restocked or made changes you can't see.
                 </div>
               </div>
             </div>
             <Button
-              onClick={syncNow}
-              disabled={state.syncing || !state.online}
+              onClick={handlePull}
+              disabled={pulling || !syncState.online}
               size="sm"
-              className="bg-white text-blue-600 hover:bg-blue-50 flex-shrink-0 font-bold"
+              className="bg-white text-emerald-600 hover:bg-emerald-50 flex-shrink-0 font-bold"
             >
-              {state.syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-              Sync Now
+              {pulling ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              Pull Now
             </Button>
           </div>
         </motion.div>
@@ -451,19 +311,19 @@ export function SyncSettings({ onBack }: SyncSettingsProps) {
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.25 }}
+          transition={{ delay: 0.2 }}
           className="bg-slate-100 rounded-2xl p-4 sm:p-5 mb-4"
         >
           <div className="flex items-start gap-3">
             <Info className="h-5 w-5 text-slate-400 flex-shrink-0 mt-0.5" />
             <div className="space-y-2">
-              <div className="text-xs font-bold text-slate-700 uppercase">How it works</div>
+              <div className="text-xs font-bold text-slate-700 uppercase">How multi-cashier sync works</div>
               <div className="text-xs text-slate-600 space-y-1.5">
-                <p>• <strong>Auto-Sync</strong> automatically pushes changes 2 seconds after you make them (add products, complete sales, etc.)</p>
-                <p>• <strong>Pull</strong> replaces your local data with the server's latest — use when switching devices</p>
-                <p>• <strong>Push</strong> uploads your local data to the server — overwrites server data</p>
-                <p>• <strong>Sync Now</strong> does both: push your changes, then pull any new server data</p>
-                <p>• All data is saved locally first (instant), then synced to the server (durable)</p>
+                <p>• When you complete a sale, the server decrements stock <strong>transactionally</strong> (race-condition safe)</p>
+                <p>• Your screen updates instantly (optimistic) and then re-syncs with the server 2 seconds later</p>
+                <p>• Every 15 seconds, your screen pulls the latest stock counts — so you'll see other cashiers' sales within 15s</p>
+                <p>• If you go offline, sales are queued in IndexedDB and auto-sync when you reconnect</p>
+                <p>• <strong>Why no "Push" button?</strong> Because pushing your local product list would overwrite other cashiers' sales — the server must be the source of truth.</p>
               </div>
             </div>
           </div>

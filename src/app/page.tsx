@@ -41,6 +41,7 @@ import { SpeedDial } from "@/components/speed-dial";
 import { queueSale, flushQueue, onQueueChange, isOnline, getQueueSize } from "@/lib/offline-queue";
 import { saveCart, loadCart, clearCart as clearPersistedCart } from "@/lib/cart-persistence";
 import { saveSessionToken, clearSessionToken, authedFetch } from "@/lib/client-auth";
+import { pullChanges, startAutoPull, schedulePull, getCachedProducts, type PulledData } from "@/lib/sync";
 
 // ===== Lazy-loaded components (code-split for faster initial load) =====
 // Each form is loaded on-demand only when the user navigates to it.
@@ -73,15 +74,49 @@ const OperationsDashboard = dynamic(() => import("@/components/operations-dashbo
 const ReceiptArchive = dynamic(() => import("@/components/receipt-archive").then(m => ({ default: m.ReceiptArchive })), { ssr: false, loading: loadingFallback });
 const SyncSettings = dynamic(() => import("@/components/sync-settings").then(m => ({ default: m.SyncSettings })), { ssr: false, loading: loadingFallback });
 
+// ===== Server → Client product transformer =====
+// The /api/products endpoint returns Prisma-shaped products (with `quantity`
+// instead of `stock`, nested `group` object, ISO date strings, etc.).
+// This function converts them to the legacy `Product` shape used by the UI.
+function serverProductToClientProduct(sp: any): Product {
+  return {
+    id: sp.id,
+    sku: sp.sku || "",
+    name: sp.name || "",
+    price: Number(sp.price) || 0,
+    costPrice: Number(sp.costPrice) || 0,
+    category: sp.category || "other",
+    groupId: sp.groupId || "",
+    unit: sp.unit || "each",
+    stock: Number(sp.quantity) || 0,  // Prisma uses `quantity`, UI uses `stock`
+    quantity: Number(sp.quantity) || 0,
+    reorderLevel: Number(sp.reorderLevel) || 5,
+    barcode: sp.barcode || "",
+    emoji: sp.emoji || "📦",
+    taxable: sp.taxable !== false,
+    batchNumber: sp.batchNumber || "",
+    receivedDate: sp.receivedDate || "",
+    expiryDate: sp.expiryDate || "",
+    supplier: sp.suppliers?.[0]?.supplier?.name || "",
+    active: sp.active !== false,
+  };
+}
+
 export default function POSPage() {
   // ===== Top-level View State =====
   const [view, setView] = useState<ViewMode>("login");
   const [openMenu, setOpenMenu] = useState<string | null>(null);
 
-  // ===== Shared Data State (persisted to localStorage) =====
+  // ===== Shared Data State =====
+  // NOTE: The server is the SINGLE SOURCE OF TRUTH for products/groups.
+  // localStorage is used only as a read-only cache for offline display.
+  // We never write the products array back to localStorage from this component
+  // — that was the source of the "lost update" bug in multi-cashier use.
+  // The cache is updated by pullChanges() in src/lib/sync.ts.
   const [products, setProducts] = useState<Product[]>(() => {
     if (typeof window !== 'undefined') {
-      try { const cached = localStorage.getItem('sylhn-products'); if (cached) return JSON.parse(cached); } catch {}
+      const cached = getCachedProducts<Product[]>();
+      if (cached && cached.length > 0) return cached;
     }
     return INITIAL_PRODUCTS;
   });
@@ -171,9 +206,15 @@ export default function POSPage() {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // ===== Persist all critical state to localStorage =====
-  useEffect(() => { try { localStorage.setItem('sylhn-products', JSON.stringify(products)); } catch {} }, [products]);
-  useEffect(() => { try { localStorage.setItem('sylhn-groups', JSON.stringify(groups)); } catch {} }, [groups]);
+  // ===== Persist session-only state to localStorage =====
+  // NOTE: products/groups are NOT persisted here. The server is the source of
+  // truth — those are fetched via pullChanges() in src/lib/sync.ts and cached
+  // by the sync module (not by this component).
+  // What we DO persist:
+  //   - history: local stock movement log (for the History tab — server has
+  //     its own StockHistory table that's the authoritative source)
+  //   - heldOrders: parked carts (for recall)
+  //   - dailyTotal / transactionCount: for header display
   useEffect(() => { try { localStorage.setItem('sylhn-history', JSON.stringify(history)); } catch {} }, [history]);
   useEffect(() => { try { localStorage.setItem('sylhn-held-orders', JSON.stringify(heldOrders)); } catch {} }, [heldOrders]);
   useEffect(() => { try { localStorage.setItem('sylhn-daily-total', String(dailyTotal)); } catch {} }, [dailyTotal]);
@@ -691,6 +732,49 @@ export default function POSPage() {
     })();
   }, [loggedInUser]);
 
+  // ===== Server-Sync: pull products from server on login + every 15s =====
+  // This is the FIX for the multi-cashier "lost update" bug. The server is the
+  // single source of truth — clients only pull (never push the products array).
+  // After login: immediate pull + start 15-second auto-pull interval.
+  // The auto-pull refreshes product stock counts so this cashier sees other
+  // cashiers' sales within 15 seconds.
+  useEffect(() => {
+    if (!loggedInUser) return;
+    // Initial pull (immediate, includes groups for the Stock Management page)
+    pullChanges({ includeGroups: true }).then(result => {
+      if (result.success && result.data?.products && result.data.products.length > 0) {
+        setProducts(result.data.products.map(serverProductToClientProduct));
+      }
+    }).catch(() => {});
+    // Start auto-pull (every 15s) — refreshes products only (groups change rarely)
+    const stopAutoPull = startAutoPull((data) => {
+      if (data.products && data.products.length > 0) {
+        setProducts(prev => {
+          // Preserve local optimistic updates for items in the cart (so the
+          // UI doesn't flicker back to the server's stale count between an
+          // optimistic update and the server's eventual consistency).
+          // We replace the entire list but keep cart-item stock counts as-is
+          // if the server's count is HIGHER than our optimistic count (which
+          // would mean another cashier restocked while we were selling).
+          const cartProductIds = new Set(cart.map(c => c.productId));
+          const serverMap = new Map(data.products.map((p: any) => [p.id, p]));
+          return prev.map(localP => {
+            const serverP = serverMap.get(localP.id);
+            if (!serverP) return localP;  // not on server (maybe just deleted) — keep local
+            const serverStock = Number(serverP.quantity) || 0;
+            // If this product is in the cart, keep the lower of (local, server)
+            // to avoid flicker. Otherwise use the server's authoritative count.
+            if (cartProductIds.has(localP.id) && localP.stock < serverStock) {
+              return { ...localP, ...serverProductToClientProduct(serverP), stock: localP.stock };
+            }
+            return serverProductToClientProduct(serverP);
+          });
+        });
+      }
+    });
+    return stopAutoPull;
+  }, [loggedInUser, cart]);
+
   // Premium: Dark Mode — auto-switch based on time (6pm-6am) + manual toggle
   useEffect(() => {
     const hour = new Date().getHours();
@@ -1023,12 +1107,21 @@ export default function POSPage() {
       cashier,
       customer: customerName || undefined,
     };
-    // Reduce stock levels locally (optimistic)
+    // Reduce stock levels locally (optimistic — UI updates immediately).
+    // The server is the source of truth and will correct any drift within
+    // 15s via the auto-pull, or immediately via schedulePull() below.
     setProducts(prev => prev.map(p => {
       const cartItem = cart.find(c => c.productId === p.id);
       if (!cartItem) return p;
       return { ...p, stock: Math.max(0, p.stock - cartItem.quantity) };
     }));
+    // Trigger a debounced server pull to refresh product list with
+    // authoritative stock counts (in case other cashiers also sold items).
+    schedulePull(2000, (data) => {
+      if (data.products && data.products.length > 0) {
+        setProducts(data.products.map(serverProductToClientProduct));
+      }
+    });
     // Add history entries locally
     const newHistory = cart.map(item => ({
       id: `h-${Date.now()}-${item.productId}`,
