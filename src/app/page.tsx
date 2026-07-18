@@ -50,6 +50,7 @@ const loadingFallback = () => (
 );
 
 const StockManagement = dynamic(() => import("@/components/stock-management").then(m => ({ default: m.StockManagement })), { ssr: false, loading: loadingFallback });
+const StockHistoryView = dynamic(() => import("@/components/stock-history").then(m => ({ default: m.StockHistory })), { ssr: false, loading: loadingFallback });
 const Reports = dynamic(() => import("@/components/reports").then(m => ({ default: m.Reports })), { ssr: false, loading: loadingFallback });
 const PurchaseMenu = dynamic(() => import("@/components/purchase-menu").then(m => ({ default: m.PurchaseMenu })), { ssr: false, loading: loadingFallback });
 const TelephoneModule = dynamic(() => import("@/components/telephone-module").then(m => ({ default: m.TelephoneModule })), { ssr: false, loading: loadingFallback });
@@ -1154,6 +1155,7 @@ export default function POSPage() {
         { label: "Group Maintenance", icon: Layers, action: () => { setInitialStockView("group-maintenance"); setView("stock"); } },
         ...(hasPermission('canAdjustStock') ? [{ label: "Quantity Adjustment", icon: ArrowUpDown, action: () => { setInitialStockView("quantity-adjustment"); setView("stock"); } }] : []),
         { label: "Stock History", icon: History, action: () => { setInitialStockView("history"); setView("stock"); } },
+        { label: "📊 Stock History Pro", icon: TrendingUp, action: () => setView("stock-history-pro") },
         { separator: true },
         { label: "Stock Qty Report", icon: FileBarChart, action: () => { setOpenStockQtyReport(true); setInitialStockView("add-modify"); setView("stock"); } },
         ...(hasPermission('canExport') ? [
@@ -1258,6 +1260,9 @@ export default function POSPage() {
   }
   if (view === "stock") {
     return <StockManagement onBack={() => { setView("pos"); setOpenStockQtyReport(false); }} products={products} setProducts={setProducts} groups={groups} setGroups={setGroups} history={history} setHistory={setHistory} initialView={initialStockView} openQtyReport={openStockQtyReport} onNavigateToPurchase={() => setView("purchase-form")} />;
+  }
+  if (view === "stock-history-pro") {
+    return <StockHistoryView onBack={() => setView("pos")} />;
   }
   if (view === "reports") {
     return <Reports onBack={() => setView("pos")} products={products} groups={groups} history={history} />;
