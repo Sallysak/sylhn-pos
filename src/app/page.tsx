@@ -2276,15 +2276,33 @@ export default function POSPage() {
       {/* ===== Premium: AI Business Assistant ===== */}
       <AiAssistant open={showAiAssistant} onClose={() => setShowAiAssistant(false)} />
 
-      {/* ===== Premium: AI Floating Button — visible on ALL devices ===== */}
+      {/* ===== Premium: AI Floating Button — stacked above scan + printer FABs ===== */}
+      {/* Mobile: bottom-right stack (AI at top, printer middle, scan bottom)
+          Desktop: fixed at bottom-right corner */}
       <button
         onClick={() => setShowAiAssistant(true)}
-        className="fixed z-30 h-12 w-12 sm:h-14 sm:w-14 rounded-full bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-600 hover:from-violet-700 hover:via-purple-700 hover:to-indigo-700 text-white shadow-xl flex items-center justify-center transition hover:scale-110 group"
-        style={{ bottom: "calc(80px + env(safe-area-inset-bottom, 0px))", right: "16px" }}
+        className="mobile-only haptic-tap fixed z-30 rounded-full bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-600 hover:from-violet-700 hover:via-purple-700 hover:to-indigo-700 text-white shadow-xl flex items-center justify-center transition hover:scale-110 group"
+        style={{
+          bottom: "calc(216px + env(safe-area-inset-bottom, 0px))",
+          right: "16px",
+          width: "44px",
+          height: "44px",
+        }}
         title="Ask AI Assistant"
         aria-label="Open AI Assistant"
       >
-        <Sparkles className="h-5 w-5 sm:h-6 sm:w-6 group-hover:scale-110 transition" />
+        <Sparkles className="h-5 w-5 group-hover:scale-110 transition" />
+        <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-emerald-400 ring-2 ring-white animate-pulse" />
+      </button>
+      {/* Desktop-only AI button (separate from mobile stack) */}
+      <button
+        onClick={() => setShowAiAssistant(true)}
+        className="hidden lg:flex fixed z-30 h-14 w-14 rounded-full bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-600 hover:from-violet-700 hover:via-purple-700 hover:to-indigo-700 text-white shadow-xl items-center justify-center transition hover:scale-110 group"
+        style={{ bottom: "24px", right: "24px" }}
+        title="Ask AI Assistant"
+        aria-label="Open AI Assistant"
+      >
+        <Sparkles className="h-6 w-6 group-hover:scale-110 transition" />
         <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-emerald-400 ring-2 ring-white animate-pulse" />
       </button>
 

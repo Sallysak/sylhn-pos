@@ -75,6 +75,12 @@ export function AiAssistant({ open, onClose }: AiAssistantProps) {
         }),
       });
       const data = await res.json();
+      if (res.status === 401) {
+        // Session expired — redirect to login
+        toast({ title: "Session expired", description: "Please log in again to use AI Assistant", variant: "destructive" });
+        setTimeout(() => window.location.href = "/", 1500);
+        return;
+      }
       if (res.ok && data.success) {
         const aiMessage: ChatMessage = {
           role: "assistant",
