@@ -279,49 +279,61 @@ export function AdminLogin({ onSuccess, onCancel, adminOnly = false }: { onSucce
   };
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[100] flex items-center justify-center p-4">
-      <motion.div initial={{ scale: 0.92, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.92, y: 20 }} transition={{ type: 'spring', damping: 25, stiffness: 300 }} className="w-full max-w-sm">
-        {/* Logo / Icon */}
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 gradient-premium-mesh z-[100] flex items-center justify-center p-4 overflow-hidden">
+      {/* Decorative ambient blobs */}
+      <div className="pointer-events-none absolute -top-32 -left-24 h-72 w-72 rounded-full bg-emerald-300/25 blur-3xl" />
+      <div className="pointer-events-none absolute top-1/3 -right-32 h-96 w-96 rounded-full bg-violet-300/20 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-32 left-1/4 h-80 w-80 rounded-full bg-blue-300/20 blur-3xl" />
+
+      <motion.div initial={{ scale: 0.92, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.92, y: 20 }} transition={{ type: 'spring', damping: 25, stiffness: 300 }} className="w-full max-w-sm relative">
+        {/* Logo / Icon — premium gradient with glow */}
         <div className="flex flex-col items-center mb-6">
-          <div className="h-16 w-16 rounded-3xl bg-gradient-to-br from-rose-500 via-pink-600 to-purple-700 flex items-center justify-center shadow-2xl ring-4 ring-white/10 mb-3">
-            <Shield className="h-8 w-8 text-white" />
+          <div className="relative">
+            <div className="absolute inset-0 rounded-3xl gradient-premium-emerald blur-xl opacity-50 scale-110" />
+            <div className="relative h-18 w-18 rounded-3xl gradient-premium-emerald flex items-center justify-center shadow-premium-xl ring-1 ring-white/40 mb-3" style={{ height: '4.5rem', width: '4.5rem' }}>
+              <Shield className="h-9 w-9 text-white" />
+            </div>
           </div>
-          <h2 className="text-xl font-bold text-white">{adminOnly ? 'Admin Access' : 'Sign In'}</h2>
-          <p className="text-xs text-slate-400">{COMPANY.name} · {adminOnly ? 'Administrative Panel' : 'Point of Sale System'}</p>
+          <h2 className="text-2xl font-bold text-slate-900 tracking-tight">{adminOnly ? 'Admin Access' : 'Welcome Back'}</h2>
+          <p className="text-xs text-slate-500 mt-1 font-medium">{COMPANY.name} · {adminOnly ? 'Administrative Panel' : 'Point of Sale System'}</p>
         </div>
 
-        {/* Login card */}
-        <div className="bg-white rounded-3xl shadow-2xl overflow-hidden ring-1 ring-white/20">
+        {/* Login card — premium glass with depth */}
+        <div className="card-premium shadow-premium-xl">
           <div className="px-5 sm:px-8 py-5 sm:py-6 space-y-4">
             {error && (
-              <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-2 p-3 rounded-xl bg-rose-50 ring-1 ring-rose-200 text-rose-700 text-xs">
-                <AlertTriangle className="h-4 w-4 flex-shrink-0" /> {error}
+              <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="flex items-start gap-2 p-3 rounded-xl bg-rose-50 ring-1 ring-rose-200 text-rose-700 text-xs">
+                <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                <span className="flex-1">{error}</span>
               </motion.div>
             )}
             <div>
-              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1.5 block">Username</label>
+              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Username</label>
               <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <input value={username} onChange={(e) => setUsername(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleLogin()} disabled={locked} placeholder="Enter username" className="w-full h-11 pl-10 pr-4 rounded-xl border-2 border-slate-100 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 outline-none text-sm font-medium transition bg-slate-50/50 disabled:opacity-50" />
+                <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <input value={username} onChange={(e) => setUsername(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleLogin()} disabled={locked} placeholder="Enter username" className="input-premium w-full h-12 pl-11 pr-4 text-sm font-medium disabled:opacity-50" />
               </div>
             </div>
             <div>
-              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1.5 block">Password</label>
+              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Password</label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <input type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleLogin()} disabled={locked} placeholder="Enter password" className="w-full h-11 pl-10 pr-10 rounded-xl border-2 border-slate-100 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 outline-none text-sm font-medium transition bg-slate-50/50 disabled:opacity-50" />
-                <button onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"><Eye className="h-4 w-4" /></button>
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <input type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleLogin()} disabled={locked} placeholder="Enter password" className="input-premium w-full h-12 pl-11 pr-11 text-sm font-medium disabled:opacity-50" />
+                <button onClick={() => setShowPassword(!showPassword)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition h-6 w-6 flex items-center justify-center rounded-md hover:bg-slate-100">
+                  <Eye className="h-4 w-4" />
+                </button>
               </div>
             </div>
-            <button onClick={handleLogin} disabled={locked || submitting} className="w-full h-11 rounded-xl bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-700 hover:to-pink-700 text-white text-sm font-bold transition shadow-lg shadow-rose-500/30 disabled:opacity-50 flex items-center justify-center gap-2">
-              <KeyRound className="h-4 w-4" /> {locked ? 'Locked — Wait...' : submitting ? 'Signing in...' : 'Sign In'}
+            <button onClick={handleLogin} disabled={locked || submitting} className="btn-premium w-full h-12 rounded-xl gradient-premium-emerald hover:shadow-glow-emerald text-white text-sm font-bold transition disabled:opacity-50 flex items-center justify-center gap-2">
+              <KeyRound className="h-4 w-4" />
+              {locked ? 'Locked — Wait...' : submitting ? 'Signing in...' : 'Sign In'}
             </button>
           </div>
 
           {/* Demo credentials hint */}
-          <div className="px-5 sm:px-8 py-3 bg-slate-50 border-t border-slate-100">
-            <div className="flex items-center justify-between mb-1">
-              <div className="text-[10px] text-slate-400 font-semibold uppercase">Demo Credentials</div>
+          <div className="px-5 sm:px-8 py-3.5 bg-gradient-to-r from-slate-50 to-slate-100/70 border-t border-slate-200/60">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Demo Credentials</div>
               <button
                 onClick={() => setShowResetConfirm(true)}
                 className="text-[10px] text-rose-500 hover:text-rose-700 font-semibold transition underline-offset-2 hover:underline"
@@ -330,49 +342,49 @@ export function AdminLogin({ onSuccess, onCancel, adminOnly = false }: { onSucce
                 Reset password
               </button>
             </div>
-            <div className="text-[10px] text-slate-500 font-mono space-y-0.5">
+            <div className="text-[10px] text-slate-600 font-mono space-y-0.5">
               {adminOnly ? (
                 <>
-                  <div>admin / admin123 <span className="text-rose-500">(Administrator)</span></div>
-                  <div>manager / manager123 <span className="text-blue-500">(Manager)</span></div>
+                  <div className="flex items-center gap-2"><span className="inline-block h-1.5 w-1.5 rounded-full bg-rose-500" />admin / admin123 <span className="text-rose-500 font-sans">(Administrator)</span></div>
+                  <div className="flex items-center gap-2"><span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-500" />manager / manager123 <span className="text-blue-500 font-sans">(Manager)</span></div>
                 </>
               ) : (
                 <>
-                  <div>admin / admin123 <span className="text-rose-500">(Administrator)</span></div>
-                  <div>manager / manager123 <span className="text-blue-500">(Manager)</span></div>
-                  <div>cashier / cashier123 <span className="text-emerald-500">(Cashier)</span></div>
+                  <div className="flex items-center gap-2"><span className="inline-block h-1.5 w-1.5 rounded-full bg-rose-500" />admin / admin123 <span className="text-rose-500 font-sans">(Administrator)</span></div>
+                  <div className="flex items-center gap-2"><span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-500" />manager / manager123 <span className="text-blue-500 font-sans">(Manager)</span></div>
+                  <div className="flex items-center gap-2"><span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />cashier / cashier123 <span className="text-emerald-500 font-sans">(Cashier)</span></div>
                 </>
               )}
             </div>
           </div>
         </div>
 
-        <button onClick={onCancel} className="w-full mt-4 text-xs text-slate-400 hover:text-white transition">{adminOnly ? '← Back to POS' : 'Login required to continue'}</button>
+        <button onClick={onCancel} className="w-full mt-5 text-xs text-slate-500 hover:text-slate-800 transition font-medium">{adminOnly ? '← Back to POS' : 'Login required to continue'}</button>
       </motion.div>
 
       {/* ===== Reset Credentials Confirmation Dialog ===== */}
       {showResetConfirm && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4" onClick={() => setShowResetConfirm(false)}>
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4" onClick={() => setShowResetConfirm(false)}>
           <motion.div
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             onClick={(e) => e.stopPropagation()}
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden"
+            className="dialog-premium shadow-premium-xl w-full max-w-sm"
           >
-            <div className="px-6 py-4 bg-gradient-to-r from-amber-500 to-rose-500 text-white flex items-center gap-2">
+            <div className="px-6 py-4 gradient-premium-amber text-white flex items-center gap-2">
               <AlertTriangle className="h-5 w-5" />
               <h3 className="text-sm font-bold">Reset all credentials?</h3>
             </div>
-            <div className="px-6 py-4 text-xs text-slate-600 space-y-2">
+            <div className="px-6 py-4 text-xs text-slate-700 space-y-2">
               <p>This will restore the default users and passwords:</p>
-              <ul className="font-mono text-[11px] text-slate-700 bg-slate-50 rounded-lg p-2 space-y-0.5">
+              <ul className="font-mono text-[11px] text-slate-700 bg-slate-50 rounded-lg p-3 space-y-0.5 ring-1 ring-slate-200">
                 <li>admin / admin123</li>
                 <li>manager / manager123</li>
                 <li>cashier / cashier123</li>
               </ul>
               <p className="text-rose-600 font-semibold">Any users you added or passwords you changed will be lost.</p>
             </div>
-            <div className="px-6 py-3 bg-slate-50 border-t border-slate-100 flex gap-2 justify-end">
+            <div className="px-6 py-3 bg-slate-50 border-t border-slate-200 flex gap-2 justify-end">
               <button
                 onClick={() => setShowResetConfirm(false)}
                 className="h-9 px-4 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold transition"

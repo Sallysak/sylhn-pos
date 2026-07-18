@@ -180,21 +180,28 @@ export function MobileNav({ active, onNavigate, cartCount, user, onLogout }: Mob
               transition={{ type: "spring", damping: 28, stiffness: 320 }}
               className="mobile-drawer"
             >
-              {/* Drawer Header — solid gradient, no backdrop-blur */}
-              <div className="flex-shrink-0 px-5 py-4 bg-gradient-to-br from-emerald-700 via-teal-700 to-cyan-800 text-white">
-                <div className="flex items-center justify-between mb-3">
+              {/* Drawer Header — premium gradient with glow */}
+              <div className="flex-shrink-0 px-5 py-4 gradient-premium-emerald text-white relative overflow-hidden">
+                {/* Decorative ambient glow */}
+                <div className="pointer-events-none absolute -top-12 -right-12 h-40 w-40 rounded-full bg-white/10 blur-2xl" />
+                <div className="pointer-events-none absolute -bottom-16 -left-8 h-40 w-40 rounded-full bg-emerald-300/15 blur-2xl" />
+
+                <div className="flex items-center justify-between mb-3 relative z-10">
                   <div className="flex items-center gap-3">
-                    <div className="h-11 w-11 rounded-full bg-white/20 flex items-center justify-center ring-2 ring-white/30 font-bold text-lg">
-                      {user?.fullName?.charAt(0) || "S"}
+                    <div className="relative">
+                      <div className="absolute inset-0 rounded-full bg-white/20 blur-md scale-110" />
+                      <div className="relative h-11 w-11 rounded-full bg-white/15 ring-2 ring-white/30 flex items-center justify-center font-bold text-lg backdrop-blur-sm">
+                        {user?.fullName?.charAt(0) || "S"}
+                      </div>
                     </div>
                     <div>
-                      <div className="font-bold text-sm">{user?.fullName || "User"}</div>
-                      <div className="text-[10px] text-emerald-100/90 capitalize font-medium">{user?.role || "Cashier"}</div>
+                      <div className="font-bold text-sm tracking-tight">{user?.fullName || "User"}</div>
+                      <div className="text-[10px] text-emerald-50/90 capitalize font-medium">{user?.role || "Cashier"}</div>
                     </div>
                   </div>
                   <button
                     onClick={() => setDrawerOpen(false)}
-                    className="h-8 w-8 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center transition haptic-tap"
+                    className="h-8 w-8 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center transition haptic-tap active:scale-90"
                   >
                     <X className="h-4 w-4" />
                   </button>
@@ -204,7 +211,7 @@ export function MobileNav({ active, onNavigate, cartCount, user, onLogout }: Mob
                 <button
                   onClick={handleSync}
                   disabled={syncing || queueSize === 0}
-                  className="w-full h-9 rounded-lg bg-white/15 hover:bg-white/25 disabled:opacity-50 text-white text-xs font-semibold flex items-center justify-center gap-2 transition haptic-tap"
+                  className="w-full h-9 rounded-lg bg-white/15 hover:bg-white/25 disabled:opacity-50 text-white text-xs font-semibold flex items-center justify-center gap-2 transition haptic-tap relative z-10 backdrop-blur-sm ring-1 ring-white/20"
                 >
                   {syncing ? (
                     <RefreshCw className="h-3.5 w-3.5 animate-spin" />

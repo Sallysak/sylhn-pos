@@ -67,7 +67,7 @@ export function SpeedDial({ actions }: SpeedDialProps) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/30 backdrop-blur-[2px] z-40 lg:hidden"
+            className="fixed inset-0 bg-slate-900/40 backdrop-blur-[2px] z-40 lg:hidden"
             onClick={() => setOpen(false)}
           />
         )}
@@ -102,14 +102,14 @@ export function SpeedDial({ actions }: SpeedDialProps) {
                     }}
                     className="flex items-center gap-2.5"
                   >
-                    {/* Label */}
-                    <div className="bg-slate-900/90 backdrop-blur text-white text-xs font-semibold px-3 py-1.5 rounded-lg shadow-lg whitespace-nowrap">
+                    {/* Label — premium pill */}
+                    <div className="bg-slate-900/95 backdrop-blur text-white text-xs font-semibold px-3 py-1.5 rounded-lg shadow-premium whitespace-nowrap ring-1 ring-white/10">
                       {action.label}
                     </div>
-                    {/* Action button */}
+                    {/* Action button — premium */}
                     <button
                       onClick={() => handleAction(action)}
-                      className={`h-11 w-11 rounded-full bg-gradient-to-br ${action.color} text-white shadow-lg flex items-center justify-center transition active:scale-90 hover:scale-105`}
+                      className={`btn-premium h-12 w-12 rounded-full bg-gradient-to-br ${action.color} text-white flex items-center justify-center transition active:scale-90 hover:scale-105 ring-1 ring-white/30`}
                       title={action.label}
                     >
                       <Icon className="h-5 w-5" />
@@ -121,16 +121,16 @@ export function SpeedDial({ actions }: SpeedDialProps) {
           )}
         </AnimatePresence>
 
-        {/* Main FAB button */}
+        {/* Main FAB button — premium gradient with glow */}
         <motion.button
           onClick={() => setOpen(!open)}
           whileTap={{ scale: 0.9 }}
           animate={{ rotate: open ? 135 : 0 }}
           transition={{ type: "spring", stiffness: 300, damping: 20 }}
-          className={`h-14 w-14 rounded-full shadow-2xl flex items-center justify-center transition-colors ${
+          className={`btn-premium h-14 w-14 rounded-full flex items-center justify-center transition-colors ring-1 ring-white/30 ${
             open
-              ? "bg-slate-700 text-white"
-              : "bg-gradient-to-br from-emerald-600 via-teal-600 to-cyan-600 text-white"
+              ? "bg-slate-700 text-white shadow-premium-lg"
+              : "gradient-premium-emerald text-white shadow-glow-emerald"
           }`}
           title={open ? "Close menu" : "Quick actions"}
           aria-label={open ? "Close menu" : "Open quick actions"}
