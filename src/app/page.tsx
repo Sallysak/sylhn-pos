@@ -1252,15 +1252,15 @@ export default function POSPage() {
     // POST to /api/sales which creates Sale + SaleItem records, decrements
     // stock atomically, and records StockHistory entries. The sale is
     // permanently recorded even if the user clears localStorage.
+    // Use authedFetch so the Bearer token is sent (needed in preview iframe).
     try {
-      const res = await fetch('/api/sales', {
+      const res = await authedFetch('/api/sales', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({
           invoiceNumber: result.invoiceNumber,
           customerName: result.customer || '',
           cashierName: result.cashier,
+          cashierId: loggedInUser?.id || '',
           subtotal: result.subtotal,
           discount: result.discount,
           taxRate: TAX_RATE,
@@ -1286,13 +1286,16 @@ export default function POSPage() {
       if (res.ok) {
         const data = await res.json();
         if (data.success && data.sale?.id) {
-          // Premium: store the server sale ID on the payment result so the
-          // receipt modal can fetch a QR code and WhatsApp link.
+          // Store the server sale ID on the payment result so the receipt
+          // modal can use it for QR codes, WhatsApp, thermal printing, etc.
           setLastPayment(prev => prev ? { ...prev, saleId: data.sale.id } : prev);
         }
+      } else if (res.status === 401) {
+        // Auth failed — DON'T queue (we're online, just not authenticated)
+        toast({ title: 'Authentication expired', description: 'Please log in again to save sales', variant: 'destructive' });
       } else {
-        console.warn('Sale recording failed:', await res.text());
-        // Premium: if offline, queue the sale for later sync
+        // Server error — queue for retry
+        console.warn('Sale recording failed:', await res.text().catch(() => ''));
         const salePayload = {
           invoiceNumber: result.invoiceNumber,
           customerName: result.customer || '',
@@ -1322,12 +1325,10 @@ export default function POSPage() {
           await queueSale(salePayload);
           toast({
             title: 'Sale queued for sync',
-            description: 'You appear to be offline. The sale will be uploaded automatically when you reconnect.',
-            variant: 'default',
+            description: 'Server temporarily unavailable. The sale will sync automatically.',
           });
         } catch (queueErr) {
           console.error('Failed to queue sale:', queueErr);
-          toast({ title: 'Warning', description: 'Sale completed locally but could not be saved to server', variant: 'destructive' });
         }
       }
     } catch (e) {
@@ -3899,13 +3900,13 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
   }, [showQR, payment.invoiceNumber, payment.saleId, qrDataUrl]);
 
   // Premium: Ensure sale is saved to server before print/WhatsApp/etc.
-  // This is called by all action buttons. If the sale is already saved
-  // (payment.saleId exists), it returns immediately.
+  // Uses authedFetch (static import at top of file) so the Bearer token
+  // is always sent. If the sale is already saved (payment.saleId exists),
+  // returns immediately.
   const ensureSaleSaved = async (): Promise<boolean> => {
     if (payment.saleId) return true;
     setSaleSaving(true);
     try {
-      const { authedFetch } = await import("@/lib/client-auth");
       const res = await authedFetch("/api/sales", {
         method: "POST",
         body: JSON.stringify({
@@ -3937,8 +3938,6 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
       if (res.ok) {
         const data = await res.json();
         if (data.success && data.sale?.id) {
-          // Update the payment object in place (the parent component
-          // should also update its state, but this prevents repeated saves)
           (payment as any).saleId = data.sale.id;
           toast({ title: "Sale saved to server", description: `Invoice ${payment.invoiceNumber}` });
           setSaleSaving(false);
@@ -4009,7 +4008,6 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
     }
     const phone = prompt('Enter customer phone number (with country code, e.g. +233241234567), or leave blank to open WhatsApp Web without a specific contact:');
     try {
-      const { authedFetch } = await import("@/lib/client-auth");
       const res = await authedFetch(`/api/receipt/whatsapp?saleId=${payment.saleId}${phone ? `&phone=${encodeURIComponent(phone)}` : ''}`);
       const data = await res.json();
       if (res.ok && data.success) {

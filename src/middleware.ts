@@ -64,6 +64,7 @@ const PUBLIC_API_PATHS = [
   "/api/auth/csrf",
   "/api/customer-display",  // customer-facing display polls this (no auth)
   "/api/payments/momo/callback",  // MTN MoMo webhook — no session cookie
+  "/api/receipt/verify",  // QR code verification — public, no auth
 ];
 
 function isPublicApiPath(pathname: string): boolean {
