@@ -6,6 +6,7 @@ import { rateLimitApiRead, rateLimitApiWrite, rateLimitResponse, getClientIp } f
 import { auditLogTx } from "@/lib/audit";
 import { generateInvoiceNumber } from "@/lib/identifiers";
 import { awardLoyaltyPoints, redeemLoyaltyPoints, reverseLoyaltyForSale } from "@/lib/loyalty";
+import { publishRealtimeEvent } from "@/lib/realtime";
 
 // GET /api/sales — list sales (with optional date filter)
 export async function GET(req: NextRequest) {
@@ -140,6 +141,10 @@ export async function POST(req: NextRequest) {
     }
 
     // ===== EXECUTE THE SALE AS A SINGLE TRANSACTION =====
+    // Collect product IDs + new quantities for realtime broadcast after commit.
+    // We can't publish events inside the transaction (it might still roll back).
+    const stockUpdates: Array<{ productId: string; newQuantity: number }> = [];
+
     const sale = await db.$transaction(async (tx) => {
       const invoiceNumber = s.invoiceNumber || generateInvoiceNumber();
 
@@ -220,12 +225,24 @@ export async function POST(req: NextRequest) {
       // (e.g. concurrent sale), the update affects 0 rows and we throw.
       for (const item of newSale.items) {
         if (!item.productId) continue;
+        // Fetch current quantity BEFORE the decrement (for realtime broadcast)
+        const productBefore = await tx.product.findUnique({
+          where: { id: item.productId },
+          select: { quantity: true },
+        });
         const updated = await tx.product.updateMany({
           where: { id: item.productId, quantity: { gte: item.quantity } },
           data: { quantity: { decrement: item.quantity } },
         });
         if (updated.count === 0) {
           throw new Error(`Insufficient stock for ${item.sku} (race condition detected)`);
+        }
+        // Record the new quantity for realtime broadcast (after commit)
+        if (productBefore) {
+          stockUpdates.push({
+            productId: item.productId,
+            newQuantity: productBefore.quantity - item.quantity,
+          });
         }
         await tx.stockHistory.create({
           data: {
@@ -280,6 +297,26 @@ export async function POST(req: NextRequest) {
       });
 
       return newSale;
+    });
+
+    // ===== PUBLISH REALTIME EVENTS (after commit) =====
+    // Now that the transaction has committed, broadcast stock updates to all
+    // connected SSE clients. If no clients are connected, this is a no-op.
+    for (const update of stockUpdates) {
+      publishRealtimeEvent({
+        type: "stock-update",
+        productId: update.productId,
+        newQuantity: update.newQuantity,
+        source: "sale",
+      });
+    }
+    // Also broadcast a sale-complete event (for live dashboards)
+    publishRealtimeEvent({
+      type: "sale-complete",
+      saleId: sale.id,
+      invoiceNumber: sale.invoiceNumber,
+      total: sale.total,
+      cashierName: sale.cashierName,
     });
 
     return NextResponse.json({

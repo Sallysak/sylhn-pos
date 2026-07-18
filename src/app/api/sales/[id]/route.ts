@@ -4,6 +4,7 @@ import { requireAuth, requirePermission } from "@/lib/auth";
 import { rateLimitApiRead, rateLimitApiWrite, rateLimitResponse, getClientIp } from "@/lib/rate-limit";
 import { auditLogTx } from "@/lib/audit";
 import { reverseLoyaltyForSale } from "@/lib/loyalty";
+import { publishRealtimeEvent } from "@/lib/realtime";
 
 // GET /api/sales/[id] — get one sale by ID or invoice number
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -85,13 +86,26 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
           throw new Error("Cannot refund a voided sale");
         }
 
+        // Track stock restorations for realtime broadcast after commit
+        const stockRestores: Array<{ productId: string; newQuantity: number }> = [];
+
         // Restore stock for each item + create linked StockHistory entries
         for (const item of sale.items) {
           if (item.productId) {
+            const productBefore = await tx.product.findUnique({
+              where: { id: item.productId },
+              select: { quantity: true },
+            });
             await tx.product.update({
               where: { id: item.productId },
               data: { quantity: { increment: item.quantity } },
             });
+            if (productBefore) {
+              stockRestores.push({
+                productId: item.productId,
+                newQuantity: productBefore.quantity + item.quantity,
+              });
+            }
             await tx.stockHistory.create({
               data: {
                 productId: item.productId,
@@ -150,10 +164,20 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
           userAgent: req.headers.get("user-agent") || "",
         });
 
-        return updatedSale;
+        return { updatedSale, stockRestores };
       });
 
-      return NextResponse.json({ success: true, sale: updated });
+      // ===== PUBLISH REALTIME EVENTS (after commit) =====
+      for (const restore of updated.stockRestores) {
+        publishRealtimeEvent({
+          type: "stock-update",
+          productId: restore.productId,
+          newQuantity: restore.newQuantity,
+          source: body.status === "voided" ? "void" : "refund",
+        });
+      }
+
+      return NextResponse.json({ success: true, sale: updated.updatedSale });
     }
 
     // Generic update (metadata only — no status change)

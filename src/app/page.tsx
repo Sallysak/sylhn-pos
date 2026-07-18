@@ -775,6 +775,78 @@ export default function POSPage() {
     return stopAutoPull;
   }, [loggedInUser, cart]);
 
+  // ===== Real-time updates via Server-Sent Events (SSE) =====
+  // Opens a long-lived connection to /api/realtime/stream. When another
+  // cashier makes a sale (or voids/refunds), the server pushes a
+  // "stock-update" event instantly — this cashier's screen updates within
+  // ~100ms instead of waiting for the 15-second poll.
+  //
+  // The browser auto-reconnects if the connection drops (default 3s).
+  // If SSE isn't supported (rare), the 15-second poll still works as a
+  // fallback.
+  useEffect(() => {
+    if (!loggedInUser) return;
+    if (typeof window === "undefined" || !("EventSource" in window)) return;
+
+    let es: EventSource | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const connect = () => {
+      try {
+        es = new EventSource("/api/realtime/stream", { withCredentials: true });
+
+        // Live stock updates — when another cashier sells/voids/refunds,
+        // update this cashier's screen instantly.
+        es.addEventListener("stock-update", (e: MessageEvent) => {
+          try {
+            const data = JSON.parse(e.data);
+            if (!data.productId || typeof data.newQuantity !== "number") return;
+            setProducts(prev => prev.map(p =>
+              p.id === data.productId
+                ? { ...p, stock: data.newQuantity, quantity: data.newQuantity }
+                : p
+            ));
+          } catch { /* ignore malformed event */ }
+        });
+
+        // Live sale notifications — could be used for a toast or dashboard
+        // refresh. For now, we just refresh the daily total + txn count.
+        es.addEventListener("sale-complete", (e: MessageEvent) => {
+          try {
+            const data = JSON.parse(e.data);
+            // Only count sales from OTHER cashiers (this cashier's sale is
+            // already counted locally). We can't tell from the event whose
+            // sale it is, so we skip our own by checking the cashier name.
+            // This is a best-effort refresh — the Z-Report at end of day is
+            // the authoritative source.
+            if (data.cashierName && loggedInUser.fullName !== data.cashierName) {
+              setDailyTotal(prev => prev + (data.total || 0));
+              setTransactionCount(prev => prev + 1);
+            }
+          } catch { /* ignore */ }
+        });
+
+        es.onerror = () => {
+          // Browser auto-reconnects, but if it fails repeatedly, we close
+          // and retry after 5s. The 15-second poll is still running as a
+          // fallback, so we don't lose data.
+          if (es) es.close();
+          es = null;
+          reconnectTimer = setTimeout(connect, 5000);
+        };
+      } catch {
+        // EventSource construction failed — fall back to polling only
+      }
+    };
+
+    connect();
+
+    return () => {
+      if (es) es.close();
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+    };
+  }, [loggedInUser]);
+
   // Premium: Dark Mode — auto-switch based on time (6pm-6am) + manual toggle
   useEffect(() => {
     const hour = new Date().getHours();

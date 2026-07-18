@@ -39,6 +39,8 @@ const SYNC_STATE_KEY = "sylhn-sync-state";
 const PRODUCT_CACHE_KEY = "sylhn-products-cache";  // offline display only
 const GROUP_CACHE_KEY = "sylhn-groups-cache";
 const SUPPLIER_CACHE_KEY = "sylhn-suppliers-cache";
+const CURSOR_KEY = "sylhn-products-cursor";  // incremental sync cursor
+const ETAG_KEY = "sylhn-products-etag";  // for non-incremental calls
 const SYNC_INTERVAL_MS = 15 * 1000; // 15 seconds (was 5 min — too slow for multi-cashier)
 
 export interface SyncState {
@@ -120,27 +122,101 @@ function cacheSuppliers(suppliers: any[]): void {
 // ===== Pull (server → client) =====
 // This is the ONLY sync operation. Server is source of truth.
 // Returns the fresh data so callers can update React state.
+//
+// INCREMENTAL SYNC
+// ================
+// On each pull, we send `?since=<cursor>` (the timestamp from the last
+// successful pull). The server only returns products updated after that
+// timestamp. We merge the deltas into the local cache:
+//   - Updated products: replace in cache
+//   - New products: add to cache
+//   - Deleted products: filter out (active=false comes through as updated)
+//
+// On the FIRST pull (no cursor), we do a full fetch (no `?since`).
+//
+// ETAG
+// ====
+// As a secondary optimization, we send `If-None-Match: <etag>` from the last
+// response. If the server's product list hasn't changed at all, it returns
+// 304 Not Modified (empty body). This is mostly useful for the first pull
+// (when we don't have a cursor yet) — incremental calls almost always return
+// some deltas.
 
 export interface PulledData {
-  products: any[];
+  products: any[];        // FULL product list (after merge) — for callers that want the whole state
+  productDeltas?: any[];  // Only the changed products (empty array if nothing changed or full refresh)
   groups?: any[];
   suppliers?: any[];
+  fromCache?: boolean;    // true if we served from cache (304 or offline)
 }
 
-export async function pullChanges(options?: { includeGroups?: boolean; includeSuppliers?: boolean }): Promise<{ success: boolean; message: string; data?: PulledData }> {
+export async function pullChanges(options?: { includeGroups?: boolean; includeSuppliers?: boolean; forceFull?: boolean }): Promise<{ success: boolean; message: string; data?: PulledData }> {
   if (!isOnline()) {
     setSyncState({ online: false, lastError: "Offline" });
-    return { success: false, message: "Offline" };
+    // Return cached data so the UI can still render
+    const cachedProducts = getCachedProducts<any[]>() || [];
+    return {
+      success: false,
+      message: "Offline",
+      data: { products: cachedProducts, fromCache: true },
+    };
   }
 
   try {
-    // Always pull products (the most frequently-changing data)
-    const productRes = await fetch("/api/products");
+    // ===== Pull products (incremental if we have a cursor) =====
+    const cursor = options?.forceFull ? null : (typeof window !== "undefined" ? localStorage.getItem(CURSOR_KEY) : null);
+    const etag = typeof window !== "undefined" ? localStorage.getItem(ETAG_KEY) : null;
+
+    const url = new URL("/api/products", typeof window !== "undefined" ? window.location.origin : "http://localhost");
+    if (cursor) url.searchParams.set("since", cursor);
+
+    const headers: Record<string, string> = {};
+    // Only send ETag on non-incremental calls (no `since` param). The server
+    // computes the ETag over the full list, so it's only meaningful when we
+    // request the full list.
+    if (!cursor && etag) headers["If-None-Match"] = etag;
+
+    const productRes = await fetch(url.toString(), { headers });
     let products: any[] = [];
-    if (productRes.ok) {
+    let productDeltas: any[] = [];
+    let fromCache = false;
+
+    if (productRes.status === 304) {
+      // 304 Not Modified — our cached list is still fresh
+      products = getCachedProducts<any[]>() || [];
+      fromCache = true;
+      productDeltas = [];
+    } else if (productRes.ok) {
       const data = await productRes.json();
-      products = Array.isArray(data.products) ? data.products : [];
+      const serverProducts = Array.isArray(data.products) ? data.products : [];
+      const newCursor = data.cursor as string | undefined;
+      const newEtag = productRes.headers.get("etag");
+
+      if (cursor && data.incremental) {
+        // ===== INCREMENTAL: merge deltas into cache =====
+        const cached = getCachedProducts<any[]>() || [];
+        const cacheMap = new Map(cached.map(p => [p.id, p]));
+        for (const sp of serverProducts) {
+          cacheMap.set(sp.id, sp);  // add or replace
+        }
+        products = Array.from(cacheMap.values());
+        productDeltas = serverProducts;
+      } else {
+        // ===== FULL: replace cache =====
+        products = serverProducts;
+        productDeltas = serverProducts;
+      }
       cacheProducts(products);
+      if (newCursor && typeof window !== "undefined") {
+        try { localStorage.setItem(CURSOR_KEY, newCursor); } catch { /* quota */ }
+      }
+      if (newEtag && typeof window !== "undefined") {
+        try { localStorage.setItem(ETAG_KEY, newEtag); } catch { /* quota */ }
+      }
+    } else {
+      // Fetch failed — fall back to cache
+      products = getCachedProducts<any[]>() || [];
+      fromCache = true;
     }
 
     let groups: any[] | undefined;
@@ -173,12 +249,25 @@ export async function pullChanges(options?: { includeGroups?: boolean; includeSu
     return {
       success: true,
       message: "Pulled",
-      data: { products, groups, suppliers },
+      data: { products, productDeltas, groups, suppliers, fromCache },
     };
   } catch (e) {
     setSyncState({ lastError: (e as Error).message, online: true });
     return { success: false, message: (e as Error).message };
   }
+}
+
+/**
+ * Reset the incremental sync cursor. The next pullChanges() call will do a
+ * full fetch (no `?since` param). Use this if the local cache is corrupted
+ * or after a server-side data migration.
+ */
+export function resetSyncCursor(): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(CURSOR_KEY);
+    localStorage.removeItem(ETAG_KEY);
+  } catch { /* ignore */ }
 }
 
 // ===== pushChanges() — DEPRECATED (no-op) =====

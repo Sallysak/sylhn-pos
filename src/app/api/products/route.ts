@@ -3,8 +3,26 @@ import { db } from "@/lib/db";
 import { requireAuth, requirePermission } from "@/lib/auth";
 import { ProductSchema, ProductBulkSchema, validate, validationError } from "@/lib/validation";
 import { rateLimitApiRead, rateLimitApiWrite, rateLimitResponse, getClientIp } from "@/lib/rate-limit";
+import crypto from "crypto";
 
 // GET /api/products — list all products (requires auth)
+//
+// Query params:
+//   includeInactive=true  — include soft-deleted products
+//   groupId=<id>          — filter by stock group
+//   lowStock=true         — only return products at or below reorderLevel
+//   since=<ISO_DATE>      — INCREMENTAL SYNC: only return products updated
+//                            after this timestamp. Returns a `cursor` field
+//                            (current server time) that the client should
+//                            pass as `since` on the next call.
+//                            If the client passes the cursor from the last
+//                            response, only changed products are returned.
+//
+// ETag support:
+//   The response includes an `ETag` header (a hash of the products list).
+//   Clients can send `If-None-Match: "<etag>"` on subsequent requests — if
+//   nothing changed, the server returns 304 Not Modified (empty body).
+//   This is most useful for non-incremental calls (no `since` param).
 export async function GET(req: NextRequest) {
   try { await requireAuth(); } catch (e) { return e as Response; }
 
@@ -17,15 +35,24 @@ export async function GET(req: NextRequest) {
     const includeInactive = searchParams.get("includeInactive") === "true";
     const groupId = searchParams.get("groupId");
     const lowStock = searchParams.get("lowStock") === "true";
+    const since = searchParams.get("since");  // ISO date for incremental sync
 
     const where: any = {};
     if (!includeInactive) where.active = true;
     if (groupId) where.groupId = groupId;
+    if (since) {
+      // Incremental sync: only return products updated after `since`.
+      // The client should pass the `cursor` from the previous response.
+      try {
+        const sinceDate = new Date(since);
+        if (!isNaN(sinceDate.getTime())) {
+          where.updatedAt = { gt: sinceDate };
+        }
+      } catch { /* invalid date — ignore, return full list */ }
+    }
     // SQLite (Prisma) cannot do column-to-column comparisons in `where`.
     // For low-stock filtering, we fetch candidates and filter in JS:
     //   "low stock" = quantity <= reorderLevel (not just quantity <= 0)
-    // This is a known limitation; if performance becomes an issue, add a
-    // computed `isLowStock` column or use raw SQL.
     if (lowStock) {
       // No `where.quantity` filter — we'll filter after fetch
     }
@@ -44,7 +71,41 @@ export async function GET(req: NextRequest) {
       ? products.filter(p => p.quantity <= p.reorderLevel)
       : products;
 
-    return NextResponse.json({ products: filtered, count: filtered.length });
+    // Compute ETag (hash of product IDs + updatedAt timestamps).
+    // This lets clients send If-None-Match on subsequent requests and get a
+    // 304 Not Modified response if nothing changed.
+    const etagSource = filtered.map(p => `${p.id}:${p.updatedAt.toISOString()}`).join("|");
+    const etag = `"${crypto.createHash("sha1").update(etagSource).digest("hex").slice(0, 16)}"`;
+    const ifNoneMatch = req.headers.get("if-none-match");
+    if (ifNoneMatch === etag) {
+      // 304 Not Modified — client's cache is still fresh.
+      // Don't send a body — saves bandwidth.
+      return new NextResponse(null, {
+        status: 304,
+        headers: {
+          "ETag": etag,
+          "Cache-Control": "no-cache",  // must revalidate every time
+        },
+      });
+    }
+
+    // The cursor is the current server time. Clients should pass it as `since`
+    // on the next call. We use `gt` (not `gte`) so we don't return the same
+    // record twice if it was updated at exactly the cursor time.
+    const cursor = new Date().toISOString();
+
+    return NextResponse.json({
+      products: filtered,
+      count: filtered.length,
+      cursor,
+      incremental: !!since,
+    }, {
+      headers: {
+        "ETag": etag,
+        "Cache-Control": "no-cache",  // must revalidate
+        "X-Total-Products": String(filtered.length),
+      },
+    });
   } catch (e) {
     console.error("GET /api/products error:", e);
     return NextResponse.json({ error: "Failed to fetch products" }, { status: 500 });
