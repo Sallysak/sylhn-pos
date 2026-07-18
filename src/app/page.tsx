@@ -14,7 +14,7 @@ import {
   Phone, Truck, Users, Database, Wrench, Shield,
   FileBarChart2, BookOpen, PhoneCall, Archive, Settings2, Lock,
   FileSearch, Copy, Image as ImageIcon, Tags,
-  Smartphone, RefreshCw, Sparkles, Loader2, AlertTriangle, Calculator as CalcIcon,
+  Smartphone, RefreshCw, Sparkles, Loader2, AlertTriangle, Calculator as CalcIcon, Mail,
 } from "lucide-react";
 import {
   products as INITIAL_PRODUCTS, categories, paymentMethods, quickCashAmounts,
@@ -61,6 +61,7 @@ const PurchaseMenu = dynamic(() => import("@/components/purchase-menu").then(m =
 const TelephoneModule = dynamic(() => import("@/components/telephone-module").then(m => ({ default: m.TelephoneModule })), { ssr: false, loading: loadingFallback });
 const TelephoneDirectory = dynamic(() => import("@/components/telephone-directory").then(m => ({ default: m.TelephoneDirectory })), { ssr: false, loading: loadingFallback });
 const MaintenanceModule = dynamic(() => import("@/components/maintenance-module").then(m => ({ default: m.MaintenanceModule })), { ssr: false, loading: loadingFallback });
+const EmailSystem = dynamic(() => import("@/components/email-system").then(m => ({ default: m.EmailSystem })), { ssr: false, loading: loadingFallback });
 const SoldItemsReport = dynamic(() => import("@/components/sold-items-report").then(m => ({ default: m.SoldItemsReport })), { ssr: false, loading: loadingFallback });
 const PurchaseForm = dynamic(() => import("@/components/purchase-form").then(m => ({ default: m.PurchaseForm })), { ssr: false, loading: loadingFallback });
 const SalesMenu = dynamic(() => import("@/components/sales-menu").then(m => ({ default: m.SalesMenu })), { ssr: false, loading: loadingFallback });
@@ -1521,11 +1522,13 @@ export default function POSPage() {
         { separator: true },
         { label: "Admin Panel", icon: Shield, action: () => setView("admin-login") },
         { separator: true },
+        { label: "📧 Email System", icon: Mail, action: () => setView("email-system" as any) },
         { label: "About SYLHN POS", icon: Store, action: () => setView("maintenance") },
         { label: "Exit", icon: Power, action: () => handleLogout(true) },
       ] : [
         { label: "Admin Panel", icon: Shield, action: () => setView("admin-login") },
         { separator: true },
+        { label: "📧 Email System", icon: Mail, action: () => setView("email-system" as any) },
         { label: "About SYLHN POS", icon: Store, action: () => setView("maintenance") },
         { label: "Exit", icon: Power, action: () => handleLogout(true) },
       ],
@@ -1575,6 +1578,9 @@ export default function POSPage() {
   }
   if (view === "maintenance") {
     return <MaintenanceModule onBack={() => setView("pos")} cashier={cashier} dailyTotal={dailyTotal} transactionCount={transactionCount} />;
+  }
+  if (view === "email-system" as any) {
+    return <EmailSystem onBack={() => setView("pos")} />;
   }
   if (view === "sold-items") {
     return <SoldItemsReport onBack={() => setView("pos")} />;
@@ -3900,11 +3906,26 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
   }, [showQR, payment.invoiceNumber, payment.saleId, qrDataUrl]);
 
   // Premium: Ensure sale is saved to server before print/WhatsApp/etc.
-  // Uses authedFetch (static import at top of file) so the Bearer token
-  // is always sent. If the sale is already saved (payment.saleId exists),
-  // returns immediately.
+  // First tries to FIND the sale by invoice number (it was likely already
+  // saved in completePayment). If not found, tries to POST it. This prevents
+  // "Unique constraint failed" errors from double-posting.
   const ensureSaleSaved = async (): Promise<boolean> => {
     if (payment.saleId) return true;
+
+    // Step 1: Try to find the sale by invoice number
+    try {
+      const findRes = await authedFetch(`/api/sales?limit=50`);
+      if (findRes.ok) {
+        const findData = await findRes.json();
+        const existing = (findData.sales || []).find((s: any) => s.invoiceNumber === payment.invoiceNumber);
+        if (existing && existing.id) {
+          (payment as any).saleId = existing.id;
+          return true;
+        }
+      }
+    } catch { /* fall through to POST */ }
+
+    // Step 2: Sale not found — try to POST it
     setSaleSaving(true);
     try {
       const res = await authedFetch("/api/sales", {
@@ -3939,10 +3960,25 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
         const data = await res.json();
         if (data.success && data.sale?.id) {
           (payment as any).saleId = data.sale.id;
-          toast({ title: "Sale saved to server", description: `Invoice ${payment.invoiceNumber}` });
           setSaleSaving(false);
           return true;
         }
+      }
+      // If POST fails with "Unique constraint" — the sale was already saved
+      // by completePayment(). Try to find it again.
+      if (res.status === 500 || res.status === 400) {
+        try {
+          const findRes2 = await authedFetch(`/api/sales?limit=50`);
+          if (findRes2.ok) {
+            const findData2 = await findRes2.json();
+            const existing2 = (findData2.sales || []).find((s: any) => s.invoiceNumber === payment.invoiceNumber);
+            if (existing2 && existing2.id) {
+              (payment as any).saleId = existing2.id;
+              setSaleSaving(false);
+              return true;
+            }
+          }
+        } catch { /* give up */ }
       }
       setSaleSaving(false);
       return false;

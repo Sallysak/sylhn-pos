@@ -47,6 +47,7 @@ model SystemUser {
   purchases         Purchase[]           @relation("PurchaseCreatedBy")
   purchaseReceived  Purchase[]           @relation("PurchaseReceivedBy")
   expenses          Expense[]
+  emailLogs         EmailLog[]
   heldOrders        HeldOrder[]
   shifts            CashierShift[]
   stocktakes        Stocktake[]
@@ -789,6 +790,30 @@ model Expense {
   @@index([date])
   @@index([category])
   @@index([createdById])
+}
+
+// ============================================================
+// EMAIL SYSTEM — sent email log + SMTP settings
+// ============================================================
+
+model EmailLog {
+  id          String   @id @default(cuid())
+  to          String
+  cc          String   @default("")
+  bcc         String   @default("")
+  subject     String
+  body        String   @default("")
+  status      String   @default("sent")  // sent | failed | fallback
+  messageId   String?  // SMTP message ID
+  errorMessage String  @default("")
+  sentById    String?
+  createdAt   DateTime @default(now())
+
+  sentBy SystemUser? @relation(fields: [sentById], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([to])
+  @@index([status])
 }
 
 // ============================================================

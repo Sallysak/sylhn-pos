@@ -6,7 +6,7 @@ import {
   ShoppingCart, Home, BarChart3, Menu, X, LogOut, User, Package,
   Truck, Phone, Settings, FileText, Wrench, Shield, Bell, Download,
   Wallet, Receipt, TrendingUp, Clock, AlertTriangle, ChevronRight,
-  RefreshCw, Wifi, WifiOff, Sparkles, Calculator, Moon, Sun,
+  RefreshCw, Wifi, WifiOff, Sparkles, Calculator, Moon, Sun, Mail,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getQueueSize, getQueuedSales, flushQueue, isOnline, onQueueChange, type QueuedSale } from "@/lib/offline-queue";
@@ -39,6 +39,7 @@ const MORE_DESTINATIONS = [
   { id: "accounts-reports", label: "Accounts", icon: TrendingUp, color: "text-amber-600", bg: "bg-amber-50" },
   { id: "receipt-archive", label: "Receipts", icon: FileText, color: "text-slate-600", bg: "bg-slate-50" },
   { id: "maintenance", label: "Maintenance", icon: Wrench, color: "text-orange-600", bg: "bg-orange-50" },
+  { id: "email-system", label: "Email System", icon: Mail, color: "text-blue-600", bg: "bg-blue-50" },
   { id: "sync-settings", label: "Sync Settings", icon: RefreshCw, color: "text-blue-600", bg: "bg-blue-50" },
   { id: "admin-panel", label: "Admin Panel", icon: Shield, color: "text-purple-600", bg: "bg-purple-50" },
 ];
