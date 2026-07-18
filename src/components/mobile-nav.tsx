@@ -329,8 +329,25 @@ export function MobileNav({ active, onNavigate, cartCount, user, onLogout }: Mob
                 })}
               </div>
 
-              {/* Logout */}
-              <div className="flex-shrink-0 p-3 border-t border-slate-200">
+              {/* Dark Mode + Logout */}
+              <div className="flex-shrink-0 p-3 border-t border-slate-200 space-y-2">
+                <button
+                  onClick={() => {
+                    // Toggle dark mode
+                    const isDark = document.documentElement.classList.contains("dark");
+                    if (isDark) {
+                      document.documentElement.classList.remove("dark");
+                      localStorage.setItem("sylhn-dark-mode", "false");
+                    } else {
+                      document.documentElement.classList.add("dark");
+                      localStorage.setItem("sylhn-dark-mode", "true");
+                    }
+                  }}
+                  className="w-full h-11 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-sm flex items-center justify-center gap-2 transition haptic-tap"
+                >
+                  <Moon className="h-4 w-4" />
+                  Toggle Dark Mode
+                </button>
                 <button
                   onClick={() => {
                     if (onLogout) onLogout();

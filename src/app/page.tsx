@@ -14,7 +14,7 @@ import {
   Phone, Truck, Users, Database, Wrench, Shield,
   FileBarChart2, BookOpen, PhoneCall, Archive, Settings2, Lock,
   FileSearch, Copy, Image as ImageIcon, Tags,
-  Smartphone, RefreshCw, Sparkles, Loader2, AlertTriangle,
+  Smartphone, RefreshCw, Sparkles, Loader2, AlertTriangle, Calculator as CalcIcon,
 } from "lucide-react";
 import {
   products as INITIAL_PRODUCTS, categories, paymentMethods, quickCashAmounts,
@@ -179,6 +179,7 @@ export default function POSPage() {
   const [darkMode, setDarkMode] = useState(false);
   // Premium: Cash denomination calculator
   const [showCashCalc, setShowCashCalc] = useState(false);
+  const [showStdCalc, setShowStdCalc] = useState(false);
   // Premium: Price tags printer
   const [showPriceTags, setShowPriceTags] = useState(false);
   const [dailyTotal, setDailyTotal] = useState(() => {
@@ -1819,8 +1820,8 @@ export default function POSPage() {
             >
               <Sparkles className="h-4 w-4" /> <span className="hidden sm:inline">AI</span>
             </button>
-            <button onClick={() => handleLogout()} className="btn-premium h-9 px-3 rounded-lg bg-rose-500/30 hover:bg-rose-500/50 ring-1 ring-rose-300/30 text-white text-xs font-bold flex items-center gap-1.5 transition" title="Sign out">
-              <LogOut className="h-4 w-4" /> <span className="hidden sm:inline">Logout</span>
+            <button onClick={() => handleLogout()} className="btn-premium h-9 px-3 rounded-lg bg-rose-500/30 hover:bg-rose-500/50 ring-1 ring-rose-300/30 text-white text-xs font-bold flex items-center gap-1.5 transition flex-shrink-0" title="Sign out">
+              <LogOut className="h-4 w-4" /> <span>Logout</span>
             </button>
           </div>
         </div>
@@ -2511,6 +2512,13 @@ export default function POSPage() {
               onClick: () => setShowCashCalc(true),
             },
             {
+              id: "std-calc",
+              icon: CalcIcon,
+              label: "Calculator",
+              color: "from-slate-700 to-slate-900",
+              onClick: () => setShowStdCalc(true),
+            },
+            {
               id: "price-tags",
               icon: Printer,
               label: "Price Tags",
@@ -2530,6 +2538,7 @@ export default function POSPage() {
       {/* ===== Premium: Cash Denomination Calculator ===== */}
       <AnimatePresence>
         {showCashCalc && <CashCalculator total={total} onClose={() => setShowCashCalc(false)} />}
+        {showStdCalc && <StandardCalculator onClose={() => setShowStdCalc(false)} />}
       </AnimatePresence>
 
       {/* ===== Premium: Price Tags Printer ===== */}
@@ -4103,36 +4112,360 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
           </div>
         </ScrollArea>
 
-        {/* Premium: action row with Print, QR toggle, WhatsApp, New Sale */}
-        <div className="px-4 py-3 border-t border-slate-200 bg-slate-50 grid grid-cols-2 gap-2">
-          <button
-            onClick={handleThermalPrint}
-            className="h-10 rounded-xl bg-white ring-1 ring-slate-200 hover:bg-slate-100 text-slate-700 font-semibold text-xs flex items-center justify-center gap-1.5 transition"
-            title="Print via Bluetooth thermal printer (or browser if not connected)"
-          >
-            <Printer className="h-4 w-4" />
-            Print
+        {/* Premium: action row with Print, Browser Print, Export, QR, WhatsApp, New Sale */}
+        <div className="px-4 py-3 border-t border-slate-200 bg-slate-50 space-y-2">
+          {/* Row 1: Print + Export */}
+          <div className="grid grid-cols-4 gap-2">
+            <button
+              onClick={handleThermalPrint}
+              className="h-10 rounded-xl bg-white ring-1 ring-slate-200 hover:bg-slate-100 text-slate-700 font-semibold text-xs flex items-center justify-center gap-1.5 transition"
+              title="Print via Bluetooth thermal printer"
+            >
+              <Printer className="h-4 w-4" />
+              Thermal
+            </button>
+            <button
+              onClick={() => {
+                // Browser print — opens print dialog
+                const win = window.open("", "_blank", "width=400,height=600");
+                if (!win) return;
+                const itemsHtml = payment.items.map((item: any) => `
+                  <tr>
+                    <td style="padding:2px 8px;text-align:left">${item.emoji || ''} ${item.name}</td>
+                    <td style="padding:2px 8px;text-align:right">${item.quantity}</td>
+                    <td style="padding:2px 8px;text-align:right">${formatGHS(item.total)}</td>
+                  </tr>`).join("");
+                win.document.write(`<!DOCTYPE html><html><head><title>Receipt ${payment.invoiceNumber}</title>
+                  <style>
+                    body{font-family:monospace;font-size:12px;max-width:300px;margin:0 auto;padding:20px}
+                    h2{text-align:center;font-size:14px}
+                    table{width:100%;border-collapse:collapse;margin:10px 0}
+                    th{border-bottom:1px solid #000;padding:4px 8px;text-align:left;font-size:11px}
+                    .total{font-size:16px;font-weight:bold;text-align:right;margin-top:10px}
+                    .center{text-align:center}
+                    @media print{body{padding:0}}
+                  </style></head><body>
+                  <h2>${COMPANY.name}</h2>
+                  <p class="center">${COMPANY.address}<br/>${COMPANY.contact}</p>
+                  <hr/>
+                  <p>Invoice: ${payment.invoiceNumber}<br/>
+                  Date: ${new Date(payment.timestamp).toLocaleString('en-GB')}<br/>
+                  Cashier: ${payment.cashier || 'N/A'}<br/>
+                  Customer: ${payment.customer || 'Walk-in'}</p>
+                  <hr/>
+                  <table><thead><tr><th>Item</th><th style="text-align:right">Qty</th><th style="text-align:right">Total</th></tr></thead>
+                  <tbody>${itemsHtml}</tbody></table>
+                  <hr/>
+                  <p>Subtotal: ${formatGHS(payment.subtotal)}</p>
+                  ${payment.discount > 0 ? `<p>Discount: -${formatGHS(payment.discount)}</p>` : ''}
+                  <p>Tax: ${formatGHS(payment.tax)}</p>
+                  <p class="total">TOTAL: ${formatGHS(payment.total)}</p>
+                  <p>Paid: ${formatGHS(payment.amountPaid)} (${payment.method})</p>
+                  <p>Change: ${formatGHS(payment.change)}</p>
+                  <hr/>
+                  <p class="center">Thank you for shopping!<br/>Have a fresh &amp; healthy day</p>
+                  </body></html>`);
+                win.document.close();
+                setTimeout(() => { win.focus(); win.print(); }, 300);
+              }}
+              className="h-10 rounded-xl bg-white ring-1 ring-slate-200 hover:bg-slate-100 text-slate-700 font-semibold text-xs flex items-center justify-center gap-1.5 transition"
+              title="Print via browser"
+            >
+              <Printer className="h-4 w-4" />
+              Print
+            </button>
+            <button
+              onClick={() => {
+                // Export as CSV
+                const rows = [
+                  ["Field", "Value"],
+                  ["Invoice", payment.invoiceNumber],
+                  ["Date", new Date(payment.timestamp).toLocaleString('en-GB')],
+                  ["Cashier", payment.cashier || 'N/A'],
+                  ["Customer", payment.customer || 'Walk-in'],
+                  ["Subtotal", payment.subtotal.toFixed(2)],
+                  ["Discount", payment.discount.toFixed(2)],
+                  ["Tax", payment.tax.toFixed(2)],
+                  ["Total", payment.total.toFixed(2)],
+                  ["Amount Paid", payment.amountPaid.toFixed(2)],
+                  ["Change", payment.change.toFixed(2)],
+                  ["Payment Method", payment.method],
+                  ["", ""],
+                  ["Items", ""],
+                  ...payment.items.map((item: any) => [`${item.emoji || ''} ${item.name}`, `${item.quantity} x ${formatGHS(item.price)} = ${formatGHS(item.total)}`]),
+                ];
+                const csv = rows.map(r => r.map(c => `"${c}"`).join(",")).join("\n");
+                const blob = new Blob([csv], { type: "text/csv" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url; a.download = `receipt-${payment.invoiceNumber}.csv`;
+                a.click(); URL.revokeObjectURL(url);
+                toast({ title: "Receipt exported as CSV" });
+              }}
+              className="h-10 rounded-xl bg-white ring-1 ring-slate-200 hover:bg-slate-100 text-slate-700 font-semibold text-xs flex items-center justify-center gap-1.5 transition"
+              title="Export as CSV"
+            >
+              <FileText className="h-4 w-4" />
+              CSV
+            </button>
+            <button
+              onClick={() => {
+                // Export as PDF (browser print to PDF)
+                const win = window.open("", "_blank", "width=400,height=600");
+                if (!win) return;
+                const itemsHtml = payment.items.map((item: any) => `
+                  <tr>
+                    <td style="padding:2px 8px;text-align:left">${item.emoji || ''} ${item.name}</td>
+                    <td style="padding:2px 8px;text-align:right">${item.quantity}</td>
+                    <td style="padding:2px 8px;text-align:right">${formatGHS(item.total)}</td>
+                  </tr>`).join("");
+                win.document.write(`<!DOCTYPE html><html><head><title>Receipt ${payment.invoiceNumber}</title>
+                  <style>
+                    body{font-family:Arial,sans-serif;font-size:12px;max-width:400px;margin:0 auto;padding:30px}
+                    h2{text-align:center;font-size:16px;color:#059669}
+                    table{width:100%;border-collapse:collapse;margin:10px 0}
+                    th{border-bottom:2px solid #059669;padding:4px 8px;text-align:left;font-size:11px}
+                    .total{font-size:18px;font-weight:bold;text-align:right;margin-top:10px;color:#059669}
+                    .center{text-align:center}
+                    hr{border:none;border-top:1px dashed #ccc;margin:10px 0}
+                  </style></head><body>
+                  <h2>${COMPANY.name}</h2>
+                  <p class="center">${COMPANY.address}<br/>${COMPANY.contact}</p>
+                  <hr/>
+                  <p><strong>Invoice:</strong> ${payment.invoiceNumber}<br/>
+                  <strong>Date:</strong> ${new Date(payment.timestamp).toLocaleString('en-GB')}<br/>
+                  <strong>Cashier:</strong> ${payment.cashier || 'N/A'}<br/>
+                  <strong>Customer:</strong> ${payment.customer || 'Walk-in'}</p>
+                  <hr/>
+                  <table><thead><tr><th>Item</th><th style="text-align:right">Qty</th><th style="text-align:right">Total</th></tr></thead>
+                  <tbody>${itemsHtml}</tbody></table>
+                  <hr/>
+                  <p>Subtotal: ${formatGHS(payment.subtotal)}</p>
+                  ${payment.discount > 0 ? `<p>Discount: -${formatGHS(payment.discount)}</p>` : ''}
+                  <p>Tax: ${formatGHS(payment.tax)}</p>
+                  <p class="total">TOTAL: ${formatGHS(payment.total)}</p>
+                  <p>Paid: ${formatGHS(payment.amountPaid)} (${payment.method})</p>
+                  <p>Change: ${formatGHS(payment.change)}</p>
+                  <hr/>
+                  <p class="center">Thank you for shopping!<br/>Have a fresh &amp; healthy day</p>
+                  </body></html>`);
+                win.document.close();
+                setTimeout(() => { win.focus(); win.print(); }, 300);
+                toast({ title: "Use 'Save as PDF' in the print dialog" });
+              }}
+              className="h-10 rounded-xl bg-white ring-1 ring-slate-200 hover:bg-slate-100 text-slate-700 font-semibold text-xs flex items-center justify-center gap-1.5 transition"
+              title="Export as PDF"
+            >
+              <FileText className="h-4 w-4" />
+              PDF
+            </button>
+          </div>
+          {/* Row 2: QR + WhatsApp + New Sale */}
+          <div className="grid grid-cols-3 gap-2">
+            <button
+              onClick={() => setShowQR(s => !s)}
+              className={`h-10 rounded-xl ring-1 ring-slate-200 hover:bg-slate-100 text-slate-700 font-semibold text-xs flex items-center justify-center gap-1.5 transition ${showQR ? 'bg-emerald-100 ring-emerald-300 text-emerald-700' : 'bg-white'}`}
+            >
+              {showQR ? 'Hide QR' : 'Show QR'}
+            </button>
+            <button
+              onClick={handleSendWhatsApp}
+              className="h-10 rounded-xl bg-[#25D366] hover:bg-[#1ebe57] text-white font-semibold text-xs flex items-center justify-center gap-1.5 transition"
+            >
+              <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/></svg>
+              WhatsApp
+            </button>
+            <button
+              onClick={onClose}
+              className="h-10 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold text-xs flex items-center justify-center gap-1.5 hover:shadow-lg transition"
+            >
+              <Check className="h-4 w-4" />
+              New Sale
+            </button>
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ===== Standard Calculator =====
+// A premium calculator with a clean, modern interface.
+// Supports: +, -, ×, ÷, %, +/-, decimal, backspace, clear.
+function StandardCalculator({ onClose }: { onClose: () => void }) {
+  const [display, setDisplay] = useState("0");
+  const [previous, setPrevious] = useState<number | null>(null);
+  const [operation, setOperation] = useState<string | null>(null);
+  const [waitingForOperand, setWaitingForOperand] = useState(false);
+
+  const inputDigit = (digit: string) => {
+    if (waitingForOperand) {
+      setDisplay(digit);
+      setWaitingForOperand(false);
+    } else {
+      setDisplay(display === "0" ? digit : display + digit);
+    }
+  };
+
+  const inputDecimal = () => {
+    if (waitingForOperand) {
+      setDisplay("0.");
+      setWaitingForOperand(false);
+    } else if (display.indexOf(".") === -1) {
+      setDisplay(display + ".");
+    }
+  };
+
+  const clear = () => {
+    setDisplay("0");
+    setPrevious(null);
+    setOperation(null);
+    setWaitingForOperand(false);
+  };
+
+  const toggleSign = () => {
+    setDisplay(String(parseFloat(display) * -1));
+  };
+
+  const inputPercent = () => {
+    setDisplay(String(parseFloat(display) / 100));
+  };
+
+  const performOperation = (nextOp: string) => {
+    const inputValue = parseFloat(display);
+    if (previous === null) {
+      setPrevious(inputValue);
+    } else if (operation) {
+      const currentValue = previous;
+      let result: number;
+      switch (operation) {
+        case "+": result = currentValue + inputValue; break;
+        case "-": result = currentValue - inputValue; break;
+        case "×": result = currentValue * inputValue; break;
+        case "÷": result = currentValue / inputValue; break;
+        default: result = inputValue;
+      }
+      result = Math.round(result * 1e10) / 1e10; // avoid floating point
+      setDisplay(String(result));
+      setPrevious(result);
+    }
+    setWaitingForOperand(true);
+    setOperation(nextOp);
+  };
+
+  const handleEquals = () => {
+    if (operation && previous !== null) {
+      const inputValue = parseFloat(display);
+      let result: number;
+      switch (operation) {
+        case "+": result = previous + inputValue; break;
+        case "-": result = previous - inputValue; break;
+        case "×": result = previous * inputValue; break;
+        case "÷": result = previous / inputValue; break;
+        default: result = inputValue;
+      }
+      result = Math.round(result * 1e10) / 1e10;
+      setDisplay(String(result));
+      setPrevious(null);
+      setOperation(null);
+      setWaitingForOperand(true);
+    }
+  };
+
+  const backspace = () => {
+    if (display.length > 1) {
+      setDisplay(display.slice(0, -1));
+    } else {
+      setDisplay("0");
+    }
+  };
+
+  const formatDisplay = (val: string) => {
+    const num = parseFloat(val);
+    if (isNaN(num)) return val;
+    if (Math.abs(num) >= 1e9) return num.toExponential(4);
+    return val.length > 12 ? num.toPrecision(10) : val;
+  };
+
+  const CalcButton = ({ label, onClick, variant = "default", wide = false }: {
+    label: React.ReactNode; onClick: () => void; variant?: "default" | "accent" | "operator" | "equals"; wide?: boolean;
+  }) => {
+    const variants = {
+      default: "bg-slate-100 hover:bg-slate-200 text-slate-800 active:bg-slate-300",
+      accent: "bg-slate-200 hover:bg-slate-300 text-slate-800 active:bg-slate-400",
+      operator: "gradient-premium-emerald text-white hover:shadow-glow-emerald active:scale-95",
+      equals: "gradient-premium-emerald text-white hover:shadow-glow-emerald active:scale-95",
+    };
+    return (
+      <button
+        onClick={onClick}
+        className={cn(
+          "h-16 rounded-2xl font-bold text-lg flex items-center justify-center transition active:scale-95 no-select",
+          variants[variant],
+          wide && "col-span-2"
+        )}
+      >
+        {label}
+      </button>
+    );
+  };
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <motion.div initial={{ scale: 0.9, y: 30 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 30 }}
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-3xl shadow-premium-xl w-full max-w-xs overflow-hidden">
+        {/* Header */}
+        <div className="gradient-premium-slate text-white px-5 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <CalcIcon className="h-4 w-4" />
+            <span className="text-sm font-bold">Calculator</span>
+          </div>
+          <button onClick={onClose} className="h-7 w-7 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center transition">
+            <X className="h-4 w-4" />
           </button>
-          <button
-            onClick={() => setShowQR(s => !s)}
-            className={`h-10 rounded-xl ring-1 ring-slate-200 hover:bg-slate-100 text-slate-700 font-semibold text-xs flex items-center justify-center gap-1.5 transition ${showQR ? 'bg-emerald-100 ring-emerald-300 text-emerald-700' : 'bg-white'}`}
-          >
-            {showQR ? 'Hide QR' : 'Show QR'}
-          </button>
-          <button
-            onClick={handleSendWhatsApp}
-            className="h-10 rounded-xl bg-[#25D366] hover:bg-[#1ebe57] text-white font-semibold text-xs flex items-center justify-center gap-1.5 transition"
-          >
-            <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/></svg>
-            WhatsApp
-          </button>
-          <button
-            onClick={onClose}
-            className="h-10 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold text-xs flex items-center justify-center gap-1.5 hover:shadow-lg transition"
-          >
-            <Check className="h-4 w-4" />
-            New Sale
-          </button>
+        </div>
+
+        {/* Display */}
+        <div className="px-5 py-6 bg-slate-50">
+          <div className="text-right">
+            {operation && previous !== null && (
+              <div className="text-xs text-slate-400 font-mono mb-1">
+                {previous} {operation}
+              </div>
+            )}
+            <div className="text-4xl font-mono font-bold text-slate-800 truncate">
+              {formatDisplay(display)}
+            </div>
+          </div>
+        </div>
+
+        {/* Keypad */}
+        <div className="p-3 grid grid-cols-4 gap-2">
+          <CalcButton label="AC" onClick={clear} variant="accent" />
+          <CalcButton label="+/-" onClick={toggleSign} variant="accent" />
+          <CalcButton label="%" onClick={inputPercent} variant="accent" />
+          <CalcButton label="÷" onClick={() => performOperation("÷")} variant="operator" />
+
+          <CalcButton label="7" onClick={() => inputDigit("7")} />
+          <CalcButton label="8" onClick={() => inputDigit("8")} />
+          <CalcButton label="9" onClick={() => inputDigit("9")} />
+          <CalcButton label="×" onClick={() => performOperation("×")} variant="operator" />
+
+          <CalcButton label="4" onClick={() => inputDigit("4")} />
+          <CalcButton label="5" onClick={() => inputDigit("5")} />
+          <CalcButton label="6" onClick={() => inputDigit("6")} />
+          <CalcButton label="−" onClick={() => performOperation("-")} variant="operator" />
+
+          <CalcButton label="1" onClick={() => inputDigit("1")} />
+          <CalcButton label="2" onClick={() => inputDigit("2")} />
+          <CalcButton label="3" onClick={() => inputDigit("3")} />
+          <CalcButton label="+" onClick={() => performOperation("+")} variant="operator" />
+
+          <CalcButton label="0" onClick={() => inputDigit("0")} wide />
+          <CalcButton label="." onClick={inputDecimal} />
+          <CalcButton label="=" onClick={handleEquals} variant="equals" />
         </div>
       </motion.div>
     </motion.div>
