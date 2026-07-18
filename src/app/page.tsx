@@ -212,9 +212,11 @@ export default function POSPage() {
   useEffect(() => {
     let cancelled = false;
     const restoreSession = async () => {
-      // First, try the server session (httpOnly cookie — most secure)
+      // First, try the server session.
+      // Use authedFetch so it sends BOTH the cookie (if available) AND the
+      // Bearer token from localStorage (fallback for cross-origin iframe).
       try {
-        const res = await fetch('/api/auth/me', { credentials: 'include' });
+        const res = await authedFetch('/api/auth/me');
         if (!cancelled && res.ok) {
           const data = await res.json();
           if (data.user) {
@@ -230,9 +232,19 @@ export default function POSPage() {
       if (cancelled) return;
       try {
         const cached = localStorage.getItem('sylhn-current-user');
+        const cachedToken = localStorage.getItem('sylhn-session-token');
         if (cached) {
           const user = JSON.parse(cached);
           if (user && user.username) {
+            // If we have a cached user but no token (e.g. user cleared
+            // storage partially), the server session is gone — log them
+            // out so they re-authenticate and get a fresh token.
+            if (!cachedToken) {
+              try { localStorage.removeItem('sylhn-current-user'); } catch {}
+              setLoggedInUser(null);
+              setView("login");
+              return;
+            }
             setLoggedInUser(user);
             setView("pos");
             return;

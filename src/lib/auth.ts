@@ -7,7 +7,7 @@
  * Session tokens are signed HMAC-SHA256 JWTs stored in httpOnly cookies.
  */
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import crypto from "crypto";
 import { db } from "./db";
 
@@ -142,21 +142,27 @@ export async function clearSessionCookie(): Promise<void> {
 
 export async function getSession(): Promise<SessionPayload | null> {
   try {
+    // 1) Try Authorization: Bearer <token> header FIRST.
+    //    This is the most reliable path in cross-origin iframes (preview env),
+    //    where browsers reject sameSite=none cookies without Secure.
+    try {
+      const h = await headers();
+      const authHeader = h.get("authorization") || h.get("Authorization");
+      if (authHeader && authHeader.startsWith("Bearer ")) {
+        const bearerToken = authHeader.slice(7).trim();
+        const session = verifySessionToken(bearerToken);
+        if (session) return session;
+      }
+    } catch {
+      /* headers() not available in this context — fall through to cookies */
+    }
+
+    // 2) Fall back to session cookies (httpOnly + visible).
     const store = await cookies();
-    // Check both cookies (httpOnly + visible)
     const token = store.get(SESSION_COOKIE)?.value || store.get("sylhn-session-visible")?.value;
     if (token) {
       const session = verifySessionToken(token);
       if (session) return session;
-    }
-
-    // Fallback: check Authorization header (Bearer token)
-    // This is used when cookies aren't sent (cross-origin iframe in preview)
-    const headers = await import("next/headers");
-    const authHeader = headers.headers().get("authorization");
-    if (authHeader?.startsWith("Bearer ")) {
-      const bearerToken = authHeader.slice(7);
-      return verifySessionToken(bearerToken);
     }
 
     return null;
