@@ -1,0 +1,211 @@
+import { NextRequest, NextResponse } from "next/server";
+import { db } from "@/lib/db";
+import { requireAuth, requirePermission } from "@/lib/auth";
+import { rateLimitApiWrite, rateLimitResponse, getClientIp } from "@/lib/rate-limit";
+import { auditLog } from "@/lib/audit";
+import { generatePurchaseRefNo } from "@/lib/identifiers";
+import { logger } from "@/lib/logger";
+
+// POST /api/recurring-pos/run-due
+//
+// Cron-style endpoint — checks for recurring POs that are due (nextRunAt <= now)
+// and creates purchase orders for them. Designed to be called every hour by a
+// cron job (e.g. via the system cron or a service like cron-job.org).
+//
+// Setup:
+//   # Every hour at minute 0
+//   0 * * * * curl -X POST -H "Authorization: Bearer $CRON_TOKEN" \
+//     https://pos.sylhn.com/api/recurring-pos/run-due
+//
+// Or via systemd timer:
+//   [Timer]
+//   OnCalendar=hourly
+//   Persistent=true
+//
+// To prevent abuse, this endpoint requires auth. Generate a long-lived
+// API token for the cron user (TODO: add API token support — for now use
+// a regular session token, but cron jobs that log in may need refresh logic).
+export async function POST(req: NextRequest) {
+  let user;
+  try {
+    user = await requireAuth();
+    requirePermission(user.role, "purchase");
+  } catch (e) { return e as Response; }
+
+  const ip = getClientIp(req);
+  const rl = rateLimitApiWrite(ip);
+  if (!rl.allowed) return rateLimitResponse(rl);
+
+  try {
+    // Find all active recurring POs that are due
+    const dueRecurring = await db.recurringPO.findMany({
+      where: {
+        isActive: true,
+        nextRunAt: { lte: new Date() },
+      },
+      include: {
+        supplier: true,
+      },
+    });
+
+    logger.info("Recurring PO run-due triggered", { dueCount: dueRecurring.length });
+
+    const results: Array<{ recurringId: string; supplierName: string; purchaseRefNo?: string; status: "created" | "skipped" | "error"; error?: string }> = [];
+
+    for (const recurring of dueRecurring) {
+      try {
+        // Parse the items JSON (stored as a string in the schema)
+        let itemsData: Array<{ productId?: string; partNo?: string; details?: string; emoji?: string; quantity: number; cost: number; taxable?: boolean }> = [];
+        try {
+          itemsData = JSON.parse(recurring.items || "[]");
+        } catch {
+          logger.warn("Recurring PO has invalid items JSON", { recurringId: recurring.id });
+          results.push({
+            recurringId: recurring.id,
+            supplierName: recurring.supplier?.name || recurring.supplierName || "",
+            status: "error",
+            error: "Invalid items JSON",
+          });
+          continue;
+        }
+
+        if (itemsData.length === 0) {
+          results.push({
+            recurringId: recurring.id,
+            supplierName: recurring.supplier?.name || recurring.supplierName || "",
+            status: "skipped",
+            error: "No items in recurring PO",
+          });
+          continue;
+        }
+
+        // Check if a PO was already created for this period (idempotency)
+        const periodStart = recurring.lastRunAt || new Date(0);
+        const existing = await db.purchase.findFirst({
+          where: {
+            notes: { contains: `[recurring:${recurring.id}]` },
+            createdAt: { gte: periodStart },
+          },
+        });
+        if (existing) {
+          results.push({
+            recurringId: recurring.id,
+            supplierName: recurring.supplier?.name || recurring.supplierName || "",
+            status: "skipped",
+            error: "Already run for this period",
+          });
+          continue;
+        }
+
+        // Generate the purchase order
+        const refNo = await generatePurchaseRefNo();
+        const items = itemsData.map(item => ({
+          productId: item.productId || null,
+          partNo: item.partNo || "",
+          details: item.details || "",
+          emoji: item.emoji || "📦",
+          quantity: Number(item.quantity) || 0,
+          cost: Number(item.cost) || 0,
+          tax: item.taxable || false,
+          total: Math.round((Number(item.quantity) || 0) * (Number(item.cost) || 0) * 100) / 100,
+        }));
+        const subtotal = items.reduce((s, i) => s + i.total, 0);
+        const taxAmount = items
+          .filter(i => i.tax)
+          .reduce((s, i) => s + i.total * 0.15, 0);
+        const total = subtotal + taxAmount;
+
+        const purchase = await db.purchase.create({
+          data: {
+            refNo,
+            type: "purchase",
+            supplierId: recurring.supplierId,
+            supplierName: recurring.supplier?.name || recurring.supplierName || "",
+            status: "pending",  // pending manager approval
+            subtotal,
+            taxAmount,
+            total,
+            amountPaid: 0,
+            createdById: user.uid,
+            notes: `[recurring:${recurring.id}] Auto-generated by recurring schedule "${recurring.name}". Review and approve.`,
+            items: { create: items },
+          },
+        });
+
+        // Update the recurring PO: set lastRunAt + compute nextRunAt + increment runCount
+        const nextRunAt = computeNextRunAt(recurring.frequency, new Date());
+        await db.recurringPO.update({
+          where: { id: recurring.id },
+          data: {
+            lastRunAt: new Date(),
+            nextRunAt,
+            runCount: { increment: 1 },
+          },
+        });
+
+        await auditLog({
+          userId: user.uid,
+          user: user.username,
+          action: "RECURRING_PO_GENERATED",
+          module: "purchase",
+          details: `Recurring PO "${recurring.name}" generated purchase ${refNo} for ${recurring.supplier?.name || recurring.supplierName} (${total.toFixed(2)} GHS, ${items.length} items)`,
+          severity: "info",
+          ipAddress: ip,
+          userAgent: req.headers.get("user-agent") || "",
+        }).catch(() => {});
+
+        results.push({
+          recurringId: recurring.id,
+          supplierName: recurring.supplier?.name || recurring.supplierName || "",
+          purchaseRefNo: refNo,
+          status: "created",
+        });
+      } catch (e: any) {
+        logger.error("Recurring PO generation failed", { recurringId: recurring.id, error: e?.message });
+        results.push({
+          recurringId: recurring.id,
+          supplierName: recurring.supplier?.name || recurring.supplierName || "",
+          status: "error",
+          error: e?.message,
+        });
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      processed: dueRecurring.length,
+      created: results.filter(r => r.status === "created").length,
+      skipped: results.filter(r => r.status === "skipped").length,
+      errors: results.filter(r => r.status === "error").length,
+      results,
+    });
+  } catch (e: any) {
+    return NextResponse.json({ error: e?.message }, { status: 500 });
+  }
+}
+
+// Compute the next run date based on frequency
+function computeNextRunAt(frequency: string, from: Date): Date {
+  const next = new Date(from);
+  switch (frequency) {
+    case "daily":
+      next.setDate(next.getDate() + 1);
+      break;
+    case "weekly":
+      next.setDate(next.getDate() + 7);
+      break;
+    case "biweekly":
+      next.setDate(next.getDate() + 14);
+      break;
+    case "monthly":
+      next.setMonth(next.getMonth() + 1);
+      break;
+    case "quarterly":
+      next.setMonth(next.getMonth() + 3);
+      break;
+    default:
+      // Default to weekly if unknown
+      next.setDate(next.getDate() + 7);
+  }
+  return next;
+}

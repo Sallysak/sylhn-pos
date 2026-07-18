@@ -1,4 +1,8 @@
 // Direct DB seed (bypasses the API which requires auth)
+// This script generates RANDOM passwords and prints them ONCE.
+// Save them immediately — hashed passwords cannot be recovered.
+//
+// Usage: bun run scripts/run-seed.js
 const { PrismaClient } = require('@prisma/client');
 const crypto = require('crypto');
 
@@ -12,6 +16,16 @@ function hashPassword(password) {
   const salt = crypto.randomBytes(SALT_BYTES);
   const hash = crypto.pbkdf2Sync(password, salt, PBKDF2_ITERATIONS, KEY_BYTES, "sha256");
   return `pbkdf2$${PBKDF2_ITERATIONS}$${salt.toString("hex")}$${hash.toString("hex")}`;
+}
+
+// Generate a random 12-char password (8 letters + 4 digits, meets policy)
+function generateRandomPassword() {
+  const letters = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ";
+  const digits = "23456789";
+  const rand = (chars, n) =>
+    Array.from({ length: n }, () => chars[crypto.randomInt(chars.length)]).join("");
+  const pwd = rand(letters, 8) + rand(digits, 4);
+  return pwd.split("").sort(() => crypto.randomInt(2) - 0.5).join("");
 }
 
 async function main() {
@@ -29,10 +43,15 @@ async function main() {
   await p.heldOrder.deleteMany();
   await p.auditLog.deleteMany();
 
+  // Generate random passwords — printed ONCE
+  const adminPwd = generateRandomPassword();
+  const managerPwd = generateRandomPassword();
+  const cashierPwd = generateRandomPassword();
+
   // Hashed users
   await p.systemUser.create({
     data: {
-      username: "admin", password: hashPassword("admin123"),
+      username: "admin", password: hashPassword(adminPwd),
       fullName: "System Administrator", role: "admin",
       phone: "+233592766044", email: "admin@sylhn.com",
       permissions: JSON.stringify({
@@ -45,7 +64,7 @@ async function main() {
   });
   await p.systemUser.create({
     data: {
-      username: "manager", password: hashPassword("manager123"),
+      username: "manager", password: hashPassword(managerPwd),
       fullName: "Store Manager", role: "manager",
       phone: "+233 24 111 2222", email: "manager@sylhn.com",
       permissions: JSON.stringify({
@@ -58,7 +77,7 @@ async function main() {
   });
   await p.systemUser.create({
     data: {
-      username: "cashier", password: hashPassword("cashier123"),
+      username: "cashier", password: hashPassword(cashierPwd),
       fullName: "Sarah Johnson", role: "cashier",
       phone: "+233 24 333 4444", email: "sarah@sylhn.com",
       permissions: JSON.stringify({
@@ -70,7 +89,17 @@ async function main() {
     },
   });
 
-  console.log("Seeded 3 users with hashed passwords.");
+  console.log("\n========================================");
+  console.log("  SEED COMPLETE — SAVE THESE CREDENTIALS");
+  console.log("========================================");
+  console.log("admin    / " + adminPwd + "    (Administrator)");
+  console.log("manager  / " + managerPwd + "    (Manager)");
+  console.log("cashier  / " + cashierPwd + "    (Cashier)");
+  console.log("========================================");
+  console.log("These passwords will NOT be shown again.");
+  console.log("Hashed passwords cannot be recovered — if lost,");
+  console.log("re-run this script to regenerate them.");
+  console.log("========================================\n");
   await p.$disconnect();
 }
 

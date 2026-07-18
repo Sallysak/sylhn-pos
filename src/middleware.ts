@@ -1,29 +1,22 @@
 /**
  * SYLHN POS — Next.js Middleware
  *
- * Restored (premium): was renamed to proxy.ts.bak, which disabled CSRF
- * protection and all security headers. Now lives at src/middleware.ts (the
- * path Next.js auto-detects) and exports `middleware` (not `proxy`).
- *
  * 1. Sets security headers on every response (CSP, HSTS, X-Content-Type-Options, etc.)
+ *    - In DEV: permissive CSP/CORS/frame-ancestors so the preview iframe works.
+ *    - In PROD: strict CSP, same-origin only frame-ancestors, no CORS wildcards.
  * 2. Blocks /api/* write methods (POST/PUT/DELETE/PATCH) without a valid
  *    X-CSRF-Token header (double-submit cookie pattern).
- * 3. Adds CORS headers for z.ai / space-z.ai preview hosts.
- *
- * Public endpoints list: /api/health, /api/auth/login, /api/auth/logout,
- * /api/auth/me, /api/auth/csrf are reachable without CSRF (but auth/login
- * is still rate-limited at the handler level).
+ * 3. Adds CORS headers for z.ai / space-z.ai preview hosts (DEV only).
  */
 
 import { NextRequest, NextResponse } from "next/server";
 
-const SECURITY_HEADERS: Record<string, string> = {
-  // X-Frame-Options removed — using CSP frame-ancestors instead (more granular).
-  // Setting X-Frame-Options: SAMEORIGIN would block the preview iframe
-  // (preview-chat-*.space-z.ai) since it's a different origin.
+const isDev = process.env.NODE_ENV !== "production";
+
+// Permissive headers for dev (preview iframe needs these)
+const DEV_HEADERS: Record<string, string> = {
   "X-Content-Type-Options": "nosniff",
   "Referrer-Policy": "strict-origin-when-cross-origin",
-  "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
   "Permissions-Policy": "camera=(), microphone=(), geolocation=(), interest-cohort=()",
   "Cross-Origin-Opener-Policy": "cross-origin",
   "Cross-Origin-Resource-Policy": "cross-origin",
@@ -36,6 +29,34 @@ const SECURITY_HEADERS: Record<string, string> = {
   ].join("; "),
 };
 
+// Strict headers for production
+const PROD_HEADERS: Record<string, string> = {
+  "X-Content-Type-Options": "nosniff",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+  "Permissions-Policy": "camera=(), microphone=(), geolocation=(), interest-cohort=()",
+  // COOP/COEP same-origin in prod for isolation
+  "Cross-Origin-Opener-Policy": "same-origin",
+  "Cross-Origin-Resource-Policy": "same-origin",
+  // Allow framing only from same origin (no clickjacking)
+  "X-Frame-Options": "SAMEORIGIN",
+  // Strict CSP — no unsafe-inline/eval, scripts only from self
+  "Content-Security-Policy": [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline'",  // 'unsafe-inline' needed for Next.js inline runtime; remove if using nonces
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob: https:",
+    "font-src 'self' data:",
+    "connect-src 'self' https:",
+    "frame-ancestors 'self'",
+    "form-action 'self'",
+    "base-uri 'self'",
+    "object-src 'none'",
+  ].join("; "),
+};
+
+const SECURITY_HEADERS = isDev ? DEV_HEADERS : PROD_HEADERS;
+
 const PUBLIC_API_PATHS = [
   "/api/health",
   "/api/auth/login",
@@ -43,6 +64,7 @@ const PUBLIC_API_PATHS = [
   "/api/auth/me",
   "/api/auth/csrf",
   "/api/customer-display",  // customer-facing display polls this (no auth)
+  "/api/payments/momo/callback",  // MTN MoMo webhook — no session cookie
 ];
 
 function isPublicApiPath(pathname: string): boolean {
@@ -64,7 +86,8 @@ export function middleware(req: NextRequest) {
   // (sameSite=lax session cookie already blocks cross-origin POST cookies,
   //  so same-origin writes are safe without CSRF token.)
   const isSameOrigin = !origin || new URL(origin).host === host;
-  const isAllowedPreviewOrigin = origin.includes("z.ai") || origin.includes("space-z.ai");
+  // Preview origins (z.ai / space-z.ai) are only trusted in DEV
+  const isAllowedPreviewOrigin = isDev && (origin.includes("z.ai") || origin.includes("space-z.ai"));
 
   // ===== Handle CORS preflight (OPTIONS) =====
   if (method === "OPTIONS") {
@@ -87,7 +110,8 @@ export function middleware(req: NextRequest) {
     res.headers.set(key, value);
   }
 
-  // 2. Add CORS headers — allow chat.z.ai and *.space-z.ai to fetch from us
+  // 2. Add CORS headers — only for trusted preview origins in DEV
+  //    In PROD, no CORS headers are added (same-origin only).
   if (isAllowedPreviewOrigin) {
     res.headers.set("Access-Control-Allow-Origin", origin);
     res.headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
@@ -98,7 +122,7 @@ export function middleware(req: NextRequest) {
   // 3. CSRF check on /api write methods (except public paths)
   //    - Same-origin requests are exempt (sameSite=lax already protects)
   //    - Cross-origin requests require a valid CSRF token (defense-in-depth)
-  //    - Preview origins (z.ai/space-z.ai) are also exempt (they're trusted)
+  //    - Preview origins (z.ai/space-z.ai) are also exempt in DEV (trusted)
   if (isApi && isWriteMethod(method) && !isPublicApiPath(pathname) && !isSameOrigin && !isAllowedPreviewOrigin) {
     const csrfToken = req.headers.get("x-csrf-token");
     const cookieToken = req.cookies.get("sylhn-csrf")?.value;

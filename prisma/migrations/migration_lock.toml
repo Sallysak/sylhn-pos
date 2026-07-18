@@ -1,0 +1,5 @@
+# Prisma migration lock file
+# This file ensures that migrations are applied in order and prevents
+# accidental schema drift. DO NOT edit unless you know what you're doing.
+
+provider = "sqlite"

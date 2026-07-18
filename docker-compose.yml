@@ -1,0 +1,30 @@
+# SYLHN POS — docker-compose for local development + testing
+# Not recommended for production — use the Dockerfile + Caddy guide in docs/DEPLOYMENT.md
+
+version: "3.8"
+
+services:
+  sylhn-pos:
+    build: .
+    container_name: sylhn-pos
+    ports:
+      - "3000:3000"
+    volumes:
+      - sylhn-db:/app/db
+      - sylhn-backups:/app/backups
+    environment:
+      - NODE_ENV=development
+      - SESSION_SECRET=dev-only-change-me-in-production-32-chars-min
+      - DATABASE_URL=file:/app/db/custom.db
+      - LOG_QUERIES=0
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  sylhn-db:
+  sylhn-backups:

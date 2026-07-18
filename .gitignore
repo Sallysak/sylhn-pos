@@ -52,3 +52,20 @@ prompt
 server.log
 # Skills directory
 /skills/dev.pid
+
+# Database files (NEVER commit)
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+db/
+prisma/*.db
+prisma/*.db-journal
+shadow.db
+
+# Backups (NEVER commit)
+backups/
+
+# Test coverage
+coverage/
+.vitest/

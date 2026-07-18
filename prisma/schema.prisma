@@ -14,6 +14,11 @@ generator client {
 datasource db {
   provider = "sqlite"
   url      = env("DATABASE_URL")
+  // SQLite WAL (Write-Ahead Logging) mode enables concurrent readers during writes
+  // — critical for a multi-cashier POS where one terminal writes a sale while
+  // another reads the product list. Prisma sets this per-connection via the
+  // `journal_mode=WAL` pragma in `db.ts` (see `__prismaWalSetup`).
+  // This comment is informational — Prisma doesn't have a native WAL flag.
 }
 
 // ============================================================

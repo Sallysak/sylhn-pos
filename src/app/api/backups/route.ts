@@ -67,17 +67,37 @@ export async function POST(req: NextRequest) {
 }
 
 // DELETE /api/backups?filename=xxx — delete a backup
+// SECURITY: filename is sanitized via path.basename() and the resolved path is
+// verified to be inside the backups directory. This prevents path-traversal
+// attacks (e.g. filename=../../etc/passwd) from deleting arbitrary files.
 export async function DELETE(req: NextRequest) {
   let user;
   try { user = await requireAuth(); requirePermission(user.role, "maintenance"); } catch (e) { return e as Response; }
   const { searchParams } = new URL(req.url);
-  const filename = searchParams.get("filename");
-  if (!filename) return NextResponse.json({ error: "filename required" }, { status: 400 });
+  const rawFilename = searchParams.get("filename");
+  if (!rawFilename) return NextResponse.json({ error: "filename required" }, { status: 400 });
+
+  // Sanitize: take only the basename (strips any path components)
+  const safeFilename = path.basename(rawFilename);
+  if (!safeFilename || safeFilename !== rawFilename) {
+    return NextResponse.json({ error: "Invalid filename" }, { status: 400 });
+  }
+  // Only allow .db files
+  if (!safeFilename.endsWith(".db")) {
+    return NextResponse.json({ error: "Only .db backup files can be deleted" }, { status: 400 });
+  }
+
+  const backupsDir = path.resolve(process.cwd(), "backups");
+  const backupPath = path.resolve(backupsDir, safeFilename);
+
+  // Verify the resolved path is inside the backups directory
+  if (!backupPath.startsWith(backupsDir + path.sep)) {
+    return NextResponse.json({ error: "Invalid backup path" }, { status: 400 });
+  }
 
   try {
-    const backupPath = path.join(process.cwd(), "backups", filename);
     await fs.unlink(backupPath).catch(() => {});
-    await auditLog({ userId: user.uid, user: user.username, action: "DELETE", module: "maintenance", details: `Backup deleted: ${filename}`, severity: "warning", ipAddress: getClientIp(req) });
+    await auditLog({ userId: user.uid, user: user.username, action: "DELETE", module: "maintenance", details: `Backup deleted: ${safeFilename}`, severity: "warning", ipAddress: getClientIp(req) });
     return NextResponse.json({ success: true });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message }, { status: 500 });

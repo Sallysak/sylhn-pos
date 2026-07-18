@@ -185,15 +185,42 @@ export const PurchaseSchema = z.object({
 });
 
 // ===== Users =====
+// Password policy: min 8 chars, must contain at least one letter and one number.
+// Common weak passwords (12345678, password1, etc.) are rejected.
+// For new user creation only. Login still accepts any password (so legacy
+// users can log in and be forced to change).
+const WEAK_PASSWORDS = new Set([
+  "password", "password1", "password123", "12345678", "123456789",
+  "qwerty123", "abc12345", "letmein1", "admin123", "manager123",
+  "cashier123", "stockkeeper123", "accountant123", "welcome1",
+]);
 export const UserSchema = z.object({
   username: z.string().min(1).max(64).regex(/^[a-zA-Z0-9_.-]+$/),
-  password: z.string().min(4).max(256),
+  password: z.string().min(8).max(256).refine(
+    (p) => /[a-zA-Z]/.test(p) && /[0-9]/.test(p),
+    "Password must contain at least one letter and one number"
+  ).refine(
+    (p) => !WEAK_PASSWORDS.has(p.toLowerCase()),
+    "Password is too common — choose a stronger one"
+  ),
   fullName: z.string().min(1).max(200),
   role: z.enum(["admin", "manager", "cashier", "stockkeeper", "accountant"]).optional().default("cashier"),
   phone: z.string().max(32).optional().default(""),
   email: z.string().max(200).optional().default(""),
   permissions: z.union([z.string(), z.record(z.string(), z.any())]).optional(),
   active: z.boolean().optional().default(true),
+});
+
+// Schema for password changes — same policy as UserSchema.password
+export const PasswordChangeSchema = z.object({
+  currentPassword: z.string().min(1).max(256),
+  newPassword: z.string().min(8).max(256).refine(
+    (p) => /[a-zA-Z]/.test(p) && /[0-9]/.test(p),
+    "Password must contain at least one letter and one number"
+  ).refine(
+    (p) => !WEAK_PASSWORDS.has(p.toLowerCase()),
+    "Password is too common — choose a stronger one"
+  ),
 });
 
 // ===== Email =====

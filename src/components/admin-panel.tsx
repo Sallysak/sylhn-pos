@@ -72,21 +72,25 @@ export interface SystemSettings {
 }
 
 // ===== Default users =====
+// SECURITY: We no longer ship default plaintext credentials in the client bundle.
+// The client only knows usernames (so the login screen can show a hint that
+// these users exist). Passwords must come from the server via /api/auth/login.
+// To reset passwords, run `bun run scripts/run-seed.js` on the server.
 const DEFAULT_USERS: SystemUser[] = [
   {
-    id: 'u-admin', username: 'admin', password: 'admin123', fullName: 'System Administrator',
+    id: 'u-admin', username: 'admin', password: '', fullName: 'System Administrator',
     role: 'admin', phone: '+233592766044', email: 'admin@sylhn.com', active: true,
     createdAt: '2026-01-01', lastLogin: new Date().toISOString(),
     permissions: { pos: true, sales: true, stock: true, purchase: true, accounts: true, telephone: true, maintenance: true, financeOps: true, canVoid: true, canDiscount: true, canAdjustStock: true, canDeleteProducts: true, canExport: true },
   },
   {
-    id: 'u-manager', username: 'manager', password: 'manager123', fullName: 'Store Manager',
+    id: 'u-manager', username: 'manager', password: '', fullName: 'Store Manager',
     role: 'manager', phone: '+233 24 111 2222', email: 'manager@sylhn.com', active: true,
     createdAt: '2026-01-01',
     permissions: { pos: true, sales: true, stock: true, purchase: true, accounts: true, telephone: true, maintenance: false, financeOps: true, canVoid: true, canDiscount: true, canAdjustStock: true, canDeleteProducts: false, canExport: true },
   },
   {
-    id: 'u-cashier', username: 'cashier', password: 'cashier123', fullName: 'Sarah Johnson',
+    id: 'u-cashier', username: 'cashier', password: '', fullName: 'Sarah Johnson',
     role: 'cashier', phone: '+233 24 333 4444', email: 'sarah@sylhn.com', active: true,
     createdAt: '2026-01-01',
     permissions: { pos: true, sales: true, stock: false, purchase: false, accounts: false, telephone: true, maintenance: false, financeOps: false, canVoid: false, canDiscount: true, canAdjustStock: false, canDeleteProducts: false, canExport: false },
@@ -140,9 +144,10 @@ export function AdminLogin({ onSuccess, onCancel, adminOnly = false }: { onSucce
     } catch { return DEFAULT_USERS; }
   }, []);
 
-  // Reset all credentials back to the factory defaults (admin/admin123, etc.).
-  // Useful when the admin password has been changed and forgotten, or when
-  // cached user data has become corrupted.
+  // Clear local cached credentials. This does NOT reset server-side passwords —
+  // it only clears the localStorage cache so the login screen forgets the last
+  // user. To reset server-side passwords, run `bun run scripts/run-seed.js`
+  // on the server.
   const handleResetCredentials = () => {
     try {
       localStorage.removeItem(USERS_KEY);
@@ -156,8 +161,8 @@ export function AdminLogin({ onSuccess, onCancel, adminOnly = false }: { onSucce
     setUsername('');
     setPassword('');
     toast({
-      title: 'Credentials reset',
-      description: 'Default users restored. Sign in with admin / admin123.',
+      title: 'Local cache cleared',
+      description: 'Server-side passwords are unchanged. Run `bun run scripts/run-seed.js` on the server to regenerate them.',
     });
     // Force re-mount of the login component so the users useMemo re-reads
     // from DEFAULT_USERS instead of the (now-cleared) cache.
@@ -333,28 +338,24 @@ export function AdminLogin({ onSuccess, onCancel, adminOnly = false }: { onSucce
           {/* Demo credentials hint */}
           <div className="px-5 sm:px-8 py-3.5 bg-gradient-to-r from-slate-50 to-slate-100/70 border-t border-slate-200/60">
             <div className="flex items-center justify-between mb-2">
-              <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Demo Credentials</div>
+              <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Default Accounts</div>
               <button
                 onClick={() => setShowResetConfirm(true)}
                 className="text-[10px] text-rose-500 hover:text-rose-700 font-semibold transition underline-offset-2 hover:underline"
-                title="Restore admin/manager/cashier to default passwords"
+                title="Regenerate random passwords (server-side)"
               >
                 Reset password
               </button>
             </div>
-            <div className="text-[10px] text-slate-600 font-mono space-y-0.5">
-              {adminOnly ? (
-                <>
-                  <div className="flex items-center gap-2"><span className="inline-block h-1.5 w-1.5 rounded-full bg-rose-500" />admin / admin123 <span className="text-rose-500 font-sans">(Administrator)</span></div>
-                  <div className="flex items-center gap-2"><span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-500" />manager / manager123 <span className="text-blue-500 font-sans">(Manager)</span></div>
-                </>
-              ) : (
-                <>
-                  <div className="flex items-center gap-2"><span className="inline-block h-1.5 w-1.5 rounded-full bg-rose-500" />admin / admin123 <span className="text-rose-500 font-sans">(Administrator)</span></div>
-                  <div className="flex items-center gap-2"><span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-500" />manager / manager123 <span className="text-blue-500 font-sans">(Manager)</span></div>
-                  <div className="flex items-center gap-2"><span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />cashier / cashier123 <span className="text-emerald-500 font-sans">(Cashier)</span></div>
-                </>
+            <div className="text-[10px] text-slate-600 space-y-1">
+              <div className="flex items-start gap-2"><span className="inline-block h-1.5 w-1.5 rounded-full bg-rose-500 mt-1 flex-shrink-0" /><span><span className="font-mono">admin</span> <span className="text-rose-500 font-sans">(Administrator)</span></span></div>
+              <div className="flex items-start gap-2"><span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-500 mt-1 flex-shrink-0" /><span><span className="font-mono">manager</span> <span className="text-blue-500 font-sans">(Manager)</span></span></div>
+              {!adminOnly && (
+                <div className="flex items-start gap-2"><span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500 mt-1 flex-shrink-0" /><span><span className="font-mono">cashier</span> <span className="text-emerald-500 font-sans">(Cashier)</span></span></div>
               )}
+              <div className="text-slate-500 italic mt-2 leading-relaxed">
+                Passwords are randomly generated on first seed. Run <code className="bg-slate-200 px-1 rounded text-[9px]">bun run scripts/run-seed.js</code> on the server to view or regenerate them.
+              </div>
             </div>
           </div>
         </div>
@@ -373,16 +374,16 @@ export function AdminLogin({ onSuccess, onCancel, adminOnly = false }: { onSucce
           >
             <div className="px-6 py-4 gradient-premium-amber text-white flex items-center gap-2">
               <AlertTriangle className="h-5 w-5" />
-              <h3 className="text-sm font-bold">Reset all credentials?</h3>
+              <h3 className="text-sm font-bold">Clear local cache?</h3>
             </div>
             <div className="px-6 py-4 text-xs text-slate-700 space-y-2">
-              <p>This will restore the default users and passwords:</p>
-              <ul className="font-mono text-[11px] text-slate-700 bg-slate-50 rounded-lg p-3 space-y-0.5 ring-1 ring-slate-200">
-                <li>admin / admin123</li>
-                <li>manager / manager123</li>
-                <li>cashier / cashier123</li>
-              </ul>
-              <p className="text-rose-600 font-semibold">Any users you added or passwords you changed will be lost.</p>
+              <p>This will clear the locally-cached login data on this device only.</p>
+              <p className="text-slate-600">
+                <strong>Server-side passwords are NOT changed.</strong> If you've forgotten your password,
+                run <code className="bg-slate-100 px-1 rounded">bun run scripts/run-seed.js</code> on the
+                server to regenerate random passwords for all users.
+              </p>
+              <p className="text-rose-600 font-semibold">This only affects the current browser/device.</p>
             </div>
             <div className="px-6 py-3 bg-slate-50 border-t border-slate-200 flex gap-2 justify-end">
               <button

@@ -21,9 +21,13 @@ export async function GET(req: NextRequest) {
     const where: any = {};
     if (!includeInactive) where.active = true;
     if (groupId) where.groupId = groupId;
+    // SQLite (Prisma) cannot do column-to-column comparisons in `where`.
+    // For low-stock filtering, we fetch candidates and filter in JS:
+    //   "low stock" = quantity <= reorderLevel (not just quantity <= 0)
+    // This is a known limitation; if performance becomes an issue, add a
+    // computed `isLowStock` column or use raw SQL.
     if (lowStock) {
-      // Products at or below reorder level
-      where.quantity = { lte: 0 }; // Prisma can't do column-to-column compare directly; this is a simplified version
+      // No `where.quantity` filter — we'll filter after fetch
     }
 
     const products = await db.product.findMany({
@@ -34,7 +38,13 @@ export async function GET(req: NextRequest) {
       },
       orderBy: { name: "asc" },
     });
-    return NextResponse.json({ products });
+
+    // Apply low-stock filter in JS (SQLite limitation workaround)
+    const filtered = lowStock
+      ? products.filter(p => p.quantity <= p.reorderLevel)
+      : products;
+
+    return NextResponse.json({ products: filtered, count: filtered.length });
   } catch (e) {
     console.error("GET /api/products error:", e);
     return NextResponse.json({ error: "Failed to fetch products" }, { status: 500 });

@@ -18,13 +18,19 @@ const PBKDF2_ITERATIONS = 100_000;
 const SALT_BYTES = 16;
 const KEY_BYTES = 32;
 
-// Secret key — falls back to a dev-only key (with a warning) if env not set.
+// Secret key — in production, SESSION_SECRET MUST be set via env var.
+// In dev, we fall back to an insecure default with a console warning.
 function getSessionSecret(): string {
   const env = process.env.SESSION_SECRET;
   if (env && env.length >= 32) return env;
   if (process.env.NODE_ENV === "production") {
-    console.warn("WARNING: SESSION_SECRET not set in production. Using insecure default.");
+    // HARD-FAIL in production — using a default secret would let anyone forge
+    // session tokens. This is a critical security boundary.
+    console.error("FATAL: SESSION_SECRET environment variable is not set or is too short (<32 chars).");
+    console.error("Set it to a random string of at least 32 characters (e.g. `openssl rand -hex 32`).");
+    throw new Error("SESSION_SECRET must be set in production. See server logs.");
   }
+  console.warn("WARNING: SESSION_SECRET not set in dev. Using insecure default. DO NOT use in production.");
   return "dev-only-insecure-session-secret-please-set-SESSION_SECRET-env-var-at-least-32-chars";
 }
 
@@ -114,24 +120,29 @@ export function verifySessionToken(token: string): SessionPayload | null {
 
 export async function setSessionCookie(token: string): Promise<void> {
   const store = await cookies();
-  // In development (preview iframe), use sameSite=none so cookies work cross-origin
-  // In production, use sameSite=lax for security
   const isDev = process.env.NODE_ENV !== "production";
+  // In production: strict sameSite=lax, secure=true, httpOnly=true (single cookie)
+  // In dev (preview iframe): sameSite=none + secure=false + a visible duplicate
+  //   cookie so the client can read it for Bearer-token fallback when the
+  //   httpOnly cookie is blocked by cross-origin iframe rules.
   store.set(SESSION_COOKIE, token, {
     httpOnly: true,
-    secure: !isDev, // dev: false (HTTP), prod: true (HTTPS)
-    sameSite: isDev ? "none" : "lax", // dev: none (cross-origin iframe), prod: lax
-    path: "/",
-    maxAge: SESSION_MAX_AGE_SECONDS,
-  });
-  // Also set a non-httpOnly version for client-side auth checks
-  store.set("sylhn-session-visible", token, {
-    httpOnly: false,
     secure: !isDev,
     sameSite: isDev ? "none" : "lax",
     path: "/",
     maxAge: SESSION_MAX_AGE_SECONDS,
   });
+  if (isDev) {
+    // Dev-only: visible cookie for client-side Bearer fallback (cross-origin iframe)
+    store.set("sylhn-session-visible", token, {
+      httpOnly: false,
+      secure: false,
+      sameSite: "none",
+      path: "/",
+      maxAge: SESSION_MAX_AGE_SECONDS,
+    });
+  }
+  // In production, no visible cookie is set — client uses httpOnly cookie only.
 }
 
 export async function clearSessionCookie(): Promise<void> {

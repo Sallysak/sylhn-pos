@@ -4,14 +4,37 @@ import { requireRole, hashPassword } from "@/lib/auth";
 import { rateLimitSeed, rateLimitResponse } from "@/lib/rate-limit";
 import { headers } from "next/headers";
 import { auditLog } from "@/lib/audit";
+import crypto from "crypto";
 
 // POST /api/seed — seed the database with initial demo data
 // Admin-only + heavily rate-limited (3/hour) + requires explicit confirmation.
 // CRITICAL SAFETY: caller must include `{ confirm: "WIPE_ALL_DATA" }` in the
 // body — prevents accidental wipes via CSRF / XSS.
+//
+// PRODUCTION SAFETY: this endpoint REFUSES to run in production. Seeding is a
+// dev-only operation. In production, use `bun run scripts/run-seed.js` from
+// the server console (it generates random passwords and prints them once).
 const REQUIRED_CONFIRMATION = "WIPE_ALL_DATA";
 
+// Generate a random 12-char password (8 letters + 4 digits, meets policy)
+function generateRandomPassword(): string {
+  const letters = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ";
+  const digits = "23456789";
+  const rand = (chars: string, n: number) =>
+    Array.from({ length: n }, () => chars[crypto.randomInt(chars.length)]).join("");
+  // Shuffle to avoid predictable pattern
+  const pwd = rand(letters, 8) + rand(digits, 4);
+  return pwd.split("").sort(() => crypto.randomInt(2) - 0.5).join("");
+}
+
 export async function POST(req: Request) {
+  // REFUSE to run in production — seeding wipes all data, which is a dev-only op.
+  if (process.env.NODE_ENV === "production" && process.env.ALLOW_PROD_SEED !== "1") {
+    return NextResponse.json({
+      error: "Seeding is disabled in production. To run anyway, set ALLOW_PROD_SEED=1 (NOT recommended).",
+    }, { status: 403 });
+  }
+
   let user;
   try { user = await requireRole("admin"); } catch (e) { return e as Response; }
 
@@ -65,19 +88,29 @@ export async function POST(req: Request) {
     await db.systemSetting.deleteMany();
     await db.systemUser.deleteMany();
 
-    // ===== Hash the default passwords =====
-    const [adminPwd, managerPwd, cashierPwd, stockkeeperPwd, accountantPwd] = await Promise.all([
-      hashPassword("admin123"),
-      hashPassword("manager123"),
-      hashPassword("cashier123"),
-      hashPassword("stockkeeper123"),
-      hashPassword("accountant123"),
+    // ===== Generate random passwords for each user =====
+    // Hardcoded weak passwords like "admin123" are a security risk — if the
+    // admin forgets to change them, anyone who reads the source code can log
+    // in. Instead, we generate random passwords and return them ONCE in the
+    // response. The admin must save them or change them immediately.
+    const adminPwd = generateRandomPassword();
+    const managerPwd = generateRandomPassword();
+    const cashierPwd = generateRandomPassword();
+    const stockkeeperPwd = generateRandomPassword();
+    const accountantPwd = generateRandomPassword();
+
+    const [adminPwdHash, managerPwdHash, cashierPwdHash, stockkeeperPwdHash, accountantPwdHash] = await Promise.all([
+      hashPassword(adminPwd),
+      hashPassword(managerPwd),
+      hashPassword(cashierPwd),
+      hashPassword(stockkeeperPwd),
+      hashPassword(accountantPwd),
     ]);
 
     // ===== Users =====
     const admin = await db.systemUser.create({
       data: {
-        username: "admin", password: adminPwd, fullName: "System Administrator",
+        username: "admin", password: adminPwdHash, fullName: "System Administrator",
         role: "admin", phone: "+233592766044", email: "admin@sylhn.com",
         permissions: JSON.stringify({
           pos: true, sales: true, stock: true, purchase: true, accounts: true,
@@ -89,7 +122,7 @@ export async function POST(req: Request) {
     });
     const manager = await db.systemUser.create({
       data: {
-        username: "manager", password: managerPwd, fullName: "Store Manager",
+        username: "manager", password: managerPwdHash, fullName: "Store Manager",
         role: "manager", phone: "+233 24 111 2222", email: "manager@sylhn.com",
         permissions: JSON.stringify({
           pos: true, sales: true, stock: true, purchase: true, accounts: true,
@@ -101,7 +134,7 @@ export async function POST(req: Request) {
     });
     const cashier = await db.systemUser.create({
       data: {
-        username: "cashier", password: cashierPwd, fullName: "Sarah Johnson",
+        username: "cashier", password: cashierPwdHash, fullName: "Sarah Johnson",
         role: "cashier", phone: "+233 24 333 4444", email: "sarah@sylhn.com",
         permissions: JSON.stringify({
           pos: true, sales: true, stock: false, purchase: false, accounts: false,
@@ -113,7 +146,7 @@ export async function POST(req: Request) {
     });
     await db.systemUser.create({
       data: {
-        username: "stockkeeper", password: stockkeeperPwd, fullName: "Kwame Mensah",
+        username: "stockkeeper", password: stockkeeperPwdHash, fullName: "Kwame Mensah",
         role: "stockkeeper", phone: "+233 24 555 7777", email: "kwame@sylhn.com",
         permissions: JSON.stringify({
           pos: true, sales: false, stock: true, purchase: true, accounts: false,
@@ -125,7 +158,7 @@ export async function POST(req: Request) {
     });
     await db.systemUser.create({
       data: {
-        username: "accountant", password: accountantPwd, fullName: "Grace Owusu",
+        username: "accountant", password: accountantPwdHash, fullName: "Grace Owusu",
         role: "accountant", phone: "+233 24 999 8888", email: "grace@sylhn.com",
         permissions: JSON.stringify({
           pos: true, sales: false, stock: false, purchase: false, accounts: true,
@@ -304,8 +337,9 @@ export async function POST(req: Request) {
     });
 
     // ===== Sample Stocktake =====
+    const stocktakeConductedById = manager.id;
     const stocktake = await db.stocktake.create({
-      data: { refNo: `ST-${Date.now()}-001`, scheduledFor: new Date(), status: "completed", startedAt: new Date(Date.now() - 3600000), completedAt: new Date(), conductedById: stockkeeperPwd ? manager.id : manager.id, countMethod: "full", scope: "all" },
+      data: { refNo: `ST-${Date.now()}-001`, scheduledFor: new Date(), status: "completed", startedAt: new Date(Date.now() - 3600000), completedAt: new Date(), conductedById: stocktakeConductedById, countMethod: "full", scope: "all" },
     });
     // Create stocktake items for a few products
     await Promise.all([
@@ -369,6 +403,16 @@ export async function POST(req: Request) {
         backups: 1,
         systemSettings: 7,
       },
+      // ⚠️ ONE-TIME-ONLY credentials — save these now, they will NOT be shown again.
+      // Hashed passwords cannot be recovered. If lost, use the admin panel to reset.
+      credentials: {
+        admin: { username: "admin", password: adminPwd, role: "Administrator" },
+        manager: { username: "manager", password: managerPwd, role: "Manager" },
+        cashier: { username: "cashier", password: cashierPwd, role: "Cashier" },
+        stockkeeper: { username: "stockkeeper", password: stockkeeperPwd, role: "Stockkeeper" },
+        accountant: { username: "accountant", password: accountantPwd, role: "Accountant" },
+      },
+      warning: "SAVE THESE CREDENTIALS NOW. They will not be shown again. Consider changing them immediately after first login.",
     });
   } catch (e) {
     console.error("POST /api/seed error:", e);
