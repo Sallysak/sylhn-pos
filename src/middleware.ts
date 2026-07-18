@@ -98,6 +98,7 @@ export function middleware(req: NextRequest) {
   // 3. CSRF check on /api write methods (except public paths)
   //    - Same-origin requests are exempt (sameSite=lax already protects)
   //    - Cross-origin requests require a valid CSRF token (defense-in-depth)
+  //    - Preview origins (z.ai/space-z.ai) are also exempt (they're trusted)
   if (isApi && isWriteMethod(method) && !isPublicApiPath(pathname) && !isSameOrigin && !isAllowedPreviewOrigin) {
     const csrfToken = req.headers.get("x-csrf-token");
     const cookieToken = req.cookies.get("sylhn-csrf")?.value;

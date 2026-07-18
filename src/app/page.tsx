@@ -3794,8 +3794,16 @@ function PriceTagsPrinter({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch("/api/price-tags?limit=200", { credentials: "include" });
-        if (res.ok) { const data = await res.json(); setProducts(data.products || []); }
+        const csrfMatch = document.cookie.match(/sylhn-csrf=([^;]+)/);
+        const csrfToken = csrfMatch ? decodeURIComponent(csrfMatch[1]) : "";
+        const res = await fetch("/api/price-tags?limit=200", {
+          credentials: "include",
+          headers: csrfToken ? { "X-CSRF-Token": csrfToken } : {},
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setProducts(data.products || []);
+        }
       } catch {}
       finally { setLoading(false); }
     })();
