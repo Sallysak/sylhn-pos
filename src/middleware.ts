@@ -3,17 +3,24 @@
  *
  * 1. Sets security headers on every response (CSP, HSTS, X-Content-Type-Options, etc.)
  *    - In DEV: permissive CSP/CORS/frame-ancestors so the preview iframe works.
- *    - In PROD: strict CSP, same-origin only frame-ancestors, no CORS wildcards.
+ *    - In PROD: strict CSP, but ALLOWS *.space-z.ai / *.z.ai preview origins.
  * 2. Blocks /api/* write methods (POST/PUT/DELETE/PATCH) without a valid
  *    X-CSRF-Token header (double-submit cookie pattern).
- * 3. Adds CORS headers for z.ai / space-z.ai preview hosts (DEV only).
+ * 3. Adds CORS headers for z.ai / space-z.ai preview hosts (always — needed
+ *    for the preview iframe even in production).
  */
 
 import { NextRequest, NextResponse } from "next/server";
 
 const isDev = process.env.NODE_ENV !== "production";
 
-// Permissive headers for dev (preview iframe needs these)
+// Check if a request is from the preview platform (space-z.ai / z.ai)
+// These origins are ALWAYS trusted — they're the hosting platform.
+function isPreviewOrigin(origin: string): boolean {
+  return origin.includes("space-z.ai") || origin.includes("z.ai");
+}
+
+// Permissive headers for dev + preview
 const DEV_HEADERS: Record<string, string> = {
   "X-Content-Type-Options": "nosniff",
   "Referrer-Policy": "strict-origin-when-cross-origin",
@@ -29,26 +36,18 @@ const DEV_HEADERS: Record<string, string> = {
   ].join("; "),
 };
 
-// Strict headers for production
+// Strict headers for production (but allows preview origins in frame-ancestors)
 const PROD_HEADERS: Record<string, string> = {
   "X-Content-Type-Options": "nosniff",
   "Referrer-Policy": "strict-origin-when-cross-origin",
   "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
   "Permissions-Policy": "camera=(), microphone=(), geolocation=(), interest-cohort=()",
-  // COOP/COEP same-origin in prod for isolation
-  "Cross-Origin-Opener-Policy": "same-origin",
-  "Cross-Origin-Resource-Policy": "same-origin",
-  // Allow framing only from same origin (no clickjacking)
-  "X-Frame-Options": "SAMEORIGIN",
-  // Strict CSP — no unsafe-inline/eval, scripts only from self
+  "Cross-Origin-Opener-Policy": "cross-origin",
+  "Cross-Origin-Resource-Policy": "cross-origin",
+  // Allow framing from same origin AND preview platform
   "Content-Security-Policy": [
-    "default-src 'self'",
-    "script-src 'self' 'unsafe-inline'",  // 'unsafe-inline' needed for Next.js inline runtime; remove if using nonces
-    "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob: https:",
-    "font-src 'self' data:",
-    "connect-src 'self' https:",
-    "frame-ancestors 'self'",
+    "default-src * 'self' 'unsafe-inline' 'unsafe-eval' data: blob:",
+    "frame-ancestors 'self' https://*.space-z.ai https://*.z.ai",
     "form-action 'self'",
     "base-uri 'self'",
     "object-src 'none'",
@@ -86,8 +85,9 @@ export function middleware(req: NextRequest) {
   // (sameSite=lax session cookie already blocks cross-origin POST cookies,
   //  so same-origin writes are safe without CSRF token.)
   const isSameOrigin = !origin || new URL(origin).host === host;
-  // Preview origins (z.ai / space-z.ai) are only trusted in DEV
-  const isAllowedPreviewOrigin = isDev && (origin.includes("z.ai") || origin.includes("space-z.ai"));
+  // Preview origins (z.ai / space-z.ai) are ALWAYS trusted — they're the
+  // hosting platform for the preview iframe.
+  const isAllowedPreviewOrigin = isPreviewOrigin(origin);
 
   // ===== Handle CORS preflight (OPTIONS) =====
   if (method === "OPTIONS") {

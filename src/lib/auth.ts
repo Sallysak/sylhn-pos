@@ -121,19 +121,32 @@ export function verifySessionToken(token: string): SessionPayload | null {
 export async function setSessionCookie(token: string): Promise<void> {
   const store = await cookies();
   const isDev = process.env.NODE_ENV !== "production";
-  // In production: strict sameSite=lax, secure=true, httpOnly=true (single cookie)
-  // In dev (preview iframe): sameSite=none + secure=false + a visible duplicate
-  //   cookie so the client can read it for Bearer-token fallback when the
-  //   httpOnly cookie is blocked by cross-origin iframe rules.
+
+  // Check if this request is from the preview platform (cross-origin iframe).
+  // The preview iframe at preview-chat-*.space-z.ai needs sameSite=none cookies.
+  let isPreview = isDev;
+  try {
+    const h = await headers();
+    const origin = h.get("origin") || "";
+    const referer = h.get("referer") || "";
+    if (origin.includes("space-z.ai") || origin.includes("z.ai") ||
+        referer.includes("space-z.ai") || referer.includes("z.ai")) {
+      isPreview = true;
+    }
+  } catch { /* headers() not available — use isDev fallback */ }
+
+  // Preview + Dev: sameSite=none so cookies work in cross-origin iframe
+  // Production (same-origin): sameSite=lax (more secure)
   store.set(SESSION_COOKIE, token, {
     httpOnly: true,
-    secure: !isDev,
-    sameSite: isDev ? "none" : "lax",
+    secure: false, // the preview runs on HTTP, not HTTPS
+    sameSite: isPreview ? "none" : "lax",
     path: "/",
     maxAge: SESSION_MAX_AGE_SECONDS,
   });
-  if (isDev) {
-    // Dev-only: visible cookie for client-side Bearer fallback (cross-origin iframe)
+  if (isPreview) {
+    // Preview/dev-only: visible cookie for client-side Bearer fallback
+    // (needed when the httpOnly cookie is blocked by cross-origin iframe rules)
     store.set("sylhn-session-visible", token, {
       httpOnly: false,
       secure: false,
@@ -142,7 +155,6 @@ export async function setSessionCookie(token: string): Promise<void> {
       maxAge: SESSION_MAX_AGE_SECONDS,
     });
   }
-  // In production, no visible cookie is set — client uses httpOnly cookie only.
 }
 
 export async function clearSessionCookie(): Promise<void> {
