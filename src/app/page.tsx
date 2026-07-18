@@ -1088,14 +1088,6 @@ export default function POSPage() {
   // the correct state. The cart is cleared (a new cashier shouldn't see the
   // previous cashier's in-progress cart).
   const handleLogout = async (silent = false) => {
-    // Warn if there's unsaved business data (held orders, offline sales)
-    if (!silent && hasUnsavedBusinessData()) {
-      // Held orders + history persist — just inform the user
-      toast({
-        title: "Signed out",
-        description: "Your held orders and history are saved and will be available on next login.",
-      });
-    }
     // Call server logout (invalidates the session cookie)
     try {
       await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
@@ -1103,10 +1095,18 @@ export default function POSPage() {
     // Clear ONLY auth-related localStorage keys (preserve business data)
     clearAuthState();
     clearSessionToken();
-    // Clear the in-progress cart (IndexedDB) — a new cashier starts fresh.
-    // Held orders are NOT cleared (they're in localStorage, not IndexedDB).
+    // NOTE: We do NOT clear:
+    //   - sylhn-held-orders (held carts for recall)
+    //   - sylhn-history (local stock movement log)
+    //   - sylhn-daily-total (today's gross sales)
+    //   - sylhn-txn-count (today's transaction count)
+    //   - sylhn-products-cache (offline product list)
+    // These are business data that should survive logout/login.
+    // On re-login, the onSuccess handler re-reads them from localStorage.
+    //
+    // We DO clear the in-progress cart (IndexedDB) — a new cashier starts fresh.
     clearPersistedCart();
-    // Reset cart React state
+    // Reset cart React state (but NOT dailyTotal, transactionCount, history, heldOrders)
     setCart([]);
     setSelectedCartIndex(null);
     setGlobalDiscount(0);
@@ -1117,6 +1117,11 @@ export default function POSPage() {
     setView("login");
     if (silent) {
       toast({ title: "Goodbye!", description: "Shift ended" });
+    } else {
+      toast({
+        title: "Signed out",
+        description: "Your held orders, history, and daily totals are saved.",
+      });
     }
   };
 
@@ -1634,7 +1639,26 @@ export default function POSPage() {
     return (
       <div className="h-screen relative gradient-premium-mesh">
         <AdminLogin
-          onSuccess={(user) => { saveUserSession(user); setLoggedInUser(user); setView("pos"); toast({ title: `Welcome, ${user.fullName}`, description: `Logged in as ${user.role}` }); }}
+          onSuccess={(user) => {
+            saveUserSession(user);
+            setLoggedInUser(user);
+            setView("pos");
+            // Re-read business data from localStorage on login (not just on
+            // initial mount). This fixes the issue where daily totals, held
+            // orders, and history were lost after logout/login because
+            // useState initializers only run once.
+            try {
+              const cachedDaily = localStorage.getItem('sylhn-daily-total');
+              if (cachedDaily) setDailyTotal(parseFloat(cachedDaily) || 0);
+              const cachedTxn = localStorage.getItem('sylhn-txn-count');
+              if (cachedTxn) setTransactionCount(parseInt(cachedTxn) || 0);
+              const cachedHistory = localStorage.getItem('sylhn-history');
+              if (cachedHistory) setHistory(JSON.parse(cachedHistory));
+              const cachedHeld = localStorage.getItem('sylhn-held-orders');
+              if (cachedHeld) setHeldOrders(JSON.parse(cachedHeld));
+            } catch { /* ignore parse errors */ }
+            toast({ title: `Welcome, ${user.fullName}`, description: `Logged in as ${user.role}` });
+          }}
           onCancel={() => toast({ title: "Login required", description: "You must log in to use the system" })}
         />
         {/* Install App button — visible on login screen */}

@@ -49,28 +49,30 @@ export default function ForecastPage() {
 
   const fetchForecast = useCallback(async (forecastDays: number, save = false) => {
     setLoading(true);
+    setAuthChecked(false);
     try {
-      // Check auth first — try authedFetch which sends Bearer token
-      const meRes = await authedFetch("/api/auth/me");
-      const meData = await meRes.json().catch(() => ({ user: null }));
-      if (!meData.user) {
-        setAuthChecked(true);
-        return;
-      }
-
+      // Skip the auth pre-check — just call the forecast API directly.
+      // If the session is invalid, the API returns 401 and we handle it.
+      // The pre-check via /api/auth/me was causing issues in the preview
+      // iframe (cross-origin cookies not sent), leaving the page stuck
+      // on "Checking authentication..." forever.
       const res = await authedFetch(`/api/ai-forecast?days=${forecastDays}${save ? "&save=true" : ""}`);
       if (res.status === 401) {
         setAuthChecked(true);
+        setLoading(false);
+        toast({ title: "Authentication required", description: "Please log in to view the forecast", variant: "destructive" });
         return;
       }
       if (!res.ok) {
         const errData = await res.json().catch(() => ({ error: "Unknown error" }));
         toast({ title: "Failed to load forecast", description: errData.error || `HTTP ${res.status}`, variant: "destructive" });
+        setLoading(false);
         return;
       }
       const json = await res.json();
       if (!json.success) {
         toast({ title: "Forecast error", description: json.error || "Unknown error", variant: "destructive" });
+        setLoading(false);
         return;
       }
       setData(json);
