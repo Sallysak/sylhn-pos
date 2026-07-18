@@ -206,6 +206,10 @@ export function AdminLogin({ onSuccess, onCancel, adminOnly = false }: { onSucce
           setError('Insufficient privileges. Admin or Manager access required.');
           return;
         }
+        // Save session token for bearer auth (iframe fallback)
+        if (data.sessionToken) {
+          try { localStorage.setItem("sylhn-session-token", data.sessionToken); } catch {}
+        }
         // Cache the user (without password) for the UI to read role/permissions
         // and for offline session restore.
         try {

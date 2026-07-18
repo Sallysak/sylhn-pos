@@ -40,6 +40,7 @@ import { AiAssistant } from "@/components/ai-assistant";
 import { SpeedDial } from "@/components/speed-dial";
 import { queueSale, flushQueue, onQueueChange, isOnline, getQueueSize } from "@/lib/offline-queue";
 import { saveCart, loadCart, clearCart as clearPersistedCart } from "@/lib/cart-persistence";
+import { saveSessionToken, clearSessionToken, authedFetch } from "@/lib/client-auth";
 
 // ===== Lazy-loaded components (code-split for faster initial load) =====
 // Each form is loaded on-demand only when the user navigates to it.
@@ -1308,12 +1309,12 @@ export default function POSPage() {
         { label: "Admin Panel", icon: Shield, action: () => setView("admin-login") },
         { separator: true },
         { label: "About SYLHN POS", icon: Store, action: () => setView("maintenance") },
-        { label: "Exit", icon: Power, action: () => { fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {}); try { localStorage.removeItem('sylhn-current-user'); } catch {} setLoggedInUser(null); setView("login"); toast({ title: "Goodbye!", description: "Shift ended" }) } },
+        { label: "Exit", icon: Power, action: () => { fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {}); try { localStorage.removeItem('sylhn-current-user'); localStorage.removeItem('sylhn-session-token'); } catch {} clearSessionToken(); setLoggedInUser(null); setView("login"); toast({ title: "Goodbye!", description: "Shift ended" }) } },
       ] : [
         { label: "Admin Panel", icon: Shield, action: () => setView("admin-login") },
         { separator: true },
         { label: "About SYLHN POS", icon: Store, action: () => setView("maintenance") },
-        { label: "Exit", icon: Power, action: () => { fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {}); try { localStorage.removeItem('sylhn-current-user'); } catch {} setLoggedInUser(null); setView("login"); toast({ title: "Goodbye!", description: "Shift ended" }) } },
+        { label: "Exit", icon: Power, action: () => { fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {}); try { localStorage.removeItem('sylhn-current-user'); localStorage.removeItem('sylhn-session-token'); } catch {} clearSessionToken(); setLoggedInUser(null); setView("login"); toast({ title: "Goodbye!", description: "Shift ended" }) } },
       ],
     },
   ].filter(m => m.items.length > 0); // Hide empty menus
@@ -1574,7 +1575,7 @@ export default function POSPage() {
             >
               <Sparkles className="h-4 w-4" /> <span className="hidden sm:inline">AI</span>
             </button>
-            <button onClick={() => { fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {}); try { localStorage.removeItem('sylhn-current-user'); } catch {} setLoggedInUser(null); setView("login"); toast({ title: "Logged out", description: "You have been signed out" }); }} className="h-8 px-3 rounded-lg bg-rose-500/20 hover:bg-rose-500/40 text-white text-xs font-bold flex items-center gap-1.5 transition" title="Sign out">
+            <button onClick={() => { fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {}); try { localStorage.removeItem('sylhn-current-user'); localStorage.removeItem('sylhn-session-token'); } catch {} clearSessionToken(); setLoggedInUser(null); setView("login"); toast({ title: "Logged out", description: "You have been signed out" }); }} className="h-8 px-3 rounded-lg bg-rose-500/20 hover:bg-rose-500/40 text-white text-xs font-bold flex items-center gap-1.5 transition" title="Sign out">
               <LogOut className="h-4 w-4" /> <span className="hidden sm:inline">Logout</span>
             </button>
           </div>
@@ -3794,12 +3795,7 @@ function PriceTagsPrinter({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     (async () => {
       try {
-        const csrfMatch = document.cookie.match(/sylhn-csrf=([^;]+)/);
-        const csrfToken = csrfMatch ? decodeURIComponent(csrfMatch[1]) : "";
-        const res = await fetch("/api/price-tags?limit=200", {
-          credentials: "include",
-          headers: csrfToken ? { "X-CSRF-Token": csrfToken } : {},
-        });
+        const res = await authedFetch("/api/price-tags?limit=200");
         if (res.ok) {
           const data = await res.json();
           setProducts(data.products || []);

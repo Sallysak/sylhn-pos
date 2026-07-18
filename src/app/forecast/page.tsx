@@ -12,6 +12,7 @@ import {
   Tooltip, ResponsiveContainer, Cell, Area, AreaChart,
 } from "recharts";
 import { useToast } from "@/hooks/use-toast";
+import { authedFetch, getSessionToken } from "@/lib/client-auth";
 
 const URGENCY_COLORS: Record<string, string> = {
   critical: "#dc2626",
@@ -49,16 +50,15 @@ export default function ForecastPage() {
   const fetchForecast = useCallback(async (forecastDays: number, save = false) => {
     setLoading(true);
     try {
-      // Check auth first
-      const meRes = await fetch("/api/auth/me", { credentials: "include" });
+      // Check auth first — try authedFetch which sends Bearer token
+      const meRes = await authedFetch("/api/auth/me");
       const meData = await meRes.json().catch(() => ({ user: null }));
       if (!meData.user) {
-        // Not logged in — redirect to main app for login
         setAuthChecked(true);
         return;
       }
 
-      const res = await fetch(`/api/ai-forecast?days=${forecastDays}${save ? "&save=true" : ""}`, { credentials: "include" });
+      const res = await authedFetch(`/api/ai-forecast?days=${forecastDays}${save ? "&save=true" : ""}`);
       if (res.status === 401) {
         setAuthChecked(true);
         return;

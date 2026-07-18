@@ -143,9 +143,23 @@ export async function clearSessionCookie(): Promise<void> {
 export async function getSession(): Promise<SessionPayload | null> {
   try {
     const store = await cookies();
+    // Check both cookies (httpOnly + visible)
     const token = store.get(SESSION_COOKIE)?.value || store.get("sylhn-session-visible")?.value;
-    if (!token) return null;
-    return verifySessionToken(token);
+    if (token) {
+      const session = verifySessionToken(token);
+      if (session) return session;
+    }
+
+    // Fallback: check Authorization header (Bearer token)
+    // This is used when cookies aren't sent (cross-origin iframe in preview)
+    const headers = await import("next/headers");
+    const authHeader = headers.headers().get("authorization");
+    if (authHeader?.startsWith("Bearer ")) {
+      const bearerToken = authHeader.slice(7);
+      return verifySessionToken(bearerToken);
+    }
+
+    return null;
   } catch {
     return null;
   }

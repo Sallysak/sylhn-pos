@@ -137,6 +137,8 @@ export async function POST(req: NextRequest) {
         email: user.email,
         permissions,
       },
+      // Session token for bearer auth fallback (when cookies don't work in iframe)
+      sessionToken: token,
     });
   } catch (e) {
     console.error("Login error:", e);

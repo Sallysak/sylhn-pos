@@ -7,6 +7,7 @@ import {
   Package, AlertTriangle, DollarSign, Users, Truck, RefreshCw,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { authedFetch } from "@/lib/client-auth";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -65,17 +66,8 @@ export function AiAssistant({ open, onClose }: AiAssistantProps) {
     setLoading(true);
 
     try {
-      // Get CSRF token from cookie
-      const csrfMatch = document.cookie.match(/sylhn-csrf=([^;]+)/);
-      const csrfToken = csrfMatch ? decodeURIComponent(csrfMatch[1]) : "";
-
-      const res = await fetch("/api/ai-assistant", {
+      const res = await authedFetch("/api/ai-assistant", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(csrfToken && { "X-CSRF-Token": csrfToken }),
-        },
-        credentials: "include",
         body: JSON.stringify({
           question: text,
           conversationHistory: messages.slice(-6).map(m => ({ role: m.role, content: m.content })),
