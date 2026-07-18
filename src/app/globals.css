@@ -365,7 +365,6 @@
     background: rgba(0, 0, 0, 0.45);
     z-index: 50;
     animation: fadeIn 0.2s ease;
-    /* NO backdrop-blur — keeps the POS content sharp behind the overlay */
   }
 
   .mobile-drawer {
@@ -374,7 +373,8 @@
     right: 0;
     bottom: 0;
     width: min(340px, 88vw);
-    background: #ffffff;
+    background: #ffffff !important;
+    color: #1e293b !important;
     z-index: 51;
     box-shadow: -12px 0 48px -8px rgba(0, 0, 0, 0.25);
     display: flex;
@@ -382,12 +382,25 @@
     animation: slideInRight 0.28s cubic-bezier(0.32, 0.72, 0, 1);
     padding-top: env(safe-area-inset-top, 0px);
     padding-bottom: env(safe-area-inset-bottom, 0px);
-    /* NO backdrop-blur — the drawer itself is solid white, crisp */
-    /* Premium: transform GPU acceleration for smooth animation */
     will-change: transform;
     -webkit-backface-visibility: hidden;
     backface-visibility: hidden;
   }
+
+  /* Force dark text in drawer even when dark mode is active */
+  html.dark .mobile-drawer {
+    background: #1e293b !important;
+    color: #f1f5f9 !important;
+  }
+  html.dark .mobile-drawer .text-slate-800 { color: #f1f5f9 !important; }
+  html.dark .mobile-drawer .bg-white { background: #0f172a !important; }
+  html.dark .mobile-drawer .border-slate-200 { border-color: #334155 !important; }
+  html.dark .mobile-drawer .bg-slate-100 { background: #334155 !important; }
+  html.dark .mobile-drawer .bg-slate-50 { background: #1e293b !important; }
+  html.dark .mobile-drawer .hover\:bg-slate-50:hover { background: #334155 !important; }
+  html.dark .mobile-drawer .hover\:bg-violet-50:hover { background: #2e1065 !important; }
+  html.dark .mobile-drawer .text-slate-400 { color: #94a3b8 !important; }
+  html.dark .mobile-drawer .text-slate-500 { color: #94a3b8 !important; }
 
   @keyframes fadeIn {
     from { opacity: 0; }
@@ -560,7 +573,7 @@
   }
 
   /* ============================================================
-     PREMIUM: DARK MODE
+     PREMIUM: DARK MODE — scoped to main POS content only
      ============================================================ */
   html.dark {
     --bg-primary: #0f172a;
@@ -575,22 +588,23 @@
     background: #0f172a;
     color: #f1f5f9;
   }
-  html.dark .bg-white { background-color: #1e293b !important; }
-  html.dark .bg-slate-50 { background-color: #0f172a !important; }
-  html.dark .bg-slate-100 { background-color: #1e293b !important; }
-  html.dark .text-slate-800 { color: #f1f5f9 !important; }
-  html.dark .text-slate-700 { color: #cbd5e1 !important; }
-  html.dark .text-slate-600 { color: #94a3b8 !important; }
-  html.dark .text-slate-900 { color: #f8fafc !important; }
-  html.dark .border-slate-200 { border-color: #334155 !important; }
-  html.dark .border-slate-300 { border-color: #475569 !important; }
-  html.dark .ring-slate-200 { --tw-ring-color: #334155 !important; }
-  html.dark input, html.dark select, html.dark textarea {
+  /* Only apply dark mode to the main POS container, NOT to modals/drawers */
+  html.dark main .bg-white { background-color: #1e293b !important; }
+  html.dark main .bg-slate-50 { background-color: #0f172a !important; }
+  html.dark main .bg-slate-100 { background-color: #1e293b !important; }
+  html.dark main .text-slate-800 { color: #f1f5f9 !important; }
+  html.dark main .text-slate-700 { color: #cbd5e1 !important; }
+  html.dark main .text-slate-600 { color: #94a3b8 !important; }
+  html.dark main .text-slate-900 { color: #f8fafc !important; }
+  html.dark main .border-slate-200 { border-color: #334155 !important; }
+  html.dark main .border-slate-300 { border-color: #475569 !important; }
+  html.dark main .ring-slate-200 { --tw-ring-color: #334155 !important; }
+  html.dark main input, html.dark main select, html.dark main textarea {
     background-color: #0f172a !important;
     color: #f1f5f9 !important;
     border-color: #334155 !important;
   }
-  html.dark .bg-gradient-to-br { background: #0f172a !important; }
+  html.dark main .bg-gradient-to-br { background: #0f172a !important; }
 
   /* ============================================================
      PREMIUM: QUICK KEYS BAR
