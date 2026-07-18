@@ -37,6 +37,7 @@ import { BarcodeScanner } from "@/components/barcode-scanner";
 import { ManagerApproval } from "@/components/manager-approval";
 import { PrinterPairing } from "@/components/printer-pairing";
 import { AiAssistant } from "@/components/ai-assistant";
+import { SpeedDial } from "@/components/speed-dial";
 import { queueSale, flushQueue, onQueueChange, isOnline, getQueueSize } from "@/lib/offline-queue";
 import { saveCart, loadCart, clearCart as clearPersistedCart } from "@/lib/cart-persistence";
 
@@ -2233,41 +2234,48 @@ export default function POSPage() {
         onClose={() => setApprovalRequest(null)}
       />
 
-      {/* ===== Premium: Mobile Floating Action Button (FAB) for barcode scan ===== */}
+      {/* ===== Premium: SpeedDial — single FAB that expands into all quick actions ===== */}
+      {/* Replaces 3 separate floating buttons (scan + printer + AI) with one clean button */}
       {view === "pos" && (
-        <>
-          <button
-            onClick={() => setShowBarcodeScanner(true)}
-            className="mobile-fab mobile-only haptic-tap"
-            aria-label="Scan barcode"
-            title="Scan barcode"
-          >
-            <ScanLine className="h-6 w-6" />
-          </button>
-          {/* Printer pairing FAB (above scan FAB) */}
-          <button
-            onClick={() => setShowPrinterPairing(true)}
-            className="mobile-only haptic-tap fixed z-30"
-            style={{
-              bottom: "calc(144px + env(safe-area-inset-bottom, 0px))",
-              right: "16px",
-              width: "44px",
-              height: "44px",
-              borderRadius: "999px",
-              background: "white",
-              border: "1px solid rgb(226 232 240)",
-              boxShadow: "0 4px 12px -2px rgba(0,0,0,0.1)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "rgb(71 85 105)",
-            }}
-            aria-label="Pair printer"
-            title="Pair Bluetooth printer"
-          >
-            <Printer className="h-5 w-5" />
-          </button>
-        </>
+        <SpeedDial
+          actions={[
+            {
+              id: "ai",
+              icon: Sparkles,
+              label: "AI Assistant",
+              color: "from-violet-600 to-indigo-600",
+              onClick: () => setShowAiAssistant(true),
+            },
+            {
+              id: "scan",
+              icon: ScanLine,
+              label: "Scan Barcode",
+              color: "from-emerald-600 to-teal-600",
+              onClick: () => setShowBarcodeScanner(true),
+            },
+            {
+              id: "printer",
+              icon: Printer,
+              label: "Pair Printer",
+              color: "from-blue-600 to-cyan-600",
+              onClick: () => setShowPrinterPairing(true),
+            },
+            {
+              id: "cash-calc",
+              icon: DollarSign,
+              label: "Cash Calculator",
+              color: "from-amber-600 to-orange-600",
+              onClick: () => setShowCashCalc(true),
+            },
+            {
+              id: "price-tags",
+              icon: Printer,
+              label: "Price Tags",
+              color: "from-indigo-600 to-purple-600",
+              onClick: () => setShowPriceTags(true),
+            },
+          ]}
+        />
       )}
 
       {/* ===== Premium: Printer Pairing Modal ===== */}
@@ -2275,36 +2283,6 @@ export default function POSPage() {
 
       {/* ===== Premium: AI Business Assistant ===== */}
       <AiAssistant open={showAiAssistant} onClose={() => setShowAiAssistant(false)} />
-
-      {/* ===== Premium: AI Floating Button — stacked above scan + printer FABs ===== */}
-      {/* Mobile: bottom-right stack (AI at top, printer middle, scan bottom)
-          Desktop: fixed at bottom-right corner */}
-      <button
-        onClick={() => setShowAiAssistant(true)}
-        className="mobile-only haptic-tap fixed z-30 rounded-full bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-600 hover:from-violet-700 hover:via-purple-700 hover:to-indigo-700 text-white shadow-xl flex items-center justify-center transition hover:scale-110 group"
-        style={{
-          bottom: "calc(216px + env(safe-area-inset-bottom, 0px))",
-          right: "16px",
-          width: "44px",
-          height: "44px",
-        }}
-        title="Ask AI Assistant"
-        aria-label="Open AI Assistant"
-      >
-        <Sparkles className="h-5 w-5 group-hover:scale-110 transition" />
-        <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-emerald-400 ring-2 ring-white animate-pulse" />
-      </button>
-      {/* Desktop-only AI button (separate from mobile stack) */}
-      <button
-        onClick={() => setShowAiAssistant(true)}
-        className="hidden lg:flex fixed z-30 h-14 w-14 rounded-full bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-600 hover:from-violet-700 hover:via-purple-700 hover:to-indigo-700 text-white shadow-xl items-center justify-center transition hover:scale-110 group"
-        style={{ bottom: "24px", right: "24px" }}
-        title="Ask AI Assistant"
-        aria-label="Open AI Assistant"
-      >
-        <Sparkles className="h-6 w-6 group-hover:scale-110 transition" />
-        <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-emerald-400 ring-2 ring-white animate-pulse" />
-      </button>
 
       {/* ===== Premium: Cash Denomination Calculator ===== */}
       <AnimatePresence>
