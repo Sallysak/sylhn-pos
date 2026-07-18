@@ -358,14 +358,14 @@
     line-height: 1;
   }
 
-  /* Slide-in drawer (right side) */
+  /* Slide-in drawer (right side) — premium, sharp, no blur */
   .mobile-drawer-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(4px);
+    background: rgba(0, 0, 0, 0.45);
     z-index: 50;
     animation: fadeIn 0.2s ease;
+    /* NO backdrop-blur — keeps the POS content sharp behind the overlay */
   }
 
   .mobile-drawer {
@@ -373,15 +373,20 @@
     top: 0;
     right: 0;
     bottom: 0;
-    width: min(320px, 85vw);
-    background: white;
+    width: min(340px, 88vw);
+    background: #ffffff;
     z-index: 51;
-    box-shadow: -8px 0 32px -8px rgba(0, 0, 0, 0.2);
+    box-shadow: -12px 0 48px -8px rgba(0, 0, 0, 0.25);
     display: flex;
     flex-direction: column;
-    animation: slideInRight 0.25s cubic-bezier(0.32, 0.72, 0, 1);
+    animation: slideInRight 0.28s cubic-bezier(0.32, 0.72, 0, 1);
     padding-top: env(safe-area-inset-top, 0px);
     padding-bottom: env(safe-area-inset-bottom, 0px);
+    /* NO backdrop-blur — the drawer itself is solid white, crisp */
+    /* Premium: transform GPU acceleration for smooth animation */
+    will-change: transform;
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
   }
 
   @keyframes fadeIn {

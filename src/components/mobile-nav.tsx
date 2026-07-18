@@ -162,7 +162,7 @@ export function MobileNav({ active, onNavigate, cartCount, user, onLogout }: Mob
         </div>
       </nav>
 
-      {/* Slide-in Drawer (More menu) */}
+      {/* Slide-in Drawer (More menu) — premium, sharp, no blur */}
       <AnimatePresence>
         {drawerOpen && (
           <>
@@ -177,19 +177,19 @@ export function MobileNav({ active, onNavigate, cartCount, user, onLogout }: Mob
               initial={{ x: "100%" }}
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
-              transition={{ type: "spring", damping: 30, stiffness: 300 }}
+              transition={{ type: "spring", damping: 28, stiffness: 320 }}
               className="mobile-drawer"
             >
-              {/* Drawer Header */}
-              <div className="flex-shrink-0 px-5 py-4 bg-gradient-to-r from-emerald-700 to-teal-700 text-white">
+              {/* Drawer Header — solid gradient, no backdrop-blur */}
+              <div className="flex-shrink-0 px-5 py-4 bg-gradient-to-br from-emerald-700 via-teal-700 to-cyan-800 text-white">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-full bg-white/15 backdrop-blur flex items-center justify-center ring-1 ring-white/20 font-bold">
+                    <div className="h-11 w-11 rounded-full bg-white/20 flex items-center justify-center ring-2 ring-white/30 font-bold text-lg">
                       {user?.fullName?.charAt(0) || "S"}
                     </div>
                     <div>
                       <div className="font-bold text-sm">{user?.fullName || "User"}</div>
-                      <div className="text-[10px] text-emerald-100/80 capitalize">{user?.role || "Cashier"}</div>
+                      <div className="text-[10px] text-emerald-100/90 capitalize font-medium">{user?.role || "Cashier"}</div>
                     </div>
                   </div>
                   <button
@@ -253,11 +253,10 @@ export function MobileNav({ active, onNavigate, cartCount, user, onLogout }: Mob
 
               {/* Destinations list */}
               <div className="flex-1 overflow-y-auto py-2">
-                {/* Premium: AI-powered tools */}
+                {/* Premium: AI-powered tools — high contrast, no blur */}
                 {AI_DESTINATIONS.map(dest => {
                   const Icon = dest.icon;
                   if (dest.href === "#ai-assistant") {
-                    // Open AI assistant via custom event
                     return (
                       <button
                         key={dest.id}
@@ -265,15 +264,15 @@ export function MobileNav({ active, onNavigate, cartCount, user, onLogout }: Mob
                           window.dispatchEvent(new CustomEvent("sylhn:open-ai"));
                           setDrawerOpen(false);
                         }}
-                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-violet-50 transition haptic-tap text-left group"
+                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-violet-50 active:bg-violet-100 transition haptic-tap text-left group"
                       >
-                        <div className={`h-9 w-9 rounded-xl ${dest.bg} flex items-center justify-center`}>
-                          <Icon className={`h-4 w-4 ${dest.color}`} />
+                        <div className={`h-10 w-10 rounded-xl ${dest.bg} flex items-center justify-center ring-1 ring-slate-200`}>
+                          <Icon className={`h-5 w-5 ${dest.color}`} />
                         </div>
-                        <span className="flex-1 text-sm font-semibold text-slate-700 group-hover:text-violet-700">
+                        <span className="flex-1 text-sm font-bold text-slate-800 group-hover:text-violet-700">
                           {dest.label}
                         </span>
-                        <ChevronRight className="h-4 w-4 text-slate-300" />
+                        <ChevronRight className="h-4 w-4 text-slate-400" />
                       </button>
                     );
                   }
@@ -281,22 +280,22 @@ export function MobileNav({ active, onNavigate, cartCount, user, onLogout }: Mob
                     <a
                       key={dest.id}
                       href={dest.href}
-                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-violet-50 transition haptic-tap text-left group"
+                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-violet-50 active:bg-violet-100 transition haptic-tap text-left group"
                     >
-                      <div className={`h-9 w-9 rounded-xl ${dest.bg} flex items-center justify-center`}>
-                        <Icon className={`h-4 w-4 ${dest.color}`} />
+                      <div className={`h-10 w-10 rounded-xl ${dest.bg} flex items-center justify-center ring-1 ring-slate-200`}>
+                        <Icon className={`h-5 w-5 ${dest.color}`} />
                       </div>
-                      <span className="flex-1 text-sm font-semibold text-slate-700 group-hover:text-violet-700">
+                      <span className="flex-1 text-sm font-bold text-slate-800 group-hover:text-violet-700">
                         {dest.label}
                       </span>
-                      <ChevronRight className="h-4 w-4 text-slate-300" />
+                      <ChevronRight className="h-4 w-4 text-slate-400" />
                     </a>
                   );
                 })}
 
                 {/* Divider */}
                 {AI_DESTINATIONS.length > 0 && (
-                  <div className="h-px bg-slate-100 my-2 mx-4" />
+                  <div className="h-px bg-slate-200 my-2 mx-4" />
                 )}
 
                 {MORE_DESTINATIONS.map(dest => {
@@ -309,15 +308,15 @@ export function MobileNav({ active, onNavigate, cartCount, user, onLogout }: Mob
                         onNavigate(dest.id);
                         setDrawerOpen(false);
                       }}
-                      className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition haptic-tap text-left ${isActive ? "bg-emerald-50" : ""}`}
+                      className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 active:bg-slate-100 transition haptic-tap text-left ${isActive ? "bg-emerald-50" : ""}`}
                     >
-                      <div className={`h-9 w-9 rounded-xl ${dest.bg} flex items-center justify-center`}>
-                        <Icon className={`h-4 w-4 ${dest.color}`} />
+                      <div className={`h-10 w-10 rounded-xl ${dest.bg} flex items-center justify-center ring-1 ring-slate-200`}>
+                        <Icon className={`h-5 w-5 ${dest.color}`} />
                       </div>
-                      <span className={`flex-1 text-sm font-semibold ${isActive ? "text-emerald-700" : "text-slate-700"}`}>
+                      <span className={`flex-1 text-sm font-bold ${isActive ? "text-emerald-700" : "text-slate-800"}`}>
                         {dest.label}
                       </span>
-                      <ChevronRight className="h-4 w-4 text-slate-300" />
+                      <ChevronRight className="h-4 w-4 text-slate-400" />
                     </button>
                   );
                 })}
