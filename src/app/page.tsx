@@ -115,8 +115,8 @@ export default function POSPage() {
   // The cache is updated by pullChanges() in src/lib/sync.ts.
   const [products, setProducts] = useState<Product[]>(() => {
     if (typeof window !== 'undefined') {
-      const cached = getCachedProducts<Product[]>();
-      if (cached && cached.length > 0) return cached;
+      const cached = getCachedProducts();
+      if (cached && cached.length > 0) return cached as Product[];
     }
     return INITIAL_PRODUCTS;
   });
@@ -699,7 +699,7 @@ export default function POSPage() {
   // Premium: Cart Persistence — save to IndexedDB on every cart change
   useEffect(() => {
     if (cart.length > 0 || customerName) {
-      saveCart(cart, customerName, invoiceNumber);
+      saveCart(cart, customerName, invoiceNumber || '');
     } else {
       clearPersistedCart();
     }

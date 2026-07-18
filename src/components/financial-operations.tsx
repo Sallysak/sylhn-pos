@@ -24,6 +24,8 @@ interface Expense {
   amount: number;
   paymentMethod: string;
   vendor: string;
+  reference?: string;
+  notes?: string;
 }
 
 interface CashCount {
@@ -143,7 +145,7 @@ export function FinancialOperations({ onBack, dailyTotal, initialTab = "expenses
           category: e.category,
           description: e.description,
           amount: e.amount,
-          paymentMode: e.paymentMode,
+          paymentMode: e.paymentMethod,
           reference: e.reference || '',
           notes: e.notes || '',
           createdBy: e.user?.fullName || '',
@@ -234,7 +236,7 @@ export function FinancialOperations({ onBack, dailyTotal, initialTab = "expenses
           category: expense.category,
           description: expense.description,
           amount: expense.amount,
-          paymentMode: expense.paymentMode,
+          paymentMode: expense.paymentMethod,
           reference: expense.reference || '',
           notes: expense.notes || '',
         }),

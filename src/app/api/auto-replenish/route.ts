@@ -189,9 +189,9 @@ export async function POST(req: NextRequest) {
         success: true,
         scanned: rules.length,
         triggered: triggered.length,
-        skipped: skipped.length,
+        skippedCount: skipped.length,
         triggeredPos: triggered,
-        skipped,
+        skippedPos: skipped,
       });
     } catch (e: any) {
       console.error("POST /api/auto-replenish scan error:", e);

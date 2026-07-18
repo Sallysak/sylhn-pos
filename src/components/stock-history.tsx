@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, History, Settings2, Download, RefreshCw,
   Package, TrendingUp, TrendingDown, AlertTriangle, Check, X,
-  Loader2, Search, Calendar, User, Shield, Printer,
+  Loader2, Search, Calendar, User, Shield, Printer, SlidersHorizontal,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -168,7 +168,7 @@ export function StockHistory({ onBack }: StockHistoryProps) {
               <Download className="h-3.5 w-3.5" /> CSV
             </button>
             <button onClick={() => { setShowAdjustment(true); setAdjustProduct(null); }} className="h-9 px-3 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold flex items-center gap-1.5 transition">
-              <Adjustments className="h-3.5 w-3.5" /> New Adjustment
+              <SlidersHorizontal className="h-3.5 w-3.5" /> New Adjustment
             </button>
           </div>
         </div>
@@ -181,7 +181,7 @@ export function StockHistory({ onBack }: StockHistoryProps) {
             <SummaryCard icon={History} label="Total Movements" value={summary.totalEntries} color="text-blue-600" bg="bg-blue-50" />
             <SummaryCard icon={TrendingUp} label="Total Inflow" value={`+${summary.totalInflow}`} color="text-emerald-600" bg="bg-emerald-50" />
             <SummaryCard icon={TrendingDown} label="Total Outflow" value={`-${summary.totalOutflow}`} color="text-rose-600" bg="bg-rose-50" />
-            <SummaryCard icon={Adjustments} label="Net Change" value={summary.netChange > 0 ? `+${summary.netChange}` : summary.netChange} color="text-amber-600" bg="bg-amber-50" />
+            <SummaryCard icon={SlidersHorizontal} label="Net Change" value={summary.netChange > 0 ? `+${summary.netChange}` : summary.netChange} color="text-amber-600" bg="bg-amber-50" />
           </div>
         )}
 
@@ -363,7 +363,7 @@ function AdjustmentModal({ product, onClose, onSubmit }: {
       >
         <div className="bg-gradient-to-r from-amber-600 to-orange-600 text-white px-6 py-4">
           <div className="flex items-center gap-2">
-            <Adjustments className="h-5 w-5" />
+            <SlidersHorizontal className="h-5 w-5" />
             <h2 className="text-base font-bold">Stock Adjustment</h2>
           </div>
           <div className="text-xs opacity-90 mt-0.5">Adjust quantity with audit trail + manager approval</div>

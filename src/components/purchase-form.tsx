@@ -73,6 +73,7 @@ type ListPopupMode = 'none' | 'purchase-list' | 'order-list';
 
 interface PurchaseLine {
   id: string;
+  productId?: string;
   partNo: string;
   details: string;
   emoji: string;
@@ -88,7 +89,7 @@ interface PurchaseFormProps {
   products: Product[];
   groups: StockGroup[];
   /** Suppliers — accepts either simple {id, name} or full Supplier objects with tradingTerms, creditLimit, balance */
-  suppliers: { id: string; name: string; tradingTerms?: string; creditLimit?: number; balance?: number; taxInclusive?: boolean; email?: string; phone?: string }[];
+  suppliers: { id: string; name: string; code?: string; tradingTerms?: string; creditLimit?: number; balance?: number; taxInclusive?: boolean; email?: string; phone?: string }[];
 }
 
 const GREEN = '#4CAF50';

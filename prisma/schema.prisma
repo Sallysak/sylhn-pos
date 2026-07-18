@@ -566,6 +566,8 @@ model SalePayment {
   method       String   // cash | card | wallet | points | momo
   amount       Float
   reference    String   @default("")  // momo txn ref, card last4, etc.
+  status       String   @default("completed")  // pending | completed | failed (for async payments like MoMo)
+  metadata     String   @default("{}")  // JSON: extra data (momo ref, phone, etc.)
   createdAt    DateTime @default(now())
 
   sale Sale @relation(fields: [saleId], references: [id], onDelete: Cascade)

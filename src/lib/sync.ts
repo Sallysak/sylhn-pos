@@ -80,7 +80,9 @@ export function isOnline(): boolean {
 }
 
 // ===== Cache helpers (offline display only) =====
-export function getCachedProducts<T = any[]>(): T[] | null {
+// Returns `any[]` (not generic) to avoid TypeScript inference issues with
+// JSON.parse. Callers should cast if they need a specific type.
+export function getCachedProducts(): any[] | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = localStorage.getItem(PRODUCT_CACHE_KEY);
@@ -88,7 +90,7 @@ export function getCachedProducts<T = any[]>(): T[] | null {
   } catch { return null; }
 }
 
-export function getCachedGroups<T = any[]>(): T[] | null {
+export function getCachedGroups(): any[] | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = localStorage.getItem(GROUP_CACHE_KEY);
@@ -96,7 +98,7 @@ export function getCachedGroups<T = any[]>(): T[] | null {
   } catch { return null; }
 }
 
-export function getCachedSuppliers<T = any[]>(): T[] | null {
+export function getCachedSuppliers(): any[] | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = localStorage.getItem(SUPPLIER_CACHE_KEY);
@@ -154,7 +156,7 @@ export async function pullChanges(options?: { includeGroups?: boolean; includeSu
   if (!isOnline()) {
     setSyncState({ online: false, lastError: "Offline" });
     // Return cached data so the UI can still render
-    const cachedProducts = getCachedProducts<any[]>() || [];
+    const cachedProducts = getCachedProducts() || [];
     return {
       success: false,
       message: "Offline",
@@ -183,7 +185,7 @@ export async function pullChanges(options?: { includeGroups?: boolean; includeSu
 
     if (productRes.status === 304) {
       // 304 Not Modified — our cached list is still fresh
-      products = getCachedProducts<any[]>() || [];
+      products = getCachedProducts() || [];
       fromCache = true;
       productDeltas = [];
     } else if (productRes.ok) {
@@ -194,7 +196,7 @@ export async function pullChanges(options?: { includeGroups?: boolean; includeSu
 
       if (cursor && data.incremental) {
         // ===== INCREMENTAL: merge deltas into cache =====
-        const cached = getCachedProducts<any[]>() || [];
+        const cached = getCachedProducts() || [];
         const cacheMap = new Map(cached.map(p => [p.id, p]));
         for (const sp of serverProducts) {
           cacheMap.set(sp.id, sp);  // add or replace
@@ -215,7 +217,7 @@ export async function pullChanges(options?: { includeGroups?: boolean; includeSu
       }
     } else {
       // Fetch failed — fall back to cache
-      products = getCachedProducts<any[]>() || [];
+      products = getCachedProducts() || [];
       fromCache = true;
     }
 
@@ -227,7 +229,7 @@ export async function pullChanges(options?: { includeGroups?: boolean; includeSu
       if (groupsRes && groupsRes.ok) {
         const data = await groupsRes.json();
         groups = Array.isArray(data.groups) ? data.groups : [];
-        cacheGroups(groups);
+        if (groups) cacheGroups(groups);
       }
     }
 
@@ -236,7 +238,7 @@ export async function pullChanges(options?: { includeGroups?: boolean; includeSu
       if (supRes && supRes.ok) {
         const data = await supRes.json();
         suppliers = Array.isArray(data.suppliers) ? data.suppliers : [];
-        cacheSuppliers(suppliers);
+        if (suppliers) cacheSuppliers(suppliers);
       }
     }
 

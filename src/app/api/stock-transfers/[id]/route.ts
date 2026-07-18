@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireAuth, requirePermission } from "@/lib/auth";
 import { rateLimitApiRead, rateLimitApiWrite, rateLimitResponse, getClientIp } from "@/lib/rate-limit";
-import { auditLogTx } from "@/lib/audit";
+import { auditLogTx, auditLog } from "@/lib/audit";
 
 // GET /api/stock-transfers/[id] — fetch a single transfer
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

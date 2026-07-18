@@ -16,7 +16,11 @@ export async function GET(req: NextRequest) {
       include: { stockHistory: { select: { action: true, quantity: true }, orderBy: { createdAt: "asc" } } },
     });
 
-    const discrepancies = [];
+    const discrepancies: Array<{
+      productId: string; sku: string; name: string; emoji: string;
+      actualQty: number; expectedQty: number; difference: number;
+      unit: string; value: number;
+    }> = [];
     let checked = 0, ok = 0;
 
     for (const p of products) {
