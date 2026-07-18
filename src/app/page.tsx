@@ -40,7 +40,8 @@ import { AiAssistant } from "@/components/ai-assistant";
 import { SpeedDial } from "@/components/speed-dial";
 import { queueSale, flushQueue, onQueueChange, isOnline, getQueueSize } from "@/lib/offline-queue";
 import { saveCart, loadCart, clearCart as clearPersistedCart } from "@/lib/cart-persistence";
-import { saveSessionToken, clearSessionToken, authedFetch } from "@/lib/client-auth";
+import { saveSessionToken, clearSessionToken, getSessionToken, authedFetch } from "@/lib/client-auth";
+import { clearAuthState, saveUserSession, getCachedUser, hasUnsavedBusinessData } from "@/lib/session-data";
 import { pullChanges, startAutoPull, schedulePull, getCachedProducts, type PulledData } from "@/lib/sync";
 
 // ===== Lazy-loaded components (code-split for faster initial load) =====
@@ -250,6 +251,10 @@ export default function POSPage() {
   // OR a cached localStorage session. This makes login seamless across
   // mobile and PC — if you're logged in on one device and open the app on
   // another (with the same server), you stay logged in.
+  //
+  // IMPORTANT: Business data (held orders, history, daily totals) is loaded
+  // from localStorage by the useState initializers, NOT here. This function
+  // only restores the USER SESSION. Business data persists independently.
   useEffect(() => {
     let cancelled = false;
     const restoreSession = async () => {
@@ -262,6 +267,7 @@ export default function POSPage() {
           const data = await res.json();
           if (data.user) {
             // Server session is valid — restore it
+            saveUserSession(data.user);
             setLoggedInUser(data.user);
             setView("pos");
             return;
@@ -271,27 +277,21 @@ export default function POSPage() {
 
       // Fallback: check localStorage for a cached session (offline mode)
       if (cancelled) return;
-      try {
-        const cached = localStorage.getItem('sylhn-current-user');
-        const cachedToken = localStorage.getItem('sylhn-session-token');
-        if (cached) {
-          const user = JSON.parse(cached);
-          if (user && user.username) {
-            // If we have a cached user but no token (e.g. user cleared
-            // storage partially), the server session is gone — log them
-            // out so they re-authenticate and get a fresh token.
-            if (!cachedToken) {
-              try { localStorage.removeItem('sylhn-current-user'); } catch {}
-              setLoggedInUser(null);
-              setView("login");
-              return;
-            }
-            setLoggedInUser(user);
-            setView("pos");
-            return;
-          }
+      const cachedUser = getCachedUser();
+      const cachedToken = getSessionToken();
+      if (cachedUser) {
+        // If we have a cached user but no token, the server session is gone.
+        // Clear auth state and go to login — but DON'T clear business data.
+        if (!cachedToken) {
+          clearAuthState();
+          setLoggedInUser(null);
+          setView("login");
+          return;
         }
-      } catch { /* ignore */ }
+        setLoggedInUser(cachedUser);
+        setView("pos");
+        return;
+      }
 
       // No session found — stay on login screen
     };
@@ -1082,6 +1082,44 @@ export default function POSPage() {
   };
 
   // ===== Function Buttons =====
+  // ===== Centralized Logout =====
+  // Clears ONLY auth state. Business data (held orders, history, daily totals,
+  // product cache, offline sale queue) is PRESERVED so the next login sees
+  // the correct state. The cart is cleared (a new cashier shouldn't see the
+  // previous cashier's in-progress cart).
+  const handleLogout = async (silent = false) => {
+    // Warn if there's unsaved business data (held orders, offline sales)
+    if (!silent && hasUnsavedBusinessData()) {
+      // Held orders + history persist — just inform the user
+      toast({
+        title: "Signed out",
+        description: "Your held orders and history are saved and will be available on next login.",
+      });
+    }
+    // Call server logout (invalidates the session cookie)
+    try {
+      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+    } catch { /* server unreachable — local logout still works */ }
+    // Clear ONLY auth-related localStorage keys (preserve business data)
+    clearAuthState();
+    clearSessionToken();
+    // Clear the in-progress cart (IndexedDB) — a new cashier starts fresh.
+    // Held orders are NOT cleared (they're in localStorage, not IndexedDB).
+    clearPersistedCart();
+    // Reset cart React state
+    setCart([]);
+    setSelectedCartIndex(null);
+    setGlobalDiscount(0);
+    setCustomerName("");
+    setInvoiceNumber(generateInvoice());
+    // Go to login screen
+    setLoggedInUser(null);
+    setView("login");
+    if (silent) {
+      toast({ title: "Goodbye!", description: "Shift ended" });
+    }
+  };
+
   const handleSave = () => {
     if (cart.length === 0) {
       toast({ title: "Cart is empty", variant: "destructive" });
@@ -1486,12 +1524,12 @@ export default function POSPage() {
         { label: "Admin Panel", icon: Shield, action: () => setView("admin-login") },
         { separator: true },
         { label: "About SYLHN POS", icon: Store, action: () => setView("maintenance") },
-        { label: "Exit", icon: Power, action: () => { fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {}); try { localStorage.removeItem('sylhn-current-user'); localStorage.removeItem('sylhn-session-token'); } catch {} clearSessionToken(); setLoggedInUser(null); setView("login"); toast({ title: "Goodbye!", description: "Shift ended" }) } },
+        { label: "Exit", icon: Power, action: () => handleLogout(true) },
       ] : [
         { label: "Admin Panel", icon: Shield, action: () => setView("admin-login") },
         { separator: true },
         { label: "About SYLHN POS", icon: Store, action: () => setView("maintenance") },
-        { label: "Exit", icon: Power, action: () => { fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {}); try { localStorage.removeItem('sylhn-current-user'); localStorage.removeItem('sylhn-session-token'); } catch {} clearSessionToken(); setLoggedInUser(null); setView("login"); toast({ title: "Goodbye!", description: "Shift ended" }) } },
+        { label: "Exit", icon: Power, action: () => handleLogout(true) },
       ],
     },
   ].filter(m => m.items.length > 0); // Hide empty menus
@@ -1594,7 +1632,7 @@ export default function POSPage() {
     return (
       <div className="h-screen relative gradient-premium-mesh">
         <AdminLogin
-          onSuccess={(user) => { setLoggedInUser(user); setView("pos"); toast({ title: `Welcome, ${user.fullName}`, description: `Logged in as ${user.role}` }); }}
+          onSuccess={(user) => { saveUserSession(user); setLoggedInUser(user); setView("pos"); toast({ title: `Welcome, ${user.fullName}`, description: `Logged in as ${user.role}` }); }}
           onCancel={() => toast({ title: "Login required", description: "You must log in to use the system" })}
         />
         {/* Install App button — visible on login screen */}
@@ -1755,7 +1793,7 @@ export default function POSPage() {
             >
               <Sparkles className="h-4 w-4" /> <span className="hidden sm:inline">AI</span>
             </button>
-            <button onClick={() => { fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {}); try { localStorage.removeItem('sylhn-current-user'); localStorage.removeItem('sylhn-session-token'); } catch {} clearSessionToken(); setLoggedInUser(null); setView("login"); toast({ title: "Logged out", description: "You have been signed out" }); }} className="btn-premium h-9 px-3 rounded-lg bg-rose-500/30 hover:bg-rose-500/50 ring-1 ring-rose-300/30 text-white text-xs font-bold flex items-center gap-1.5 transition" title="Sign out">
+            <button onClick={() => handleLogout()} className="btn-premium h-9 px-3 rounded-lg bg-rose-500/30 hover:bg-rose-500/50 ring-1 ring-rose-300/30 text-white text-xs font-bold flex items-center gap-1.5 transition" title="Sign out">
               <LogOut className="h-4 w-4" /> <span className="hidden sm:inline">Logout</span>
             </button>
           </div>
@@ -2376,13 +2414,7 @@ export default function POSPage() {
         }}
         cartCount={cart.reduce((s, i) => s + i.quantity, 0)}
         user={loggedInUser ? { fullName: loggedInUser.fullName, role: loggedInUser.role } : null}
-        onLogout={() => {
-          fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
-          try { localStorage.removeItem('sylhn-current-user'); } catch {}
-          setLoggedInUser(null);
-          setView("login");
-          toast({ title: "Logged out", description: "You have been signed out" });
-        }}
+        onLogout={() => handleLogout()}
       />
 
       {/* ===== Premium: Barcode Scanner Modal ===== */}

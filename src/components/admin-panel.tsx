@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { COMPANY, formatGHS } from "@/lib/pos-data";
+import { saveUserSession } from "@/lib/session-data";
 
 // ===== Types =====
 export type UserRole = 'admin' | 'manager' | 'cashier' | 'stockkeeper' | 'accountant';
@@ -216,10 +217,9 @@ export function AdminLogin({ onSuccess, onCancel, adminOnly = false }: { onSucce
           try { localStorage.setItem("sylhn-session-token", data.sessionToken); } catch {}
         }
         // Cache the user (without password) for the UI to read role/permissions
-        // and for offline session restore.
-        try {
-          localStorage.setItem(SESSION_KEY, JSON.stringify(data.user));
-        } catch { /* ignore */ }
+        // and for offline session restore. Uses the centralized session manager
+        // to ensure consistency with the logout flow.
+        saveUserSession(data.user);
         toast({ title: `Welcome, ${data.user.fullName}`, description: `Logged in as ${ROLE_CONFIG[data.user.role as UserRole]?.label || data.user.role}` });
         onSuccess(data.user as SystemUser);
         return;
