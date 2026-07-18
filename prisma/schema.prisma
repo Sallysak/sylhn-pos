@@ -53,6 +53,7 @@ model SystemUser {
   transfersCreated  StockTransfer[]      @relation("TransferCreatedBy")
   transfersReceived StockTransfer[]      @relation("TransferReceivedBy")
   autoReplenishRules AutoReplenishRule[]
+  recurringPOs      RecurringPO[]
   currentRegister   Register?            @relation("CurrentRegisterCashier")
 
   @@index([role])
@@ -261,8 +262,35 @@ model ForecastSnapshot {
 }
 
 // ============================================================
-// CATALOG (Stock)
+// RECURRING PURCHASE ORDERS (premium — auto-create POs on schedule)
 // ============================================================
+
+model RecurringPO {
+  id              String   @id @default(cuid())
+  name            String                // "Weekly Milk Order", "Monthly Cleaning Supplies"
+  supplierId      String?
+  supplierName    String   @default("")
+  // Schedule
+  frequency       String               // weekly | biweekly | monthly
+  dayOfWeek       Int?                  // 0=Sun, 1=Mon, ..., 6=Sat (for weekly/biweekly)
+  dayOfMonth      Int?                  // 1-31 (for monthly)
+  // Items (JSON array: [{productId, quantity, cost}])
+  items           String   @default("[]")
+  // Tracking
+  isActive        Boolean  @default(true)
+  lastRunAt       DateTime?
+  nextRunAt       DateTime?
+  runCount        Int      @default(0)
+  createdById     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  supplier  Supplier?    @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  createdBy SystemUser?  @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([isActive])
+  @@index([nextRunAt])
+}
 
 model StockGroup {
   id          String    @id @default(cuid())
@@ -399,8 +427,9 @@ model Supplier {
   products        ProductSupplier[]
   purchases       Purchase[]
   payments        SupplierPayment[]
-  // Premium: auto-replenish rules
+  // Premium: auto-replenish rules, recurring POs
   autoReplenishRules AutoReplenishRule[]
+  recurringPOs      RecurringPO[]
 
   @@index([name])
   @@index([active])

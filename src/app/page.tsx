@@ -38,6 +38,7 @@ import { ManagerApproval } from "@/components/manager-approval";
 import { PrinterPairing } from "@/components/printer-pairing";
 import { AiAssistant } from "@/components/ai-assistant";
 import { queueSale, flushQueue, onQueueChange, isOnline, getQueueSize } from "@/lib/offline-queue";
+import { saveCart, loadCart, clearCart as clearPersistedCart } from "@/lib/cart-persistence";
 
 // ===== Lazy-loaded components (code-split for faster initial load) =====
 // Each form is loaded on-demand only when the user navigates to it.
@@ -134,6 +135,14 @@ export default function POSPage() {
   const [showPrinterPairing, setShowPrinterPairing] = useState(false);
   // Premium: AI Business Assistant
   const [showAiAssistant, setShowAiAssistant] = useState(false);
+  // Premium: Quick Keys bar
+  const [quickKeys, setQuickKeys] = useState<any[]>([]);
+  // Premium: Dark mode
+  const [darkMode, setDarkMode] = useState(false);
+  // Premium: Cash denomination calculator
+  const [showCashCalc, setShowCashCalc] = useState(false);
+  // Premium: Price tags printer
+  const [showPriceTags, setShowPriceTags] = useState(false);
   const [dailyTotal, setDailyTotal] = useState(() => {
     if (typeof window !== 'undefined') { try { return parseFloat(localStorage.getItem('sylhn-daily-total') || '0') || 0; } catch {} }
     return 0;
@@ -632,7 +641,60 @@ export default function POSPage() {
   const total = totalAfterDiscount + taxAmount;
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
 
-  // Premium: auto-sync cart to customer-facing display (/display page polls it).
+  // Premium: Cart Persistence — save to IndexedDB on every cart change
+  useEffect(() => {
+    if (cart.length > 0 || customerName) {
+      saveCart(cart, customerName, invoiceNumber);
+    } else {
+      clearPersistedCart();
+    }
+  }, [cart, customerName, invoiceNumber]);
+
+  // Premium: Cart Persistence — restore on mount
+  useEffect(() => {
+    (async () => {
+      const saved = await loadCart();
+      if (saved && saved.cart && saved.cart.length > 0) {
+        setCart(saved.cart);
+        if (saved.customerName) setCustomerName(saved.customerName);
+        if (saved.invoiceNumber) setInvoiceNumber(saved.invoiceNumber);
+        toast({ title: "Cart restored", description: `${saved.cart.length} items recovered from previous session` });
+      }
+    })();
+  }, []);
+
+  // Premium: Quick Keys — fetch top-selling products
+  useEffect(() => {
+    if (!loggedInUser) return;
+    (async () => {
+      try {
+        const res = await fetch("/api/quick-keys?limit=20", { credentials: "include" });
+        if (res.ok) {
+          const data = await res.json();
+          setQuickKeys(data.quickKeys || []);
+        }
+      } catch {}
+    })();
+  }, [loggedInUser]);
+
+  // Premium: Dark Mode — auto-switch based on time (6pm-6am) + manual toggle
+  useEffect(() => {
+    const hour = new Date().getHours();
+    const autoDark = hour >= 18 || hour < 6;
+    const saved = localStorage.getItem("sylhn-dark-mode");
+    const isDark = saved !== null ? saved === "true" : autoDark;
+    setDarkMode(isDark);
+    if (isDark) document.documentElement.classList.add("dark");
+    else document.documentElement.classList.remove("dark");
+  }, []);
+
+  const toggleDarkMode = () => {
+    const newMode = !darkMode;
+    setDarkMode(newMode);
+    localStorage.setItem("sylhn-dark-mode", String(newMode));
+    if (newMode) document.documentElement.classList.add("dark");
+    else document.documentElement.classList.remove("dark");
+  };
   // Debounced — only updates 500ms after the last cart change to avoid spamming.
   // Lives AFTER subtotal/total/etc are defined (TDZ-safe).
   useEffect(() => {
@@ -1472,6 +1534,30 @@ export default function POSPage() {
               </div>
             </div>
             <InstallButton />
+            {/* Premium: Dark Mode toggle */}
+            <button
+              onClick={toggleDarkMode}
+              className="h-8 w-8 rounded-lg bg-white/15 hover:bg-white/25 text-white flex items-center justify-center transition flex-shrink-0"
+              title={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            >
+              {darkMode ? "☀️" : "🌙"}
+            </button>
+            {/* Premium: Cash Calculator */}
+            <button
+              onClick={() => setShowCashCalc(true)}
+              className="h-8 px-2 rounded-lg bg-white/15 hover:bg-white/25 text-white text-xs font-bold flex items-center gap-1 transition flex-shrink-0"
+              title="Cash Denomination Calculator"
+            >
+              <DollarSign className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Cash Calc</span>
+            </button>
+            {/* Premium: Price Tags */}
+            <button
+              onClick={() => setShowPriceTags(true)}
+              className="h-8 px-2 rounded-lg bg-white/15 hover:bg-white/25 text-white text-xs font-bold flex items-center gap-1 transition flex-shrink-0"
+              title="Print Price Tags"
+            >
+              <Printer className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Tags</span>
+            </button>
             {/* Premium: AI Assistant button — opens the chat panel */}
             <button
               onClick={() => setShowAiAssistant(true)}
@@ -1512,6 +1598,23 @@ export default function POSPage() {
           ))}
         </div>
       </nav>
+
+      {/* ===== Premium: Quick Keys Bar (top-selling products, one-tap add) ===== */}
+      {view === "pos" && quickKeys.length > 0 && (
+        <div className="quick-keys-bar flex-shrink-0">
+          {quickKeys.map((qk, i) => (
+            <button key={i} className="quick-key" onClick={() => {
+              const product = products.find(p => p.id === qk.productId || p.sku === qk.sku);
+              if (product) addToCart(product);
+              else toast({ title: "Product not found", variant: "destructive" });
+            }} title={`Add ${qk.name}`}>
+              <span className="qk-emoji">{qk.emoji}</span>
+              <span className="qk-name">{qk.name}</span>
+              <span className="qk-price">{formatGHS(qk.price)}</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* ===== Main Content ===== */}
       <main className="flex-1 flex flex-col lg:flex-row lg:overflow-hidden p-2 sm:p-3 gap-2 sm:gap-3">
@@ -2176,6 +2279,16 @@ export default function POSPage() {
         <Sparkles className="h-6 w-6 group-hover:scale-110 transition" />
         <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-emerald-400 ring-2 ring-white animate-pulse" />
       </button>
+
+      {/* ===== Premium: Cash Denomination Calculator ===== */}
+      <AnimatePresence>
+        {showCashCalc && <CashCalculator total={total} onClose={() => setShowCashCalc(false)} />}
+      </AnimatePresence>
+
+      {/* ===== Premium: Price Tags Printer ===== */}
+      <AnimatePresence>
+        {showPriceTags && <PriceTagsPrinter onClose={() => setShowPriceTags(false)} />}
+      </AnimatePresence>
 
       {/* ===== Cash Drawer Animation ===== */}
       <AnimatePresence>
@@ -3605,4 +3718,133 @@ function generateInvoice(): string {
   const num = Math.floor(100000 + Math.random() * 900000);
   const check = Math.floor(Math.random() * 90 + 10);
   return `${num} F${check}`;
+}
+
+// ===== Premium: Cash Denomination Calculator =====
+function CashCalculator({ total, onClose }: { total: number; onClose: () => void }) {
+  const DENOMINATIONS = [
+    { label: "GHS 100", value: 100 },
+    { label: "GHS 50", value: 50 },
+    { label: "GHS 20", value: 20 },
+    { label: "GHS 10", value: 10 },
+    { label: "GHS 5", value: 5 },
+    { label: "GHS 2", value: 2 },
+    { label: "GHS 1", value: 1 },
+    { label: "50p", value: 0.5 },
+  ];
+  const [counts, setCounts] = useState<Record<number, number>>({});
+  const counted = DENOMINATIONS.reduce((s, d) => s + d.value * (counts[d.value] || 0), 0);
+  const variance = counted - total;
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <motion.div initial={{ scale: 0.95, y: 30 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 30 }}
+        onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+        <div className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2"><DollarSign className="h-5 w-5" /><h2 className="text-base font-bold">Cash Calculator</h2></div>
+            <button onClick={onClose} className="h-8 w-8 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center"><X className="h-4 w-4" /></button>
+          </div>
+        </div>
+        <div className="p-6 space-y-3">
+          <div className="bg-slate-50 rounded-xl p-3 flex justify-between items-center">
+            <span className="text-xs font-bold text-slate-600">Expected (Total Due)</span>
+            <span className="text-lg font-bold font-mono text-slate-800">{formatGHS(total)}</span>
+          </div>
+          {DENOMINATIONS.map(d => (
+            <div key={d.value} className="flex items-center gap-3">
+              <span className="w-16 text-xs font-bold text-slate-600">{d.label}</span>
+              <span className="text-slate-400 text-xs">×</span>
+              <input type="number" min="0" value={counts[d.value] || ""} onChange={(e) => setCounts(prev => ({ ...prev, [d.value]: parseInt(e.target.value) || 0 }))}
+                className="w-16 h-8 px-2 text-center text-sm font-mono border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-emerald-400" placeholder="0" />
+              <span className="text-slate-400 text-xs">=</span>
+              <span className="text-sm font-mono text-slate-700 flex-1">{formatGHS(d.value * (counts[d.value] || 0))}</span>
+            </div>
+          ))}
+          <div className={cn("rounded-xl p-3 flex justify-between items-center border-2", variance === 0 ? "bg-emerald-50 border-emerald-300" : variance > 0 ? "bg-amber-50 border-amber-300" : "bg-rose-50 border-rose-300")}>
+            <div>
+              <span className="text-xs font-bold text-slate-600">Counted Cash</span>
+              <span className="block text-lg font-bold font-mono text-slate-800">{formatGHS(counted)}</span>
+            </div>
+            <div className="text-right">
+              <span className="text-xs font-bold text-slate-600">Variance</span>
+              <span className={cn("block text-lg font-bold font-mono", variance === 0 ? "text-emerald-600" : variance > 0 ? "text-amber-600" : "text-rose-600")}>
+                {variance > 0 ? "+" : ""}{formatGHS(variance)}
+              </span>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ===== Premium: Price Tags Printer =====
+function PriceTagsPrinter({ onClose }: { onClose: () => void }) {
+  const { toast } = useToast();
+  const [products, setProducts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/price-tags?limit=200", { credentials: "include" });
+        if (res.ok) { const data = await res.json(); setProducts(data.products || []); }
+      } catch {}
+      finally { setLoading(false); }
+    })();
+  }, []);
+
+  const printTags = () => {
+    const toPrint = products.filter(p => selected.has(p.id));
+    if (toPrint.length === 0) { toast({ title: "Select at least one product", variant: "destructive" }); return; }
+    const win = window.open("", "_blank", "width=800,height=600");
+    if (!win) return;
+    const tags = toPrint.map(p => `
+      <div style="display:inline-block;width:200px;height:120px;margin:5mm;border:2px dashed #999;padding:8px;text-align:center;font-family:Arial">
+        <div style="font-size:20px">${p.emoji}</div>
+        <div style="font-size:11px;font-weight:bold;margin:2px 0">${p.name}</div>
+        <div style="font-size:24px;font-weight:bold;color:#1e40af">${formatGHS(p.price)}</div>
+        <div style="font-size:8px;color:#666">SKU: ${p.sku} · per ${p.unit}</div>
+        ${p.barcode ? `<div style="font-size:8px;font-family:monospace;margin-top:4px">${p.barcode}</div>` : ""}
+        ${p.expiryDate ? `<div style="font-size:8px;color:#dc2626">Exp: ${new Date(p.expiryDate).toLocaleDateString("en-GB")}</div>` : ""}
+      </div>`).join("");
+    win.document.write(`<!DOCTYPE html><html><head><title>Price Tags</title><style>@media print{body{margin:0}}</style></head><body>${tags}</body></html>`);
+    win.document.close();
+    setTimeout(() => { win.focus(); win.print(); }, 300);
+    toast({ title: `Printing ${toPrint.length} price tags` });
+  };
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <motion.div initial={{ scale: 0.95, y: 30 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 30 }}
+        onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-2"><Printer className="h-5 w-5" /><h2 className="text-base font-bold">Price Tags / Shelf Labels</h2></div>
+          <div className="flex items-center gap-2">
+            <button onClick={printTags} disabled={selected.size === 0} className="h-8 px-3 rounded-lg bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 text-white text-xs font-bold flex items-center gap-1.5"><Printer className="h-3.5 w-3.5" /> Print ({selected.size})</button>
+            <button onClick={onClose} className="h-8 w-8 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center"><X className="h-4 w-4" /></button>
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto p-4">
+          {loading ? <div className="flex justify-center py-10"><Loader2 className="h-8 w-8 animate-spin text-indigo-500" /></div> :
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+              {products.map(p => (
+                <button key={p.id} onClick={() => { const next = new Set(selected); next.has(p.id) ? next.delete(p.id) : next.add(p.id); setSelected(next); }}
+                  className={cn("rounded-xl p-3 text-center border-2 transition", selected.has(p.id) ? "border-emerald-400 bg-emerald-50" : "border-slate-200 hover:border-indigo-300")}>
+                  <div className="text-2xl">{p.emoji}</div>
+                  <div className="text-xs font-semibold text-slate-700 truncate mt-1">{p.name}</div>
+                  <div className="text-sm font-bold text-indigo-600 font-mono">{formatGHS(p.price)}</div>
+                  <div className="text-[8px] text-slate-400">{p.sku}</div>
+                  {selected.has(p.id) && <Check className="h-4 w-4 text-emerald-500 mx-auto mt-1" />}
+                </button>
+              ))}
+            </div>}
+        </div>
+      </motion.div>
+    </motion.div>
+  );
 }

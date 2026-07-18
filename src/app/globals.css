@@ -553,4 +553,80 @@
   .mobile-fab:active {
     transform: scale(0.92);
   }
+
+  /* ============================================================
+     PREMIUM: DARK MODE
+     ============================================================ */
+  html.dark {
+    --bg-primary: #0f172a;
+    --bg-secondary: #1e293b;
+    --bg-tertiary: #334155;
+    --text-primary: #f1f5f9;
+    --text-secondary: #94a3b8;
+    --border-color: #334155;
+    color-scheme: dark;
+  }
+  html.dark body {
+    background: #0f172a;
+    color: #f1f5f9;
+  }
+  html.dark .bg-white { background-color: #1e293b !important; }
+  html.dark .bg-slate-50 { background-color: #0f172a !important; }
+  html.dark .bg-slate-100 { background-color: #1e293b !important; }
+  html.dark .text-slate-800 { color: #f1f5f9 !important; }
+  html.dark .text-slate-700 { color: #cbd5e1 !important; }
+  html.dark .text-slate-600 { color: #94a3b8 !important; }
+  html.dark .text-slate-900 { color: #f8fafc !important; }
+  html.dark .border-slate-200 { border-color: #334155 !important; }
+  html.dark .border-slate-300 { border-color: #475569 !important; }
+  html.dark .ring-slate-200 { --tw-ring-color: #334155 !important; }
+  html.dark input, html.dark select, html.dark textarea {
+    background-color: #0f172a !important;
+    color: #f1f5f9 !important;
+    border-color: #334155 !important;
+  }
+  html.dark .bg-gradient-to-br { background: #0f172a !important; }
+
+  /* ============================================================
+     PREMIUM: QUICK KEYS BAR
+     ============================================================ */
+  .quick-keys-bar {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding: 6px 8px;
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid rgb(226 232 240);
+    scrollbar-width: none;
+  }
+  .quick-keys-bar::-webkit-scrollbar { display: none; }
+
+  .quick-key {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 64px;
+    padding: 6px 8px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, rgb(239 246 255), rgb(219 234 254));
+    border: 1px solid rgb(147 197 253);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .quick-key:active {
+    transform: scale(0.92);
+    background: linear-gradient(135deg, rgb(59 130 246), rgb(37 99 235));
+  }
+  .quick-key:active .qk-emoji,
+  .quick-key:active .qk-name,
+  .quick-key:active .qk-price {
+    color: white;
+  }
+  .quick-key .qk-emoji { font-size: 20px; line-height: 1; }
+  .quick-key .qk-name { font-size: 9px; font-weight: 600; color: rgb(30 41 59); margin-top: 2px; max-width: 60px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .quick-key .qk-price { font-size: 10px; font-weight: 700; color: rgb(37 99 235); font-family: monospace; }
 }
