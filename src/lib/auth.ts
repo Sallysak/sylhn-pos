@@ -114,10 +114,21 @@ export function verifySessionToken(token: string): SessionPayload | null {
 
 export async function setSessionCookie(token: string): Promise<void> {
   const store = await cookies();
+  // In development (preview iframe), use sameSite=none so cookies work cross-origin
+  // In production, use sameSite=lax for security
+  const isDev = process.env.NODE_ENV !== "production";
   store.set(SESSION_COOKIE, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    secure: !isDev, // dev: false (HTTP), prod: true (HTTPS)
+    sameSite: isDev ? "none" : "lax", // dev: none (cross-origin iframe), prod: lax
+    path: "/",
+    maxAge: SESSION_MAX_AGE_SECONDS,
+  });
+  // Also set a non-httpOnly version for client-side auth checks
+  store.set("sylhn-session-visible", token, {
+    httpOnly: false,
+    secure: !isDev,
+    sameSite: isDev ? "none" : "lax",
     path: "/",
     maxAge: SESSION_MAX_AGE_SECONDS,
   });
@@ -126,12 +137,13 @@ export async function setSessionCookie(token: string): Promise<void> {
 export async function clearSessionCookie(): Promise<void> {
   const store = await cookies();
   store.delete(SESSION_COOKIE);
+  store.delete("sylhn-session-visible");
 }
 
 export async function getSession(): Promise<SessionPayload | null> {
   try {
     const store = await cookies();
-    const token = store.get(SESSION_COOKIE)?.value;
+    const token = store.get(SESSION_COOKIE)?.value || store.get("sylhn-session-visible")?.value;
     if (!token) return null;
     return verifySessionToken(token);
   } catch {

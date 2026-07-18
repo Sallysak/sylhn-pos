@@ -49,18 +49,18 @@ export default function ForecastPage() {
   const fetchForecast = useCallback(async (forecastDays: number, save = false) => {
     setLoading(true);
     try {
-      // First check if we're authenticated
+      // Check auth first
       const meRes = await fetch("/api/auth/me", { credentials: "include" });
-      const meData = await meRes.json();
+      const meData = await meRes.json().catch(() => ({ user: null }));
       if (!meData.user) {
-        // Not logged in — redirect to main app
-        window.location.href = "/";
+        // Not logged in — redirect to main app for login
+        setAuthChecked(true);
         return;
       }
 
       const res = await fetch(`/api/ai-forecast?days=${forecastDays}${save ? "&save=true" : ""}`, { credentials: "include" });
       if (res.status === 401) {
-        window.location.href = "/";
+        setAuthChecked(true);
         return;
       }
       if (!res.ok) {
