@@ -247,21 +247,21 @@ export default function POSPage() {
     return unsub;
   }, []);
 
-  // ===== Cross-device session restore =====
-  // On page load, check if there's a valid server session (httpOnly cookie)
-  // OR a cached localStorage session. This makes login seamless across
-  // mobile and PC — if you're logged in on one device and open the app on
-  // another (with the same server), you stay logged in.
+  // ===== Session restore on page load =====
+  // SECURITY: We only restore from the SERVER session (httpOnly cookie).
+  // We do NOT auto-login from localStorage cache — that would bypass the
+  // password prompt. The user must always enter their credentials.
   //
-  // IMPORTANT: Business data (held orders, history, daily totals) is loaded
-  // from localStorage by the useState initializers, NOT here. This function
-  // only restores the USER SESSION. Business data persists independently.
+  // The only exception is if the server confirms the session is still valid
+  // via /api/auth/me — in that case, the cookie was sent automatically and
+  // the server validates it. No localStorage token is used for auto-login.
+  //
+  // Business data (held orders, history, daily totals) is loaded from
+  // localStorage by the useState initializers, NOT here.
   useEffect(() => {
     let cancelled = false;
     const restoreSession = async () => {
-      // First, try the server session.
-      // Use authedFetch so it sends BOTH the cookie (if available) AND the
-      // Bearer token from localStorage (fallback for cross-origin iframe).
+      // Try the server session ONLY (httpOnly cookie, not localStorage)
       try {
         const res = await authedFetch('/api/auth/me');
         if (!cancelled && res.ok) {
@@ -274,27 +274,16 @@ export default function POSPage() {
             return;
           }
         }
-      } catch { /* server unreachable — fall through to local */ }
+      } catch { /* server unreachable — fall through to login */ }
 
-      // Fallback: check localStorage for a cached session (offline mode)
+      // No valid server session — clear any stale auth state and show login.
+      // This ensures the user ALWAYS sees the login screen when there's no
+      // valid server session (no auto-login from localStorage).
       if (cancelled) return;
-      const cachedUser = getCachedUser();
-      const cachedToken = getSessionToken();
-      if (cachedUser) {
-        // If we have a cached user but no token, the server session is gone.
-        // Clear auth state and go to login — but DON'T clear business data.
-        if (!cachedToken) {
-          clearAuthState();
-          setLoggedInUser(null);
-          setView("login");
-          return;
-        }
-        setLoggedInUser(cachedUser);
-        setView("pos");
-        return;
-      }
-
-      // No session found — stay on login screen
+      clearAuthState();
+      clearSessionToken();
+      setLoggedInUser(null);
+      setView("login");
     };
     restoreSession();
     return () => { cancelled = true; };
@@ -3993,9 +3982,9 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
         animate={{ scale: 1, y: 0 }}
         exit={{ scale: 0.9, y: 30 }}
         onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden max-h-[90vh] flex flex-col"
+        className="dialog-premium shadow-premium-xl w-full max-w-sm max-h-[92vh] flex flex-col overflow-hidden"
       >
-        <div className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-6 py-5 text-center">
+        <div className="flex-shrink-0 bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-6 py-5 text-center">
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
@@ -4010,8 +3999,9 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
           </div>
         </div>
 
-        <ScrollArea className="flex-1">
-          <div className="px-6 py-4 font-mono text-xs">
+        {/* Receipt body — native scroll (not ScrollArea) so buttons are always visible */}
+        <div className="flex-1 overflow-y-auto min-h-0 scroll-premium" style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
+        <div className="px-6 py-4 font-mono text-xs">
             <div className="text-center mb-3">
               <div className="font-bold text-sm text-slate-800">{COMPANY.name}</div>
               <div className="text-slate-500">{COMPANY.address}</div>
@@ -4110,10 +4100,10 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
               <div className="mt-1">Returns within 7 days with receipt</div>
             </div>
           </div>
-        </ScrollArea>
+        </div>
 
         {/* Premium: action row with Print, Browser Print, Export, QR, WhatsApp, New Sale */}
-        <div className="px-4 py-3 border-t border-slate-200 bg-slate-50 space-y-2">
+        <div className="flex-shrink-0 px-4 py-3 border-t border-slate-200 bg-slate-50 space-y-2">
           {/* Row 1: Print + Export */}
           <div className="grid grid-cols-4 gap-2">
             <button
@@ -4393,14 +4383,15 @@ function StandardCalculator({ onClose }: { onClose: () => void }) {
     const variants = {
       default: "bg-slate-100 hover:bg-slate-200 text-slate-800 active:bg-slate-300",
       accent: "bg-slate-200 hover:bg-slate-300 text-slate-800 active:bg-slate-400",
-      operator: "gradient-premium-emerald text-white hover:shadow-glow-emerald active:scale-95",
-      equals: "gradient-premium-emerald text-white hover:shadow-glow-emerald active:scale-95",
+      operator: "gradient-premium-emerald text-white hover:shadow-glow-emerald active:brightness-110",
+      equals: "gradient-premium-emerald text-white hover:shadow-glow-emerald active:brightness-110",
     };
     return (
       <button
         onClick={onClick}
+        style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
         className={cn(
-          "h-16 rounded-2xl font-bold text-lg flex items-center justify-center transition active:scale-95 no-select",
+          "h-16 rounded-2xl font-bold text-xl flex items-center justify-center select-none",
           variants[variant],
           wide && "col-span-2"
         )}

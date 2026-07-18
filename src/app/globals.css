@@ -610,19 +610,86 @@
   html.dark main .bg-white { background-color: #1e293b !important; }
   html.dark main .bg-slate-50 { background-color: #0f172a !important; }
   html.dark main .bg-slate-100 { background-color: #1e293b !important; }
+  html.dark main .bg-slate-200 { background-color: #334155 !important; }
   html.dark main .text-slate-800 { color: #f1f5f9 !important; }
   html.dark main .text-slate-700 { color: #cbd5e1 !important; }
   html.dark main .text-slate-600 { color: #94a3b8 !important; }
   html.dark main .text-slate-900 { color: #f8fafc !important; }
+  html.dark main .text-slate-500 { color: #94a3b8 !important; }
+  html.dark main .text-slate-400 { color: #64748b !important; }
+  html.dark main .text-slate-300 { color: #475569 !important; }
   html.dark main .border-slate-200 { border-color: #334155 !important; }
   html.dark main .border-slate-300 { border-color: #475569 !important; }
+  html.dark main .border-slate-100 { border-color: #1e293b !important; }
   html.dark main .ring-slate-200 { --tw-ring-color: #334155 !important; }
   html.dark main input, html.dark main select, html.dark main textarea {
     background-color: #0f172a !important;
     color: #f1f5f9 !important;
     border-color: #334155 !important;
   }
+  html.dark main input::placeholder, html.dark main textarea::placeholder {
+    color: #64748b !important;
+  }
+  html.dark main select option {
+    background-color: #1e293b !important;
+    color: #f1f5f9 !important;
+  }
   html.dark main .bg-gradient-to-br { background: #0f172a !important; }
+  html.dark main .bg-gradient-to-r { background: #1e293b !important; }
+  html.dark main .bg-gradient-to-b { background: #0f172a !important; }
+  /* Dark mode for buttons that use slate backgrounds */
+  html.dark main .bg-slate-800 { background-color: #0f172a !important; }
+  html.dark main .bg-slate-700 { background-color: #1e293b !important; }
+  html.dark main .bg-slate-300 { background-color: #475569 !important; }
+  /* Dark mode for text field placeholders */
+  html.dark main .text-emerald-600 { color: #34d399 !important; }
+  html.dark main .text-emerald-700 { color: #6ee7b7 !important; }
+  html.dark main .text-rose-600 { color: #fb7185 !important; }
+  html.dark main .text-rose-700 { color: #fda4af !important; }
+  html.dark main .text-amber-600 { color: #fbbf24 !important; }
+  html.dark main .text-amber-700 { color: #fcd34d !important; }
+  html.dark main .text-blue-600 { color: #60a5fa !important; }
+  html.dark main .text-blue-700 { color: #93c5fd !important; }
+  html.dark main .text-violet-600 { color: #a78bfa !important; }
+  html.dark main .text-violet-700 { color: #c4b5fd !important; }
+  /* Dark mode for badges */
+  html.dark main .bg-emerald-50 { background-color: rgba(16, 185, 129, 0.15) !important; }
+  html.dark main .bg-rose-50 { background-color: rgba(244, 63, 94, 0.15) !important; }
+  html.dark main .bg-amber-50 { background-color: rgba(245, 158, 11, 0.15) !important; }
+  html.dark main .bg-blue-50 { background-color: rgba(59, 130, 246, 0.15) !important; }
+  html.dark main .bg-violet-50 { background-color: rgba(139, 92, 246, 0.15) !important; }
+  /* Dark mode for the receipt and cart areas */
+  html.dark main .bg-emerald-500\/20 { background-color: rgba(16, 185, 129, 0.2) !important; }
+  html.dark main .bg-rose-500\/20 { background-color: rgba(244, 63, 94, 0.2) !important; }
+  /* Dark mode for divide borders */
+  html.dark main .divide-slate-100 > * { border-color: #1e293b !important; }
+  html.dark main .divide-slate-200 > * { border-color: #334155 !important; }
+  /* Dark mode for shadow on cards */
+  html.dark main .shadow-lg { box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.3) !important; }
+  html.dark main .shadow-md { box-shadow: 0 2px 8px -1px rgba(0, 0, 0, 0.3) !important; }
+  html.dark main .shadow-sm { box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.2) !important; }
+  /* Dark mode for the input-premium class */
+  html.dark main .input-premium {
+    background: #0f172a !important;
+    border-color: #334155 !important;
+    color: #f1f5f9 !important;
+  }
+  html.dark main .input-premium:focus {
+    border-color: #10b981 !important;
+    background: #0f172a !important;
+  }
+  /* Dark mode for the product-card-premium */
+  html.dark main .product-card-premium {
+    background: #1e293b !important;
+    border-color: #334155 !important;
+  }
+  html.dark main .product-card-premium:hover {
+    border-color: #10b981 !important;
+  }
+  /* Dark mode for FuncBtn variants */
+  html.dark main .bg-emerald-50 { background-color: rgba(16, 185, 129, 0.1) !important; }
+  html.dark main .bg-amber-50 { background-color: rgba(245, 158, 11, 0.1) !important; }
+  html.dark main .bg-rose-50 { background-color: rgba(244, 63, 94, 0.1) !important; }
 
   /* ============================================================
      PREMIUM: QUICK KEYS BAR

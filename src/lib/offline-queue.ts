@@ -171,10 +171,11 @@ export async function flushQueue(): Promise<{ synced: number; failed: number; er
     });
 
     try {
-      const res = await fetch("/api/sales", {
+      // Use authedFetch so the Bearer token is sent (needed for cross-origin
+      // iframe in preview environment where cookies aren't sent automatically)
+      const { authedFetch } = await import("./client-auth");
+      const res = await authedFetch("/api/sales", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify(entry.payload),
       });
 
