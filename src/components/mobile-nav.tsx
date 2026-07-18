@@ -6,7 +6,7 @@ import {
   ShoppingCart, Home, BarChart3, Menu, X, LogOut, User, Package,
   Truck, Phone, Settings, FileText, Wrench, Shield, Bell, Download,
   Wallet, Receipt, TrendingUp, Clock, AlertTriangle, ChevronRight,
-  RefreshCw, Wifi, WifiOff, Sparkles,
+  RefreshCw, Wifi, WifiOff, Sparkles, Calculator, Moon, Sun,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getQueueSize, getQueuedSales, flushQueue, isOnline, onQueueChange, type QueuedSale } from "@/lib/offline-queue";
@@ -43,9 +43,10 @@ const MORE_DESTINATIONS = [
   { id: "admin-panel", label: "Admin Panel", icon: Shield, color: "text-purple-600", bg: "bg-purple-50" },
 ];
 
-// Premium: AI-powered destinations (linked to standalone pages)
+// Premium: AI-powered destinations + tools (linked to standalone pages/actions)
 const AI_DESTINATIONS = [
   { id: "forecast-link", label: "AI Demand Forecast", icon: Sparkles, color: "text-violet-600", bg: "bg-violet-50", href: "/forecast" },
+  { id: "ai-assistant", label: "AI Business Assistant", icon: Sparkles, color: "text-indigo-600", bg: "bg-indigo-50", href: "#ai-assistant" },
 ];
 
 export function MobileNav({ active, onNavigate, cartCount, user, onLogout }: MobileNavProps) {
@@ -255,6 +256,27 @@ export function MobileNav({ active, onNavigate, cartCount, user, onLogout }: Mob
                 {/* Premium: AI-powered tools */}
                 {AI_DESTINATIONS.map(dest => {
                   const Icon = dest.icon;
+                  if (dest.href === "#ai-assistant") {
+                    // Open AI assistant via custom event
+                    return (
+                      <button
+                        key={dest.id}
+                        onClick={() => {
+                          window.dispatchEvent(new CustomEvent("sylhn:open-ai"));
+                          setDrawerOpen(false);
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-violet-50 transition haptic-tap text-left group"
+                      >
+                        <div className={`h-9 w-9 rounded-xl ${dest.bg} flex items-center justify-center`}>
+                          <Icon className={`h-4 w-4 ${dest.color}`} />
+                        </div>
+                        <span className="flex-1 text-sm font-semibold text-slate-700 group-hover:text-violet-700">
+                          {dest.label}
+                        </span>
+                        <ChevronRight className="h-4 w-4 text-slate-300" />
+                      </button>
+                    );
+                  }
                   return (
                     <a
                       key={dest.id}

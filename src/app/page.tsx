@@ -695,6 +695,13 @@ export default function POSPage() {
     if (newMode) document.documentElement.classList.add("dark");
     else document.documentElement.classList.remove("dark");
   };
+
+  // Premium: Listen for AI assistant open event (from MobileNav drawer)
+  useEffect(() => {
+    const handler = () => setShowAiAssistant(true);
+    window.addEventListener("sylhn:open-ai", handler);
+    return () => window.removeEventListener("sylhn:open-ai", handler);
+  }, []);
   // Debounced — only updates 500ms after the last cart change to avoid spamming.
   // Lives AFTER subtotal/total/etc are defined (TDZ-safe).
   useEffect(() => {
@@ -1558,10 +1565,10 @@ export default function POSPage() {
             >
               <Printer className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Tags</span>
             </button>
-            {/* Premium: AI Assistant button — opens the chat panel */}
+            {/* Premium: AI Assistant button — always visible (mobile + desktop) */}
             <button
               onClick={() => setShowAiAssistant(true)}
-              className="h-8 px-3 rounded-lg bg-gradient-to-r from-violet-500/30 to-indigo-500/30 hover:from-violet-500/50 hover:to-indigo-500/50 text-white text-xs font-bold flex items-center gap-1.5 transition ring-1 ring-white/20"
+              className="h-8 w-8 sm:px-3 rounded-lg bg-gradient-to-r from-violet-500/30 to-indigo-500/30 hover:from-violet-500/50 hover:to-indigo-500/50 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition ring-1 ring-white/20 flex-shrink-0"
               title="Ask AI Assistant"
             >
               <Sparkles className="h-4 w-4" /> <span className="hidden sm:inline">AI</span>
@@ -2269,14 +2276,15 @@ export default function POSPage() {
       {/* ===== Premium: AI Business Assistant ===== */}
       <AiAssistant open={showAiAssistant} onClose={() => setShowAiAssistant(false)} />
 
-      {/* ===== Premium: AI Floating Button (always visible on desktop, above mobile FAB) ===== */}
+      {/* ===== Premium: AI Floating Button — visible on ALL devices ===== */}
       <button
         onClick={() => setShowAiAssistant(true)}
-        className="hidden lg:flex fixed bottom-6 right-6 z-30 h-14 w-14 rounded-full bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-600 hover:from-violet-700 hover:via-purple-700 hover:to-indigo-700 text-white shadow-xl items-center justify-center transition hover:scale-110 group"
+        className="fixed z-30 h-12 w-12 sm:h-14 sm:w-14 rounded-full bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-600 hover:from-violet-700 hover:via-purple-700 hover:to-indigo-700 text-white shadow-xl flex items-center justify-center transition hover:scale-110 group"
+        style={{ bottom: "calc(80px + env(safe-area-inset-bottom, 0px))", right: "16px" }}
         title="Ask AI Assistant"
         aria-label="Open AI Assistant"
       >
-        <Sparkles className="h-6 w-6 group-hover:scale-110 transition" />
+        <Sparkles className="h-5 w-5 sm:h-6 sm:w-6 group-hover:scale-110 transition" />
         <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-emerald-400 ring-2 ring-white animate-pulse" />
       </button>
 
