@@ -3,9 +3,9 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  ArrowLeft, History, Adjustments, Filter, Download, RefreshCw,
+  ArrowLeft, History, Settings2, Download, RefreshCw,
   Package, TrendingUp, TrendingDown, AlertTriangle, Check, X,
-  Loader2, Search, Calendar, User, Shield, ChevronRight, Printer,
+  Loader2, Search, Calendar, User, Shield, Printer,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -36,7 +36,7 @@ interface StockHistoryProps {
 const ACTION_CONFIG: Record<string, { label: string; color: string; bg: string; icon: any }> = {
   sold:      { label: "Sold",       color: "text-rose-600",    bg: "bg-rose-50",     icon: TrendingDown },
   received:  { label: "Received",   color: "text-emerald-600", bg: "bg-emerald-50",  icon: TrendingUp },
-  adjusted:  { label: "Adjusted",   color: "text-amber-600",   bg: "bg-amber-50",    icon: Adjustments },
+  adjusted:  { label: "Adjusted",   color: "text-amber-600",   bg: "bg-amber-50",    icon: Settings2 },
   returned:  { label: "Returned",   color: "text-blue-600",    bg: "bg-blue-50",     icon: TrendingUp },
   transfer:  { label: "Transfer",   color: "text-purple-600",  bg: "bg-purple-50",   icon: Package },
   damaged:   { label: "Damaged",    color: "text-red-600",     bg: "bg-red-50",      icon: AlertTriangle },
