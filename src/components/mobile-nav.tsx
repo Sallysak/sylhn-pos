@@ -7,13 +7,15 @@ import {
   Truck, Phone, PhoneCall, Settings, FileText, Wrench, Shield, Bell, Download,
   Wallet, Receipt, TrendingUp, Clock, History, AlertTriangle, ChevronRight,
   RefreshCw, Sparkles, Calculator, Moon, Sun, Mail, Users, Map as MapIcon,
+  LayoutGrid, Store,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { COMPANY } from "@/lib/pos-data";
 
 export interface MobileNavTab {
   id: string;
   label: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
   badge?: number;
   onClick?: () => void;
 }
@@ -101,12 +103,12 @@ export function MobileNav({ active, onNavigate, cartCount, user, onLogout }: Mob
   const [drawerOpen, setDrawerOpen] = useState(false);
   const { toast } = useToast();
 
-  // Top 5 destinations shown as bottom tabs
+  // Top 5 destinations shown as bottom tabs — premium icon set
   const tabs: MobileNavTab[] = [
-    { id: "pos", label: "POS", icon: Home },
+    { id: "pos", label: "POS", icon: Store },
     { id: "cart", label: "Cart", icon: ShoppingCart, badge: cartCount },
-    { id: "dashboard", label: "Dashboard", icon: BarChart3 },
-    { id: "reports", label: "Reports", icon: FileText },
+    { id: "dashboard", label: "Dashboard", icon: LayoutGrid },
+    { id: "reports", label: "Reports", icon: BarChart3 },
     { id: "more", label: "More", icon: Menu },
   ];
 
@@ -123,34 +125,37 @@ export function MobileNav({ active, onNavigate, cartCount, user, onLogout }: Mob
 
   return (
     <>
-      {/* Bottom Tab Bar */}
+      {/* ===== Bottom Tab Bar — premium floating glass ===== */}
       <nav className="mobile-bottom-nav mobile-only" role="navigation" aria-label="Primary">
         <div className="mobile-bottom-nav-inner">
-          {tabs.map(tab => {
+          {tabs.map((tab, i) => {
             const isActive = active === tab.id;
             const Icon = tab.icon;
             return (
-              <button
+              <motion.button
                 key={tab.id}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.04, type: "spring", stiffness: 300, damping: 24 }}
                 onClick={() => handleTabClick(tab.id)}
                 className={`mobile-tab haptic-tap ${isActive ? "active" : ""}`}
                 aria-label={tab.label}
                 aria-current={isActive ? "page" : undefined}
               >
                 <span className="tab-icon">
-                  <Icon className="h-5 w-5" />
+                  <Icon className="h-5 w-5" strokeWidth={isActive ? 2.5 : 2} />
                 </span>
                 <span>{tab.label}</span>
                 {tab.badge !== undefined && tab.badge > 0 && (
                   <span className="tab-badge">{tab.badge > 99 ? "99+" : tab.badge}</span>
                 )}
-              </button>
+              </motion.button>
             );
           })}
         </div>
       </nav>
 
-      {/* Slide-in Drawer (More menu) — premium, sharp, no blur */}
+      {/* ===== Slide-in Drawer (More menu) — premium redesigned ===== */}
       <AnimatePresence>
         {drawerOpen && (
           <>
@@ -165,40 +170,59 @@ export function MobileNav({ active, onNavigate, cartCount, user, onLogout }: Mob
               initial={{ x: "100%" }}
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
-              transition={{ type: "spring", damping: 28, stiffness: 320 }}
+              transition={{ type: "spring", damping: 30, stiffness: 340 }}
               className="mobile-drawer"
             >
-              {/* Drawer Header — premium gradient with glow */}
-              <div className="flex-shrink-0 px-5 py-4 gradient-premium-emerald text-white relative overflow-hidden">
+              {/* ===== Drawer Header — premium gradient with company branding ===== */}
+              <div className="flex-shrink-0 relative overflow-hidden text-white"
+                style={{
+                  background: "linear-gradient(135deg, #059669 0%, #0d9488 50%, #0891b2 100%)",
+                  padding: "calc(env(safe-area-inset-top, 0px) + 20px) 20px 20px",
+                }}
+              >
                 {/* Decorative ambient glow */}
-                <div className="pointer-events-none absolute -top-12 -right-12 h-40 w-40 rounded-full bg-white/10 blur-2xl" />
-                <div className="pointer-events-none absolute -bottom-16 -left-8 h-40 w-40 rounded-full bg-emerald-300/15 blur-2xl" />
+                <div className="pointer-events-none absolute -top-16 -right-12 h-48 w-48 rounded-full bg-white/15 blur-3xl" />
+                <div className="pointer-events-none absolute -bottom-20 -left-12 h-44 w-44 rounded-full bg-emerald-300/20 blur-3xl" />
+                <div className="pointer-events-none absolute top-1/2 left-1/3 h-32 w-32 rounded-full bg-cyan-300/10 blur-2xl" />
 
-                <div className="flex items-center justify-between mb-3 relative z-10">
-                  <div className="flex items-center gap-3">
-                    <div className="relative">
-                      <div className="absolute inset-0 rounded-full bg-white/20 blur-md scale-110" />
-                      <div className="relative h-11 w-11 rounded-full bg-white/15 ring-2 ring-white/30 flex items-center justify-center font-bold text-lg backdrop-blur-sm">
-                        {user?.fullName?.charAt(0) || "S"}
-                      </div>
+                {/* Top row: close button */}
+                <div className="flex items-center justify-between mb-4 relative z-10">
+                  <div className="flex items-center gap-2">
+                    <div className="h-7 w-7 rounded-lg bg-white/15 ring-1 ring-white/30 flex items-center justify-center backdrop-blur-sm">
+                      <Menu className="h-4 w-4" />
                     </div>
-                    <div>
-                      <div className="font-bold text-sm tracking-tight">{user?.fullName || "User"}</div>
-                      <div className="text-[10px] text-emerald-50/90 capitalize font-medium">{user?.role || "Cashier"}</div>
-                    </div>
+                    <span className="text-xs font-semibold uppercase tracking-wider opacity-80">Menu</span>
                   </div>
                   <button
                     onClick={() => setDrawerOpen(false)}
-                    className="h-8 w-8 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center transition haptic-tap active:scale-90"
+                    className="h-9 w-9 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center transition haptic-tap active:scale-90 ring-1 ring-white/20 backdrop-blur-sm"
+                    aria-label="Close menu"
                   >
                     <X className="h-4 w-4" />
                   </button>
                 </div>
+
+                {/* User profile + company branding */}
+                <div className="flex items-center gap-3 relative z-10">
+                  <div className="relative">
+                    <div className="absolute inset-0 rounded-2xl bg-white/30 blur-md scale-110" />
+                    <div className="relative h-14 w-14 rounded-2xl bg-white/15 ring-2 ring-white/40 flex items-center justify-center font-bold text-xl backdrop-blur-sm">
+                      {user?.fullName?.charAt(0).toUpperCase() || "S"}
+                    </div>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="font-bold text-base tracking-tight truncate">{user?.fullName || "User"}</div>
+                    <div className="text-[11px] text-emerald-50/90 capitalize font-medium flex items-center gap-1.5">
+                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-200 animate-pulse" />
+                      {user?.role || "Cashier"} · {COMPANY.name}
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              {/* Destinations list — categorized for discoverability */}
-              <div className="flex-1 overflow-y-auto py-2">
-                {/* Premium: AI-powered tools + Features Map — high contrast, no blur */}
+              {/* Destinations list — premium redesigned with refined cards */}
+              <div className="flex-1 overflow-y-auto py-3">
+                {/* Premium: AI-powered tools + Features Map — highlighted at top */}
                 {AI_DESTINATIONS.map(dest => {
                   const Icon = dest.icon;
                   // Features Map → navigate via onNavigate (no href)
@@ -210,15 +234,16 @@ export function MobileNav({ active, onNavigate, cartCount, user, onLogout }: Mob
                           onNavigate(dest.id);
                           setDrawerOpen(false);
                         }}
-                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-violet-50 active:bg-violet-100 transition haptic-tap text-left group"
+                        className="w-full flex items-center gap-3 mx-3 px-3 py-3 rounded-xl hover:bg-violet-50 active:bg-violet-100 transition haptic-tap text-left group ring-1 ring-transparent hover:ring-violet-200"
+                        style={{ width: "calc(100% - 24px)" }}
                       >
-                        <div className={`h-10 w-10 rounded-xl ${dest.bg} flex items-center justify-center ring-1 ring-slate-200`}>
-                          <Icon className={`h-5 w-5 ${dest.color}`} />
+                        <div className={`h-11 w-11 rounded-xl ${dest.bg} flex items-center justify-center ring-1 ring-violet-200/50 shadow-sm`}>
+                          <Icon className={`h-5 w-5 ${dest.color}`} strokeWidth={2.2} />
                         </div>
                         <span className="flex-1 text-sm font-bold text-slate-800 group-hover:text-violet-700">
                           {dest.label}
                         </span>
-                        <ChevronRight className="h-4 w-4 text-slate-400" />
+                        <ChevronRight className="h-4 w-4 text-slate-300 group-hover:text-violet-500 transition" />
                       </button>
                     );
                   }
@@ -230,15 +255,16 @@ export function MobileNav({ active, onNavigate, cartCount, user, onLogout }: Mob
                           window.dispatchEvent(new CustomEvent("sylhn:open-ai"));
                           setDrawerOpen(false);
                         }}
-                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-violet-50 active:bg-violet-100 transition haptic-tap text-left group"
+                        className="w-full flex items-center gap-3 mx-3 px-3 py-3 rounded-xl hover:bg-violet-50 active:bg-violet-100 transition haptic-tap text-left group ring-1 ring-transparent hover:ring-violet-200"
+                        style={{ width: "calc(100% - 24px)" }}
                       >
-                        <div className={`h-10 w-10 rounded-xl ${dest.bg} flex items-center justify-center ring-1 ring-slate-200`}>
-                          <Icon className={`h-5 w-5 ${dest.color}`} />
+                        <div className={`h-11 w-11 rounded-xl ${dest.bg} flex items-center justify-center ring-1 ring-violet-200/50 shadow-sm`}>
+                          <Icon className={`h-5 w-5 ${dest.color}`} strokeWidth={2.2} />
                         </div>
                         <span className="flex-1 text-sm font-bold text-slate-800 group-hover:text-violet-700">
                           {dest.label}
                         </span>
-                        <ChevronRight className="h-4 w-4 text-slate-400" />
+                        <ChevronRight className="h-4 w-4 text-slate-300 group-hover:text-violet-500 transition" />
                       </button>
                     );
                   }
@@ -246,30 +272,33 @@ export function MobileNav({ active, onNavigate, cartCount, user, onLogout }: Mob
                     <a
                       key={dest.id}
                       href={dest.href}
-                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-violet-50 active:bg-violet-100 transition haptic-tap text-left group"
+                      className="w-full flex items-center gap-3 mx-3 px-3 py-3 rounded-xl hover:bg-violet-50 active:bg-violet-100 transition haptic-tap text-left group ring-1 ring-transparent hover:ring-violet-200"
+                      style={{ width: "calc(100% - 24px)" }}
                     >
-                      <div className={`h-10 w-10 rounded-xl ${dest.bg} flex items-center justify-center ring-1 ring-slate-200`}>
-                        <Icon className={`h-5 w-5 ${dest.color}`} />
+                      <div className={`h-11 w-11 rounded-xl ${dest.bg} flex items-center justify-center ring-1 ring-violet-200/50 shadow-sm`}>
+                        <Icon className={`h-5 w-5 ${dest.color}`} strokeWidth={2.2} />
                       </div>
                       <span className="flex-1 text-sm font-bold text-slate-800 group-hover:text-violet-700">
                         {dest.label}
                       </span>
-                      <ChevronRight className="h-4 w-4 text-slate-400" />
+                      <ChevronRight className="h-4 w-4 text-slate-300 group-hover:text-violet-500 transition" />
                     </a>
                   );
                 })}
 
-                {/* Divider */}
+                {/* Divider — premium gradient fade */}
                 {AI_DESTINATIONS.length > 0 && (
-                  <div className="h-px bg-slate-200 my-2 mx-4" />
+                  <div className="h-px mx-6 my-3 bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
                 )}
 
                 {/* Categorized destinations — every ViewMode is reachable */}
                 {MORE_DESTINATIONS.map((section, si) => (
                   <div key={section.category}>
-                    {/* Category header — small, uppercase, muted */}
-                    <div className="px-4 pt-3 pb-1 sticky top-0 bg-white z-10">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{section.category}</span>
+                    {/* Category header — premium sticky header with subtle background */}
+                    <div className="sticky top-0 z-10 px-5 pt-3 pb-2 bg-white/95 backdrop-blur-sm">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                        {section.category}
+                      </span>
                     </div>
                     {section.items.map(dest => {
                       const Icon = dest.icon;
@@ -281,28 +310,29 @@ export function MobileNav({ active, onNavigate, cartCount, user, onLogout }: Mob
                             onNavigate(dest.id);
                             setDrawerOpen(false);
                           }}
-                          className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 active:bg-slate-100 transition haptic-tap text-left ${isActive ? "bg-emerald-50" : ""}`}
+                          className={`w-full flex items-center gap-3 mx-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 active:bg-slate-100 transition haptic-tap text-left ring-1 ring-transparent hover:ring-slate-200 ${isActive ? "bg-emerald-50 ring-emerald-200" : ""}`}
+                          style={{ width: "calc(100% - 24px)" }}
                         >
-                          <div className={`h-10 w-10 rounded-xl ${dest.bg} flex items-center justify-center ring-1 ring-slate-200`}>
-                            <Icon className={`h-5 w-5 ${dest.color}`} />
+                          <div className={`h-10 w-10 rounded-xl ${dest.bg} flex items-center justify-center ring-1 ring-slate-200/70 shadow-sm flex-shrink-0`}>
+                            <Icon className={`h-5 w-5 ${dest.color}`} strokeWidth={2.2} />
                           </div>
-                          <span className={`flex-1 text-sm font-bold ${isActive ? "text-emerald-700" : "text-slate-800"}`}>
+                          <span className={`flex-1 text-sm font-semibold ${isActive ? "text-emerald-700" : "text-slate-700"}`}>
                             {dest.label}
                           </span>
-                          <ChevronRight className="h-4 w-4 text-slate-400" />
+                          <ChevronRight className={`h-4 w-4 transition ${isActive ? "text-emerald-500" : "text-slate-300"}`} />
                         </button>
                       );
                     })}
                     {/* Divider between categories (except after the last) */}
                     {si < MORE_DESTINATIONS.length - 1 && (
-                      <div className="h-px bg-slate-100 my-1 mx-4" />
+                      <div className="h-px mx-6 my-2 bg-gradient-to-r from-transparent via-slate-100 to-transparent" />
                     )}
                   </div>
                 ))}
               </div>
 
-              {/* Dark Mode + Logout */}
-              <div className="flex-shrink-0 p-3 border-t border-slate-200 space-y-2">
+              {/* Dark Mode + Sign Out — premium footer with refined buttons */}
+              <div className="flex-shrink-0 px-3 py-3 border-t border-slate-200 bg-gradient-to-b from-white to-slate-50/50 space-y-2">
                 <button
                   onClick={() => {
                     // Toggle dark mode
@@ -315,7 +345,7 @@ export function MobileNav({ active, onNavigate, cartCount, user, onLogout }: Mob
                       localStorage.setItem("sylhn-dark-mode", "true");
                     }
                   }}
-                  className="w-full h-11 rounded-xl bg-violet-500/10 hover:bg-violet-500/20 text-violet-700 dark:text-violet-300 font-semibold text-sm flex items-center justify-center gap-2 transition haptic-tap ring-1 ring-violet-200 dark:ring-violet-800"
+                  className="w-full h-11 rounded-xl bg-gradient-to-r from-violet-50 to-indigo-50 hover:from-violet-100 hover:to-indigo-100 text-violet-700 dark:text-violet-300 font-semibold text-sm flex items-center justify-center gap-2 transition haptic-tap ring-1 ring-violet-200 dark:ring-violet-800 active:scale-95"
                 >
                   <Moon className="h-4 w-4" />
                   Toggle Dark Mode
@@ -325,7 +355,7 @@ export function MobileNav({ active, onNavigate, cartCount, user, onLogout }: Mob
                     if (onLogout) onLogout();
                     setDrawerOpen(false);
                   }}
-                  className="w-full h-11 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-sm flex items-center justify-center gap-2 transition haptic-tap"
+                  className="w-full h-11 rounded-xl bg-gradient-to-r from-rose-500 to-red-500 hover:from-rose-600 hover:to-red-600 text-white font-bold text-sm flex items-center justify-center gap-2 transition haptic-tap active:scale-95 shadow-md shadow-rose-500/30"
                 >
                   <LogOut className="h-4 w-4" />
                   Sign Out

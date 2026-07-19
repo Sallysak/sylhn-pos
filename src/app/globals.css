@@ -273,100 +273,144 @@
      - Haptic feedback on supported devices
      ============================================================ */
 
-  /* Bottom nav container — fixed to viewport bottom */
+  /* =====================================================================
+     PREMIUM MOBILE BOTTOM NAV — floating glass with pill indicator
+     Inspired by iOS 18, Stripe Dashboard, Linear. Premium, robust, modern.
+     ===================================================================== */
+
+  /* Bottom nav container — floats above content with safe-area padding */
   .mobile-bottom-nav {
     position: fixed;
     bottom: 0;
     left: 0;
     right: 0;
-    z-index: 60; /* Above SpeedDial (z-50) and any other fixed elements */
-    background: rgba(255, 255, 255, 0.92);
-    backdrop-filter: saturate(180%) blur(24px);
-    -webkit-backdrop-filter: saturate(180%) blur(24px);
-    border-top: 1px solid rgba(226, 232, 240, 0.7);
+    z-index: 60;
+    /* Frosted glass effect — heavy saturation + blur for premium feel */
+    background: rgba(255, 255, 255, 0.82);
+    backdrop-filter: saturate(200%) blur(28px) brightness(1.05);
+    -webkit-backdrop-filter: saturate(200%) blur(28px) brightness(1.05);
+    /* Hairline border + subtle glow */
+    border-top: 0.5px solid rgba(255, 255, 255, 0.85);
     padding-bottom: env(safe-area-inset-bottom, 0px);
+    /* Layered shadow for floating effect */
     box-shadow:
-      0 -1px 0 0 rgba(255, 255, 255, 0.6) inset,
-      0 -8px 32px -8px rgba(15, 23, 42, 0.10),
-      0 -2px 8px -2px rgba(15, 23, 42, 0.06);
+      0 0 0 0.5px rgba(15, 23, 42, 0.06),
+      0 -1px 0 0 rgba(255, 255, 255, 0.7) inset,
+      0 -10px 30px -8px rgba(15, 23, 42, 0.12),
+      0 -4px 12px -4px rgba(15, 23, 42, 0.06);
+  }
+
+  html.dark .mobile-bottom-nav {
+    background: rgba(15, 23, 42, 0.82);
+    border-top: 0.5px solid rgba(255, 255, 255, 0.06);
+    box-shadow:
+      0 0 0 0.5px rgba(255, 255, 255, 0.04),
+      0 -1px 0 0 rgba(255, 255, 255, 0.04) inset,
+      0 -10px 30px -8px rgba(0, 0, 0, 0.4),
+      0 -4px 12px -4px rgba(0, 0, 0, 0.3);
   }
 
   .mobile-bottom-nav-inner {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
-    gap: 4px;
-    padding: 8px 8px 6px;
+    gap: 2px;
+    padding: 6px 8px 6px;
     max-width: 480px;
     margin: 0 auto;
   }
 
+  /* Individual tab — premium pill-style with glass background on active */
   .mobile-tab {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 3px;
-    padding: 7px 4px 5px;
-    border-radius: 14px;
+    padding: 8px 4px 6px;
+    border-radius: 16px;
     background: transparent;
     border: none;
     cursor: pointer;
-    transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.32s cubic-bezier(0.32, 0.72, 0, 1);
     color: rgb(100 116 139);
     font-size: 10px;
     font-weight: 600;
     line-height: 1;
     position: relative;
     -webkit-tap-highlight-color: transparent;
+    letter-spacing: 0.01em;
   }
 
+  /* Pressed state — strong tactile feedback */
   .mobile-tab:active {
     transform: scale(0.92);
-    background: rgb(241 245 249);
+    background: rgb(241 245 249 / 0.7);
+  }
+  html.dark .mobile-tab:active {
+    background: rgb(30 41 59 / 0.6);
   }
 
+  /* ACTIVE STATE — premium glass pill with gradient top-bar */
   .mobile-tab.active {
     color: rgb(5 150 105);
+    background: linear-gradient(180deg,
+      rgba(16, 185, 129, 0.14) 0%,
+      rgba(20, 184, 166, 0.08) 60%,
+      transparent 100%);
+  }
+  html.dark .mobile-tab.active {
+    color: rgb(52 211 153);
+    background: linear-gradient(180deg,
+      rgba(16, 185, 129, 0.20) 0%,
+      rgba(20, 184, 166, 0.10) 60%,
+      transparent 100%);
   }
 
+  /* Top indicator bar — replaced with a glowing pill */
   .mobile-tab.active::before {
     content: "";
     position: absolute;
-    top: 2px;
+    top: 1px;
     left: 50%;
     transform: translateX(-50%);
-    width: 24px;
+    width: 28px;
     height: 3px;
     border-radius: 999px;
-    background: linear-gradient(90deg, #059669, #14b8a6);
-    box-shadow: 0 1px 3px 0 rgba(16, 185, 129, 0.4);
+    background: linear-gradient(90deg, #10b981, #14b8a6, #06b6d4);
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.6) inset,
+      0 1px 4px 0 rgba(16, 185, 129, 0.5),
+      0 0 12px 0 rgba(16, 185, 129, 0.4);
   }
 
+  /* Icon container — premium with subtle background on active */
   .mobile-tab .tab-icon {
-    width: 24px;
-    height: 24px;
+    width: 26px;
+    height: 26px;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+    border-radius: 8px;
   }
 
+  /* Active icon — bouncy spring + glow */
   .mobile-tab.active .tab-icon {
-    transform: translateY(-1px) scale(1.05);
-    filter: drop-shadow(0 2px 4px rgba(16, 185, 129, 0.3));
+    transform: translateY(-2px) scale(1.08);
+    filter: drop-shadow(0 3px 6px rgba(16, 185, 129, 0.4));
   }
 
-  /* Cart badge on bottom nav */
+  /* Cart badge on bottom nav — premium pill with glow */
   .mobile-tab .tab-badge {
     position: absolute;
-    top: 2px;
-    right: calc(50% - 18px);
-    background: rgb(244 63 94);
+    top: 1px;
+    right: calc(50% - 20px);
+    background: linear-gradient(135deg, #f43f5e, #e11d48);
     color: white;
     font-size: 9px;
     font-weight: 700;
-    min-width: 16px;
-    height: 16px;
+    min-width: 17px;
+    height: 17px;
     border-radius: 999px;
     padding: 0 4px;
     display: flex;
@@ -374,15 +418,30 @@
     justify-content: center;
     border: 2px solid white;
     line-height: 1;
+    box-shadow:
+      0 0 0 0.5px rgba(244, 63, 94, 0.3),
+      0 2px 6px 0 rgba(244, 63, 94, 0.5);
+    animation: cartBadgePop 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  html.dark .mobile-tab .tab-badge {
+    border-color: rgb(15 23 42);
+    box-shadow:
+      0 0 0 0.5px rgba(244, 63, 94, 0.4),
+      0 2px 6px 0 rgba(244, 63, 94, 0.6);
   }
 
-  /* Slide-in drawer (right side) — premium, sharp, no blur */
+  /* =====================================================================
+     PREMIUM MORE DRAWER — redesigned right-side slide-in
+     ===================================================================== */
+
   .mobile-drawer-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.45);
-    z-index: 50;
-    animation: fadeIn 0.2s ease;
+    background: rgba(15, 23, 42, 0.55);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 65;
+    animation: fadeIn 0.22s ease;
   }
 
   .mobile-drawer {
@@ -390,14 +449,17 @@
     top: 0;
     right: 0;
     bottom: 0;
-    width: min(340px, 88vw);
+    width: min(360px, 92vw);
     background: #ffffff !important;
     color: #1e293b !important;
-    z-index: 51;
-    box-shadow: -12px 0 48px -8px rgba(0, 0, 0, 0.25);
+    z-index: 66;
+    box-shadow:
+      -1px 0 0 0 rgba(15, 23, 42, 0.04),
+      -16px 0 48px -8px rgba(15, 23, 42, 0.25),
+      -4px 0 12px -4px rgba(15, 23, 42, 0.10);
     display: flex;
     flex-direction: column;
-    animation: slideInRight 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+    animation: slideInRight 0.34s cubic-bezier(0.32, 0.72, 0, 1);
     padding-top: env(safe-area-inset-top, 0px);
     padding-bottom: env(safe-area-inset-bottom, 0px);
     will-change: transform;
