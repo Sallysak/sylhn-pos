@@ -413,7 +413,7 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
         <h2>${COMPANY.address} · ${COMPANY.contact}</h2>
       </div>
       <div>Invoice: <strong>${sale.invoiceNumber}</strong></div>
-      <div>Date: ${new Date(sale.createdAt).toLocaleString()}</div>
+      <div>Date: ${sale.createdAt ? new Date(sale.createdAt).toLocaleString() : 'N/A'}</div>
       <div>Cashier: ${sale.cashierName}</div>
       <div>Customer: ${sale.customerName || "Walk-in"}</div>
       <div>Payment: ${sale.paymentMethod}</div>
@@ -646,7 +646,7 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
                             className="border-b border-slate-100 hover:bg-slate-50 cursor-pointer"
                           >
                             <td className="py-2 px-2 font-mono font-semibold text-slate-800">{sale.invoiceNumber}</td>
-                            <td className="py-2 px-2 text-slate-600">{new Date(sale.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })} {new Date(sale.createdAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</td>
+                            <td className="py-2 px-2 text-slate-600">{sale.createdAt ? new Date(sale.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : '—'} {sale.createdAt ? new Date(sale.createdAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : ''}</td>
                             <td className="py-2 px-2 text-slate-600">{sale.customerName || "Walk-in"}</td>
                             <td className="py-2 px-2 text-slate-600">{sale.cashierName}</td>
                             <td className="py-2 px-2 text-right text-slate-600">{sale.items?.length || 0}</td>
@@ -823,7 +823,7 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
                               </div>
                             </td>
                             <td className="py-2 px-2 text-center text-slate-600">
-                              {new Date(p.expiryDate as any).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                              {p.expiryDate ? new Date(p.expiryDate as any).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
                             </td>
                             <td className="py-2 px-2 text-center font-mono font-bold">
                               <span className={cn(
@@ -974,7 +974,7 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
                   <div className="grid grid-cols-2 gap-3 text-xs">
                     <div>
                       <div className="text-slate-400 font-semibold uppercase text-[9px]">Date</div>
-                      <div className="text-slate-800">{new Date(selectedSale.createdAt).toLocaleString()}</div>
+                      <div className="text-slate-800">{selectedSale.createdAt ? new Date(selectedSale.createdAt).toLocaleString() : 'N/A'}</div>
                     </div>
                     <div>
                       <div className="text-slate-400 font-semibold uppercase text-[9px]">Cashier</div>

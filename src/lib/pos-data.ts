@@ -236,6 +236,7 @@ export const TAX_RATE = 0.15; // 15% VAT
 export const TAX_NAME = "VAT";
 
 // Helper to format currency in GHS
-export function formatGHS(amount: number): string {
-  return `${CURRENCY}${amount.toLocaleString('en-GH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+export function formatGHS(amount: number | undefined | null): string {
+  const safeAmount = typeof amount === 'number' && !isNaN(amount) ? amount : 0;
+  return `${CURRENCY}${safeAmount.toLocaleString('en-GH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
