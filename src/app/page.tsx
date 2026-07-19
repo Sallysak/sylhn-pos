@@ -15,6 +15,7 @@ import {
   FileBarChart2, BookOpen, PhoneCall, Archive, Settings2, Lock,
   FileSearch, Copy, Image as ImageIcon, Tags,
   Smartphone, RefreshCw, Sparkles, Loader2, AlertTriangle, Calculator as CalcIcon, Mail, Send,
+  ExternalLink,
 } from "lucide-react";
 import {
   products as INITIAL_PRODUCTS, categories, paymentMethods, quickCashAmounts,
@@ -206,17 +207,53 @@ export default function POSPage() {
   const menuRef = useRef<HTMLDivElement>(null);
 
   // ===== Persist session-only state to localStorage =====
-  // NOTE: products/groups are NOT persisted here. They are fetched from
-  // the server every 30 seconds.
-  // What we DO persist:
-  //   - history: local stock movement log (for the History tab — server has
-  //     its own StockHistory table that's the authoritative source)
-  //   - heldOrders: parked carts (for recall)
-  //   - dailyTotal / transactionCount: for header display
+  // ROBUST DATA PERSISTENCE — survives logout/login, page refresh, browser restart.
+  //
+  // What we persist:
+  //   - history:        local stock movement log
+  //   - heldOrders:     parked carts (for recall)
+  //   - dailyTotal:     today's gross sales (header display)
+  //   - transactionCount: today's transaction count (header display)
+  //   - products-cache: offline product list (so the POS grid isn't empty
+  //                     after logout/login or refresh — the server refresh
+  //                     will overwrite with fresh data within 30s)
+  //   - groups:         stock groups (so Stock Management view isn't empty)
+  //
+  // The products-cache is written DEBOUNCED (500ms) because product arrays
+  // can be large and we don't want to write on every keystroke during edits.
   useEffect(() => { try { localStorage.setItem('sylhn-history', JSON.stringify(history)); } catch {} }, [history]);
   useEffect(() => { try { localStorage.setItem('sylhn-held-orders', JSON.stringify(heldOrders)); } catch {} }, [heldOrders]);
   useEffect(() => { try { localStorage.setItem('sylhn-daily-total', String(dailyTotal)); } catch {} }, [dailyTotal]);
   useEffect(() => { try { localStorage.setItem('sylhn-txn-count', String(transactionCount)); } catch {} }, [transactionCount]);
+
+  // Debounced persistence for products (large array — don't write on every change)
+  const productsSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (productsSaveTimer.current) clearTimeout(productsSaveTimer.current);
+    productsSaveTimer.current = setTimeout(() => {
+      try {
+        // Only cache if we have real data (not the initial seed fallback)
+        if (products && products.length > 0) {
+          localStorage.setItem('sylhn-products-cache', JSON.stringify(products));
+        }
+      } catch { /* localStorage may be full — silently ignore */ }
+    }, 500);
+    return () => { if (productsSaveTimer.current) clearTimeout(productsSaveTimer.current); };
+  }, [products]);
+
+  // Debounced persistence for groups
+  const groupsSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (groupsSaveTimer.current) clearTimeout(groupsSaveTimer.current);
+    groupsSaveTimer.current = setTimeout(() => {
+      try {
+        if (groups && groups.length > 0) {
+          localStorage.setItem('sylhn-groups', JSON.stringify(groups));
+        }
+      } catch { /* ignore */ }
+    }, 500);
+    return () => { if (groupsSaveTimer.current) clearTimeout(groupsSaveTimer.current); };
+  }, [groups]);
 
   // ===== Effects =====
   // Initialize client-only values to avoid hydration mismatch.
@@ -1482,6 +1519,20 @@ export default function POSPage() {
               if (cachedHistory) setHistory(JSON.parse(cachedHistory));
               const cachedHeld = localStorage.getItem('sylhn-held-orders');
               if (cachedHeld) setHeldOrders(JSON.parse(cachedHeld));
+              // Also reload products and groups from cache so the UI shows
+              // the last-known state immediately (server refresh will arrive
+              // within 30s and overwrite). This prevents the "data is missing"
+              // flash after logout/login.
+              const cachedProducts = localStorage.getItem('sylhn-products-cache');
+              if (cachedProducts) {
+                const parsed = JSON.parse(cachedProducts);
+                if (Array.isArray(parsed) && parsed.length > 0) setProducts(parsed);
+              }
+              const cachedGroups = localStorage.getItem('sylhn-groups');
+              if (cachedGroups) {
+                const parsed = JSON.parse(cachedGroups);
+                if (Array.isArray(parsed) && parsed.length > 0) setGroups(parsed);
+              }
             } catch { /* ignore parse errors */ }
             toast({ title: `Welcome, ${user.fullName}`, description: `Logged in as ${user.role}` });
           }}
@@ -3715,35 +3766,56 @@ function CartPreviewModal({
 }
 
 // ===== Helper: Build WhatsApp receipt text from payment data =====
-function buildWhatsAppReceiptText(payment: any): string {
+// Defensive: cart items may not have `total` set (it's optional in CartItem),
+// and any numeric field on the payment may be missing if the result object
+// was assembled from an older code path. Compute everything from primitives.
+const safeNum = (v: any): number =>
+  typeof v === 'number' && isFinite(v) ? v : 0;
+const itemTotalOf = (item: any): number =>
+  typeof item.total === 'number' && isFinite(item.total)
+    ? item.total
+    : safeNum(item.price) * safeNum(item.quantity) * (1 - (safeNum(item.discount) / 100));
+
+function buildWhatsAppReceiptText(payment: any, verifyUrl?: string): string {
+  const ts = payment.timestamp instanceof Date
+    ? payment.timestamp
+    : new Date(payment.timestamp || Date.now());
   const lines: string[] = [
     `*SYLHN COMPANY LTD*`,
     `Grocery Store · East Legon, Accra`,
     `+233 59 276 6044`,
     ``,
-    `*Invoice:* ${payment.invoiceNumber}`,
-    `*Date:* ${new Date(payment.timestamp).toLocaleString('en-GB')}`,
+    `*Invoice:* ${payment.invoiceNumber || 'N/A'}`,
+    `*Date:* ${ts.toLocaleString('en-GB')}`,
     `*Cashier:* ${payment.cashier || 'N/A'}`,
     payment.customer ? `*Customer:* ${payment.customer}` : '',
     ``,
     `*Items:*`,
   ].filter(Boolean);
 
-  for (const item of payment.items) {
-    lines.push(`${item.emoji || '📦'} ${item.name}`);
-    lines.push(`   ${item.quantity} × ${CURRENCY}${item.price.toFixed(2)} = ${CURRENCY}${item.total.toFixed(2)}`);
+  for (const item of (payment.items || [])) {
+    lines.push(`${item.emoji || '📦'} ${item.name || 'Item'}`);
+    lines.push(`   ${safeNum(item.quantity)} × ${CURRENCY}${safeNum(item.price).toFixed(2)} = ${CURRENCY}${itemTotalOf(item).toFixed(2)}`);
   }
 
   lines.push(``);
-  lines.push(`*Subtotal:* ${CURRENCY}${payment.subtotal.toFixed(2)}`);
-  if (payment.discount > 0) lines.push(`*Discount:* -${CURRENCY}${payment.discount.toFixed(2)}`);
-  lines.push(`*VAT:* ${CURRENCY}${payment.tax.toFixed(2)}`);
-  lines.push(`*TOTAL: ${CURRENCY}${payment.total.toFixed(2)}*`);
+  lines.push(`*Subtotal:* ${CURRENCY}${safeNum(payment.subtotal).toFixed(2)}`);
+  if (safeNum(payment.discount) > 0) lines.push(`*Discount:* -${CURRENCY}${safeNum(payment.discount).toFixed(2)}`);
+  lines.push(`*VAT:* ${CURRENCY}${safeNum(payment.tax).toFixed(2)}`);
+  lines.push(`*TOTAL: ${CURRENCY}${safeNum(payment.total).toFixed(2)}*`);
   lines.push(``);
-  lines.push(`*Paid:* ${CURRENCY}${payment.amountPaid.toFixed(2)} (${payment.method})`);
-  lines.push(`*Change:* ${CURRENCY}${payment.change.toFixed(2)}`);
+  lines.push(`*Paid:* ${CURRENCY}${safeNum(payment.amountPaid).toFixed(2)} (${payment.method || 'cash'})`);
+  lines.push(`*Change:* ${CURRENCY}${safeNum(payment.change).toFixed(2)}`);
   lines.push(``);
   lines.push(`Thank you for shopping with us! 🙏`);
+  // Append a tappable online receipt link so customers can view the full
+  // receipt in any browser (no WhatsApp needed) — works on the customer's
+  // phone even if they don't have WhatsApp installed.
+  if (verifyUrl) {
+    lines.push(``);
+    lines.push(`📄 *View / verify receipt online:*`);
+    lines.push(verifyUrl);
+  }
 
   return lines.join("\n");
 }
@@ -3764,37 +3836,54 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
   const [copied, setCopied] = useState(false);
   const { toast } = useToast();
 
+  // Compute the public receipt-verify URL once (used by QR code, WhatsApp
+  // message, and the "View Online" button). Prefers saleId when available
+  // because it's more reliable than invoice number for lookup.
+  const verifyUrl = useMemo(() => {
+    if (typeof window === 'undefined') return '';
+    const origin = window.location.origin;
+    const params = new URLSearchParams();
+    if (payment.saleId) params.set('saleId', payment.saleId);
+    if (payment.invoiceNumber) params.set('invoice', payment.invoiceNumber);
+    return `${origin}/api/receipt/verify?${params.toString()}`;
+  }, [payment.saleId, payment.invoiceNumber]);
+
   // Generate QR code
   useEffect(() => {
-    if (!showQR || qrDataUrl) return;
-    const verifyUrl = `${window.location.origin}/api/receipt/verify?invoice=${payment.invoiceNumber}`;
+    if (!showQR || qrDataUrl || !verifyUrl) return;
     setQrDataUrl(`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(verifyUrl)}`);
-  }, [showQR, payment.invoiceNumber, qrDataUrl]);
+  }, [showQR, verifyUrl, qrDataUrl]);
 
-  // Generate CSV string
+  // Generate CSV string (defensive — item.total is optional in CartItem)
   const csvContent = useMemo(() => {
+    const ts = payment.timestamp instanceof Date
+      ? payment.timestamp
+      : new Date(payment.timestamp || Date.now());
     const rows = [
       ["Field", "Value"],
-      ["Invoice", payment.invoiceNumber],
-      ["Date", new Date(payment.timestamp).toLocaleString('en-GB')],
+      ["Invoice", payment.invoiceNumber || 'N/A'],
+      ["Date", ts.toLocaleString('en-GB')],
       ["Cashier", payment.cashier || 'N/A'],
       ["Customer", payment.customer || 'Walk-in'],
-      ["Subtotal", payment.subtotal.toFixed(2)],
-      ["Discount", payment.discount.toFixed(2)],
-      ["Tax", payment.tax.toFixed(2)],
-      ["Total", payment.total.toFixed(2)],
-      ["Amount Paid", payment.amountPaid.toFixed(2)],
-      ["Change", payment.change.toFixed(2)],
-      ["Payment Method", payment.method],
+      ["Subtotal", safeNum(payment.subtotal).toFixed(2)],
+      ["Discount", safeNum(payment.discount).toFixed(2)],
+      ["Tax", safeNum(payment.tax).toFixed(2)],
+      ["Total", safeNum(payment.total).toFixed(2)],
+      ["Amount Paid", safeNum(payment.amountPaid).toFixed(2)],
+      ["Change", safeNum(payment.change).toFixed(2)],
+      ["Payment Method", payment.method || 'cash'],
       ["", ""],
       ["Items", ""],
-      ...payment.items.map((item: any) => [`${item.emoji || ''} ${item.name}`, `${item.quantity} x ${formatGHS(item.price)} = ${formatGHS(item.total)}`]),
+      ...(payment.items || []).map((item: any) =>
+        [`${item.emoji || ''} ${item.name || 'Item'}`,
+         `${safeNum(item.quantity)} x ${formatGHS(item.price)} = ${formatGHS(itemTotalOf(item))}`]),
     ];
     return rows.map(r => r.map(c => `"${c}"`).join(",")).join("\n");
   }, [payment]);
 
-  // Generate WhatsApp receipt text
-  const waText = useMemo(() => buildWhatsAppReceiptText(payment), [payment]);
+  // Generate WhatsApp receipt text (includes the verify URL so customers
+  // can tap to view the receipt in any browser)
+  const waText = useMemo(() => buildWhatsAppReceiptText(payment, verifyUrl), [payment, verifyUrl]);
   const waLink = useMemo(() => {
     const phone = waPhone.replace(/[\s+\-()]/g, "");
     return phone
@@ -3845,13 +3934,13 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
     }, 100);
   };
 
-  // Print receipt HTML (full-screen overlay within the app)
+  // Print receipt HTML (full-screen overlay within the app) — defensive
   const printReceiptHTML = useMemo(() => {
-    const itemsHtml = payment.items.map((item: any) => `
+    const itemsHtml = (payment.items || []).map((item: any) => `
       <tr>
-        <td style="padding:3px 8px;text-align:left;border-bottom:1px dotted #ccc">${item.emoji || ''} ${item.name}</td>
-        <td style="padding:3px 8px;text-align:right;border-bottom:1px dotted #ccc">${item.quantity}</td>
-        <td style="padding:3px 8px;text-align:right;border-bottom:1px dotted #ccc">${formatGHS(item.total)}</td>
+        <td style="padding:3px 8px;text-align:left;border-bottom:1px dotted #ccc">${item.emoji || ''} ${item.name || 'Item'}</td>
+        <td style="padding:3px 8px;text-align:right;border-bottom:1px dotted #ccc">${safeNum(item.quantity)}</td>
+        <td style="padding:3px 8px;text-align:right;border-bottom:1px dotted #ccc">${formatGHS(itemTotalOf(item))}</td>
       </tr>`).join("");
     return `<div style="font-family:monospace;max-width:320px;margin:0 auto;padding:20px;font-size:13px;color:#1e293b">
       <div style="text-align:center;margin-bottom:10px">
@@ -3860,8 +3949,8 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
         <div style="font-size:11px;color:#64748b">${COMPANY.contact}</div>
       </div>
       <hr style="border:none;border-top:1px dashed #94a3b8;margin:8px 0"/>
-      <div>Invoice: <strong>${payment.invoiceNumber}</strong></div>
-      <div>Date: ${new Date(payment.timestamp).toLocaleString('en-GB')}</div>
+      <div>Invoice: <strong>${payment.invoiceNumber || 'N/A'}</strong></div>
+      <div>Date: ${(payment.timestamp instanceof Date ? payment.timestamp : new Date(payment.timestamp || Date.now())).toLocaleString('en-GB')}</div>
       <div>Cashier: ${payment.cashier || 'N/A'}</div>
       ${payment.customer ? `<div>Customer: ${payment.customer}</div>` : ''}
       <hr style="border:none;border-top:1px dashed #94a3b8;margin:8px 0"/>
@@ -3906,7 +3995,7 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
               <Check className="h-9 w-9" />
             </motion.div>
             <div className="text-lg font-bold">Payment Successful!</div>
-            <div className="text-xs opacity-90 mt-0.5">{new Date(payment.timestamp).toLocaleString('en-GB')}</div>
+            <div className="text-xs opacity-90 mt-0.5">{(payment.timestamp instanceof Date ? payment.timestamp : new Date(payment.timestamp || Date.now())).toLocaleString('en-GB')}</div>
           </div>
 
           {/* Receipt body — scrollable with max height */}
@@ -4055,16 +4144,32 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
                 />
               </div>
             </div>
-            <div className="flex-shrink-0 p-4 border-t border-slate-200 flex gap-2">
-              <button onClick={() => copyToClipboard(waLink)} className="btn-premium flex-1 h-10 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold flex items-center justify-center gap-1.5">
-                {copied ? <><Check className="h-3.5 w-3.5" /> Copied!</> : <><FileText className="h-3.5 w-3.5" /> Copy Link</>}
-              </button>
-              <button onClick={() => copyToClipboard(waText)} className="btn-premium flex-1 h-10 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold flex items-center justify-center gap-1.5">
-                <FileText className="h-3.5 w-3.5" /> Copy Message
-              </button>
-              <a href={waLink} target="_blank" rel="noopener noreferrer" className="btn-premium flex-1 h-10 rounded-xl bg-[#25D366] hover:bg-[#1ebe57] text-white text-xs font-bold flex items-center justify-center gap-1.5 no-underline">
-                <Send className="h-3.5 w-3.5" /> Open WhatsApp
-              </a>
+            <div className="flex-shrink-0 p-4 border-t border-slate-200 space-y-2">
+              {/* Primary: open WhatsApp with prefilled receipt text */}
+              <div className="flex gap-2">
+                <button onClick={() => copyToClipboard(waLink)} className="btn-premium flex-1 h-10 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold flex items-center justify-center gap-1.5">
+                  {copied ? <><Check className="h-3.5 w-3.5" /> Copied!</> : <><FileText className="h-3.5 w-3.5" /> Copy Link</>}
+                </button>
+                <button onClick={() => copyToClipboard(waText)} className="btn-premium flex-1 h-10 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold flex items-center justify-center gap-1.5">
+                  <FileText className="h-3.5 w-3.5" /> Copy Message
+                </button>
+                <a href={waLink} target="_blank" rel="noopener noreferrer" className="btn-premium flex-1 h-10 rounded-xl bg-[#25D366] hover:bg-[#1ebe57] text-white text-xs font-bold flex items-center justify-center gap-1.5 no-underline">
+                  <Send className="h-3.5 w-3.5" /> Open WhatsApp
+                </a>
+              </div>
+              {/* Secondary: view the receipt online in any browser (no WhatsApp needed) */}
+              <div className="flex gap-2">
+                <button onClick={() => copyToClipboard(verifyUrl)} className="btn-premium flex-1 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold flex items-center justify-center gap-1.5 ring-1 ring-slate-200">
+                  <FileText className="h-3.5 w-3.5" /> Copy Receipt URL
+                </button>
+                <a href={verifyUrl} target="_blank" rel="noopener noreferrer" className="btn-premium flex-1 h-10 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 no-underline">
+                  <ExternalLink className="h-3.5 w-3.5" /> View Receipt Online
+                </a>
+              </div>
+              <div className="text-[10px] text-slate-400 text-center">
+                💡 “View Receipt Online” opens the receipt in any browser — no WhatsApp required.
+                Share this link via SMS, email, or any messenger.
+              </div>
             </div>
           </div>
         </div>

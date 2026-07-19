@@ -1,13 +1,18 @@
 {
-  "name": "SYLHN POS - Grocery Store Point of Sale",
+  "name": "SYLHN POS — Grocery Store Point of Sale",
   "short_name": "SYLHN POS",
-  "description": "Modern point-of-sale system for SYLHN COMPANY LTD. Stock management, sales, purchases, and reports in Ghana Cedis.",
+  "description": "Premium point-of-sale system for SYLHN COMPANY LTD. Stock management, sales, purchases, and reports in Ghana Cedis.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "orientation": "any",
-  "background_color": "#0f172a",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait-primary",
+  "background_color": "#059669",
   "theme_color": "#059669",
-  "categories": ["business", "productivity", "shopping"],
+  "categories": ["business", "productivity", "shopping", "finance"],
+  "lang": "en",
+  "dir": "ltr",
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "/icon-192.png",
@@ -33,13 +38,22 @@
       "name": "New Sale",
       "short_name": "Sale",
       "description": "Start a new sale at the POS",
-      "url": "/?action=new-sale"
+      "url": "/?action=new-sale",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
     },
     {
       "name": "Stock Management",
       "short_name": "Stock",
       "description": "Manage products and stock levels",
-      "url": "/?action=stock"
+      "url": "/?action=stock",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Reports",
+      "short_name": "Reports",
+      "description": "View sales and stock reports",
+      "url": "/?action=reports",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
     }
   ]
 }

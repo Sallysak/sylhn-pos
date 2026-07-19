@@ -42,13 +42,19 @@ export default function CustomerDisplay() {
   }, []);
 
   const items = state?.items || [];
-  const subtotal = state?.subtotal || 0;
-  const discount = state?.discount || 0;
-  const tax = state?.tax || 0;
-  const total = state?.total || 0;
+  const subtotal = Number(state?.subtotal) || 0;
+  const discount = Number(state?.discount) || 0;
+  const tax = Number(state?.tax) || 0;
+  const total = Number(state?.total) || 0;
   const customerName = state?.customerName;
   const loyaltyPoints = state?.loyaltyPoints;
   const message = state?.message;
+
+  // Defensive: each item field could be missing/NaN if a stale or partial
+  // payload was sent to /api/customer-display. Coerce to finite numbers so
+  // .toFixed() below never crashes the whole display.
+  const num = (v: any): number =>
+    typeof v === 'number' && isFinite(v) ? v : 0;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-emerald-950 to-slate-900 text-white flex flex-col">
@@ -126,15 +132,15 @@ export default function CustomerDisplay() {
                     transition={{ duration: 0.25 }}
                     className="flex items-center gap-4 bg-white/5 backdrop-blur rounded-2xl p-4 ring-1 ring-white/10"
                   >
-                    <div className="text-3xl">{item.emoji}</div>
+                    <div className="text-3xl">{item.emoji || '📦'}</div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-semibold text-lg truncate">{item.name}</div>
+                      <div className="font-semibold text-lg truncate">{item.name || 'Item'}</div>
                       <div className="text-sm text-slate-400">
-                        {item.quantity} × ₵{item.price.toFixed(2)}
+                        {num(item.quantity)} × ₵{num(item.price).toFixed(2)}
                       </div>
                     </div>
                     <div className="text-2xl font-bold font-mono text-emerald-300">
-                      ₵{item.total.toFixed(2)}
+                      ₵{num(item.total).toFixed(2)}
                     </div>
                   </motion.div>
                 ))}

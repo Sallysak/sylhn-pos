@@ -1404,3 +1404,827 @@
     background: linear-gradient(135deg, rgb(30 41 59), rgb(51 65 85));
   }
 }
+
+/* ============================================================================
+   PREMIUM MOBILE POLISH — applies native-app feel across ALL modules
+   This is a global overlay that upgrades the mobile UX without requiring
+   per-component rewrites. Inspired by Shopify POS, Square POS, and
+   modern native iOS/Android finance apps.
+   ============================================================================ */
+
+/* ===== 1. Viewport & Safe Areas ===== */
+@supports (padding: env(safe-area-inset-top)) {
+  body {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+}
+
+/* ===== 2. Touch Target Sizing — premium apps require 44pt+ tap targets ===== */
+@media (max-width: 768px) {
+  button,
+  [role="button"],
+  a.btn-premium,
+  .btn-premium,
+  input[type="button"],
+  input[type="submit"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  /* But don't force tiny icon-only buttons to be huge */
+  button.h-7, button.h-8, button.h-9,
+  .btn-premium.h-7, .btn-premium.h-8, .btn-premium.h-9 {
+    min-height: 36px;
+    min-width: 36px;
+  }
+}
+
+/* ===== 3. Haptic-style Active States (visual feedback on tap) ===== */
+@media (hover: none) and (pointer: coarse) {
+  button:not(:disabled):active,
+  [role="button"]:active,
+  a:active,
+  .btn-premium:active,
+  .haptic-tap:active {
+    transform: scale(0.96);
+    transition: transform 80ms ease-out;
+  }
+  /* Slightly stronger feedback for primary actions */
+  .gradient-premium-emerald:active,
+  button[class*="bg-emerald"]:active,
+  button[class*="bg-violet"]:active,
+  button[class*="bg-rose"]:active {
+    transform: scale(0.93);
+  }
+}
+
+/* ===== 4. Premium Inputs (mobile-optimized) ===== */
+@media (max-width: 768px) {
+  .input-premium,
+  input[type="text"], input[type="email"], input[type="password"],
+  input[type="number"], input[type="tel"], input[type="url"],
+  input[type="search"], input[type="date"], input[type="time"],
+  textarea, select {
+    font-size: 16px !important; /* prevents iOS zoom on focus */
+    min-height: 44px;
+  }
+  /* Smaller inputs stay small but readable */
+  input.text-[10px], input.text-[11px], input.text-xs,
+  input.h-7, input.h-8 {
+    font-size: 14px !important;
+  }
+}
+
+/* ===== 5. Mobile-Only Premium Bottom Sheet / Modal Polish ===== */
+@media (max-width: 767px) {
+  /* Modals slide up from bottom like a native bottom sheet */
+  .dialog-premium,
+  [class*="dialog-premium"],
+  [role="dialog"] > div {
+    border-radius: 20px 20px 0 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    max-height: 92vh !important;
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    top: auto !important;
+    animation: slideUpModal 320ms cubic-bezier(0.32, 0.72, 0, 1) !important;
+  }
+  @keyframes slideUpModal {
+    from { transform: translateY(100%); opacity: 0.4; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+  /* Add a grab handle indicator on mobile modals */
+  [role="dialog"] > div::before,
+  .dialog-premium::before {
+    content: "";
+    display: block;
+    width: 36px;
+    height: 4px;
+    background: rgba(100, 116, 139, 0.3);
+    border-radius: 9999px;
+    margin: 8px auto 0;
+  }
+  /* Modal overlay darker on mobile for focus */
+  [class*="bg-slate-900/60"],
+  [class*="bg-black/60"],
+  [class*="bg-slate-900/50"] {
+    background: rgba(15, 23, 42, 0.75) !important;
+    backdrop-filter: blur(8px);
+  }
+}
+
+/* ===== 6. Premium Cards (more depth on mobile) ===== */
+@media (max-width: 768px) {
+  .card-premium,
+  [class*="card-premium"] {
+    border-radius: 16px;
+    box-shadow:
+      0 1px 2px rgba(15, 23, 42, 0.04),
+      0 4px 12px rgba(15, 23, 42, 0.06);
+  }
+  /* On mobile, give cards breathing room from edges */
+  .card-premium:not([class*="m-0"]):not([class*="mx-0"]) {
+    margin-left: 4px;
+    margin-right: 4px;
+  }
+}
+
+/* ===== 7. Hide desktop-only menus on mobile (use MobileNav instead) ===== */
+@media (max-width: 767px) {
+  /* Top menu bar (POS/Sale/Stock/Purchase/...) is replaced by MobileNav bottom tabs */
+  .header-premium > div > div[class*="flex items-center gap-0.5"]:has(> div > button[aria-label]),
+  nav.header-premium nav {
+    display: none !important;
+  }
+  /* Header takes less vertical space on mobile */
+  .header-premium {
+    padding-top: env(safe-area-inset-top, 0);
+  }
+  .header-premium > div {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+    padding-top: 8px !important;
+    padding-bottom: 8px !important;
+  }
+}
+
+/* ===== 8. Premium Buttons (mobile) ===== */
+@media (max-width: 768px) {
+  .btn-premium {
+    border-radius: 12px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    transition: all 200ms cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  .btn-premium:not(:disabled):hover {
+    transform: translateY(-1px);
+  }
+  .btn-premium:not(:disabled):active {
+    transform: translateY(0) scale(0.97);
+  }
+}
+
+/* ===== 9. Premium Product Grid (POS) — touch-friendly tiles ===== */
+@media (max-width: 768px) {
+  /* Product tiles: 2 columns on phones, larger tap area */
+  .grid[class*="grid-cols"] > button[class*="rounded"] {
+    border-radius: 14px;
+    transition: transform 150ms ease-out;
+  }
+  .grid[class*="grid-cols"] > button[class*="rounded"]:active {
+    transform: scale(0.95);
+  }
+}
+
+/* ===== 10. Bottom Navigation polish ===== */
+@media (max-width: 767px) {
+  .mobile-bottom-nav {
+    background: rgba(255, 255, 255, 0.96) !important;
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    border-top: 0.5px solid rgba(0, 0, 0, 0.08);
+    box-shadow: 0 -4px 24px rgba(15, 23, 42, 0.08);
+  }
+  html.dark .mobile-bottom-nav {
+    background: rgba(15, 23, 42, 0.96) !important;
+    border-top: 0.5px solid rgba(255, 255, 255, 0.08);
+  }
+  .mobile-tab {
+    transition: transform 150ms ease-out, color 150ms ease-out;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .mobile-tab.active {
+    color: #059669 !important;
+  }
+  html.dark .mobile-tab.active {
+    color: #34d399 !important;
+  }
+  .mobile-tab.active::before {
+    background: linear-gradient(180deg, #059669, #0d9488) !important;
+  }
+  .mobile-tab .tab-icon {
+    transition: transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .mobile-tab.active .tab-icon {
+    transform: translateY(-2px) scale(1.1);
+  }
+}
+
+/* ===== 11. Toast / Notification polish (mobile) ===== */
+@media (max-width: 768px) {
+  /* Toasts appear at top on mobile, above the safe area */
+  [data-sonner-toast],
+  [class*="toast-premium"],
+  .toast-premium {
+    max-width: calc(100vw - 32px) !important;
+    margin-left: 16px !important;
+    margin-right: 16px !important;
+    border-radius: 14px;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.16);
+  }
+}
+
+/* ===== 12. Form polish — premium grouped fields on mobile ===== */
+@media (max-width: 768px) {
+  label {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+  /* Form sections have more breathing room */
+  form > div + div,
+  form > fieldset + fieldset {
+    margin-top: 16px;
+  }
+}
+
+/* ===== 13. Table → Card transformation on mobile (premium pattern) ===== */
+@media (max-width: 767px) {
+  /* Wrap any table in .mobile-scroll-x to make it horizontally scrollable
+     instead of breaking the layout. For tables NOT wrapped, we shrink fonts. */
+  table:not(.mobile-scroll-x table):not([class*="table-fixed"]) {
+    font-size: 11px;
+  }
+  table:not(.mobile-scroll-x table) th,
+  table:not(.mobile-scroll-x table) td {
+    padding: 6px 8px;
+  }
+}
+
+/* ===== 14. Loading states — premium skeleton shimmer ===== */
+.skeleton-premium {
+  background: linear-gradient(
+    90deg,
+    rgba(226, 232, 240, 0.4) 0%,
+    rgba(226, 232, 240, 0.8) 50%,
+    rgba(226, 232, 240, 0.4) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer-premium 1.4s ease-in-out infinite;
+  border-radius: 8px;
+}
+html.dark .skeleton-premium {
+  background: linear-gradient(
+    90deg,
+    rgba(30, 41, 59, 0.4) 0%,
+    rgba(51, 65, 85, 0.8) 50%,
+    rgba(30, 41, 59, 0.4) 100%
+  );
+  background-size: 200% 100%;
+}
+@keyframes shimmer-premium {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ===== 15. PWA Display Mode Polish ===== */
+@media (display-mode: standalone) {
+  /* When installed as PWA, give the app a more native feel */
+  body {
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+  /* But allow text selection in inputs and content areas */
+  input, textarea, [contenteditable="true"], .selectable {
+    user-select: text;
+    -webkit-user-select: text;
+    -webkit-touch-callout: default;
+  }
+  /* No tap highlight in PWA mode */
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* ===== 16. Scrollbar hiding for horizontal scrollers (premium feel) ===== */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* ===== 17. Premium gradient overlays for empty states ===== */
+.gradient-empty-state {
+  background:
+    radial-gradient(circle at 30% 20%, rgba(16, 185, 129, 0.08), transparent 50%),
+    radial-gradient(circle at 70% 80%, rgba(139, 92, 246, 0.06), transparent 50%),
+    linear-gradient(135deg, rgb(248 250 252), rgb(241 245 249));
+}
+html.dark .gradient-empty-state {
+  background:
+    radial-gradient(circle at 30% 20%, rgba(16, 185, 129, 0.10), transparent 50%),
+    radial-gradient(circle at 70% 80%, rgba(139, 92, 246, 0.08), transparent 50%),
+    linear-gradient(135deg, rgb(15 23 42), rgb(30 41 59));
+}
+
+/* ===== 18. Mobile-optimized header (compact on small screens) ===== */
+@media (max-width: 480px) {
+  .header-premium .text-base {
+    font-size: 14px !important;
+  }
+  .header-premium .text-\[10px\] {
+    font-size: 9px !important;
+  }
+  /* Hide the address/contact line on very small screens to save space */
+  .header-premium .text-\[10px\].text-emerald-50\/90 {
+    display: none;
+  }
+}
+
+/* ===== 19. Floating Action Button (FAB) premium polish ===== */
+.fab-premium {
+  position: fixed;
+  bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+  right: 16px;
+  z-index: 40;
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #059669, #0d9488);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    0 4px 12px rgba(5, 150, 105, 0.4),
+    0 8px 24px rgba(5, 150, 105, 0.24);
+  transition: transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.fab-premium:active {
+  transform: scale(0.92);
+}
+
+/* ===== 20. Print receipts: hide everything except the receipt ===== */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-receipt-visible,
+  .print-receipt-visible * {
+    visibility: visible;
+  }
+  .print-receipt-visible {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 80mm;
+    padding: 4mm;
+  }
+}
+
+/* ===== 21. Premium focus rings (accessibility + polish) ===== */
+@media (max-width: 768px) {
+  *:focus-visible {
+    outline: 2px solid #059669;
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+  /* No focus ring on mouse clicks, only keyboard nav */
+  *:focus:not(:focus-visible) {
+    outline: none;
+  }
+}
+
+/* ===== 22. Dark mode premium polish (mobile) ===== */
+@media (max-width: 768px) {
+  html.dark body {
+    background: #0f172a;
+    color: #f1f5f9;
+  }
+  html.dark .card-premium,
+  html.dark [class*="card-premium"] {
+    background: #1e293b !important;
+    color: #f1f5f9;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+  }
+  html.dark .input-premium,
+  html.dark input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+  html.dark textarea,
+  html.dark select {
+    background: #0f172a !important;
+    color: #f1f5f9 !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
+  }
+  html.dark .header-premium {
+    background: linear-gradient(135deg, #064e3b, #0f766e) !important;
+  }
+}
+
+/* ===== 23. Premium transitions for view switches ===== */
+@media (max-width: 768px) {
+  /* Smooth page transitions for SPA view changes */
+  .view-transition {
+    animation: viewFadeIn 280ms cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  @keyframes viewFadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+/* ===== 24. Premium number pad / calculator styling on mobile ===== */
+@media (max-width: 768px) {
+  /* Larger tap targets for number-pad style buttons */
+  .keypad-premium button,
+  button[class*="rounded"][class*="font-mono"][class*="text-"] {
+    min-height: 56px;
+    font-size: 20px;
+    font-weight: 600;
+    transition: transform 80ms ease-out, background-color 80ms ease-out;
+  }
+  .keypad-premium button:active,
+  button[class*="rounded"][class*="font-mono"]:active {
+    transform: scale(0.94);
+  }
+}
+
+/* ===== 25. Premium tab pills (segmented control style) ===== */
+@media (max-width: 768px) {
+  .segmented-control {
+    background: rgba(15, 23, 42, 0.06);
+    padding: 3px;
+    border-radius: 12px;
+    display: inline-flex;
+    gap: 2px;
+    width: 100%;
+  }
+  html.dark .segmented-control {
+    background: rgba(255, 255, 255, 0.06);
+  }
+  .segmented-control button {
+    flex: 1;
+    border-radius: 9px;
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: rgba(15, 23, 42, 0.6);
+    transition: all 200ms cubic-bezier(0.32, 0.72, 0, 1);
+    background: transparent;
+    border: none;
+    min-height: 36px;
+  }
+  html.dark .segmented-control button {
+    color: rgba(255, 255, 255, 0.6);
+  }
+  .segmented-control button.active {
+    background: white;
+    color: #059669;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+  }
+  html.dark .segmented-control button.active {
+    background: rgba(255, 255, 255, 0.12);
+    color: #34d399;
+  }
+}
+
+/* ===== 26. Hide scrollbars on horizontal category tabs (cleaner mobile UI) ===== */
+@media (max-width: 768px) {
+  .category-tabs-scroll,
+  [class*="flex"][class*="overflow-x-auto"] {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .category-tabs-scroll::-webkit-scrollbar,
+  [class*="flex"][class*="overflow-x-auto"]::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* ===== 27. Premium splash/loading backdrop for async actions ===== */
+.loading-backdrop-premium {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  animation: fadeIn 200ms ease-out;
+}
+.loading-backdrop-premium > div {
+  background: white;
+  border-radius: 16px;
+  padding: 24px 32px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+}
+html.dark .loading-backdrop-premium > div {
+  background: #1e293b;
+  color: white;
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ===== 28. App-like bounce on view enter (mobile only) ===== */
+@media (max-width: 768px) {
+  .app-view-enter {
+    animation: appViewBounce 380ms cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  @keyframes appViewBounce {
+    0% { opacity: 0; transform: translateY(12px) scale(0.98); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+  }
+}
+
+/* ===== 29. Premium receipt modal polish on mobile ===== */
+@media (max-width: 767px) {
+  /* Receipt modal takes full width on mobile, slides up like a bottom sheet */
+  [class*="max-w-sm"][class*="dialog-premium"] {
+    max-width: 100% !important;
+    width: 100% !important;
+    border-radius: 24px 24px 0 0 !important;
+    margin: 0 !important;
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    top: auto !important;
+    max-height: 90vh !important;
+  }
+  /* Print button row stays at bottom (sticky) */
+  .dialog-premium > div:last-child {
+    position: sticky;
+    bottom: 0;
+    background: white;
+    z-index: 2;
+  }
+}
+
+/* ===== 30. Disable iOS double-tap-to-zoom on action buttons ===== */
+@media (max-width: 768px) {
+  button,
+  [role="button"],
+  .btn-premium,
+  a.btn-premium {
+    touch-action: manipulation;
+  }
+}
+
+/* ===== 31. Long-press protection on important buttons ===== */
+@media (max-width: 768px) {
+  /* Prevent accidental long-press menu on POS action buttons */
+  button[class*="gradient-premium-emerald"],
+  button[class*="bg-rose"],
+  button[class*="bg-violet"],
+  .btn-premium {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+}
+
+/* ===== 32. Premium pull-to-refresh feel (subtle) ===== */
+@media (max-width: 768px) {
+  /* When the user scrolls to the top and pulls down slightly, show a subtle hint */
+  body {
+    overscroll-behavior-y: contain;
+  }
+}
+
+/* ===== 33. Print Receipt Layout (80mm thermal printer compatible) ===== */
+@media print {
+  @page {
+    size: 80mm auto;
+    margin: 0;
+  }
+  body {
+    margin: 0;
+    padding: 0;
+  }
+}
+
+/* ===== 34. Mobile-optimized number inputs (no spinners on touch) ===== */
+@media (max-width: 768px) {
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type="number"] {
+    -moz-appearance: textfield;
+  }
+}
+
+/* ===== 35. Premium Active States for Cart Items (mobile) ===== */
+@media (max-width: 768px) {
+  .cart-item-premium,
+  [class*="rounded"][class*="border"][class*="border-slate-200"]:has(> div > button) {
+    transition: transform 150ms ease-out, background-color 150ms ease-out;
+  }
+  .cart-item-premium:active {
+    transform: scale(0.98);
+  }
+}
+
+/* ===== 36. Mobile-only utilities ===== */
+.mobile-only {
+  display: none;
+}
+@media (max-width: 767px) {
+  .mobile-only {
+    display: flex;
+  }
+}
+.desktop-only {
+  display: flex;
+}
+@media (max-width: 767px) {
+  .desktop-only {
+    display: none !important;
+  }
+}
+
+/* ===== 37. Premium color tokens for status (mobile emphasis) ===== */
+.status-success-premium {
+  background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+  color: #065f46;
+  border: 1px solid #6ee7b7;
+}
+.status-warning-premium {
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  color: #92400e;
+  border: 1px solid #fcd34d;
+}
+.status-error-premium {
+  background: linear-gradient(135deg, #fee2e2, #fecaca);
+  color: #991b1b;
+  border: 1px solid #fca5a5;
+}
+html.dark .status-success-premium {
+  background: rgba(16, 185, 129, 0.16);
+  color: #6ee7b7;
+  border-color: rgba(16, 185, 129, 0.4);
+}
+html.dark .status-warning-premium {
+  background: rgba(245, 158, 11, 0.16);
+  color: #fcd34d;
+  border-color: rgba(245, 158, 11, 0.4);
+}
+html.dark .status-error-premium {
+  background: rgba(239, 68, 68, 0.16);
+  color: #fca5a5;
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
+/* ===== 38. Hide ugly default file input on mobile, show custom button ===== */
+@media (max-width: 768px) {
+  input[type="file"] {
+    width: 100%;
+    padding: 12px;
+    border-radius: 12px;
+    background: #f1f5f9;
+    border: 1px dashed #cbd5e1;
+    font-size: 13px;
+  }
+}
+
+/* ===== 39. Premium chip / badge styling (mobile) ===== */
+@media (max-width: 768px) {
+  .chip-premium,
+  [class*="bg-emerald-100"][class*="text-emerald-700"],
+  [class*="bg-rose-100"][class*="text-rose-700"],
+  [class*="bg-amber-100"][class*="text-amber-700"],
+  [class*="bg-blue-100"][class*="text-blue-700"] {
+    padding: 4px 10px;
+    border-radius: 9999px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+  }
+}
+
+/* ===== 40. iOS PWA splash background ===== */
+@media (display-mode: standalone) {
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background: linear-gradient(135deg, #059669, #0d9488);
+    z-index: -1;
+  }
+}
+
+/* ===== 41. Premium hover suppression on touch devices ===== */
+@media (hover: none) {
+  /* Disable hover effects on touch devices — they stick after tap */
+  *:hover {
+    transition: none !important;
+  }
+  .btn-premium:hover,
+  button:hover {
+    transform: none !important;
+  }
+}
+
+/* ===== 42. Animated cart badge (mobile) ===== */
+@keyframes cartBadgePop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.25); }
+  100% { transform: scale(1); }
+}
+.cart-badge-pop {
+  animation: cartBadgePop 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ===== 43. Mobile-optimized dropdown menus ===== */
+@media (max-width: 767px) {
+  /* Dropdown menus should be full-width bottom sheets on mobile */
+  [class*="absolute"][class*="bg-white"][class*="rounded"][class*="shadow-2xl"][class*="ring-1"][class*="ring-slate-200"],
+  [role="menu"] {
+    position: fixed !important;
+    top: auto !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    border-radius: 20px 20px 0 0 !important;
+    max-height: 70vh !important;
+    overflow-y: auto;
+    animation: slideUpModal 280ms cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  /* Add a drag handle */
+  [role="menu"]::before {
+    content: "";
+    display: block;
+    width: 36px;
+    height: 4px;
+    background: rgba(100, 116, 139, 0.3);
+    border-radius: 9999px;
+    margin: 8px auto;
+  }
+  /* Dropdown items taller for touch */
+  [role="menuitem"],
+  [role="menu"] button {
+    min-height: 48px;
+    padding: 14px 16px !important;
+    font-size: 14px !important;
+  }
+}
+
+/* ===== 44. Premium status bar styling (PWA) ===== */
+@media (display-mode: standalone) {
+  html {
+    background: #059669;
+  }
+  /* iOS uses meta theme-color; this is a fallback */
+}
+
+/* ===== 45. Mobile-optimized table → card layout for small screens ===== */
+@media (max-width: 640px) {
+  /* Convert simple tables to card-style layout on phones.
+     Apply by adding class="mobile-table-cards" to a table. */
+  table.mobile-table-cards,
+  table.mobile-table-cards thead,
+  table.mobile-table-cards tbody,
+  table.mobile-table-cards tr,
+  table.mobile-table-cards th,
+  table.mobile-table-cards td {
+    display: block;
+    width: 100%;
+  }
+  table.mobile-table-cards thead {
+    display: none;
+  }
+  table.mobile-table-cards tr {
+    margin-bottom: 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 12px;
+    background: white;
+  }
+  html.dark table.mobile-table-cards tr {
+    background: #1e293b;
+    border-color: #334155;
+  }
+  table.mobile-table-cards td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    border: none;
+    font-size: 13px;
+  }
+  table.mobile-table-cards td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: #64748b;
+    margin-right: 12px;
+  }
+}
+
+/* ===== END PREMIUM MOBILE POLISH ===== */

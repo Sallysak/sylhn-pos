@@ -148,12 +148,16 @@ export async function POST(req: NextRequest) {
     const sale = await db.$transaction(async (tx) => {
       const invoiceNumber = s.invoiceNumber || generateInvoiceNumber();
 
-      // Compute tax server-side using the tax rate from the request
-      const taxRate = Number(s.taxRate) || 0;
+      // Compute tax server-side using the tax rate from the request.
+      // The frontend sends taxRate as a decimal (e.g. 0.15 for 15% VAT),
+      // but some legacy callers may send a whole-number percentage (15).
+      // Normalize: if taxRate > 1, treat it as a percentage and divide by 100.
+      const rawTaxRate = Number(s.taxRate) || 0;
+      const taxRate = rawTaxRate > 1 ? rawTaxRate / 100 : rawTaxRate;
       const taxableSubtotal = s.items
         .filter(i => i.taxable !== false && (!i.productId || productMap[i.productId]?.taxable))
         .reduce((sum, i) => sum + (i.price * i.quantity - (i.discount || 0)), 0);
-      const computedTax = Math.round(taxableSubtotal * taxRate / 100 * 100) / 100;
+      const computedTax = Math.round(taxableSubtotal * taxRate * 100) / 100;
 
       // Apply loyalty redemption first (modifies customer balance atomically).
       // saleId is null at this point — the sale hasn't been created yet.
