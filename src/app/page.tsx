@@ -206,6 +206,7 @@ export default function POSPage() {
   const { toast } = useToast();
   const searchInputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
 
   // ===== Persist session-only state to localStorage =====
   // ROBUST DATA PERSISTENCE — survives logout/login, page refresh, browser restart.
@@ -315,10 +316,13 @@ export default function POSPage() {
     return () => clearInterval(interval);
   }, [now]);
 
-  // Close menu on outside click
+  // Close menu on outside click (covers both desktop and mobile menu bars)
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      const insideDesktop = menuRef.current?.contains(target);
+      const insideMobile = mobileMenuRef.current?.contains(target);
+      if (!insideDesktop && !insideMobile) {
         setOpenMenu(null);
       }
     };
@@ -1553,25 +1557,26 @@ export default function POSPage() {
   // ===== Render POS =====
   return (
     <div className="min-h-screen w-full gradient-premium-mesh flex flex-col font-sans pb-[72px] lg:pb-0 lg:h-screen lg:overflow-hidden">
-      {/* ===== Header Bar with Menu — Premium Glass ===== */}
+      {/* ===== Header Bar with Menu — Premium Glass (responsive) ===== */}
       <header className="header-premium flex-shrink-0 text-white z-30 relative">
-        <div className="flex items-center px-4 py-2 gap-4 relative">
-          {/* Logo */}
-          <div className="flex items-center gap-2.5 flex-shrink-0">
-            <div className="relative">
+        {/* Top row: Logo + Search + Stats (logo only on mobile, full on desktop) */}
+        <div className="flex items-center px-3 sm:px-4 py-2 gap-3 sm:gap-4 relative">
+          {/* Logo — always visible */}
+          <div className="flex items-center gap-2 sm:gap-2.5 flex-shrink-0 min-w-0">
+            <div className="relative flex-shrink-0">
               <div className="absolute inset-0 rounded-xl bg-white/20 blur-md" />
-              <div className="relative h-10 w-10 rounded-xl gradient-premium-glass flex items-center justify-center ring-1 ring-white/30 font-bold text-lg backdrop-blur-md">
+              <div className="relative h-9 w-9 sm:h-10 sm:w-10 rounded-xl gradient-premium-glass flex items-center justify-center ring-1 ring-white/30 font-bold text-base sm:text-lg backdrop-blur-md">
                 S
               </div>
             </div>
-            <div>
-              <div className="font-bold text-base leading-tight tracking-tight">{COMPANY.name}</div>
-              <div className="text-[10px] text-emerald-50/90 leading-tight font-medium">{COMPANY.address} · {COMPANY.contact}</div>
+            <div className="min-w-0 hidden min-[400px]:block">
+              <div className="font-bold text-sm sm:text-base leading-tight tracking-tight truncate">{COMPANY.name}</div>
+              <div className="text-[9px] sm:text-[10px] text-emerald-50/90 leading-tight font-medium truncate">{COMPANY.address} · {COMPANY.contact}</div>
             </div>
           </div>
 
-          {/* Menu Bar */}
-          <div ref={menuRef} className="flex items-center gap-0.5 flex-shrink-0">
+          {/* Desktop Menu Bar — hidden on mobile (mobile uses the bar below) */}
+          <div ref={menuRef} className="hidden lg:flex items-center gap-0.5 flex-shrink-0">
             {menus.map(menu => (
               <div key={menu.id} className="relative">
                 <button
@@ -1619,8 +1624,8 @@ export default function POSPage() {
             ))}
           </div>
 
-          {/* Search */}
-          <div className="flex-1 max-w-xl relative">
+          {/* Search — desktop only (mobile has its own search in POS content) */}
+          <div className="hidden lg:block flex-1 max-w-xl relative">
             <div className="relative">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
               <input
@@ -1642,8 +1647,8 @@ export default function POSPage() {
             </div>
           </div>
 
-          {/* Right: Date, Stats, Cashier */}
-          <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Right: Stats + Logout (compact on mobile, full on desktop) */}
+          <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
             <div className="hidden lg:flex items-center gap-2 text-right">
               <div className="px-2.5 py-1 rounded-lg gradient-premium-glass ring-1 ring-white/25 backdrop-blur-md">
                 <div className="text-[9px] text-emerald-50/80 font-medium tracking-wide">{now ? now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : '--'}</div>
@@ -1704,6 +1709,71 @@ export default function POSPage() {
               <LogOut className="h-4 w-4" /> <span>Logout</span>
             </button>
           </div>
+        </div>
+
+        {/* ===== Mobile Menu Bar — horizontally scrollable, all 7 menus visible =====
+            Premium glass pills with active-state styling. Hidden on desktop
+            (desktop uses the dropdown menus in the top row above). */}
+        <div ref={mobileMenuRef} className="lg:hidden">
+          <div className="border-t border-white/10 bg-black/10 backdrop-blur-md">
+            <div className="flex items-center gap-1.5 px-3 py-2 overflow-x-auto scrollbar-hide">
+              {menus.filter(m => m.items.length > 0).map(menu => {
+                const isOpen = openMenu === menu.id;
+                return (
+                  <button
+                    key={menu.id}
+                    onClick={() => setOpenMenu(isOpen ? null : menu.id)}
+                    className={cn(
+                      "flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0",
+                      isOpen
+                        ? "bg-white text-emerald-700 shadow-md"
+                        : "bg-white/10 text-white hover:bg-white/20 ring-1 ring-white/15"
+                    )}
+                    style={{ WebkitTapHighlightColor: 'transparent' }}
+                  >
+                    {menu.label}
+                    <ChevronDown className={cn("h-3 w-3 transition-transform", isOpen && "rotate-180")} />
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* ===== Mobile Dropdown — expands inline below the menu bar ===== */}
+          <AnimatePresence>
+            {openMenu && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.22, ease: [0.32, 0.72, 0, 1] }}
+                className="overflow-hidden bg-white border-t border-slate-200 shadow-xl"
+              >
+                <div className="py-2 max-h-[60vh] overflow-y-auto">
+                  {menus.find(m => m.id === openMenu)?.items.map((item, i) => {
+                    if ('separator' in item) {
+                      return <div key={i} className="h-px bg-slate-100 my-1.5 mx-4" />;
+                    }
+                    return (
+                      <button
+                        key={i}
+                        onClick={() => { item.action(); setOpenMenu(null); }}
+                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-emerald-50 active:bg-emerald-100 text-slate-700 text-sm font-semibold transition text-left group"
+                      >
+                        <div className="h-8 w-8 rounded-lg bg-emerald-50 group-hover:bg-emerald-100 flex items-center justify-center transition flex-shrink-0">
+                          <item.icon className="h-4 w-4 text-emerald-600" />
+                        </div>
+                        <span className="flex-1">{item.label}</span>
+                        {'shortcut' in item && item.shortcut && (
+                          <kbd className="text-[10px] font-mono text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">{item.shortcut}</kbd>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </header>
 
