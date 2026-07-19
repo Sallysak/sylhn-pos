@@ -2103,12 +2103,124 @@ export default function POSPage() {
         </div>
       )}
 
-      {/* ===== Main Content — matches mobile layout on ALL screen sizes =====
-          The cart/invoice panel is at the TOP, product grid is BELOW.
-          This is the same layout as the mobile view — a single vertical column.
-          On desktop, the cart panel is wider and the product grid shows more columns. */}
+      {/* ===== Main Content — product grid on TOP, cart/invoice BELOW ===== */}
+
       <main className="flex-1 flex flex-col lg:overflow-hidden p-2 sm:p-3 gap-2 sm:gap-3">
-        {/* ===== Cart/Invoice Panel — at the TOP (like mobile) ===== */}
+        {/* ===== Product Grid — at the TOP ===== */}
+        <section className="flex flex-col card-premium shadow-premium lg:overflow-hidden min-w-0 min-h-0 flex-1">
+          <div className="flex-shrink-0 flex items-center justify-between px-3 sm:px-5 py-3 bg-gradient-to-r from-slate-50 to-white border-b border-slate-200/80">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <div className="flex items-center gap-2">
+                <div className="h-8 w-8 rounded-lg gradient-premium-emerald flex items-center justify-center shadow-premium-sm">
+                  <Package className="h-4 w-4 text-white" />
+                </div>
+                <h2 className="text-sm sm:text-base font-bold text-slate-800 truncate tracking-tight">
+                  {categories.find(c => c.id === activeCategory)?.name || "All Products"}
+                </h2>
+              </div>
+              <Badge variant="outline" className="font-mono text-[10px] sm:text-[11px] flex-shrink-0 bg-white">
+                {filteredProducts.length} items
+              </Badge>
+            </div>
+            <div className="flex items-center gap-2 text-[11px] text-slate-500">
+              <span className="flex items-center gap-1">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 pulse-ring" />
+                Live Inventory
+              </span>
+              <span className="text-slate-300">·</span>
+              <span>Prices in {CURRENCY_CODE}</span>
+            </div>
+          </div>
+
+          {/* Product Search Bar */}
+          <div className="flex-shrink-0 px-4 py-2.5 bg-white border-b border-slate-200/80">
+            <div className="relative">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <input
+                value={productSearch}
+                onChange={(e) => setProductSearch(e.target.value)}
+                placeholder="Search inventory by name, SKU, barcode, or supplier..."
+                className="input-premium w-full h-9 pl-10 pr-9 text-sm"
+              />
+              {productSearch && (
+                <button
+                  onClick={() => setProductSearch("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 rounded-full bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition active:scale-90"
+                >
+                  <X className="h-3.5 w-3.5 text-slate-600" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Product Grid — scrolls, fills remaining space */}
+          <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 scroll-premium" style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 p-3 sm:p-4">
+              {filteredProducts.map((product, idx) => {
+                const inCart = cart.find(item => item.productId === product.id);
+                const lowStock = product.stock <= product.reorderLevel;
+                return (
+                  <motion.button
+                    key={product.id}
+                    layout
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.2, delay: Math.min(idx * 0.015, 0.3) }}
+                    whileHover={{ y: -3, scale: 1.02 }}
+                    whileTap={{ scale: 0.97 }}
+                    onClick={() => addToCart(product)}
+                    className="product-card-premium flex flex-col items-center text-center"
+                  >
+                    {inCart && (
+                      <div className="absolute top-1.5 right-1.5 z-10 h-6 w-6 rounded-full bg-emerald-500 text-white text-[11px] font-bold flex items-center justify-center shadow-glow-emerald ring-2 ring-white">
+                        {inCart.quantity}
+                      </div>
+                    )}
+                    {product.taxable && (
+                      <div className="absolute top-1.5 left-1.5 z-10 px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700 text-[9px] font-bold ring-1 ring-amber-200">
+                        VAT
+                      </div>
+                    )}
+                    {lowStock && (
+                      <div className="absolute bottom-1.5 left-1.5 z-10 px-1.5 py-0.5 rounded-md bg-rose-100 text-rose-700 text-[9px] font-bold ring-1 ring-rose-200">
+                        LOW
+                      </div>
+                    )}
+                    <div className="h-16 w-16 rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center text-4xl mb-2 group-hover:scale-110 transition-transform duration-200 ring-1 ring-slate-100">
+                      {product.emoji}
+                    </div>
+                    <div className="w-full">
+                      <div className="text-xs font-semibold text-slate-800 leading-tight line-clamp-2 min-h-[2rem]">
+                        {product.name}
+                      </div>
+                      <div className="text-[10px] text-slate-400 font-mono mt-0.5 tabular">
+                        {product.sku}
+                      </div>
+                      <div className="flex items-center justify-between mt-1.5">
+                        <div className="text-sm font-bold text-gradient-emerald">
+                          {formatGHS(product.price)}
+                        </div>
+                        <div className="text-[10px] text-slate-400">/{product.unit}</div>
+                      </div>
+                      <div className="text-[10px] text-slate-400 mt-0.5 tabular">
+                        Stock: {product.stock}
+                      </div>
+                    </div>
+                  </motion.button>
+                );
+              })}
+            </div>
+            {filteredProducts.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+                <Package className="h-12 w-12 mb-3 opacity-40" />
+                <div className="text-sm font-medium">No products found</div>
+                <div className="text-xs mt-1">Try a different category or search term</div>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* ===== Cart/Invoice Panel — BELOW the product grid ===== */}
         <section className={cn(
           "flex flex-col card-premium shadow-premium-lg transition-all duration-300 flex-shrink-0",
           showSidebar ? "w-full" : "w-0 min-w-0 max-h-0 overflow-hidden opacity-0"
@@ -2438,119 +2550,6 @@ export default function POSPage() {
           </AnimatePresence>
         </section>
 
-        {/* ===== Product Grid — BELOW the cart (like mobile) ===== */}
-        <section className="flex flex-col card-premium shadow-premium lg:overflow-hidden min-w-0 min-h-0 flex-1">
-          <div className="flex-shrink-0 flex items-center justify-between px-3 sm:px-5 py-3 bg-gradient-to-r from-slate-50 to-white border-b border-slate-200/80">
-            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-              <div className="flex items-center gap-2">
-                <div className="h-8 w-8 rounded-lg gradient-premium-emerald flex items-center justify-center shadow-premium-sm">
-                  <Package className="h-4 w-4 text-white" />
-                </div>
-                <h2 className="text-sm sm:text-base font-bold text-slate-800 truncate tracking-tight">
-                  {categories.find(c => c.id === activeCategory)?.name || "All Products"}
-                </h2>
-              </div>
-              <Badge variant="outline" className="font-mono text-[10px] sm:text-[11px] flex-shrink-0 bg-white">
-                {filteredProducts.length} items
-              </Badge>
-            </div>
-            <div className="flex items-center gap-2 text-[11px] text-slate-500">
-              <span className="flex items-center gap-1">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 pulse-ring" />
-                Live Inventory
-              </span>
-              <span className="text-slate-300">·</span>
-              <span>Prices in {CURRENCY_CODE}</span>
-            </div>
-          </div>
-
-          {/* Product Search Bar */}
-          <div className="flex-shrink-0 px-4 py-2.5 bg-white border-b border-slate-200/80">
-            <div className="relative">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <input
-                value={productSearch}
-                onChange={(e) => setProductSearch(e.target.value)}
-                placeholder="Search inventory by name, SKU, barcode, or supplier..."
-                className="input-premium w-full h-9 pl-10 pr-9 text-sm"
-              />
-              {productSearch && (
-                <button
-                  onClick={() => setProductSearch("")}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 rounded-full bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition active:scale-90"
-                >
-                  <X className="h-3.5 w-3.5 text-slate-600" />
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Product Grid — scrolls, fills remaining space */}
-          <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 scroll-premium" style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 p-3 sm:p-4">
-              {filteredProducts.map((product, idx) => {
-                const inCart = cart.find(item => item.productId === product.id);
-                const lowStock = product.stock <= product.reorderLevel;
-                return (
-                  <motion.button
-                    key={product.id}
-                    layout
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ duration: 0.2, delay: Math.min(idx * 0.015, 0.3) }}
-                    whileHover={{ y: -3, scale: 1.02 }}
-                    whileTap={{ scale: 0.97 }}
-                    onClick={() => addToCart(product)}
-                    className="product-card-premium flex flex-col items-center text-center"
-                  >
-                    {inCart && (
-                      <div className="absolute top-1.5 right-1.5 z-10 h-6 w-6 rounded-full bg-emerald-500 text-white text-[11px] font-bold flex items-center justify-center shadow-glow-emerald ring-2 ring-white">
-                        {inCart.quantity}
-                      </div>
-                    )}
-                    {product.taxable && (
-                      <div className="absolute top-1.5 left-1.5 z-10 px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700 text-[9px] font-bold ring-1 ring-amber-200">
-                        VAT
-                      </div>
-                    )}
-                    {lowStock && (
-                      <div className="absolute bottom-1.5 left-1.5 z-10 px-1.5 py-0.5 rounded-md bg-rose-100 text-rose-700 text-[9px] font-bold ring-1 ring-rose-200">
-                        LOW
-                      </div>
-                    )}
-                    <div className="h-16 w-16 rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center text-4xl mb-2 group-hover:scale-110 transition-transform duration-200 ring-1 ring-slate-100">
-                      {product.emoji}
-                    </div>
-                    <div className="w-full">
-                      <div className="text-xs font-semibold text-slate-800 leading-tight line-clamp-2 min-h-[2rem]">
-                        {product.name}
-                      </div>
-                      <div className="text-[10px] text-slate-400 font-mono mt-0.5 tabular">
-                        {product.sku}
-                      </div>
-                      <div className="flex items-center justify-between mt-1.5">
-                        <div className="text-sm font-bold text-gradient-emerald">
-                          {formatGHS(product.price)}
-                        </div>
-                        <div className="text-[10px] text-slate-400">/{product.unit}</div>
-                      </div>
-                      <div className="text-[10px] text-slate-400 mt-0.5 tabular">
-                        Stock: {product.stock}
-                      </div>
-                    </div>
-                  </motion.button>
-                );
-              })}
-            </div>
-            {filteredProducts.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-                <Package className="h-12 w-12 mb-3 opacity-40" />
-                <div className="text-sm font-medium">No products found</div>
-                <div className="text-xs mt-1">Try a different category or search term</div>
-              </div>
-            )}
-          </div>
-        </section>
 
         {!showSidebar && (
           <button
