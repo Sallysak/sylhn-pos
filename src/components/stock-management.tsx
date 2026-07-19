@@ -1255,7 +1255,7 @@ function GroupForm({ group, onSave, onClose }: {
   ];
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-0 sm:p-4" onClick={onClose}>
       <motion.div
         initial={{ scale: 0.92, y: 20, opacity: 0 }}
         animate={{ scale: 1, y: 0, opacity: 1 }}
@@ -1957,7 +1957,7 @@ function StockFileView({ products, setProducts, groups, history, setHistory }: {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-0 sm:p-4"
             onClick={() => setShowCloneConfirm(null)}
           >
             <motion.div
@@ -1992,7 +1992,7 @@ function StockFileView({ products, setProducts, groups, history, setHistory }: {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-0 sm:p-4"
             onClick={() => setShowQtyAdjust(null)}
           >
             <motion.div
@@ -2264,7 +2264,7 @@ function StockSearchView({ products, groups, history }: {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-0 sm:p-4"
             onClick={() => setSelectedProduct(null)}
           >
             <motion.div
@@ -2491,7 +2491,7 @@ function PictureModal({ product, onSave, onClose }: {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-0 sm:p-4"
       onClick={onClose}
     >
       <motion.div
@@ -2607,7 +2607,7 @@ function ProductHistoryModal({ product, history, onClose }: {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-0 sm:p-4"
       onClick={onClose}
     >
       <motion.div
@@ -2615,7 +2615,7 @@ function ProductHistoryModal({ product, history, onClose }: {
         animate={{ scale: 1, y: 0 }}
         exit={{ scale: 0.95, y: 20 }}
         onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] sm:max-h-[85vh] overflow-hidden flex flex-col"
       >
         <div className="px-5 py-3 bg-gradient-to-r from-purple-600 to-violet-600 text-white flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -2839,7 +2839,7 @@ export function StockQtyReportModal({ products, groups, onClose }: {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-0 sm:p-4"
         onClick={onClose}
       >
         <motion.div
@@ -3057,7 +3057,7 @@ function QtyReportViewer({ report, onClose }: { report: ReportData; onClose: () 
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[60] flex items-center justify-center p-4"
+      className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[60] flex items-center justify-center p-0 sm:p-4"
       onClick={onClose}
     >
       <motion.div
@@ -3878,7 +3878,7 @@ function StocktakeDashboard({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4"
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex items-center justify-center p-0 sm:p-4"
       onClick={onClose}
     >
       <motion.div
@@ -4827,7 +4827,7 @@ function ProductVarianceDrillDown({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[80] flex items-center justify-center p-4"
+      className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[80] flex items-center justify-center p-0 sm:p-4"
       onClick={onClose}
     >
       <motion.div

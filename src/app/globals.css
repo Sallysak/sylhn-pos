@@ -2404,3 +2404,117 @@ html.dark .status-error-premium {
 }
 
 /* ===== END mobile form fit fix ===== */
+
+/* ===== 49. UNIVERSAL MOBILE MODAL FIX — all popups become bottom sheets =====
+   This rule applies to EVERY popup/modal in the app (60+ instances).
+   On mobile, all modals become full-width bottom sheets that slide up
+   from the bottom and can scroll their content. No more overflow or
+   content getting cut off.
+
+   How it works:
+   1. The overlay (fixed inset-0) stays the same — darkens the background
+   2. The modal container becomes a bottom sheet:
+      - position: fixed at bottom (not centered)
+      - full width (100vw - 8px margin)
+      - max-height: 92vh (leaves room for status bar)
+      - rounded top corners (bottom sheet look)
+      - scrollable content area
+   3. On desktop (lg+): modals stay centered as before
+*/
+@media (max-width: 1023px) {
+  /* === Modal overlays — darker on mobile for focus === */
+  .fixed.inset-0[class*="bg-black"],
+  .fixed.inset-0[class*="bg-slate-900"] {
+    align-items: flex-end !important;  /* Push modal to bottom */
+    padding: 0 !important;
+  }
+
+  /* === Modal containers — become bottom sheets === */
+  .fixed.inset-0[class*="bg-black"] > div[class*="bg-white"],
+  .fixed.inset-0[class*="bg-black"] > div[class*="rounded"],
+  .fixed.inset-0[class*="bg-slate-900"] > div[class*="bg-white"],
+  .fixed.inset-0[class*="bg-slate-900"] > div[class*="rounded"],
+  .fixed.inset-0[class*="bg-slate-900"] > div[class*="dialog-premium"],
+  .fixed.inset-0[class*="bg-black"] > div[class*="dialog-premium"] {
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    top: auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: 92vh !important;
+    border-radius: 20px 20px 0 0 !important;
+    margin: 0 !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+    animation: slideUpSheet 0.3s cubic-bezier(0.32, 0.72, 0, 1) !important;
+    /* Add a grab handle visual indicator */
+    box-shadow: 0 -8px 32px -4px rgba(0, 0, 0, 0.2) !important;
+  }
+
+  /* === Add grab handle to bottom sheets === */
+  .fixed.inset-0[class*="bg-black"] > div[class*="bg-white"]::before,
+  .fixed.inset-0[class*="bg-slate-900"] > div[class*="bg-white"]::before,
+  .fixed.inset-0[class*="bg-black"] > div[class*="rounded"]::before,
+  .fixed.inset-0[class*="bg-slate-900"] > div[class*="rounded"]::before,
+  .fixed.inset-0[class*="bg-black"] > div[class*="dialog-premium"]::before,
+  .fixed.inset-0[class*="bg-slate-900"] > div[class*="dialog-premium"]::before {
+    content: "";
+    display: block;
+    width: 40px;
+    height: 4px;
+    background: rgba(100, 116, 139, 0.3);
+    border-radius: 9999px;
+    margin: 8px auto 4px;
+    flex-shrink: 0;
+  }
+
+  /* === Motion divs that wrap modals === */
+  .fixed.inset-0[class*="bg-black"] > motion-div,
+  .fixed.inset-0[class*="bg-slate-900"] > motion-div {
+    width: 100% !important;
+    max-height: 92vh !important;
+  }
+
+  /* === Inner content — ensure it doesn't overflow === */
+  .fixed.inset-0[class*="bg-black"] > div input,
+  .fixed.inset-0[class*="bg-black"] > div select,
+  .fixed.inset-0[class*="bg-black"] > div textarea,
+  .fixed.inset-0[class*="bg-slate-900"] > div input,
+  .fixed.inset-0[class*="bg-slate-900"] > div select,
+  .fixed.inset-0[class*="bg-slate-900"] > div textarea {
+    max-width: 100% !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    font-size: 16px !important;  /* Prevents iOS zoom */
+  }
+
+  /* === Tables inside modals — allow horizontal scroll === */
+  .fixed.inset-0[class*="bg-black"] > div table,
+  .fixed.inset-0[class*="bg-slate-900"] > div table {
+    font-size: 11px !important;
+  }
+
+  /* === Grid layouts inside modals — stack on mobile === */
+  .fixed.inset-0[class*="bg-black"] > div .grid-cols-2,
+  .fixed.inset-0[class*="bg-slate-900"] > div .grid-cols-2,
+  .fixed.inset-0[class*="bg-black"] > div .grid-cols-3,
+  .fixed.inset-0[class*="bg-slate-900"] > div .grid-cols-3 {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Bottom sheet slide-up animation */
+@keyframes slideUpSheet {
+  from {
+    transform: translateY(100%);
+    opacity: 0.5;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* ===== END universal mobile modal fix ===== */

@@ -356,7 +356,7 @@ function UserFormModal({ user, onSave, onClose }: { user: SystemUser | null; onS
   const isNew = !user;
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-0 sm:p-4" onClick={onClose}>
       <motion.div initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }} onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
         <div className="flex-shrink-0 px-5 py-3 bg-gradient-to-r from-slate-700 to-slate-800 text-white flex items-center justify-between">
           <div className="flex items-center gap-2">{isNew ? <Plus className="h-5 w-5" /> : <Edit2 className="h-5 w-5" />}<h3 className="font-bold">{isNew ? "Add New User" : "Edit User"}</h3></div>

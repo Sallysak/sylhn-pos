@@ -573,7 +573,7 @@ function ExpenseFormModal({ expense, onSave, onClose }: { expense: Expense | nul
     id: `exp-${Date.now()}`, date: new Date().toISOString().split('T')[0], category: 'Rent', description: '', amount: 0, paymentMethod: 'Cash', vendor: '',
   });
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-0 sm:p-4" onClick={onClose}>
       <motion.div initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }} onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-rose-600 to-pink-600 text-white"><h3 className="text-lg font-bold">{expense ? 'Edit Expense' : 'Record Expense'}</h3><button onClick={onClose} className="h-8 w-8 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center"><X className="h-4 w-4" /></button></div>
         <div className="p-6 space-y-4">
@@ -603,7 +603,7 @@ function MomoFormModal({ onSave, onClose }: { onSave: (t: MobileMoneyTransaction
     id: `momo-${Date.now()}`, date: new Date().toISOString(), provider: 'mtn', transactionId: '', customerPhone: '', amount: 0, type: 'received', reference: '',
   });
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-0 sm:p-4" onClick={onClose}>
       <motion.div initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }} onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-amber-500 to-orange-500 text-white"><h3 className="text-lg font-bold">Record MoMo Transaction</h3><button onClick={onClose} className="h-8 w-8 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center"><X className="h-4 w-4" /></button></div>
         <div className="p-6 space-y-4">

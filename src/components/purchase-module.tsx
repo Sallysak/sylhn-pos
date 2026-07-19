@@ -366,7 +366,7 @@ function POViewModal({ order, onClose }: { order: PurchaseOrder; onClose: () => 
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-0 sm:p-4"
       onClick={onClose}
     >
       <motion.div
@@ -374,7 +374,7 @@ function POViewModal({ order, onClose }: { order: PurchaseOrder; onClose: () => 
         animate={{ scale: 1, y: 0 }}
         exit={{ scale: 0.95, y: 20 }}
         onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] sm:max-h-[85vh] overflow-hidden flex flex-col"
       >
         <div className="flex-shrink-0 px-5 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -490,7 +490,7 @@ function POEditModal({ order, suppliers, onClose, onSave }: {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-0 sm:p-4"
       onClick={onClose}
     >
       <motion.div
@@ -498,7 +498,7 @@ function POEditModal({ order, suppliers, onClose, onSave }: {
         animate={{ scale: 1, y: 0 }}
         exit={{ scale: 0.95, y: 20 }}
         onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] sm:max-h-[90vh] overflow-hidden flex flex-col"
       >
         <div className="flex-shrink-0 px-5 py-3 bg-gradient-to-r from-amber-600 to-orange-600 text-white flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -997,7 +997,7 @@ function SupplierViewModal({ supplier, products, onClose }: { supplier: Supplier
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-0 sm:p-4"
       onClick={onClose}
     >
       <motion.div
@@ -1005,7 +1005,7 @@ function SupplierViewModal({ supplier, products, onClose }: { supplier: Supplier
         animate={{ scale: 1, y: 0 }}
         exit={{ scale: 0.95, y: 20 }}
         onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] sm:max-h-[85vh] overflow-hidden flex flex-col"
       >
         <div className="flex-shrink-0 px-5 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -1086,7 +1086,7 @@ function SupplierFormModal({ supplier, onClose, onSave }: {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-0 sm:p-4"
       onClick={onClose}
     >
       <motion.div

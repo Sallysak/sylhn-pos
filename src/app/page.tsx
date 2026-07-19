@@ -2978,7 +2978,7 @@ function PaymentModal({ total, subtotal, tax, discount, itemCount, invoiceNumber
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-0 sm:p-4"
       onClick={onClose}
     >
       <motion.div
@@ -3289,7 +3289,7 @@ function FindProductModal({ products, onAdd, onClose }: {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-0 sm:p-4"
       onClick={onClose}
     >
       <motion.div
@@ -3836,7 +3836,7 @@ function CartPreviewModal({
         exit={{ scale: 0.95, y: 30 }}
         transition={{ type: "spring", damping: 25, stiffness: 300 }}
         onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[95vh] sm:max-h-[92vh] overflow-hidden flex flex-col"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] sm:max-h-[92vh] overflow-hidden flex flex-col"
       >
         {/* Header — compact on mobile */}
         <div className="flex-shrink-0 bg-gradient-to-r from-violet-600 via-purple-600 to-fuchsia-600 text-white px-3 sm:px-6 py-2.5 sm:py-4 flex items-center justify-between gap-2">
@@ -4355,7 +4355,7 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-0 sm:p-4"
         onClick={onClose}
       >
         <motion.div
@@ -4477,7 +4477,7 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
 
       {/* WHATSAPP MODAL — in-app, no popups */}
       {showWhatsApp && (
-        <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowWhatsApp(false)}>
+        <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4" onClick={() => setShowWhatsApp(false)}>
           <div className="dialog-premium shadow-premium-xl w-full max-w-md max-h-[80vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="flex-shrink-0 bg-[#25D366] text-white px-5 py-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -4685,7 +4685,7 @@ function StandardCalculator({ onClose }: { onClose: () => void }) {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+      className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-0 sm:p-4" onClick={onClose}>
       <motion.div initial={{ scale: 0.9, y: 30 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 30 }}
         onClick={(e) => e.stopPropagation()}
         className="bg-white rounded-3xl shadow-premium-xl w-full max-w-xs overflow-hidden">
@@ -4770,7 +4770,7 @@ function CashCalculator({ total, onClose }: { total: number; onClose: () => void
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-0 sm:p-4" onClick={onClose}>
       <motion.div initial={{ scale: 0.95, y: 30 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 30 }}
         onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
         <div className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-6 py-4">
@@ -4854,9 +4854,9 @@ function PriceTagsPrinter({ onClose }: { onClose: () => void }) {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+      className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-0 sm:p-4" onClick={onClose}>
       <motion.div initial={{ scale: 0.95, y: 30 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 30 }}
-        onClick={(e) => e.stopPropagation()} className="dialog-premium shadow-premium-xl w-full max-w-2xl max-h-[85vh] flex flex-col">
+        onClick={(e) => e.stopPropagation()} className="dialog-premium shadow-premium-xl w-full max-w-2xl max-h-[92vh] sm:max-h-[85vh] flex flex-col">
         <div className="gradient-premium-violet text-white px-6 py-4 flex items-center justify-between relative overflow-hidden">
           <div className="pointer-events-none absolute -top-12 -right-12 h-40 w-40 rounded-full bg-white/10 blur-3xl" />
           <div className="flex items-center gap-2 relative z-10">

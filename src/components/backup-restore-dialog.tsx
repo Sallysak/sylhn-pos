@@ -134,7 +134,7 @@ export function BackupRestoreDialog({ open, onClose }: BackupRestoreDialogProps)
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-0 sm:p-4"
           onClick={onClose}
         >
           <motion.div
@@ -142,7 +142,7 @@ export function BackupRestoreDialog({ open, onClose }: BackupRestoreDialogProps)
             animate={{ scale: 1, y: 0 }}
             exit={{ scale: 0.95, y: 30 }}
             onClick={(e) => e.stopPropagation()}
-            className="dialog-premium shadow-premium-xl w-full max-w-2xl max-h-[90vh] flex flex-col"
+            className="dialog-premium shadow-premium-xl w-full max-w-2xl max-h-[92vh] sm:max-h-[90vh] flex flex-col"
           >
             {/* Header */}
             <div className="gradient-premium-violet text-white px-6 py-4 flex items-center justify-between relative overflow-hidden flex-shrink-0">

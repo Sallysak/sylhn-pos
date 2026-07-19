@@ -9,7 +9,7 @@ export default function Error({ error, reset }: { error: Error; reset: () => voi
   }, [error]);
 
   return (
-    <div className="min-h-[100dvh] bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
+    <div className="min-h-[100dvh] bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-0 sm:p-4">
       <div className="max-w-md w-full bg-white rounded-3xl shadow-xl ring-1 ring-slate-200 overflow-hidden">
         <div className="bg-gradient-to-r from-rose-500 to-red-500 text-white px-6 py-8 text-center">
           <div className="h-16 w-16 rounded-full bg-white/20 flex items-center justify-center mx-auto mb-3">
