@@ -1,231 +1,287 @@
-# SYLHN POS — Grocery Store Point of Sale System
+# SYLHN POS — Grocery Store Point of Sale
 
-A production-grade, mobile-first Point of Sale system for **SYLHN COMPANY LTD**, a grocery store in East Legon, Accra, Ghana. Built with Next.js 16, Prisma, and SQLite.
+A premium, production-ready Point of Sale system for grocery stores and retail businesses in Ghana. Built with Next.js 16, TypeScript, Prisma, and Tailwind CSS. Installable as a PWA on any device.
 
-![SYLHN POS](public/icon-512.png)
+![SYLHN POS](https://img.shields.io/badge/SYLHN-POS-059669?style=for-the-badge&logo=shopify)
 
 ## Features
 
-### Point of Sale
-- Mobile-first responsive UI with bottom tab navigation
-- Speed Dial (expandable FAB) for quick actions
-- Barcode scanning (camera + manual entry)
-- Quick Keys for top-selling products
-- Held orders (park & recall carts)
-- Cash denomination calculator (GHS denominations)
-- Multi-currency display (GHS, USD, EUR, GBP, NGN, CFA)
-- Dark mode
+### Sales & Checkout
+- **Fast POS screen** with product grid, barcode scanner, quick-add keys
+- **Multiple payment methods** — Cash (with denomination calculator), Card, Mobile Money (MTN MoMo API)
+- **Held orders** — park a sale and resume later
+- **Refunds & returns** — full or partial refunds with manager approval for amounts over GHS 100
+- **Receipt printing** — thermal printer support, PDF, CSV, WhatsApp delivery
+- **QR code receipts** — customers scan to verify receipt authenticity
 
-### Inventory
-- Product CRUD with bulk upsert, barcode, expiry date, supplier linking
-- Stock groups, stocktake module with variance tracking
-- Stock history (full movement log)
-- Low-stock alerts + auto-replenish rules
-- Expiry date tracking + urgency tiers
-- Multi-location stock + stock transfers
+### Stock Management
+- **Full product CRUD** — add, modify, delete products with images, barcodes, SKUs
+- **Stock groups** — organize products into categories
+- **Quantity adjustments** — with reason codes and audit trail
+- **Stock history** — complete movement log with filters
+- **Stock History Pro** — advanced analytics with charts
+- **Bulk CSV import** — import hundreds of products at once
+- **Low-stock alerts** — automatic notifications when items hit reorder level
+- **Expiry tracking** — alerts for products expiring soon
 
-### Sales & Customers
-- Server-side total recalculation (cashier can't fake totals)
-- Race-condition-safe stock decrement
-- Idempotent void/refund with stock restoration + loyalty reversal
-- Loyalty program with tier auto-upgrade
-- Customer credit accounts (buy-now-pay-later) with FIFO settlement
-- WhatsApp receipts + QR code verification
-- ESC/POS thermal printer (58mm/80mm via Web Bluetooth)
+### Purchasing & Suppliers
+- **Purchase orders** — create, send, and track POs to suppliers
+- **Supplier management** — contacts, balances, payment terms
+- **Receive stock** — increment inventory when deliveries arrive
+- **Supplier payments** — track payables and aging
 
-### Reporting
-- Z-Report (gross/voids/refunds, payment breakdown, per-cashier)
-- GRA VAT filing report (output VAT, input VAT, NHIL split)
-- Sales, profit, low-stock, expiry, supplier-aging, inventory-valuation reports
-- CSV/Excel/PDF export for all reports
+### Reports & Analytics
+- **Operations Dashboard** — real-time KPIs (revenue, txn count, top products, low stock, expiry)
+- **Sales reports** — daily, monthly, custom date ranges
+- **Profit & Loss** — margin analysis per product/category
+- **VAT filing** — Ghana-standard VAT report with e-file export
+- **Inventory valuation** — current stock value at cost or retail
+- **Inventory aging** — identify slow-moving stock
+- **Supplier aging** — track payables by age
+- **Z-Report** — end-of-day reconciliation with auto-email cron
 
-### Operations
-- Manager approval flow for voids/refunds/discounts/deletions
-- Cashier shifts (open/close, opening float, expected vs actual cash)
-- Audit log for every sensitive action
-- AI Business Assistant (LLM-backed)
-- AI Demand Forecasting (90-day history, day-of-week seasonality)
-- Offline sale queue (IndexedDB, auto-flush on reconnect)
-- PWA (installable, service worker, offline support)
+### Finance
+- **Expense tracking** — record business expenses with categories
+- **Cash reconciliation** — denomination counter for shift close
+- **Mobile Money tracking** — reconcile MoMo payments
+- **Customer credit** — track customer balances and credit limits
 
-### Security
-- PBKDF2 password hashing (100k iterations, SHA-256, per-user salt)
-- Signed session cookies (HMAC-SHA256 JWT-like tokens, httpOnly)
-- CSRF protection (double-submit cookie)
-- Rate limiting (login, API writes, reads, seed, email)
-- Role-based access control (admin, manager, cashier, stockkeeper, accountant)
-- Strict CSP + frame-ancestors in production
-- Path-traversal protection on backup operations
-- Strong password policy (min 8 chars, letter+number, no common passwords)
+### Communication
+- **Email system** — send invoices, reports, statements via SMTP
+- **Telephone directory** — customer/supplier contacts
+- **WhatsApp receipts** — send receipts via wa.me link
+- **Daily summary email** — automated 8 AM business summary (cron)
 
-## Quick Start (Development)
+### Admin & Security
+- **Role-based access** — admin, manager, cashier, stockkeeper, accountant
+- **Permission system** — granular per-module permissions
+- **Audit log** — every action is logged with user, IP, timestamp
+- **Manager approval** — required for voids, large discounts, refunds over GHS 100
+- **Strong password policy** — zxcvbn-based with weak-password blocklist
+- **Rate limiting** — login (10/15min), API read (300/min), API write (120/min)
+- **CSRF protection** — double-submit cookie pattern
+- **Security headers** — CSP, HSTS, X-Content-Type-Options, Permissions-Policy
+
+### Premium Mobile Experience
+- **PWA installable** — add to home screen, works offline
+- **Mobile-first design** — all modules optimized for touch
+- **Bottom navigation** — POS, Cart, Dashboard, Reports, More
+- **Premium glass UI** — frosted backgrounds, spring animations, haptic feedback
+- **Safe-area aware** — notched device support
+- **Offline cart persistence** — IndexedDB survives crashes/refreshes
+- **Data persistence** — products, held orders, history survive logout/login
+
+### AI Features
+- **AI Business Assistant** — natural-language queries about your business
+- **AI Demand Forecast** — predict future product demand
+- **Auto-replenish rules** — automatic reorder suggestions
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Framework | Next.js 16 (App Router, Turbopack) |
+| Language | TypeScript 5 |
+| Database | SQLite (dev) / PostgreSQL (prod) via Prisma ORM |
+| Styling | Tailwind CSS 4 + custom premium glass components |
+| Auth | JWT sessions + httpOnly cookies + CSRF |
+| Email | Nodemailer (SMTP) |
+| PDF | jsPDF + jspdf-autotable |
+| Charts | Recharts |
+| Icons | Lucide React |
+| Animations | Framer Motion |
+
+## Quick Start
 
 ### Prerequisites
-- Node.js 18+ or Bun 1.0+
-- SQLite (bundled with the project)
+- Node.js 18+ and Bun (or npm)
+- SQLite (for dev) or PostgreSQL (for prod)
 
-### Install & Run
+### Installation
 
 ```bash
-# 1. Install dependencies
-bun install
+# Clone
+git clone https://github.com/Sallysak/sylhn-pos.git
+cd sylhn-pos
 
-# 2. Copy env template and set required vars
+# Install dependencies
+bun install   # or npm install
+
+# Set up environment
 cp .env.example .env
-# Edit .env — at minimum set SESSION_SECRET to a random 32+ char string:
-#   openssl rand -hex 32
+# Edit .env with your settings (see below)
 
-# 3. Create the database + apply schema (uses migrations)
-bun run db:migrate:deploy
+# Set up database
+bun run db:generate
+bun run db:push
+bun run seed   # creates default admin user + sample products
 
-# 4. Seed the database (generates RANDOM passwords, prints them ONCE)
-bun run seed
-# Save the printed credentials — they will NOT be shown again.
-
-# 5. Start the dev server
+# Start dev server
 bun run dev
-# Open http://localhost:3000
 ```
 
-### Login
+Open http://localhost:3000 and log in with:
+- Username: `admin`
+- Password: `admin123`
 
-Use the credentials printed by `bun run seed`. Default usernames are `admin`, `manager`, `cashier`, `stockkeeper`, `accountant`. **Passwords are random** — there are no default passwords.
+### Environment Variables
 
-If you lose the passwords, re-run `bun run seed` to regenerate them (this wipes all data — use only for fresh installs).
+Create a `.env` file:
 
-## Production Deployment
+```env
+# Database
+DATABASE_URL="file:./db/custom.db"  # SQLite dev
+# DATABASE_URL="postgresql://user:pass@localhost:5432/sylhn_pos"  # PostgreSQL prod
 
-### Option 1: Docker (recommended)
+# Auth
+JWT_SECRET="your-super-secret-jwt-key-change-this"
+SESSION_MAX_AGE_SECONDS="2592000"  # 30 days
+
+# Cron (for automated emails)
+CRON_SECRET="your-cron-secret"
+
+# MTN MoMo (optional)
+MTN_MOMO_USER_ID="your-momo-user-id"
+MTN_MOMO_API_KEY="your-momo-api-key"
+MTN_MOMO_SUBSCRIPTION_KEY="your-momo-subscription-key"
+MTN_MOMO_ENVIRONMENT="sandbox"  # or "production"
+
+# Email (optional, for reports and daily summary)
+SMTP_HOST="smtp.gmail.com"
+SMTP_PORT="587"
+SMTP_USER="your-email@gmail.com"
+SMTP_PASS="your-app-password"
+SMTP_FROM='"SYLHN POS" <your-email@gmail.com>'
+
+# AI (optional)
+ZAI_API_KEY="your-zai-api-key"
+```
+
+## Deployment
+
+### Option 1: Vercel (recommended)
+
+1. Push to GitHub
+2. Import project at https://vercel.com/new
+3. Add all env vars in Vercel dashboard
+4. Deploy
+
+### Option 2: Self-hosted (VPS)
 
 ```bash
-# 1. Build the image
-docker build -t sylhn-pos .
+# Build
+bun run build
 
-# 2. Run with persistent volumes
-docker run -d \
-  --name sylhn-pos \
-  -p 3000:3000 \
-  -v sylhn-pos-db:/app/db \
-  -v sylhn-pos-backups:/app/backups \
-  -e SESSION_SECRET=$(openssl rand -hex 32) \
-  -e NODE_ENV=production \
-  --restart unless-stopped \
-  sylhn-pos
+# Start production server
+bun run start
 
-# 3. Run the initial migration + seed (one-time)
-docker exec -it sylhn-pos bun run db:migrate:deploy
-docker exec -it sylhn-pos bun run seed
+# Or use PM2 for process management
+pm2 start "bun .next/standalone/server.js" --name sylhn-pos
+pm2 save
+pm2 startup
 ```
 
-### Option 2: Direct deployment with Caddy + systemd
+### Option 3: Docker (coming soon)
 
-See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for a step-by-step guide including TLS via Caddy and a systemd service file.
+### Post-Deployment Setup
 
-### Production Checklist
+1. **Change admin password** — log in as `admin/admin123`, then Maintenance → User Management
+2. **Configure SMTP** — Maintenance → System Settings → Email (for receipts and reports)
+3. **Set daily summary recipient** — add `email.dailySummaryTo` in system settings
+4. **Set up cron jobs** — use cron-job.org or Vercel Cron:
+   - **Daily Z-Report at 23:59**: `POST https://your-domain/api/z-report/cron` with header `x-cron-secret: your-secret`
+   - **Daily summary at 08:00**: `POST https://your-domain/api/notifications/daily-summary` with header `x-cron-secret: your-secret`
+5. **Install PWA** — open the app on your phone, tap "Add to Home Screen"
+6. **Set up registers** — Maintenance → System Settings → Registers (if multi-terminal)
 
-Before going live, ensure ALL of the following are set:
+## Default Users
 
-- [ ] `SESSION_SECRET` env var is set to a random 32+ char string
-- [ ] `NODE_ENV=production`
-- [ ] HTTPS is enabled (Caddy, nginx, or a reverse proxy with TLS)
-- [ ] `bun run seed` has been run and credentials saved securely
-- [ ] All default users have logged in and changed their passwords
-- [ ] Daily backup cron is configured (see `docs/OPERATIONS.md`)
-- [ ] `/api/health` returns 200 (verify with `curl https://yourdomain.com/api/health`)
-- [ ] Sentry / error monitoring is configured (see `docs/OPERATIONS.md`)
-- [ ] Firewall allows only ports 80 (HTTP→HTTPS redirect) and 443 (HTTPS)
+| Username | Password | Role |
+|----------|----------|------|
+| admin | admin123 | Administrator |
+| sarah | (set during seed) | Admin |
+| mike | (set during seed) | Manager |
+| grace | (set during seed) | Cashier |
+
+**⚠️ Change all passwords immediately after first login.**
+
+## API Reference
+
+The API is documented via the source files in `src/app/api/`. Key endpoints:
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/auth/login` | POST | Authenticate user, set session cookie |
+| `/api/auth/logout` | POST | Clear session |
+| `/api/auth/me` | GET | Current user info |
+| `/api/products` | GET/POST | List/create products |
+| `/api/products/import` | POST | Bulk CSV import |
+| `/api/sales` | GET/POST | List/create sales |
+| `/api/sales/[id]/refund` | POST | Process a refund |
+| `/api/reports/*` | GET | Various reports |
+| `/api/z-report` | GET | End-of-day Z-Report |
+| `/api/z-report/cron` | POST | Auto-email Z-Report (cron) |
+| `/api/notifications/daily-summary` | POST | Daily summary email (cron) |
+| `/api/dashboard` | GET | Operations dashboard data |
+| `/api/receipt/verify` | GET | Public receipt verification |
 
 ## Project Structure
 
 ```
 src/
 ├── app/
-│   ├── api/              # API routes (auth, sales, products, reports, etc.)
-│   ├── page.tsx          # Main POS page (login + POS interface)
-│   ├── forecast/         # AI demand forecast dashboard
-│   ├── display/          # Customer-facing secondary display
-│   └── globals.css       # Premium design system
-├── components/           # React components (admin panel, mobile nav, AI assistant, etc.)
-├── lib/                  # Shared libraries (auth, db, validation, rate-limit, audit, etc.)
-├── middleware.ts         # Security headers, CSRF, CORS
-└── hooks/                # React hooks
-
-prisma/
-├── schema.prisma         # Database schema (30+ models)
-└── migrations/           # Migration history (NEVER use db:push in prod)
-
-tests/                    # Vitest integration tests
-scripts/                  # Seed + maintenance scripts
-docs/                     # Documentation (DEPLOYMENT.md, OPERATIONS.md)
+│   ├── api/              # API routes (80+ endpoints)
+│   ├── display/          # Customer-facing display page
+│   ├── forecast/         # AI demand forecast page
+│   ├── globals.css       # Global styles + premium mobile polish
+│   ├── layout.tsx        # Root layout (ErrorBoundary, Toaster, fonts)
+│   ├── loading.tsx       # Loading skeleton
+│   ├── error.tsx         # Error boundary
+│   ├── not-found.tsx     # 404 page
+│   └── page.tsx          # Main POS page (4500+ lines)
+├── components/
+│   ├── features-map.tsx  # "Where to find everything" guide
+│   ├── mobile-nav.tsx    # Premium bottom nav + More drawer
+│   ├── stock-management.tsx
+│   ├── operations-dashboard.tsx
+│   ├── sales-reports.tsx
+│   ├── maintenance-module.tsx
+│   └── ... (30+ components)
+├── lib/
+│   ├── auth.ts           # JWT sessions, CSRF, permissions
+│   ├── pos-data.ts       # Constants (TAX_RATE, COMPANY, formatGHS)
+│   ├── pos-types.ts      # TypeScript types (ViewMode, CartItem, etc.)
+│   ├── session-data.ts   # Logout/login data persistence
+│   ├── cart-persistence.ts # IndexedDB cart recovery
+│   └── ...
+└── prisma/
+    └── schema.prisma     # 30+ models (Sale, Product, SystemUser, etc.)
 ```
 
-## Documentation
+## Mobile Features Map
 
-- [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) — Production deployment guide (Docker, Caddy, systemd)
-- [`docs/OPERATIONS.md`](docs/OPERATIONS.md) — Day-to-day operations (backups, monitoring, troubleshooting)
-- [`docs/API.md`](docs/API.md) — API reference for all endpoints
-- [`docs/SECURITY.md`](docs/SECURITY.md) — Security architecture and best practices
+| Where | What |
+|-------|------|
+| Bottom Nav → POS tab | Main checkout screen |
+| Bottom Nav → Cart tab | View/edit current sale |
+| Bottom Nav → Dashboard tab | Operations Dashboard (KPIs) |
+| Bottom Nav → Reports tab | Sales Menu |
+| Bottom Nav → More tab | All other modules (categorized) |
+| Floating + button (bottom-left) | SpeedDial: AI, Scan, Printer, Cash Calc |
+| More → Features Map | Visual guide to every feature's location |
 
-## Testing
+## Security Checklist
 
-```bash
-# Run all tests
-bun run test
-
-# Watch mode (re-runs on file change)
-bun run test:watch
-
-# Coverage report
-bun run test:coverage
-```
-
-## Database Migrations
-
-**NEVER use `prisma db push` in production.** Always use migrations:
-
-```bash
-# Create a new migration after editing prisma/schema.prisma
-bun run db:migrate --name describe_your_change
-
-# Apply pending migrations in production
-bun run db:migrate:deploy
-
-# Reset DB (dev only — destroys all data)
-bun run db:reset
-```
-
-## Backups
-
-### Manual backup
-```bash
-curl -X POST https://yourdomain.com/api/backups \
-  -H "Authorization: Bearer $TOKEN"
-```
-
-### Restore
-```bash
-curl -X POST https://yourdomain.com/api/backups/restore \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"filename":"backup-2026-07-18.db"}'
-# A pre-restore safety backup is automatically created.
-```
-
-### Automated daily backup (cron)
-See [`docs/OPERATIONS.md`](docs/OPERATIONS.md) for the cron setup.
-
-## Tech Stack
-
-- **Framework**: Next.js 16 (Turbopack, App Router)
-- **Language**: TypeScript (strict mode)
-- **Database**: SQLite + Prisma ORM (with WAL mode for concurrent reads)
-- **Auth**: PBKDF2 + HMAC-SHA256 JWT-like tokens, httpOnly cookies
-- **UI**: Tailwind CSS 4, shadcn/ui, Framer Motion, Lucide icons
-- **Charts**: Recharts
-- **AI**: z-ai-web-dev-sdk (LLM for AI Assistant + Demand Forecasting)
-- **Printer**: Web Bluetooth ESC/POS
-- **Offline**: IndexedDB sale queue, service worker
-- **Testing**: Vitest
+- [x] Strong password policy (zxcvbn)
+- [x] Rate limiting on login + API
+- [x] CSRF protection (double-submit cookie)
+- [x] Security headers (CSP, HSTS, X-Content-Type-Options)
+- [x] httpOnly session cookies
+- [x] Audit logging for all actions
+- [x] Manager approval for high-value voids/refunds
+- [x] Input validation (Zod schemas)
+- [x] SQL injection protection (Prisma parameterized queries)
+- [x] XSS protection (React escaping + CSP)
 
 ## License
 
@@ -233,4 +289,6 @@ Proprietary — © SYLHN COMPANY LTD. All rights reserved.
 
 ## Support
 
-For support, contact the system administrator at `admin@sylhn.com` or call `+233 59 276 6044`.
+- **Phone**: +233 59 276 6044
+- **Email**: admin@sylhn.com
+- **Address**: East Legon, Accra, Ghana
