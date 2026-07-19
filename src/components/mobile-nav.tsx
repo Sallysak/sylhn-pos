@@ -75,6 +75,7 @@ const MORE_DESTINATIONS: { category: string; items: { id: string; label: string;
   {
     category: "Admin",
     items: [
+      { id: "admin-hub", label: "Admin Hub (All Admin Modules)", icon: Shield, color: "text-purple-600", bg: "bg-purple-50" },
       { id: "dashboard", label: "Operations Dashboard", icon: BarChart3, color: "text-emerald-600", bg: "bg-emerald-50" },
       { id: "maintenance", label: "Maintenance", icon: Wrench, color: "text-orange-600", bg: "bg-orange-50" },
       { id: "admin-panel", label: "Admin Panel", icon: Shield, color: "text-purple-600", bg: "bg-purple-50" },

@@ -74,6 +74,7 @@ const AdminPanel = dynamic(() => import("@/components/admin-panel").then(m => ({
 const OperationsDashboard = dynamic(() => import("@/components/operations-dashboard").then(m => ({ default: m.OperationsDashboard })), { ssr: false, loading: loadingFallback });
 const ReceiptArchive = dynamic(() => import("@/components/receipt-archive").then(m => ({ default: m.ReceiptArchive })), { ssr: false, loading: loadingFallback });
 const FeaturesMap = dynamic(() => import("@/components/features-map").then(m => ({ default: m.FeaturesMap })), { ssr: false, loading: loadingFallback });
+const AdminHub = dynamic(() => import("@/components/admin-hub").then(m => ({ default: m.AdminHub })), { ssr: false, loading: loadingFallback });
 
 // ===== Server → Client product transformer =====
 // The /api/products endpoint returns Prisma-shaped products (with `quantity`
@@ -1452,6 +1453,34 @@ export default function POSPage() {
       </>
     );
   }
+  if (view === "admin-hub") {
+    return (
+      <>
+        <AdminHub onBack={() => setView("pos")} onNavigate={(v) => setView(v as ViewMode)} userRole={loggedInUser?.role || "cashier"} />
+        <MobileNav
+          active={view}
+          onNavigate={(v) => { if (v === "cart") setMobileCartOpen(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
+          cartCount={cart.reduce((s, i) => s + i.quantity, 0)}
+          user={loggedInUser ? { fullName: loggedInUser.fullName, role: loggedInUser.role } : null}
+          onLogout={() => handleLogout()}
+        />
+      </>
+    );
+  }
+  if (view === "email-system") {
+    return (
+      <>
+        <EmailSystem onBack={() => setView("pos")} />
+        <MobileNav
+          active={view}
+          onNavigate={(v) => { if (v === "cart") setMobileCartOpen(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
+          cartCount={cart.reduce((s, i) => s + i.quantity, 0)}
+          user={loggedInUser ? { fullName: loggedInUser.fullName, role: loggedInUser.role } : null}
+          onLogout={() => handleLogout()}
+        />
+      </>
+    );
+  }
   if (view === "stock") {
     return (
       <>
@@ -1560,20 +1589,6 @@ export default function POSPage() {
     return (
       <>
         <MaintenanceModule onBack={() => setView("pos")} cashier={cashier} dailyTotal={dailyTotal} transactionCount={transactionCount} />
-        <MobileNav
-          active={view}
-          onNavigate={(v) => { if (v === "cart") setMobileCartOpen(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
-          cartCount={cart.reduce((s, i) => s + i.quantity, 0)}
-          user={loggedInUser ? { fullName: loggedInUser.fullName, role: loggedInUser.role } : null}
-          onLogout={() => handleLogout()}
-        />
-      </>
-    );
-  }
-  if (view === "email-system" as any) {
-    return (
-      <>
-        <EmailSystem onBack={() => setView("pos")} />
         <MobileNav
           active={view}
           onNavigate={(v) => { if (v === "cart") setMobileCartOpen(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}

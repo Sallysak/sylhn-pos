@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireAuth } from "@/lib/auth";
+import { requireAuth, requireRole } from "@/lib/auth";
 import { rateLimitApiRead, rateLimitResponse, getClientIp } from "@/lib/rate-limit";
 
-// GET /api/system-health — dashboard for admin
+// GET /api/system-health — admin/manager only dashboard
 export async function GET(req: NextRequest) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireRole("admin", "manager"); } catch (e) { return e as Response; }
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
   if (!rl.allowed) return rateLimitResponse(rl);
