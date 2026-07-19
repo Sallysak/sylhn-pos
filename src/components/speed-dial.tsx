@@ -73,13 +73,15 @@ export function SpeedDial({ actions }: SpeedDialProps) {
         )}
       </AnimatePresence>
 
-      {/* Speed Dial container */}
+      {/* Speed Dial container — positioned on the LEFT side on mobile so it
+          doesn't cover the "More" tab (rightmost) of the bottom nav. */}
       <div
         ref={containerRef}
-        className="fixed z-50 flex flex-col items-end gap-2.5"
+        className="fixed flex flex-col items-start gap-2.5"
         style={{
           bottom: "calc(80px + env(safe-area-inset-bottom, 0px))",
-          right: "16px",
+          left: "16px",
+          zIndex: 45,
         }}
       >
         {/* Expanded actions (reverse order so first action is on top) */}
@@ -102,11 +104,7 @@ export function SpeedDial({ actions }: SpeedDialProps) {
                     }}
                     className="flex items-center gap-2.5"
                   >
-                    {/* Label — premium pill */}
-                    <div className="bg-slate-900/95 backdrop-blur text-white text-xs font-semibold px-3 py-1.5 rounded-lg shadow-premium whitespace-nowrap ring-1 ring-white/10">
-                      {action.label}
-                    </div>
-                    {/* Action button — premium */}
+                    {/* Action button — premium (on left, label on right) */}
                     <button
                       onClick={() => handleAction(action)}
                       className={`btn-premium h-12 w-12 rounded-full bg-gradient-to-br ${action.color} text-white flex items-center justify-center transition active:scale-90 hover:scale-105 ring-1 ring-white/30`}
@@ -114,6 +112,10 @@ export function SpeedDial({ actions }: SpeedDialProps) {
                     >
                       <Icon className="h-5 w-5" />
                     </button>
+                    {/* Label — premium pill (on right since FAB is on left) */}
+                    <div className="bg-slate-900/95 backdrop-blur text-white text-xs font-semibold px-3 py-1.5 rounded-lg shadow-premium whitespace-nowrap ring-1 ring-white/10">
+                      {action.label}
+                    </div>
                   </motion.div>
                 );
               })}

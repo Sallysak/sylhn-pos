@@ -73,6 +73,7 @@ const AdminLogin = dynamic(() => import("@/components/admin-panel").then(m => ({
 const AdminPanel = dynamic(() => import("@/components/admin-panel").then(m => ({ default: m.AdminPanel })), { ssr: false, loading: loadingFallback });
 const OperationsDashboard = dynamic(() => import("@/components/operations-dashboard").then(m => ({ default: m.OperationsDashboard })), { ssr: false, loading: loadingFallback });
 const ReceiptArchive = dynamic(() => import("@/components/receipt-archive").then(m => ({ default: m.ReceiptArchive })), { ssr: false, loading: loadingFallback });
+const FeaturesMap = dynamic(() => import("@/components/features-map").then(m => ({ default: m.FeaturesMap })), { ssr: false, loading: loadingFallback });
 
 // ===== Server → Client product transformer =====
 // The /api/products endpoint returns Prisma-shaped products (with `quantity`
@@ -1410,6 +1411,9 @@ export default function POSPage() {
   }
   if (view === "receipt-archive") {
     return <ReceiptArchive onBack={() => setView("pos")} />;
+  }
+  if (view === "features-map") {
+    return <FeaturesMap onBack={() => setView("pos")} onNavigate={(v) => setView(v as ViewMode)} />;
   }
   if (view === "stock") {
     return <StockManagement onBack={() => { setView("pos"); setOpenStockQtyReport(false); }} products={products} setProducts={setProducts} groups={groups} setGroups={setGroups} history={history} setHistory={setHistory} initialView={initialStockView} openQtyReport={openStockQtyReport} onNavigateToPurchase={() => setView("purchase-form")} />;

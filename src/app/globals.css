@@ -279,7 +279,7 @@
     bottom: 0;
     left: 0;
     right: 0;
-    z-index: 40;
+    z-index: 60; /* Above SpeedDial (z-50) and any other fixed elements */
     background: rgba(255, 255, 255, 0.92);
     backdrop-filter: saturate(180%) blur(24px);
     -webkit-backdrop-filter: saturate(180%) blur(24px);
@@ -2030,22 +2030,18 @@ html.dark .loading-backdrop-premium > div {
   }
 }
 
-/* ===== 36. Mobile-only utilities ===== */
-.mobile-only {
-  display: none;
+/* ===== 36. Mobile-only utilities =====
+   NOTE: The original .mobile-only rule earlier in this file (§5) hides at
+   min-width:1024px and shows below 1024px (tablet + mobile). We keep that
+   behaviour as the source of truth. This block is a no-op duplicate kept
+   only for backward compatibility — do NOT redefine display:none here or
+   it will break the mobile nav on tablets (768-1023px). */
+/* (intentionally empty — see §5 above for the real .mobile-only rule) */
+@media (max-width: 1023px) {
+  .mobile-only { display: flex; }
 }
-@media (max-width: 767px) {
-  .mobile-only {
-    display: flex;
-  }
-}
-.desktop-only {
-  display: flex;
-}
-@media (max-width: 767px) {
-  .desktop-only {
-    display: none !important;
-  }
+@media (min-width: 1024px) {
+  .desktop-only { display: none !important; }
 }
 
 /* ===== 37. Premium color tokens for status (mobile emphasis) ===== */

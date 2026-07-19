@@ -4,9 +4,9 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ShoppingCart, Home, BarChart3, Menu, X, LogOut, User, Package,
-  Truck, Phone, Settings, FileText, Wrench, Shield, Bell, Download,
-  Wallet, Receipt, TrendingUp, Clock, AlertTriangle, ChevronRight,
-  RefreshCw, Sparkles, Calculator, Moon, Sun, Mail,
+  Truck, Phone, PhoneCall, Settings, FileText, Wrench, Shield, Bell, Download,
+  Wallet, Receipt, TrendingUp, Clock, History, AlertTriangle, ChevronRight,
+  RefreshCw, Sparkles, Calculator, Moon, Sun, Mail, Users, Map as MapIcon,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -26,24 +26,73 @@ interface MobileNavProps {
   onLogout?: () => void;
 }
 
-// All available destinations in the "More" drawer
-const MORE_DESTINATIONS = [
-  { id: "stock", label: "Stock Management", icon: Package, color: "text-blue-600", bg: "bg-blue-50" },
-  { id: "purchase", label: "Purchases", icon: Truck, color: "text-purple-600", bg: "bg-purple-50" },
-  { id: "supplier-form", label: "Suppliers", icon: Truck, color: "text-indigo-600", bg: "bg-indigo-50" },
-  { id: "telephone-directory", label: "Directory", icon: Phone, color: "text-cyan-600", bg: "bg-cyan-50" },
-  { id: "sold-items", label: "Sold Items", icon: Receipt, color: "text-emerald-600", bg: "bg-emerald-50" },
-  { id: "sales-history", label: "Sales History", icon: Clock, color: "text-teal-600", bg: "bg-teal-50" },
-  { id: "finance-ops", label: "Finance Ops", icon: Wallet, color: "text-rose-600", bg: "bg-rose-50" },
-  { id: "accounts-reports", label: "Accounts", icon: TrendingUp, color: "text-amber-600", bg: "bg-amber-50" },
-  { id: "receipt-archive", label: "Receipts", icon: FileText, color: "text-slate-600", bg: "bg-slate-50" },
-  { id: "maintenance", label: "Maintenance", icon: Wrench, color: "text-orange-600", bg: "bg-orange-50" },
-  { id: "email-system", label: "Email System", icon: Mail, color: "text-blue-600", bg: "bg-blue-50" },
-  { id: "admin-panel", label: "Admin Panel", icon: Shield, color: "text-purple-600", bg: "bg-purple-50" },
+// All available destinations in the "More" drawer, organized by category.
+// Every ViewMode from src/lib/pos-types.ts is represented here so no feature
+// is hidden from mobile users.
+const MORE_DESTINATIONS: { category: string; items: { id: string; label: string; icon: any; color: string; bg: string }[] }[] = [
+  {
+    category: "Sales",
+    items: [
+      { id: "sales-menu", label: "Sales Menu", icon: FileText, color: "text-blue-600", bg: "bg-blue-50" },
+      { id: "sold-items", label: "Sold Items Report", icon: Receipt, color: "text-emerald-600", bg: "bg-emerald-50" },
+      { id: "sales-history", label: "Sales History", icon: Clock, color: "text-teal-600", bg: "bg-teal-50" },
+      { id: "daily-sales", label: "Daily Sales Report", icon: TrendingUp, color: "text-cyan-600", bg: "bg-cyan-50" },
+      { id: "receipt-archive", label: "Receipt Archive", icon: FileText, color: "text-slate-600", bg: "bg-slate-50" },
+    ],
+  },
+  {
+    category: "Stock",
+    items: [
+      { id: "stock", label: "Stock Management", icon: Package, color: "text-blue-600", bg: "bg-blue-50" },
+      { id: "stock-history-pro", label: "Stock History Pro", icon: History, color: "text-indigo-600", bg: "bg-indigo-50" },
+    ],
+  },
+  {
+    category: "Purchasing",
+    items: [
+      { id: "purchase-form", label: "New Purchase Order", icon: FileText, color: "text-purple-600", bg: "bg-purple-50" },
+      { id: "purchase", label: "Purchase Orders", icon: Truck, color: "text-violet-600", bg: "bg-violet-50" },
+      { id: "supplier-form", label: "Suppliers", icon: Users, color: "text-indigo-600", bg: "bg-indigo-50" },
+    ],
+  },
+  {
+    category: "Finance & Accounts",
+    items: [
+      { id: "finance-ops", label: "Finance Operations", icon: Wallet, color: "text-rose-600", bg: "bg-rose-50" },
+      { id: "accounts-reports", label: "Accounts Reports", icon: TrendingUp, color: "text-amber-600", bg: "bg-amber-50" },
+    ],
+  },
+  {
+    category: "Communication",
+    items: [
+      { id: "telephone-directory", label: "Telephone Directory", icon: Phone, color: "text-cyan-600", bg: "bg-cyan-50" },
+      { id: "telephone", label: "Telephone Module", icon: PhoneCall, color: "text-blue-600", bg: "bg-blue-50" },
+      { id: "email-system", label: "Email System", icon: Mail, color: "text-blue-600", bg: "bg-blue-50" },
+    ],
+  },
+  {
+    category: "Admin",
+    items: [
+      { id: "dashboard", label: "Operations Dashboard", icon: BarChart3, color: "text-emerald-600", bg: "bg-emerald-50" },
+      { id: "maintenance", label: "Maintenance", icon: Wrench, color: "text-orange-600", bg: "bg-orange-50" },
+      { id: "admin-panel", label: "Admin Panel", icon: Shield, color: "text-purple-600", bg: "bg-purple-50" },
+      { id: "sync-settings", label: "Sync Settings", icon: Settings, color: "text-slate-600", bg: "bg-slate-50" },
+    ],
+  },
 ];
 
+// Quick link to the Features Map (always shown at the top of the More drawer)
+const FEATURES_MAP_LINK: { id: string; label: string; icon: any; color: string; bg: string; href?: string } = {
+  id: "features-map",
+  label: "Features Map — Where to find everything",
+  icon: MapIcon,
+  color: "text-violet-600",
+  bg: "bg-violet-50",
+};
+
 // Premium: AI-powered destinations + tools (linked to standalone pages/actions)
-const AI_DESTINATIONS = [
+const AI_DESTINATIONS: { id: string; label: string; icon: any; color: string; bg: string; href?: string }[] = [
+  FEATURES_MAP_LINK,
   { id: "forecast-link", label: "AI Demand Forecast", icon: Sparkles, color: "text-violet-600", bg: "bg-violet-50", href: "/forecast" },
   { id: "ai-assistant", label: "AI Business Assistant", icon: Sparkles, color: "text-indigo-600", bg: "bg-indigo-50", href: "#ai-assistant" },
 ];
@@ -147,11 +196,32 @@ export function MobileNav({ active, onNavigate, cartCount, user, onLogout }: Mob
                 </div>
               </div>
 
-              {/* Destinations list */}
+              {/* Destinations list — categorized for discoverability */}
               <div className="flex-1 overflow-y-auto py-2">
-                {/* Premium: AI-powered tools — high contrast, no blur */}
+                {/* Premium: AI-powered tools + Features Map — high contrast, no blur */}
                 {AI_DESTINATIONS.map(dest => {
                   const Icon = dest.icon;
+                  // Features Map → navigate via onNavigate (no href)
+                  if (!dest.href) {
+                    return (
+                      <button
+                        key={dest.id}
+                        onClick={() => {
+                          onNavigate(dest.id);
+                          setDrawerOpen(false);
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-violet-50 active:bg-violet-100 transition haptic-tap text-left group"
+                      >
+                        <div className={`h-10 w-10 rounded-xl ${dest.bg} flex items-center justify-center ring-1 ring-slate-200`}>
+                          <Icon className={`h-5 w-5 ${dest.color}`} />
+                        </div>
+                        <span className="flex-1 text-sm font-bold text-slate-800 group-hover:text-violet-700">
+                          {dest.label}
+                        </span>
+                        <ChevronRight className="h-4 w-4 text-slate-400" />
+                      </button>
+                    );
+                  }
                   if (dest.href === "#ai-assistant") {
                     return (
                       <button
@@ -194,28 +264,41 @@ export function MobileNav({ active, onNavigate, cartCount, user, onLogout }: Mob
                   <div className="h-px bg-slate-200 my-2 mx-4" />
                 )}
 
-                {MORE_DESTINATIONS.map(dest => {
-                  const Icon = dest.icon;
-                  const isActive = active === dest.id;
-                  return (
-                    <button
-                      key={dest.id}
-                      onClick={() => {
-                        onNavigate(dest.id);
-                        setDrawerOpen(false);
-                      }}
-                      className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 active:bg-slate-100 transition haptic-tap text-left ${isActive ? "bg-emerald-50" : ""}`}
-                    >
-                      <div className={`h-10 w-10 rounded-xl ${dest.bg} flex items-center justify-center ring-1 ring-slate-200`}>
-                        <Icon className={`h-5 w-5 ${dest.color}`} />
-                      </div>
-                      <span className={`flex-1 text-sm font-bold ${isActive ? "text-emerald-700" : "text-slate-800"}`}>
-                        {dest.label}
-                      </span>
-                      <ChevronRight className="h-4 w-4 text-slate-400" />
-                    </button>
-                  );
-                })}
+                {/* Categorized destinations — every ViewMode is reachable */}
+                {MORE_DESTINATIONS.map((section, si) => (
+                  <div key={section.category}>
+                    {/* Category header — small, uppercase, muted */}
+                    <div className="px-4 pt-3 pb-1 sticky top-0 bg-white z-10">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{section.category}</span>
+                    </div>
+                    {section.items.map(dest => {
+                      const Icon = dest.icon;
+                      const isActive = active === dest.id;
+                      return (
+                        <button
+                          key={dest.id}
+                          onClick={() => {
+                            onNavigate(dest.id);
+                            setDrawerOpen(false);
+                          }}
+                          className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 active:bg-slate-100 transition haptic-tap text-left ${isActive ? "bg-emerald-50" : ""}`}
+                        >
+                          <div className={`h-10 w-10 rounded-xl ${dest.bg} flex items-center justify-center ring-1 ring-slate-200`}>
+                            <Icon className={`h-5 w-5 ${dest.color}`} />
+                          </div>
+                          <span className={`flex-1 text-sm font-bold ${isActive ? "text-emerald-700" : "text-slate-800"}`}>
+                            {dest.label}
+                          </span>
+                          <ChevronRight className="h-4 w-4 text-slate-400" />
+                        </button>
+                      );
+                    })}
+                    {/* Divider between categories (except after the last) */}
+                    {si < MORE_DESTINATIONS.length - 1 && (
+                      <div className="h-px bg-slate-100 my-1 mx-4" />
+                    )}
+                  </div>
+                ))}
               </div>
 
               {/* Dark Mode + Logout */}
