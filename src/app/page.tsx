@@ -2103,10 +2103,343 @@ export default function POSPage() {
         </div>
       )}
 
-      {/* ===== Main Content ===== */}
-      <main className="flex-1 flex flex-col lg:flex-row lg:overflow-hidden p-2 sm:p-3 gap-2 sm:gap-3">
-        {/* ===== Left Panel: Product Grid — Premium Card ===== */}
-        <section className="flex flex-col card-premium shadow-premium lg:overflow-hidden min-w-0 min-h-0 lg:flex-1">
+      {/* ===== Main Content — matches mobile layout on ALL screen sizes =====
+          The cart/invoice panel is at the TOP, product grid is BELOW.
+          This is the same layout as the mobile view — a single vertical column.
+          On desktop, the cart panel is wider and the product grid shows more columns. */}
+      <main className="flex-1 flex flex-col lg:overflow-hidden p-2 sm:p-3 gap-2 sm:gap-3">
+        {/* ===== Cart/Invoice Panel — at the TOP (like mobile) ===== */}
+        <section className={cn(
+          "flex flex-col card-premium shadow-premium-lg transition-all duration-300 flex-shrink-0",
+          showSidebar ? "w-full" : "w-0 min-w-0 max-h-0 overflow-hidden opacity-0"
+        )}>
+          <AnimatePresence>
+            {showSidebar && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="flex flex-col w-full"
+              >
+                {/* Cart Header — Premium Gradient */}
+                <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 gradient-premium-emerald text-white relative">
+                  <div className="flex items-center gap-2 relative z-10">
+                    <div className="h-7 w-7 rounded-lg bg-white/15 ring-1 ring-white/25 flex items-center justify-center backdrop-blur-sm">
+                      <Cart className="h-3.5 w-3.5" />
+                    </div>
+                    <span className="text-xs font-bold tracking-tight">Invoice #{invoiceNumber || '------'}</span>
+                  </div>
+                  <button onClick={() => setShowSidebar(false)} className="h-7 w-7 rounded-lg hover:bg-white/20 flex items-center justify-center transition active:scale-90">
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+
+                {/* Invoice Info Bar — horizontal layout, wraps on mobile */}
+                <div className="flex-shrink-0 px-3 py-1.5 bg-slate-100 border-b border-slate-300 flex items-center gap-3 text-[10px] flex-wrap">
+                  <div className="flex items-center gap-1">
+                    <span className="font-semibold text-slate-600">Client:</span>
+                    <input
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      placeholder="Walk-in customer"
+                      className="w-32 lg:w-48 h-6 px-1.5 border border-slate-300 rounded text-[10px] bg-white outline-none focus:ring-1 focus:ring-blue-400"
+                    />
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="font-semibold text-slate-600">Balance:</span>
+                    <span className="font-mono font-bold text-slate-800">{formatGHS(0)}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="font-semibold text-slate-600">Points:</span>
+                    <span className="font-mono text-slate-700">0</span>
+                  </div>
+                  {heldOrders.length > 0 && (
+                    <button className="ml-auto px-2 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-semibold flex items-center gap-1 hover:bg-amber-200 transition">
+                      <Pause className="h-2.5 w-2.5" />
+                      {heldOrders.length} Held
+                    </button>
+                  )}
+                </div>
+
+                {/* Part No. Input — full width */}
+                <div className="flex-shrink-0 px-3 py-1.5 bg-white border-b border-slate-200 flex items-center gap-2">
+                  <label className="text-[10px] font-bold text-slate-600 whitespace-nowrap">Part No.:</label>
+                  <input
+                    value={partNoInput}
+                    onChange={(e) => {
+                      setPartNoInput(e.target.value);
+                      if (e.target.value.length > 0) {
+                        setShowStockList(true);
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const product = products.find(p => p.barcode === partNoInput || p.sku.toLowerCase() === partNoInput.toLowerCase());
+                        if (product) {
+                          addToCart(product);
+                          setPartNoInput("");
+                          setShowStockList(false);
+                        } else {
+                          setShowStockList(true);
+                        }
+                      }
+                      if (e.key === 'Escape') setShowStockList(false);
+                    }}
+                    onFocus={() => { if (partNoInput) setShowStockList(true); }}
+                    placeholder="Type part number or scan barcode..."
+                    className="flex-1 h-7 px-2 text-xs font-mono border border-slate-400 rounded outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                  />
+                  <button
+                    onClick={() => setShowStockList(true)}
+                    className="h-7 px-2 rounded bg-blue-100 hover:bg-blue-200 text-blue-700 text-[10px] font-semibold flex items-center gap-1"
+                  >
+                    <Search className="h-3 w-3" /> F10
+                  </button>
+                </div>
+
+                {/* ===== Two-column layout: cart items on left, totals+buttons on right (desktop) ===== */}
+                <div className="flex flex-col lg:flex-row lg:items-stretch">
+                  {/* Cart Items Table — left side on desktop, full width on mobile */}
+                  <div className="flex-1 flex flex-col min-h-0 max-h-[30vh] lg:max-h-[35vh]">
+                    {/* Table Header — same for all screen sizes */}
+                    <div className="flex-shrink-0 grid grid-cols-[1fr_60px_50px_80px] lg:grid-cols-[140px_1fr_60px_90px_50px_90px] gap-1 px-2 py-1 text-[10px] font-bold text-slate-700 border-b border-slate-400" style={{ backgroundColor: '#ADD8E6' }}>
+                      <div className="lg:hidden"># · Item / Part No.</div>
+                      <div className="hidden lg:block">Part No.</div>
+                      <div className="hidden lg:block">Part Details</div>
+                      <div className="text-right hidden lg:block">Qty</div>
+                      <div className="text-right hidden lg:block">Amount GHC</div>
+                      <div className="text-center hidden lg:block">Disc%</div>
+                      <div className="text-right">Total GHC</div>
+                    </div>
+
+                    {/* Items List — scrolls */}
+                    <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 no-scrollbar" style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
+                      <div className="divide-y divide-slate-100">
+                        <AnimatePresence mode="popLayout">
+                          {cart.map((item, index) => {
+                            const lineTotal = item.price * item.quantity;
+                            const lineDiscount = lineTotal * (item.discount / 100);
+                            const lineFinal = lineTotal - lineDiscount;
+                            const isSelected = selectedCartIndex === index;
+                            return (
+                              <motion.div
+                                key={item.id}
+                                layout
+                                initial={{ opacity: 0, x: 20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                exit={{ opacity: 0, x: -20 }}
+                                transition={{ duration: 0.2 }}
+                                onClick={() => setSelectedCartIndex(index)}
+                                className={cn("cursor-pointer transition-colors px-2 py-1.5")}
+                                style={{
+                                  backgroundColor: isSelected ? '#E3F2FD' : (index % 2 === 1 ? '#FAFAFA' : '#FFFFFF'),
+                                  color: isSelected ? '#1565C0' : '#424242',
+                                }}
+                              >
+                                {/* === MOBILE LAYOUT === */}
+                                <div className="lg:hidden grid grid-cols-[1fr_auto_auto_auto] gap-1 items-center">
+                                  <div className="min-w-0 flex items-center gap-1">
+                                    <span className="text-[8px] font-mono text-slate-400 flex-shrink-0">{index + 1}</span>
+                                    <span className="text-sm flex-shrink-0">{item.emoji}</span>
+                                    <div className="min-w-0">
+                                      <div className="font-semibold text-[11px] truncate">{item.name}</div>
+                                      <div className="text-[8px] font-mono text-slate-400 truncate">{item.sku} · {formatGHS(item.price)}</div>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-0.5 justify-center w-10 flex-shrink-0">
+                                    <button onClick={(e) => { e.stopPropagation(); updateQuantity(index, -1); }} className="h-5 w-5 rounded bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition">
+                                      <Minus className="h-2.5 w-2.5" />
+                                    </button>
+                                    <span className="w-5 text-center font-mono font-semibold text-[10px]">{item.quantity.toFixed(item.unit === 'kg' ? 2 : 0)}</span>
+                                    <button onClick={(e) => { e.stopPropagation(); updateQuantity(index, 1); }} className="h-5 w-5 rounded bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition">
+                                      <Plus className="h-2.5 w-2.5" />
+                                    </button>
+                                  </div>
+                                  <div className="flex items-center justify-center w-10 flex-shrink-0">
+                                    <input
+                                      type="number"
+                                      value={item.discount || ''}
+                                      onClick={(e) => { e.stopPropagation(); setSelectedCartIndex(index); }}
+                                      onChange={(e) => applyDiscount(index, parseFloat(e.target.value) || 0)}
+                                      className="w-8 h-5 text-center text-[9px] font-mono font-bold rounded border-2 border-violet-400 bg-violet-50 outline-none focus:border-violet-600 focus:ring-2 focus:ring-violet-400/40 transition"
+                                      placeholder="0"
+                                    />
+                                  </div>
+                                  <div className="flex items-center justify-end gap-1 w-14 flex-shrink-0">
+                                    <span className="font-mono font-bold text-[11px]">{formatGHS(lineFinal)}</span>
+                                    <button onClick={(e) => { e.stopPropagation(); removeLine(index); }} className="h-4 w-4 rounded-md bg-rose-100 text-rose-600 hover:bg-rose-200 flex items-center justify-center transition">
+                                      <Trash2 className="h-2 w-2" />
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {/* === DESKTOP LAYOUT (grid) === */}
+                                <div className="hidden lg:grid lg:grid-cols-[140px_1fr_60px_90px_50px_90px] lg:gap-1 lg:items-center lg:text-[11px]">
+                                  <div className="font-mono truncate">{item.sku}</div>
+                                  <div className="truncate">{item.emoji} {item.name}</div>
+                                  <div className="text-right font-mono">{item.quantity.toFixed(item.unit === 'kg' ? 2 : 0)}</div>
+                                  <div className="text-right font-mono">{formatGHS(item.price)}</div>
+                                  <div className="text-center">
+                                    <input
+                                      type="number"
+                                      value={item.discount || ''}
+                                      onClick={(e) => { e.stopPropagation(); setSelectedCartIndex(index); }}
+                                      onChange={(e) => applyDiscount(index, parseFloat(e.target.value) || 0)}
+                                      className="w-9 text-center text-[10px] bg-transparent border-b border-slate-200 focus:border-blue-400 outline-none font-mono"
+                                      placeholder="0"
+                                    />
+                                  </div>
+                                  <div className="text-right font-mono font-semibold">{formatGHS(lineFinal)}</div>
+                                </div>
+                              </motion.div>
+                            );
+                          })}
+                        </AnimatePresence>
+
+                        {cart.length === 0 && (
+                          <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+                            <ShoppingCart className="h-10 w-10 mb-2 opacity-40" />
+                            <div className="text-sm font-medium">Cart is empty</div>
+                            <div className="text-xs mt-1">Type a Part No. above or click products below</div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right side: Totals + Function buttons (desktop only, side-by-side with cart) */}
+                  <div className="flex-shrink-0 lg:w-[320px] flex flex-col border-t lg:border-t-0 lg:border-l border-slate-200">
+                    {/* Held Orders */}
+                    {heldOrders.length > 0 && (
+                      <div className="flex-shrink-0 px-3 py-2 bg-amber-50 border-b border-amber-200 max-h-24 overflow-y-auto">
+                        <div className="text-[10px] font-bold text-amber-800 mb-1">HELD ORDERS (click to recall)</div>
+                        <div className="flex flex-wrap gap-1">
+                          {heldOrders.map((order, i) => (
+                            <button key={i} onClick={() => recallOrder(i)} className="px-2 py-1 rounded-md bg-white ring-1 ring-amber-300 text-[10px] text-amber-700 hover:bg-amber-100 transition">
+                              #{order.invoice} · {order.items.length} items
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Totals — Premium */}
+                    <div className="flex-shrink-0 bg-gradient-to-b from-slate-50/60 to-white">
+                      <div className="px-4 py-2 space-y-0.5">
+                        <div className="flex justify-between text-xs text-slate-600">
+                          <span>Subtotal ({totalItems} items)</span>
+                          <span className="font-mono tabular">{formatGHS(subtotal)}</span>
+                        </div>
+                        <div className="flex justify-between text-xs text-slate-600">
+                          <span className="flex items-center gap-1">
+                            <Percent className="h-3 w-3" /> Discount
+                            <input
+                              type="number"
+                              value={globalDiscount || ''}
+                              onChange={(e) => applyGlobalDiscount(parseFloat(e.target.value) || 0)}
+                              className="w-10 text-center font-mono font-bold rounded border-2 border-violet-400 bg-violet-50 outline-none focus:border-violet-600 focus:ring-2 focus:ring-violet-400/40 transition tabular"
+                              placeholder="0"
+                            />%
+                          </span>
+                          <span className="font-mono text-rose-600 tabular">-{formatGHS(discountAmount)}</span>
+                        </div>
+                        <div className="flex justify-between text-xs text-slate-600">
+                          <span>{TAX_NAME} ({(TAX_RATE * 100).toFixed(0)}%)</span>
+                          <span className="font-mono tabular">{formatGHS(taxAmount)}</span>
+                        </div>
+                      </div>
+                      <div className="px-4 py-2 gradient-premium-emerald text-white relative">
+                        <div className="flex justify-between items-baseline relative z-10">
+                          <span className="text-xs font-semibold uppercase tracking-wider opacity-90">Total Due</span>
+                          <span className="text-2xl font-bold font-mono tabular">{formatGHS(total)}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Function Buttons — Premium grid */}
+                    <div className="flex-shrink-0 grid grid-cols-4 gap-1 p-2 bg-slate-100/60">
+                      <button
+                        onClick={() => setShowFindProduct(true)}
+                        className="btn-premium col-span-4 h-10 rounded-lg gradient-premium-violet hover:shadow-glow-violet text-white font-bold text-xs flex items-center justify-center gap-1.5 transition"
+                      >
+                        <Search className="h-3.5 w-3.5" />
+                        FIND PRODUCT
+                        <kbd className="ml-1 px-1 py-0.5 rounded bg-white/20 text-[9px] font-mono hidden lg:inline">F1</kbd>
+                      </button>
+                      <FuncBtn icon={<Pause className="h-3 w-3" />} label="Save" sub="F2" onClick={handleSave} variant="amber" />
+                      <FuncBtn icon={<Printer className="h-3 w-3" />} label="Print" sub="F3" onClick={handlePrint} variant="slate" />
+                      <FuncBtn icon={<RotateCcw className="h-3 w-3" />} label="Void" sub="F4" onClick={handleVoid} variant="rose" />
+                      <FuncBtn icon={<DollarSign className="h-3 w-3" />} label="Cash" sub="" onClick={handleOpenCash} variant="slate" />
+                      <FuncBtn icon={<Trash2 className="h-3 w-3" />} label="Del Line" sub="Del" onClick={() => selectedCartIndex !== null ? removeLine(selectedCartIndex) : toast({ title: "Select a line first", variant: "destructive" })} variant="slate" />
+                      <FuncBtn icon={<Check className="h-3 w-3" />} label="Enter" sub="↵" onClick={handleKeypadEnter} variant="emerald" />
+                      <button
+                        onClick={() => setShowCartPreview(true)}
+                        className="btn-premium col-span-1 h-10 rounded-lg bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white font-bold text-[10px] flex items-center justify-center gap-0.5 transition"
+                      >
+                        <Eye className="h-3 w-3" />
+                        PREVIEW
+                        <kbd className="ml-0.5 px-0.5 py-0.5 rounded bg-white/20 text-[8px] font-mono hidden lg:inline">F6</kbd>
+                      </button>
+                      <button
+                        onClick={handlePay}
+                        className="btn-premium col-span-3 h-10 rounded-lg gradient-premium-emerald hover:shadow-glow-emerald text-white font-bold text-xs flex items-center justify-center gap-1.5 transition"
+                      >
+                        <CreditCard className="h-3.5 w-3.5" />
+                        PAY NOW
+                        <kbd className="ml-1 px-1 py-0.5 rounded bg-white/20 text-[9px] font-mono hidden lg:inline">F5</kbd>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Numeric Keypad — always visible, below the cart+totals */}
+                <div className="flex-shrink-0 p-1.5 bg-slate-800">
+                  <div className="flex gap-1 mb-1">
+                    {(["qty", "price", "barcode"] as const).map(mode => (
+                      <button
+                        key={mode}
+                        onClick={() => setActiveKeypadMode(mode)}
+                        className={cn(
+                          "flex-1 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wide transition",
+                          activeKeypadMode === mode ? "bg-emerald-500 text-white" : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+                        )}
+                      >
+                        {mode === "qty" ? "Qty" : mode === "price" ? "Price" : "Barcode"}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="mb-1 px-2 py-1 bg-slate-900 rounded-lg flex items-center justify-between">
+                    <span className="text-[9px] text-slate-400 uppercase font-semibold">
+                      {activeKeypadMode === "qty" ? "Quantity" : activeKeypadMode === "price" ? `Price (${CURRENCY_CODE})` : "Scan Code"}
+                    </span>
+                    <span className="font-mono text-sm font-bold text-emerald-400">
+                      {keypadInput || (activeKeypadMode === "price" ? `${CURRENCY}0.00` : "—")}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-4 gap-1">
+                    <KeypadBtn label="7" onClick={() => handleKeypadPress("7")} />
+                    <KeypadBtn label="8" onClick={() => handleKeypadPress("8")} />
+                    <KeypadBtn label="9" onClick={() => handleKeypadPress("9")} />
+                    <KeypadBtn label="C" onClick={() => handleKeypadPress("C")} variant="rose" />
+                    <KeypadBtn label="4" onClick={() => handleKeypadPress("4")} />
+                    <KeypadBtn label="5" onClick={() => handleKeypadPress("5")} />
+                    <KeypadBtn label="6" onClick={() => handleKeypadPress("6")} />
+                    <KeypadBtn label="⌫" onClick={() => handleKeypadPress("⌫")} variant="amber" />
+                    <KeypadBtn label="1" onClick={() => handleKeypadPress("1")} />
+                    <KeypadBtn label="2" onClick={() => handleKeypadPress("2")} />
+                    <KeypadBtn label="3" onClick={() => handleKeypadPress("3")} />
+                    <KeypadBtn label="Enter" onClick={() => handleKeypadPress("Enter")} variant="emerald" rowSpan />
+                    <KeypadBtn label="0" onClick={() => handleKeypadPress("0")} wide />
+                    <KeypadBtn label="." onClick={() => handleKeypadPress(".")} />
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </section>
+
+        {/* ===== Product Grid — BELOW the cart (like mobile) ===== */}
+        <section className="flex flex-col card-premium shadow-premium lg:overflow-hidden min-w-0 min-h-0 flex-1">
           <div className="flex-shrink-0 flex items-center justify-between px-3 sm:px-5 py-3 bg-gradient-to-r from-slate-50 to-white border-b border-slate-200/80">
             <div className="flex items-center gap-2 sm:gap-3 min-w-0">
               <div className="flex items-center gap-2">
@@ -2152,8 +2485,8 @@ export default function POSPage() {
             </div>
           </div>
 
-          {/* Product Grid — scrolls on mobile (max-h) and desktop */}
-          <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 max-h-[40vh] lg:max-h-none scroll-premium" style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
+          {/* Product Grid — scrolls, fills remaining space */}
+          <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 scroll-premium" style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 p-3 sm:p-4">
               {filteredProducts.map((product, idx) => {
                 const inCart = cart.find(item => item.productId === product.id);
@@ -2217,343 +2550,6 @@ export default function POSPage() {
               </div>
             )}
           </div>
-        </section>
-
-        {/* ===== Right Panel: Cart — Premium ===== */}
-        <section className={cn(
-          "flex flex-col card-premium shadow-premium-lg lg:overflow-hidden transition-all duration-300",
-          showSidebar ? "lg:w-[38%] lg:min-w-[380px] w-full lg:flex-none" : "w-0 min-w-0 lg:w-0"
-        )}>
-          <AnimatePresence>
-            {showSidebar && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="flex flex-col w-full lg:h-full"
-              >
-                {/* Cart Header — Premium Gradient */}
-                <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 gradient-premium-emerald text-white relative">
-                  <div className="flex items-center gap-2 relative z-10">
-                    <div className="h-7 w-7 rounded-lg bg-white/15 ring-1 ring-white/25 flex items-center justify-center backdrop-blur-sm">
-                      <Cart className="h-3.5 w-3.5" />
-                    </div>
-                    <span className="text-xs font-bold tracking-tight">Invoice #{invoiceNumber || '------'}</span>
-                  </div>
-                  <button onClick={() => setShowSidebar(false)} className="h-7 w-7 rounded-lg hover:bg-white/20 flex items-center justify-center transition active:scale-90">
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-
-                {/* Invoice Info Bar */}
-                <div className="flex-shrink-0 px-3 py-1.5 bg-slate-100 border-b border-slate-300 flex items-center gap-3 text-[10px]">
-                  <div className="flex items-center gap-1">
-                    <span className="font-semibold text-slate-600">Client:</span>
-                    <input
-                      value={customerName}
-                      onChange={(e) => setCustomerName(e.target.value)}
-                      placeholder="Walk-in customer"
-                      className="w-32 h-6 px-1.5 border border-slate-300 rounded text-[10px] bg-white outline-none focus:ring-1 focus:ring-blue-400"
-                    />
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span className="font-semibold text-slate-600">Balance:</span>
-                    <span className="font-mono font-bold text-slate-800">{formatGHS(0)}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span className="font-semibold text-slate-600">Points:</span>
-                    <span className="font-mono text-slate-700">0</span>
-                  </div>
-                  {heldOrders.length > 0 && (
-                    <button className="ml-auto px-2 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-semibold flex items-center gap-1 hover:bg-amber-200 transition">
-                      <Pause className="h-2.5 w-2.5" />
-                      {heldOrders.length} Held
-                    </button>
-                  )}
-                </div>
-
-                {/* Part No. Input — typing here opens Stock List popup */}
-                <div className="flex-shrink-0 px-3 py-1.5 bg-white border-b border-slate-200 flex items-center gap-2">
-                  <label className="text-[10px] font-bold text-slate-600 whitespace-nowrap">Part No.:</label>
-                  <input
-                    value={partNoInput}
-                    onChange={(e) => {
-                      setPartNoInput(e.target.value);
-                      if (e.target.value.length > 0) {
-                        setShowStockList(true);
-                      }
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        const product = products.find(p => p.barcode === partNoInput || p.sku.toLowerCase() === partNoInput.toLowerCase());
-                        if (product) {
-                          addToCart(product);
-                          setPartNoInput("");
-                          setShowStockList(false);
-                        } else {
-                          setShowStockList(true);
-                        }
-                      }
-                      if (e.key === 'Escape') setShowStockList(false);
-                    }}
-                    onFocus={() => { if (partNoInput) setShowStockList(true); }}
-                    placeholder="Type part number or scan barcode..."
-                    className="flex-1 h-7 px-2 text-xs font-mono border border-slate-400 rounded outline-none focus:ring-2 focus:ring-blue-400 bg-white"
-                  />
-                  <button
-                    onClick={() => setShowStockList(true)}
-                    className="h-7 px-2 rounded bg-blue-100 hover:bg-blue-200 text-blue-700 text-[10px] font-semibold flex items-center gap-1"
-                  >
-                    <Search className="h-3 w-3" /> F10
-                  </button>
-                </div>
-
-                {/* Cart Items Table */}
-                <div className="flex-1 flex flex-col lg:overflow-hidden lg:min-h-0">
-                  {/* Desktop Table Header — light blue, hidden on mobile */}
-                  <div className="hidden lg:grid flex-shrink-0 grid-cols-[120px_1fr_50px_80px_45px_80px] gap-1 px-2 py-1 text-[10px] font-bold text-slate-700 border-b border-slate-400" style={{ backgroundColor: '#ADD8E6' }}>
-                    <div>Part No.</div>
-                    <div>Part Details</div>
-                    <div className="text-right">Qty</div>
-                    <div className="text-right">Amount GHC</div>
-                    <div className="text-center">Disc%</div>
-                    <div className="text-right">Total GHC</div>
-                  </div>
-
-                  {/* Mobile Table Header — compact, visible only on mobile */}
-                  <div className="lg:hidden flex-shrink-0 grid grid-cols-[1fr_auto_auto_auto] gap-1 px-2 py-1 text-[8px] font-bold text-slate-600 border-b border-slate-300 bg-slate-100">
-                    <div># · Item / Part No.</div>
-                    <div className="text-center w-10">Qty</div>
-                    <div className="text-center w-10">Disc%</div>
-                    <div className="text-right w-14">Total</div>
-                  </div>
-
-                  {/* Items List — scrolls on mobile (max-h) and desktop */}
-                  <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 max-h-[35vh] lg:max-h-none no-scrollbar" style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
-                    <div className="divide-y divide-slate-100">
-                      <AnimatePresence mode="popLayout">
-                        {cart.map((item, index) => {
-                          const lineTotal = item.price * item.quantity;
-                          const lineDiscount = lineTotal * (item.discount / 100);
-                          const lineFinal = lineTotal - lineDiscount;
-                          const isSelected = selectedCartIndex === index;
-                          return (
-                            <motion.div
-                              key={item.id}
-                              layout
-                              initial={{ opacity: 0, x: 20 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              exit={{ opacity: 0, x: -20 }}
-                              transition={{ duration: 0.2 }}
-                              onClick={() => setSelectedCartIndex(index)}
-                              className={cn(
-                                "cursor-pointer transition-colors",
-                                "lg:grid lg:grid-cols-[120px_1fr_50px_80px_45px_80px] lg:gap-1 lg:px-2 lg:py-1.5 lg:text-[11px]",
-                                "px-2 py-1.5",
-                              )}
-                              style={{
-                                backgroundColor: isSelected ? '#E3F2FD' : (index % 2 === 1 ? '#FAFAFA' : '#FFFFFF'),
-                                color: isSelected ? '#1565C0' : '#424242',
-                              }}
-                            >
-                              {/* === MOBILE LAYOUT (grid matching headers) === */}
-                              <div className="lg:hidden grid grid-cols-[1fr_auto_auto_auto] gap-1 items-center">
-                                {/* Col 1: # + emoji + name + SKU */}
-                                <div className="min-w-0 flex items-center gap-1">
-                                  <span className="text-[8px] font-mono text-slate-400 flex-shrink-0">{index + 1}</span>
-                                  <span className="text-sm flex-shrink-0">{item.emoji}</span>
-                                  <div className="min-w-0">
-                                    <div className="font-semibold text-[11px] truncate">{item.name}</div>
-                                    <div className="text-[8px] font-mono text-slate-400 truncate">{item.sku} · {formatGHS(item.price)}</div>
-                                  </div>
-                                </div>
-                                {/* Col 2: Qty controls */}
-                                <div className="flex items-center gap-0.5 justify-center w-10 flex-shrink-0">
-                                  <button onClick={(e) => { e.stopPropagation(); updateQuantity(index, -1); }} className="h-5 w-5 rounded bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition">
-                                    <Minus className="h-2.5 w-2.5" />
-                                  </button>
-                                  <span className="w-5 text-center font-mono font-semibold text-[10px]">{item.quantity.toFixed(item.unit === 'kg' ? 2 : 0)}</span>
-                                  <button onClick={(e) => { e.stopPropagation(); updateQuantity(index, 1); }} className="h-5 w-5 rounded bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition">
-                                    <Plus className="h-2.5 w-2.5" />
-                                  </button>
-                                </div>
-                                {/* Col 3: Discount input */}
-                                <div className="flex items-center justify-center w-10 flex-shrink-0">
-                                  <input
-                                    type="number"
-                                    value={item.discount || ''}
-                                    onClick={(e) => { e.stopPropagation(); setSelectedCartIndex(index); }}
-                                    onChange={(e) => applyDiscount(index, parseFloat(e.target.value) || 0)}
-                                    className="w-8 h-5 text-center text-[9px] font-mono font-bold rounded border-2 border-violet-400 bg-violet-50 outline-none focus:border-violet-600 focus:ring-2 focus:ring-violet-400/40 transition"
-                                    placeholder="0"
-                                  />
-                                </div>
-                                {/* Col 4: Total + remove */}
-                                <div className="flex items-center justify-end gap-1 w-14 flex-shrink-0">
-                                  <span className="font-mono font-bold text-[11px]">{formatGHS(lineFinal)}</span>
-                                  <button onClick={(e) => { e.stopPropagation(); removeLine(index); }} className="h-4 w-4 rounded-md bg-rose-100 text-rose-600 hover:bg-rose-200 flex items-center justify-center transition">
-                                    <Trash2 className="h-2 w-2" />
-                                  </button>
-                                </div>
-                              </div>
-
-                              {/* === DESKTOP LAYOUT (grid) === */}
-                              <div className="hidden lg:block font-mono truncate">{item.sku}</div>
-                              <div className="hidden lg:block truncate">{item.emoji} {item.name}</div>
-                              <div className="hidden lg:block text-right font-mono">{item.quantity.toFixed(item.unit === 'kg' ? 2 : 0)}</div>
-                              <div className="hidden lg:block text-right font-mono">{formatGHS(item.price)}</div>
-                              <div className="hidden lg:block text-center">
-                                <input
-                                  type="number"
-                                  value={item.discount || ''}
-                                  onClick={(e) => { e.stopPropagation(); setSelectedCartIndex(index); }}
-                                  onChange={(e) => applyDiscount(index, parseFloat(e.target.value) || 0)}
-                                  className="w-9 text-center text-[10px] bg-transparent border-b border-slate-200 focus:border-blue-400 outline-none font-mono"
-                                  placeholder="0"
-                                />
-                              </div>
-                              <div className="hidden lg:block text-right font-mono font-semibold">{formatGHS(lineFinal)}</div>
-                            </motion.div>
-                          );
-                        })}
-                      </AnimatePresence>
-
-                      {cart.length === 0 && (
-                        <div className="flex flex-col items-center justify-center py-16 text-slate-400">
-                          <ShoppingCart className="h-10 w-10 mb-2 opacity-40" />
-                          <div className="text-sm font-medium">Cart is empty</div>
-                          <div className="text-xs mt-1">Type a Part No. above or click products</div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Held Orders */}
-                {heldOrders.length > 0 && (
-                  <div className="flex-shrink-0 px-3 py-2 bg-amber-50 border-t border-amber-200 max-h-24 overflow-y-auto">
-                    <div className="text-[10px] font-bold text-amber-800 mb-1">HELD ORDERS (click to recall)</div>
-                    <div className="flex flex-wrap gap-1">
-                      {heldOrders.map((order, i) => (
-                        <button key={i} onClick={() => recallOrder(i)} className="px-2 py-1 rounded-md bg-white ring-1 ring-amber-300 text-[10px] text-amber-700 hover:bg-amber-100 transition">
-                          #{order.invoice} · {order.items.length} items
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Totals — Premium */}
-                <div className="flex-shrink-0 border-t border-slate-200/80 bg-gradient-to-b from-slate-50/60 to-white">
-                  <div className="px-4 py-2 space-y-0.5">
-                    <div className="flex justify-between text-xs text-slate-600">
-                      <span>Subtotal ({totalItems} items)</span>
-                      <span className="font-mono tabular">{formatGHS(subtotal)}</span>
-                    </div>
-                    <div className="flex justify-between text-xs text-slate-600">
-                      <span className="flex items-center gap-1">
-                        <Percent className="h-3 w-3" /> Discount
-                        <input
-                          type="number"
-                          value={globalDiscount || ''}
-                          onChange={(e) => applyGlobalDiscount(parseFloat(e.target.value) || 0)}
-                          className="w-10 text-center font-mono font-bold rounded border-2 border-violet-400 bg-violet-50 outline-none focus:border-violet-600 focus:ring-2 focus:ring-violet-400/40 transition tabular"
-                          placeholder="0"
-                        />%
-                      </span>
-                      <span className="font-mono text-rose-600 tabular">-{formatGHS(discountAmount)}</span>
-                    </div>
-                    <div className="flex justify-between text-xs text-slate-600">
-                      <span>{TAX_NAME} ({(TAX_RATE * 100).toFixed(0)}%)</span>
-                      <span className="font-mono tabular">{formatGHS(taxAmount)}</span>
-                    </div>
-                  </div>
-                  <div className="px-4 py-2 gradient-premium-emerald text-white relative">
-                    <div className="flex justify-between items-baseline relative z-10">
-                      <span className="text-xs font-semibold uppercase tracking-wider opacity-90">Total Due</span>
-                      <span className="text-2xl font-bold font-mono tabular">{formatGHS(total)}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Function Buttons — Premium grid */}
-                <div className="flex-shrink-0 grid grid-cols-4 gap-1 p-2 bg-slate-100/60">
-                  <button
-                    onClick={() => setShowFindProduct(true)}
-                    className="btn-premium col-span-4 h-10 rounded-lg gradient-premium-violet hover:shadow-glow-violet text-white font-bold text-xs flex items-center justify-center gap-1.5 transition"
-                  >
-                    <Search className="h-3.5 w-3.5" />
-                    FIND PRODUCT
-                    <kbd className="ml-1 px-1 py-0.5 rounded bg-white/20 text-[9px] font-mono hidden lg:inline">F1</kbd>
-                  </button>
-                  <FuncBtn icon={<Pause className="h-3 w-3" />} label="Save" sub="F2" onClick={handleSave} variant="amber" />
-                  <FuncBtn icon={<Printer className="h-3 w-3" />} label="Print" sub="F3" onClick={handlePrint} variant="slate" />
-                  <FuncBtn icon={<RotateCcw className="h-3 w-3" />} label="Void" sub="F4" onClick={handleVoid} variant="rose" />
-                  <FuncBtn icon={<DollarSign className="h-3 w-3" />} label="Cash" sub="" onClick={handleOpenCash} variant="slate" />
-                  <FuncBtn icon={<Trash2 className="h-3 w-3" />} label="Del Line" sub="Del" onClick={() => selectedCartIndex !== null ? removeLine(selectedCartIndex) : toast({ title: "Select a line first", variant: "destructive" })} variant="slate" />
-                  <FuncBtn icon={<Check className="h-3 w-3" />} label="Enter" sub="↵" onClick={handleKeypadEnter} variant="emerald" />
-                  <button
-                    onClick={() => setShowCartPreview(true)}
-                    className="btn-premium col-span-1 h-10 rounded-lg bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white font-bold text-[10px] flex items-center justify-center gap-0.5 transition"
-                  >
-                    <Eye className="h-3 w-3" />
-                    PREVIEW
-                    <kbd className="ml-0.5 px-0.5 py-0.5 rounded bg-white/20 text-[8px] font-mono hidden lg:inline">F6</kbd>
-                  </button>
-                  <button
-                    onClick={handlePay}
-                    className="btn-premium col-span-3 h-10 rounded-lg gradient-premium-emerald hover:shadow-glow-emerald text-white font-bold text-xs flex items-center justify-center gap-1.5 transition"
-                  >
-                    <CreditCard className="h-3.5 w-3.5" />
-                    PAY NOW
-                    <kbd className="ml-1 px-1 py-0.5 rounded bg-white/20 text-[9px] font-mono hidden lg:inline">F5</kbd>
-                  </button>
-                </div>
-
-                {/* Numeric Keypad — always visible */}
-                <div className="flex-shrink-0 p-1.5 bg-slate-800">
-                  <div className="flex gap-1 mb-1">
-                    {(["qty", "price", "barcode"] as const).map(mode => (
-                      <button
-                        key={mode}
-                        onClick={() => setActiveKeypadMode(mode)}
-                        className={cn(
-                          "flex-1 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wide transition",
-                          activeKeypadMode === mode ? "bg-emerald-500 text-white" : "bg-slate-700 text-slate-300 hover:bg-slate-600"
-                        )}
-                      >
-                        {mode === "qty" ? "Qty" : mode === "price" ? "Price" : "Barcode"}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="mb-1 px-2 py-1 bg-slate-900 rounded-lg flex items-center justify-between">
-                    <span className="text-[9px] text-slate-400 uppercase font-semibold">
-                      {activeKeypadMode === "qty" ? "Quantity" : activeKeypadMode === "price" ? `Price (${CURRENCY_CODE})` : "Scan Code"}
-                    </span>
-                    <span className="font-mono text-sm font-bold text-emerald-400">
-                      {keypadInput || (activeKeypadMode === "price" ? `${CURRENCY}0.00` : "—")}
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-4 gap-1">
-                    <KeypadBtn label="7" onClick={() => handleKeypadPress("7")} />
-                    <KeypadBtn label="8" onClick={() => handleKeypadPress("8")} />
-                    <KeypadBtn label="9" onClick={() => handleKeypadPress("9")} />
-                    <KeypadBtn label="C" onClick={() => handleKeypadPress("C")} variant="rose" />
-                    <KeypadBtn label="4" onClick={() => handleKeypadPress("4")} />
-                    <KeypadBtn label="5" onClick={() => handleKeypadPress("5")} />
-                    <KeypadBtn label="6" onClick={() => handleKeypadPress("6")} />
-                    <KeypadBtn label="⌫" onClick={() => handleKeypadPress("⌫")} variant="amber" />
-                    <KeypadBtn label="1" onClick={() => handleKeypadPress("1")} />
-                    <KeypadBtn label="2" onClick={() => handleKeypadPress("2")} />
-                    <KeypadBtn label="3" onClick={() => handleKeypadPress("3")} />
-                    <KeypadBtn label="Enter" onClick={() => handleKeypadPress("Enter")} variant="emerald" rowSpan />
-                    <KeypadBtn label="0" onClick={() => handleKeypadPress("0")} wide />
-                    <KeypadBtn label="." onClick={() => handleKeypadPress(".")} />
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
         </section>
 
         {!showSidebar && (
