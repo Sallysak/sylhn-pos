@@ -439,12 +439,12 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
     win.print();
   };
 
-  const tabs: Array<{ id: Tab; label: string; icon: any }> = [
-    { id: "overview", label: "Overview", icon: Activity },
-    { id: "sales-history", label: "Sales History", icon: ShoppingCart },
-    { id: "reorder", label: "Reorder Alerts", icon: AlertTriangle },
-    { id: "expiry", label: "Expiry Tracking", icon: Clock },
-    { id: "profit", label: "Profit Analysis", icon: Percent },
+  const tabs: Array<{ id: Tab; label: string; short: string; icon: any }> = [
+    { id: "overview", label: "Overview", short: "Overview", icon: Activity },
+    { id: "sales-history", label: "Sales History", short: "Sales", icon: ShoppingCart },
+    { id: "reorder", label: "Reorder Alerts", short: "Reorder", icon: AlertTriangle },
+    { id: "expiry", label: "Expiry Tracking", short: "Expiry", icon: Clock },
+    { id: "profit", label: "Profit Analysis", short: "Profit", icon: Percent },
   ];
 
   return (
@@ -469,7 +469,7 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
             <span className="hidden sm:inline ml-1">Refresh</span>
           </Button>
         </div>
-        {/* Tabs */}
+        {/* Tabs — horizontally scrollable on mobile, full on desktop */}
         <div className="flex items-center gap-1 px-3 sm:px-6 pb-2 overflow-x-auto scrollbar-hide">
           {tabs.map(t => {
             const Icon = t.icon;
@@ -478,12 +478,13 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
                 key={t.id}
                 onClick={() => setTab(t.id)}
                 className={cn(
-                  "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition whitespace-nowrap",
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition whitespace-nowrap flex-shrink-0 active:scale-95",
                   tab === t.id ? "bg-emerald-500 text-white" : "bg-white/5 text-slate-300 hover:bg-white/10"
                 )}
               >
                 <Icon className="h-3.5 w-3.5" />
-                {t.label}
+                <span className="sm:hidden">{t.short}</span>
+                <span className="hidden sm:inline">{t.label}</span>
               </button>
             );
           })}

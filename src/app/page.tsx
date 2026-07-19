@@ -1995,20 +1995,21 @@ export default function POSPage() {
 
       {/* ===== Category Navigation — Premium Pills ===== */}
       <nav className="flex-shrink-0 bg-white/70 backdrop-blur-xl border-b border-slate-200/80 z-20 sticky top-0">
-        <div className="flex items-center gap-1.5 px-4 py-2 overflow-x-auto scrollbar-hide">
+        <div className="flex items-center gap-1.5 px-3 sm:px-4 py-2 overflow-x-auto scrollbar-hide">
           {categories.map(cat => (
             <button
               key={cat.id}
               onClick={() => setActiveCategory(cat.id)}
               className={cn(
-                "cat-pill-premium flex-shrink-0 flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold",
+                "cat-pill-premium flex-shrink-0 flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap",
                 activeCategory === cat.id
                   ? `bg-gradient-to-r ${cat.gradient} text-white active shadow-premium`
                   : "bg-slate-100/80 text-slate-600 hover:bg-slate-200/80 hover:scale-105"
               )}
             >
               <span className="text-base">{cat.icon}</span>
-              {cat.name}
+              <span className="sm:hidden">{cat.id === 'confectionery' ? 'Confect.' : cat.id === 'soft-drinks' ? 'Drinks' : cat.id === 'hard-liquor' ? 'Liquor' : cat.id === 'households' ? 'Home' : cat.id === 'groceries' ? 'Grocery' : cat.name}</span>
+              <span className="hidden sm:inline">{cat.name}</span>
               {activeCategory === cat.id && cat.id !== "all" && (
                 <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px] bg-white/25 text-white border-0">
                   {products.filter(p => p.category === cat.id).length}
