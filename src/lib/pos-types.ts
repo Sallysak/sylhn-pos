@@ -12,6 +12,7 @@ export interface CartItem {
   discount: number; // percentage
   taxable: boolean;
   stock: number;
+  total?: number; // computed: price * quantity * (1 - discount/100)
 }
 
 export interface PaymentResult {

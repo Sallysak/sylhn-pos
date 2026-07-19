@@ -14,7 +14,7 @@ import {
   Phone, Truck, Users, Database, Wrench, Shield,
   FileBarChart2, BookOpen, PhoneCall, Archive, Settings2, Lock,
   FileSearch, Copy, Image as ImageIcon, Tags,
-  Smartphone, RefreshCw, Sparkles, Loader2, AlertTriangle, Calculator as CalcIcon, Mail,
+  Smartphone, RefreshCw, Sparkles, Loader2, AlertTriangle, Calculator as CalcIcon, Mail, Send,
 } from "lucide-react";
 import {
   products as INITIAL_PRODUCTS, categories, paymentMethods, quickCashAmounts,
@@ -3749,193 +3749,30 @@ function buildWhatsAppReceiptText(payment: any): string {
 }
 
 // ===== Receipt Modal =====
+// ALL actions work inside the preview iframe — no popups, no new windows.
+// Print: opens a full-screen print overlay within the app
+// CSV: shows CSV text in a copyable text area
+// PDF: same as print (user selects "Save as PDF")
+// WhatsApp: shows wa.me link in a copyable text area
 function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: () => void }) {
-  // Premium: WhatsApp + QR code for receipt delivery
   const [showQR, setShowQR] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState<string>("");
-  const [saleSaving, setSaleSaving] = useState(false);
+  const [printMode, setPrintMode] = useState(false); // full-screen print overlay
+  const [showCSV, setShowCSV] = useState(false);
+  const [showWhatsApp, setShowWhatsApp] = useState(false);
+  const [waPhone, setWaPhone] = useState("");
+  const [copied, setCopied] = useState(false);
   const { toast } = useToast();
 
-  // Premium: Generate QR code client-side (no server needed)
-  // Uses a simple QR code API fallback or generates a data URL
+  // Generate QR code
   useEffect(() => {
     if (!showQR || qrDataUrl) return;
-    // Generate a QR code pointing to a receipt verification URL
-    const verifyUrl = `${window.location.origin}/api/receipt/verify?invoice=${payment.invoiceNumber}&saleId=${payment.saleId || ''}`;
-    // Use the qr-server.com API as a fallback (free, no auth needed)
-    // If that fails, show the invoice number as text
-    const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(verifyUrl)}`;
-    setQrDataUrl(qrApiUrl);
-  }, [showQR, payment.invoiceNumber, payment.saleId, qrDataUrl]);
+    const verifyUrl = `${window.location.origin}/api/receipt/verify?invoice=${payment.invoiceNumber}`;
+    setQrDataUrl(`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(verifyUrl)}`);
+  }, [showQR, payment.invoiceNumber, qrDataUrl]);
 
-  // Premium: Ensure sale is saved to server before print/WhatsApp/etc.
-  // First tries to FIND the sale by invoice number (it was likely already
-  // saved in completePayment). If not found, tries to POST it. This prevents
-  // "Unique constraint failed" errors from double-posting.
-  const ensureSaleSaved = async (): Promise<boolean> => {
-    if (payment.saleId) return true;
-
-    // Step 1: Try to find the sale by invoice number
-    try {
-      const findRes = await authedFetch(`/api/sales?limit=50`);
-      if (findRes.ok) {
-        const findData = await findRes.json();
-        const existing = (findData.sales || []).find((s: any) => s.invoiceNumber === payment.invoiceNumber);
-        if (existing && existing.id) {
-          (payment as any).saleId = existing.id;
-          return true;
-        }
-      }
-    } catch { /* fall through to POST */ }
-
-    // Step 2: Sale not found — try to POST it
-    setSaleSaving(true);
-    try {
-      const res = await authedFetch("/api/sales", {
-        method: "POST",
-        body: JSON.stringify({
-          invoiceNumber: payment.invoiceNumber,
-          customerName: payment.customer || '',
-          cashierName: payment.cashier || 'Cashier',
-          subtotal: payment.subtotal,
-          discount: payment.discount,
-          taxRate: TAX_RATE,
-          taxAmount: payment.tax,
-          total: payment.total,
-          amountPaid: payment.amountPaid,
-          change: payment.change,
-          paymentMethod: payment.method,
-          status: 'completed',
-          items: payment.items.map((item: any) => ({
-            productId: item.productId,
-            sku: item.sku,
-            name: item.name,
-            price: item.price,
-            quantity: item.quantity,
-            unit: item.unit,
-            discount: item.discount || 0,
-            taxable: item.taxable,
-            total: item.price * item.quantity * (1 - (item.discount || 0) / 100),
-          })),
-        }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success && data.sale?.id) {
-          (payment as any).saleId = data.sale.id;
-          setSaleSaving(false);
-          return true;
-        }
-      }
-      // If POST fails with "Unique constraint" — the sale was already saved
-      // by completePayment(). Try to find it again.
-      if (res.status === 500 || res.status === 400) {
-        try {
-          const findRes2 = await authedFetch(`/api/sales?limit=50`);
-          if (findRes2.ok) {
-            const findData2 = await findRes2.json();
-            const existing2 = (findData2.sales || []).find((s: any) => s.invoiceNumber === payment.invoiceNumber);
-            if (existing2 && existing2.id) {
-              (payment as any).saleId = existing2.id;
-              setSaleSaving(false);
-              return true;
-            }
-          }
-        } catch { /* give up */ }
-      }
-      setSaleSaving(false);
-      return false;
-    } catch (e) {
-      setSaleSaving(false);
-      return false;
-    }
-  };
-
-  // Premium: print via Bluetooth thermal printer (falls back to browser print)
-  const handleThermalPrint = async () => {
-    // Don't block on ensureSaleSaved — just try to print
-    try {
-      const { isPrinterConnected, buildReceiptBytes, printBytes } = await import("@/lib/thermal-printer");
-      if (!isPrinterConnected()) {
-        // Fall back to browser print
-        handleBrowserPrint();
-        return;
-      }
-      const bytes = buildReceiptBytes({
-        companyName: COMPANY.name,
-        companyAddress: COMPANY.address,
-        companyPhone: COMPANY.contact,
-        invoiceNumber: payment.invoiceNumber,
-        cashierName: payment.cashier,
-        customerName: payment.customer,
-        timestamp: new Date(payment.timestamp),
-        items: payment.items.map(item => ({
-          name: item.name,
-          emoji: item.emoji,
-          quantity: item.quantity,
-          price: item.price,
-          total: item.price * item.quantity * (1 - item.discount / 100),
-        })),
-        subtotal: payment.subtotal,
-        discount: payment.discount,
-        taxAmount: payment.tax,
-        total: payment.total,
-        amountPaid: payment.amountPaid,
-        change: payment.change,
-        paymentMethod: payment.method,
-        currencySymbol: CURRENCY,
-      }, 80);
-      await printBytes(bytes);
-      toast({ title: 'Receipt printed', description: 'Sent to thermal printer' });
-    } catch (e: any) {
-      console.warn('Thermal print failed, falling back to browser print:', e);
-      handleBrowserPrint();
-    }
-  };
-
-  // Browser print — works in iframe using srcdoc
-  const handleBrowserPrint = () => {
-    const itemsHtml = payment.items.map((item: any) => `
-      <tr>
-        <td style="padding:2px 8px;text-align:left">${item.emoji || ''} ${item.name}</td>
-        <td style="padding:2px 8px;text-align:right">${item.quantity}</td>
-        <td style="padding:2px 8px;text-align:right">${formatGHS(item.total)}</td>
-      </tr>`).join("");
-    const html = `<!DOCTYPE html><html><head><title>Receipt ${payment.invoiceNumber}</title>
-      <style>
-        body{font-family:monospace;font-size:12px;max-width:300px;margin:0 auto;padding:20px}
-        h2{text-align:center;font-size:14px}
-        table{width:100%;border-collapse:collapse;margin:10px 0}
-        th{border-bottom:1px solid #000;padding:4px 8px;text-align:left;font-size:11px}
-        .total{font-size:16px;font-weight:bold;text-align:right;margin-top:10px}
-        .center{text-align:center}
-        @media print{body{padding:0}}
-      </style></head><body>
-      <h2>${COMPANY.name}</h2>
-      <p class="center">${COMPANY.address}<br/>${COMPANY.contact}</p>
-      <hr/>
-      <p>Invoice: ${payment.invoiceNumber}<br/>
-      Date: ${new Date(payment.timestamp).toLocaleString('en-GB')}<br/>
-      Cashier: ${payment.cashier || 'N/A'}<br/>
-      Customer: ${payment.customer || 'Walk-in'}</p>
-      <hr/>
-      <table><thead><tr><th>Item</th><th style="text-align:right">Qty</th><th style="text-align:right">Total</th></tr></thead>
-      <tbody>${itemsHtml}</tbody></table>
-      <hr/>
-      <p>Subtotal: ${formatGHS(payment.subtotal)}</p>
-      ${payment.discount > 0 ? `<p>Discount: -${formatGHS(payment.discount)}</p>` : ''}
-      <p>Tax: ${formatGHS(payment.tax)}</p>
-      <p class="total">TOTAL: ${formatGHS(payment.total)}</p>
-      <p>Paid: ${formatGHS(payment.amountPaid)} (${payment.method})</p>
-      <p>Change: ${formatGHS(payment.change)}</p>
-      <hr/>
-      <p class="center">Thank you for shopping!<br/>Have a fresh & healthy day</p>
-      </body></html>`;
-    printHTML(html);
-  };
-
-  // CSV export — works in iframe using Blob + anchor click
-  const handleCSVExport = () => {
+  // Generate CSV string
+  const csvContent = useMemo(() => {
     const rows = [
       ["Field", "Value"],
       ["Invoice", payment.invoiceNumber],
@@ -3953,420 +3790,286 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
       ["Items", ""],
       ...payment.items.map((item: any) => [`${item.emoji || ''} ${item.name}`, `${item.quantity} x ${formatGHS(item.price)} = ${formatGHS(item.total)}`]),
     ];
-    const csv = rows.map(r => r.map(c => `"${c}"`).join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
+    return rows.map(r => r.map(c => `"${c}"`).join(",")).join("\n");
+  }, [payment]);
+
+  // Generate WhatsApp receipt text
+  const waText = useMemo(() => buildWhatsAppReceiptText(payment), [payment]);
+  const waLink = useMemo(() => {
+    const phone = waPhone.replace(/[\s+\-()]/g, "");
+    return phone
+      ? `https://wa.me/${phone}?text=${encodeURIComponent(waText)}`
+      : `https://wa.me/?text=${encodeURIComponent(waText)}`;
+  }, [waPhone, waText]);
+
+  // Copy to clipboard (works in iframe using execCommand)
+  const copyToClipboard = (text: string) => {
+    // Method 1: execCommand (works in older browsers + iframes)
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    try {
+      document.execCommand('copy');
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+      toast({ title: 'Copied to clipboard' });
+    } catch {
+      // Method 2: navigator.clipboard
+      navigator.clipboard?.writeText(text).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+        toast({ title: 'Copied to clipboard' });
+      }).catch(() => {
+        toast({ title: 'Copy failed', description: 'Select the text manually and copy', variant: 'destructive' });
+      });
+    }
+    document.body.removeChild(textarea);
+  };
+
+  // Download file (works in iframe using Blob + anchor download)
+  const downloadFile = (content: string, filename: string, mimeType: string) => {
+    const blob = new Blob([content], { type: mimeType });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
+    const a = document.createElement('a');
     a.href = url;
-    a.download = `receipt-${payment.invoiceNumber}.csv`;
+    a.download = filename;
+    a.style.display = 'none';
     document.body.appendChild(a);
     a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    toast({ title: "Receipt exported as CSV" });
+    setTimeout(() => {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 100);
   };
 
-  // PDF export — opens browser print dialog (user selects Save as PDF)
-  const handlePDFExport = () => {
+  // Print receipt HTML (full-screen overlay within the app)
+  const printReceiptHTML = useMemo(() => {
     const itemsHtml = payment.items.map((item: any) => `
       <tr>
-        <td style="padding:2px 8px;text-align:left">${item.emoji || ''} ${item.name}</td>
-        <td style="padding:2px 8px;text-align:right">${item.quantity}</td>
-        <td style="padding:2px 8px;text-align:right">${formatGHS(item.total)}</td>
+        <td style="padding:3px 8px;text-align:left;border-bottom:1px dotted #ccc">${item.emoji || ''} ${item.name}</td>
+        <td style="padding:3px 8px;text-align:right;border-bottom:1px dotted #ccc">${item.quantity}</td>
+        <td style="padding:3px 8px;text-align:right;border-bottom:1px dotted #ccc">${formatGHS(item.total)}</td>
       </tr>`).join("");
-    const html = `<!DOCTYPE html><html><head><title>Receipt ${payment.invoiceNumber}</title>
-      <style>
-        body{font-family:Arial,sans-serif;font-size:12px;max-width:400px;margin:0 auto;padding:30px}
-        h2{text-align:center;font-size:16px;color:#059669}
-        table{width:100%;border-collapse:collapse;margin:10px 0}
-        th{border-bottom:2px solid #059669;padding:4px 8px;text-align:left;font-size:11px}
-        .total{font-size:18px;font-weight:bold;text-align:right;margin-top:10px;color:#059669}
-        .center{text-align:center}
-        hr{border:none;border-top:1px dashed #ccc;margin:10px 0}
-      </style></head><body>
-      <h2>${COMPANY.name}</h2>
-      <p class="center">${COMPANY.address}<br/>${COMPANY.contact}</p>
-      <hr/>
-      <p><strong>Invoice:</strong> ${payment.invoiceNumber}<br/>
-      <strong>Date:</strong> ${new Date(payment.timestamp).toLocaleString('en-GB')}<br/>
-      <strong>Cashier:</strong> ${payment.cashier || 'N/A'}<br/>
-      <strong>Customer:</strong> ${payment.customer || 'Walk-in'}</p>
-      <hr/>
-      <table><thead><tr><th>Item</th><th style="text-align:right">Qty</th><th style="text-align:right">Total</th></tr></thead>
-      <tbody>${itemsHtml}</tbody></table>
-      <hr/>
-      <p>Subtotal: ${formatGHS(payment.subtotal)}</p>
-      ${payment.discount > 0 ? `<p>Discount: -${formatGHS(payment.discount)}</p>` : ''}
-      <p>Tax: ${formatGHS(payment.tax)}</p>
-      <p class="total">TOTAL: ${formatGHS(payment.total)}</p>
-      <p>Paid: ${formatGHS(payment.amountPaid)} (${payment.method})</p>
-      <p>Change: ${formatGHS(payment.change)}</p>
-      <hr/>
-      <p class="center">Thank you for shopping!<br/>Have a fresh &amp; healthy day</p>
-      </body></html>`;
-    printHTML(html);
-    toast({ title: "Select 'Save as PDF' in the print dialog" });
-  };
-
-  // Universal print function — uses multiple methods (works in preview iframe)
-  const printHTML = (html: string) => {
-    let printed = false;
-
-    // Method 1: Hidden iframe with srcdoc
-    try {
-      const iframe = document.createElement('iframe');
-      iframe.style.position = 'fixed';
-      iframe.style.right = '0';
-      iframe.style.bottom = '0';
-      iframe.style.width = '0';
-      iframe.style.height = '0';
-      iframe.style.border = '0';
-      iframe.setAttribute('srcdoc', html);
-      document.body.appendChild(iframe);
-      iframe.onload = () => {
-        try {
-          iframe.contentWindow?.focus();
-          iframe.contentWindow?.print();
-          printed = true;
-        } catch (e) {
-          console.warn('iframe print failed:', e);
-        }
-        setTimeout(() => {
-          try { document.body.removeChild(iframe); } catch {}
-        }, 3000);
-      };
-      // Fallback: if onload doesn't fire in 2s, try contentDocument
-      setTimeout(() => {
-        if (!printed && iframe.contentDocument) {
-          try {
-            iframe.contentDocument.open();
-            iframe.contentDocument.write(html);
-            iframe.contentDocument.close();
-            iframe.contentWindow?.focus();
-            iframe.contentWindow?.print();
-            printed = true;
-          } catch {}
-        }
-      }, 1000);
-    } catch {}
-
-    // Method 2: If iframe fails, open in new window (may be blocked in iframe)
-    setTimeout(() => {
-      if (!printed) {
-        try {
-          const topWin = window.top || window;
-          const win = topWin.open('', '_blank', 'width=400,height=600');
-          if (win) {
-            win.document.write(html);
-            win.document.close();
-            setTimeout(() => { win.focus(); win.print(); }, 300);
-            printed = true;
-          }
-        } catch {}
-      }
-    }, 1500);
-
-    // Method 3: Last resort — navigate to a data URL (leaves the app)
-    setTimeout(() => {
-      if (!printed) {
-        try {
-          const blob = new Blob([html], { type: 'text/html' });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `receipt-${payment.invoiceNumber}.html`;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-          toast({ title: 'Receipt saved as HTML', description: 'Open the downloaded file to print' });
-        } catch (e) {
-          console.warn('All print methods failed:', e);
-          toast({ title: 'Print failed', description: 'Try the Thermal button or save as HTML', variant: 'destructive' });
-        }
-      }
-    }, 2500);
-  };
-
-  // Premium: send via WhatsApp — generate receipt text and open wa.me link
-  // Uses multiple fallback methods to open the link (iframe blocks most)
-  const handleSendWhatsApp = async () => {
-    const phone = prompt('Enter customer phone number (with country code, e.g. +233247075044), or leave blank for WhatsApp Web:');
-    if (phone === null) return;
-
-    // Build receipt text directly from payment data (no server needed)
-    const receiptText = buildWhatsAppReceiptText(payment);
-    const normalizedPhone = phone ? phone.replace(/[\s+\-()]/g, "") : "";
-    const waLink = normalizedPhone
-      ? `https://wa.me/${normalizedPhone}?text=${encodeURIComponent(receiptText)}`
-      : `https://wa.me/?text=${encodeURIComponent(receiptText)}`;
-
-    // Try multiple methods to open the link (iframe blocks most)
-    let opened = false;
-
-    // Method 1: Try window.open on top window (escapes iframe)
-    try {
-      const topWin = window.top || window;
-      const newWin = topWin.open(waLink, '_blank');
-      if (newWin) opened = true;
-    } catch {}
-
-    // Method 2: Try regular window.open
-    if (!opened) {
-      try {
-        const newWin = window.open(waLink, '_blank');
-        if (newWin) opened = true;
-      } catch {}
-    }
-
-    // Method 3: Create a link and click it
-    if (!opened) {
-      try {
-        const a = document.createElement('a');
-        a.href = waLink;
-        a.target = '_blank';
-        a.rel = 'noopener noreferrer';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        opened = true;
-      } catch {}
-    }
-
-    // Method 4: If all else fails, show the link for the user to copy
-    if (!opened) {
-      // Copy to clipboard as fallback
-      try {
-        navigator.clipboard.writeText(waLink);
-        toast({
-          title: 'WhatsApp link copied to clipboard',
-          description: 'Paste it in your browser to send the receipt. Link also shown below.',
-        });
-      } catch {
-        toast({
-          title: 'Could not open WhatsApp automatically',
-          description: 'Please copy this link: ' + waLink.substring(0, 60) + '...',
-          variant: 'destructive',
-        });
-      }
-      // Also try location.href as last resort
-      setTimeout(() => {
-        try { window.location.href = waLink; } catch {}
-      }, 500);
-    } else {
-      toast({ title: 'WhatsApp opened', description: `Receipt ready to send to ${phone || 'WhatsApp Web'}` });
-    }
-  };
+    return `<div style="font-family:monospace;max-width:320px;margin:0 auto;padding:20px;font-size:13px;color:#1e293b">
+      <div style="text-align:center;margin-bottom:10px">
+        <div style="font-size:16px;font-weight:bold">${COMPANY.name}</div>
+        <div style="font-size:11px;color:#64748b">${COMPANY.address}</div>
+        <div style="font-size:11px;color:#64748b">${COMPANY.contact}</div>
+      </div>
+      <hr style="border:none;border-top:1px dashed #94a3b8;margin:8px 0"/>
+      <div>Invoice: <strong>${payment.invoiceNumber}</strong></div>
+      <div>Date: ${new Date(payment.timestamp).toLocaleString('en-GB')}</div>
+      <div>Cashier: ${payment.cashier || 'N/A'}</div>
+      ${payment.customer ? `<div>Customer: ${payment.customer}</div>` : ''}
+      <hr style="border:none;border-top:1px dashed #94a3b8;margin:8px 0"/>
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr><th style="text-align:left;padding:3px 8px;font-size:11px;border-bottom:1px solid #475569">Item</th><th style="text-align:right;padding:3px 8px;font-size:11px;border-bottom:1px solid #475569">Qty</th><th style="text-align:right;padding:3px 8px;font-size:11px;border-bottom:1px solid #475569">Total</th></tr></thead>
+        <tbody>${itemsHtml}</tbody>
+      </table>
+      <hr style="border:none;border-top:1px dashed #94a3b8;margin:8px 0"/>
+      <div style="display:flex;justify-content:space-between"><span>Subtotal:</span><span>${formatGHS(payment.subtotal)}</span></div>
+      ${payment.discount > 0 ? `<div style="display:flex;justify-content:space-between"><span>Discount:</span><span>-${formatGHS(payment.discount)}</span></div>` : ''}
+      <div style="display:flex;justify-content:space-between"><span>Tax:</span><span>${formatGHS(payment.tax)}</span></div>
+      <div style="display:flex;justify-content:space-between;font-size:16px;font-weight:bold;margin-top:5px"><span>TOTAL:</span><span>${formatGHS(payment.total)}</span></div>
+      <div style="display:flex;justify-content:space-between;margin-top:5px"><span>Paid (${payment.method}):</span><span>${formatGHS(payment.amountPaid)}</span></div>
+      <div style="display:flex;justify-content:space-between"><span>Change:</span><span>${formatGHS(payment.change)}</span></div>
+      <hr style="border:none;border-top:1px dashed #94a3b8;margin:8px 0"/>
+      <div style="text-align:center;font-size:11px;color:#64748b">
+        Thank you for shopping!<br/>Have a fresh &amp; healthy day
+      </div>
+    </div>`;
+  }, [payment]);
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-      onClick={onClose}
-    >
+    <>
       <motion.div
-        initial={{ scale: 0.9, y: 30 }}
-        animate={{ scale: 1, y: 0 }}
-        exit={{ scale: 0.9, y: 30 }}
-        onClick={(e) => e.stopPropagation()}
-        className="dialog-premium shadow-premium-xl w-full max-w-sm max-h-[92vh] flex flex-col overflow-hidden"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        onClick={onClose}
       >
-        <div className="flex-shrink-0 bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-6 py-5 text-center">
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ delay: 0.2, type: "spring" }}
-            className="h-16 w-16 rounded-full bg-white/20 mx-auto flex items-center justify-center mb-2"
-          >
-            <Check className="h-9 w-9" />
-          </motion.div>
-          <div className="text-lg font-bold">Payment Successful!</div>
-          <div className="text-xs opacity-90 mt-0.5">
-            {new Date(payment.timestamp).toLocaleString('en-GB')}
+        <motion.div
+          initial={{ scale: 0.9, y: 30 }}
+          animate={{ scale: 1, y: 0 }}
+          exit={{ scale: 0.9, y: 30 }}
+          onClick={(e) => e.stopPropagation()}
+          className="dialog-premium shadow-premium-xl w-full max-w-sm max-h-[92vh] flex flex-col overflow-hidden"
+        >
+          {/* Header */}
+          <div className="flex-shrink-0 bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-6 py-5 text-center">
+            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.2, type: "spring" }}
+              className="h-16 w-16 rounded-full bg-white/20 mx-auto flex items-center justify-center mb-2">
+              <Check className="h-9 w-9" />
+            </motion.div>
+            <div className="text-lg font-bold">Payment Successful!</div>
+            <div className="text-xs opacity-90 mt-0.5">{new Date(payment.timestamp).toLocaleString('en-GB')}</div>
           </div>
-        </div>
 
-        {/* Receipt body — SCROLLABLE, with max height so buttons are ALWAYS visible */}
-        <div className="overflow-y-auto min-h-0 scroll-premium" style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y', maxHeight: '50vh' }}>
-        <div className="px-6 py-4 font-mono text-xs">
-            <div className="text-center mb-3">
-              <div className="font-bold text-sm text-slate-800">{COMPANY.name}</div>
-              <div className="text-slate-500">{COMPANY.address}</div>
-              <div className="text-slate-500">{COMPANY.contact}</div>
-            </div>
-            <Separator className="my-2" />
-            <div className="flex justify-between text-slate-600">
-              <span>Invoice:</span>
-              <span>#{payment.invoiceNumber}</span>
-            </div>
-            <div className="flex justify-between text-slate-600">
-              <span>Cashier:</span>
-              <span>{payment.cashier}</span>
-            </div>
-            {payment.customer && (
-              <div className="flex justify-between text-slate-600">
-                <span>Customer:</span>
-                <span>{payment.customer}</span>
+          {/* Receipt body — scrollable with max height */}
+          <div className="overflow-y-auto min-h-0 scroll-premium" style={{ maxHeight: '45vh', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
+            <div className="px-6 py-4 font-mono text-xs">
+              <div className="text-center mb-3">
+                <div className="font-bold text-sm text-slate-800">{COMPANY.name}</div>
+                <div className="text-slate-500">{COMPANY.address}</div>
+                <div className="text-slate-500">{COMPANY.contact}</div>
               </div>
-            )}
-            <div className="flex justify-between text-slate-600">
-              <span>Method:</span>
-              <span className="capitalize">{payment.method}</span>
-            </div>
-            <Separator className="my-2" />
-            <div className="space-y-1">
-              {payment.items.map(item => {
-                const lineTotal = item.price * item.quantity;
-                const lineDiscount = lineTotal * (item.discount / 100);
-                return (
-                  <div key={item.id}>
-                    <div className="flex justify-between text-slate-700">
-                      <span className="truncate flex-1">{item.emoji} {item.name}</span>
-                      <span>{formatGHS(lineTotal - lineDiscount)}</span>
-                    </div>
-                    <div className="text-slate-400 text-[10px] pl-5">
-                      {item.quantity} × {formatGHS(item.price)}
-                      {item.discount > 0 && ` (-${item.discount}%)`}
-                    </div>
+              <Separator className="my-2" />
+              <div className="flex justify-between text-slate-600"><span>Invoice:</span><span>#{payment.invoiceNumber}</span></div>
+              <div className="flex justify-between text-slate-600"><span>Cashier:</span><span>{payment.cashier}</span></div>
+              {payment.customer && <div className="flex justify-between text-slate-600"><span>Customer:</span><span>{payment.customer}</span></div>}
+              <Separator className="my-2" />
+              {payment.items.map((item, i) => (
+                <div key={i} className="mb-1">
+                  <div className="flex justify-between text-slate-700">
+                    <span className="truncate flex-1">{item.emoji} {item.name}</span>
+                    <span className="font-mono ml-2">{formatGHS(item.price * item.quantity)}</span>
                   </div>
-                );
-              })}
-            </div>
-            <Separator className="my-2" />
-            <div className="space-y-0.5">
-              <div className="flex justify-between text-slate-600">
-                <span>Subtotal:</span>
-                <span>{formatGHS(payment.subtotal)}</span>
-              </div>
-              {payment.discount > 0 && (
-                <div className="flex justify-between text-rose-600">
-                  <span>Discount:</span>
-                  <span>-{formatGHS(payment.discount)}</span>
+                  <div className="text-[10px] text-slate-400">{item.quantity} x {formatGHS(item.price)}</div>
+                </div>
+              ))}
+              <Separator className="my-2" />
+              <div className="flex justify-between text-slate-600"><span>Subtotal:</span><span>{formatGHS(payment.subtotal)}</span></div>
+              {payment.discount > 0 && <div className="flex justify-between text-rose-600"><span>Discount:</span><span>-{formatGHS(payment.discount)}</span></div>}
+              <div className="flex justify-between text-slate-600"><span>{TAX_NAME}:</span><span>{formatGHS(payment.tax)}</span></div>
+              <div className="flex justify-between font-bold text-emerald-600 text-sm mt-1"><span>TOTAL:</span><span>{formatGHS(payment.total)}</span></div>
+              <div className="flex justify-between text-slate-600 mt-1"><span>Paid ({payment.method}):</span><span>{formatGHS(payment.amountPaid)}</span></div>
+              {payment.change > 0 && <div className="flex justify-between font-bold text-emerald-600"><span>Change:</span><span>{formatGHS(payment.change)}</span></div>}
+
+              {showQR && (
+                <div className="flex flex-col items-center my-3 p-3 bg-white rounded-lg ring-1 ring-slate-200">
+                  {qrDataUrl ? (
+                    <img src={qrDataUrl} alt="QR Code" className="h-32 w-32 rounded" onError={() => setQrDataUrl("")} />
+                  ) : (
+                    <div className="h-32 w-32 flex items-center justify-center bg-slate-50 rounded border-2 border-dashed border-slate-300">
+                      <div className="text-center">
+                        <div className="text-[10px] text-slate-400">QR Code</div>
+                        <div className="text-xs font-mono font-bold text-slate-600 mt-1">{payment.invoiceNumber}</div>
+                      </div>
+                    </div>
+                  )}
+                  <div className="text-[10px] text-slate-500 mt-2 text-center">Scan to verify receipt<br/><span className="font-mono">{payment.invoiceNumber}</span></div>
                 </div>
               )}
-              <div className="flex justify-between text-slate-600">
-                <span>{TAX_NAME}:</span>
-                <span>{formatGHS(payment.tax)}</span>
-              </div>
-              <div className="flex justify-between font-bold text-slate-800 text-sm pt-1">
-                <span>TOTAL:</span>
-                <span>{formatGHS(payment.total)}</span>
-              </div>
-              <Separator className="my-1.5" />
-              <div className="flex justify-between text-slate-600">
-                <span>Paid ({payment.method}):</span>
-                <span>{formatGHS(payment.amountPaid)}</span>
-              </div>
-              {payment.change > 0 && (
-                <div className="flex justify-between font-bold text-emerald-600">
-                  <span>Change:</span>
-                  <span>{formatGHS(payment.change)}</span>
-                </div>
-              )}
-            </div>
-            <Separator className="my-2" />
 
-            {/* Premium: QR code section (toggle) */}
-            {showQR && (
-              <div className="flex flex-col items-center my-3 p-3 bg-white rounded-lg ring-1 ring-slate-200">
-                {qrDataUrl ? (
-                  <img
-                    src={qrDataUrl}
-                    alt="Receipt QR Code"
-                    className="h-32 w-32 rounded"
-                    onError={() => {
-                      // If the QR API fails, show a fallback with the invoice number
-                      setQrDataUrl("");
-                    }}
-                  />
-                ) : (
-                  <div className="h-32 w-32 flex items-center justify-center bg-slate-50 rounded border-2 border-dashed border-slate-300">
-                    <div className="text-center">
-                      <div className="text-[10px] text-slate-400">QR Code</div>
-                      <div className="text-xs font-mono font-bold text-slate-600 mt-1">{payment.invoiceNumber}</div>
-                    </div>
-                  </div>
-                )}
-                <div className="text-[10px] text-slate-500 mt-2 text-center">
-                  Scan to verify receipt<br />
-                  <span className="font-mono">{payment.invoiceNumber}</span>
-                </div>
+              <div className="text-center text-slate-500 text-[10px] mt-3">
+                <div className="font-bold">Thank you for shopping!</div>
+                <div>Have a fresh & healthy day 🌿</div>
               </div>
-            )}
-
-            <div className="text-center text-slate-500 text-[10px] mt-3">
-              <div className="font-bold">Thank you for shopping!</div>
-              <div>Have a fresh &amp; healthy day 🌿</div>
-              <div className="mt-1">Returns within 7 days with receipt</div>
             </div>
           </div>
-        </div>
 
-        {/* Premium: action row with Print, Export, QR, WhatsApp, New Sale */}
-        <div className="flex-shrink-0 px-4 py-3 border-t border-slate-200 bg-slate-50 space-y-2">
-          {/* Row 1: Print + Export */}
-          <div className="grid grid-cols-4 gap-2">
-            <button
-              onClick={handleThermalPrint}
-              className="h-10 rounded-xl bg-white ring-1 ring-slate-200 hover:bg-slate-100 text-slate-700 font-semibold text-xs flex items-center justify-center gap-1.5"
-              title="Print via Bluetooth thermal printer"
-            >
-              <Printer className="h-4 w-4" />
-              Thermal
-            </button>
-            <button
-              onClick={handleBrowserPrint}
-              className="h-10 rounded-xl bg-white ring-1 ring-slate-200 hover:bg-slate-100 text-slate-700 font-semibold text-xs flex items-center justify-center gap-1.5"
-              title="Print receipt"
-            >
-              <Printer className="h-4 w-4" />
-              Print
-            </button>
-            <button
-              onClick={handleCSVExport}
-              className="h-10 rounded-xl bg-white ring-1 ring-slate-200 hover:bg-slate-100 text-slate-700 font-semibold text-xs flex items-center justify-center gap-1.5"
-              title="Export as CSV"
-            >
-              <FileText className="h-4 w-4" />
-              CSV
-            </button>
-            <button
-              onClick={handlePDFExport}
-              className="h-10 rounded-xl bg-white ring-1 ring-slate-200 hover:bg-slate-100 text-slate-700 font-semibold text-xs flex items-center justify-center gap-1.5"
-              title="Export as PDF"
-            >
-              <FileText className="h-4 w-4" />
-              PDF
-            </button>
+          {/* Action buttons — ALWAYS visible */}
+          <div className="flex-shrink-0 px-4 py-3 border-t border-slate-200 bg-slate-50 space-y-2">
+            <div className="grid grid-cols-4 gap-2">
+              <button onClick={() => setPrintMode(true)} className="h-10 rounded-xl bg-white ring-1 ring-slate-200 hover:bg-slate-100 text-slate-700 font-semibold text-xs flex items-center justify-center gap-1">
+                <Printer className="h-4 w-4" /> Print
+              </button>
+              <button onClick={() => downloadFile(csvContent, `receipt-${payment.invoiceNumber}.csv`, 'text/csv')} className="h-10 rounded-xl bg-white ring-1 ring-slate-200 hover:bg-slate-100 text-slate-700 font-semibold text-xs flex items-center justify-center gap-1">
+                <FileText className="h-4 w-4" /> CSV
+              </button>
+              <button onClick={() => { setPrintMode(true); toast({ title: "Select 'Save as PDF' in print dialog" }); }} className="h-10 rounded-xl bg-white ring-1 ring-slate-200 hover:bg-slate-100 text-slate-700 font-semibold text-xs flex items-center justify-center gap-1">
+                <FileText className="h-4 w-4" /> PDF
+              </button>
+              <button onClick={() => setShowWhatsApp(true)} className="h-10 rounded-xl bg-[#25D366] hover:bg-[#1ebe57] text-white font-semibold text-xs flex items-center justify-center gap-1">
+                <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/></svg>
+                WhatsApp
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button onClick={() => setShowQR(s => !s)} className={`h-10 rounded-xl ring-1 ring-slate-200 text-slate-700 font-semibold text-xs flex items-center justify-center gap-1 ${showQR ? 'bg-emerald-100 ring-emerald-300 text-emerald-700' : 'bg-white hover:bg-slate-100'}`}>
+                {showQR ? 'Hide QR' : 'Show QR'}
+              </button>
+              <button onClick={onClose} className="h-10 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold text-xs flex items-center justify-center gap-1 hover:shadow-lg">
+                <Check className="h-4 w-4" /> New Sale
+              </button>
+            </div>
           </div>
-          {/* Row 2: QR + WhatsApp + New Sale */}
-          <div className="grid grid-cols-3 gap-2">
-            <button
-              onClick={() => setShowQR(s => !s)}
-              className={`h-10 rounded-xl ring-1 ring-slate-200 hover:bg-slate-100 text-slate-700 font-semibold text-xs flex items-center justify-center gap-1.5 ${showQR ? 'bg-emerald-100 ring-emerald-300 text-emerald-700' : 'bg-white'}`}
-            >
-              {showQR ? 'Hide QR' : 'Show QR'}
-            </button>
-            <button
-              onClick={handleSendWhatsApp}
-              className="h-10 rounded-xl bg-[#25D366] hover:bg-[#1ebe57] text-white font-semibold text-xs flex items-center justify-center gap-1.5"
-            >
-              <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/></svg>
-              WhatsApp
-            </button>
-            <button
-              onClick={onClose}
-              className="h-10 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold text-xs flex items-center justify-center gap-1.5 hover:shadow-lg"
-            >
-              <Check className="h-4 w-4" />
-              New Sale
-            </button>
-          </div>
-        </div>
+        </motion.div>
       </motion.div>
-    </motion.div>
+
+      {/* PRINT OVERLAY — full-screen within the app */}
+      {printMode && (
+        <div className="fixed inset-0 z-[100] bg-white flex flex-col">
+          <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 bg-slate-800 text-white print:hidden">
+            <span className="text-sm font-bold">Receipt Preview — {payment.invoiceNumber}</span>
+            <div className="flex gap-2">
+              <button onClick={() => window.print()} className="h-9 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5">
+                <Printer className="h-4 w-4" /> Print / Save as PDF
+              </button>
+              <button onClick={() => setPrintMode(false)} className="h-9 px-4 rounded-lg bg-slate-600 hover:bg-slate-700 text-white text-xs font-bold flex items-center gap-1.5">
+                <X className="h-4 w-4" /> Close
+              </button>
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto" dangerouslySetInnerHTML={{ __html: printReceiptHTML }} />
+        </div>
+      )}
+
+      {/* WHATSAPP MODAL — in-app, no popups */}
+      {showWhatsApp && (
+        <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowWhatsApp(false)}>
+          <div className="dialog-premium shadow-premium-xl w-full max-w-md max-h-[80vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="flex-shrink-0 bg-[#25D366] text-white px-5 py-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/></svg>
+                <span className="font-bold text-sm">Send via WhatsApp</span>
+              </div>
+              <button onClick={() => setShowWhatsApp(false)} className="h-7 w-7 rounded-lg bg-white/20 hover:bg-white/30 flex items-center justify-center">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-5 space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Customer Phone Number</label>
+                <input
+                  type="tel"
+                  value={waPhone}
+                  onChange={(e) => setWaPhone(e.target.value)}
+                  placeholder="+233247075044"
+                  className="input-premium w-full h-11 px-4 text-sm font-mono font-bold"
+                />
+                <div className="text-[10px] text-slate-400 mt-1">Enter the customer's phone number with country code</div>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">WhatsApp Link</label>
+                <textarea
+                  readOnly
+                  value={waLink}
+                  rows={3}
+                  className="input-premium w-full px-3 py-2 text-[10px] font-mono resize-none"
+                  onClick={(e) => (e.target as HTMLTextAreaElement).select()}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Receipt Message</label>
+                <textarea
+                  readOnly
+                  value={waText}
+                  rows={8}
+                  className="input-premium w-full px-3 py-2 text-[10px] font-mono resize-none"
+                  onClick={(e) => (e.target as HTMLTextAreaElement).select()}
+                />
+              </div>
+            </div>
+            <div className="flex-shrink-0 p-4 border-t border-slate-200 flex gap-2">
+              <button onClick={() => copyToClipboard(waLink)} className="btn-premium flex-1 h-10 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold flex items-center justify-center gap-1.5">
+                {copied ? <><Check className="h-3.5 w-3.5" /> Copied!</> : <><FileText className="h-3.5 w-3.5" /> Copy Link</>}
+              </button>
+              <button onClick={() => copyToClipboard(waText)} className="btn-premium flex-1 h-10 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold flex items-center justify-center gap-1.5">
+                <FileText className="h-3.5 w-3.5" /> Copy Message
+              </button>
+              <a href={waLink} target="_blank" rel="noopener noreferrer" className="btn-premium flex-1 h-10 rounded-xl bg-[#25D366] hover:bg-[#1ebe57] text-white text-xs font-bold flex items-center justify-center gap-1.5 no-underline">
+                <Send className="h-3.5 w-3.5" /> Open WhatsApp
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
