@@ -147,8 +147,16 @@ export function AdminLogin({ onSuccess, onCancel, adminOnly = false }: { onSucce
   const [bioLoading, setBioLoading] = useState(false);
 
   // Check biometric support on mount
+  const [inIframe, setInIframe] = useState(false);
   useEffect(() => {
     (async () => {
+      // Detect if we're in an iframe — WebAuthn won't work in iframes
+      // unless the parent explicitly allows it via Permissions-Policy.
+      const framed = typeof window !== 'undefined' && window.self !== window.top;
+      setInIframe(framed);
+
+      if (framed) return; // Skip biometric check in iframe — it won't work
+
       const supported = isBiometricSupported();
       setBioSupported(supported);
       if (supported) {
@@ -423,7 +431,15 @@ export function AdminLogin({ onSuccess, onCancel, adminOnly = false }: { onSucce
             </button>
 
             {/* Biometric authentication — fingerprint/face unlock */}
-            {bioSupported && bioAvailable && (
+            {inIframe ? (
+              <div className="flex items-center gap-2.5 p-3 rounded-xl bg-amber-50 ring-1 ring-amber-200">
+                <Fingerprint className="h-5 w-5 text-amber-500 flex-shrink-0" />
+                <div className="text-[11px] text-amber-700 leading-snug">
+                  <strong>Biometric login available when installed as PWA.</strong><br/>
+                  Tap "Install" at the top, then open from your home screen to enable fingerprint/face unlock.
+                </div>
+              </div>
+            ) : bioSupported && bioAvailable && (
               <>
                 {bioCredentialExists ? (
                   <button

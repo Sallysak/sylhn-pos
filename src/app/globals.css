@@ -2335,3 +2335,72 @@ html.dark .status-error-premium {
 }
 
 /* ===== END mobile viewport + tab fixes ===== */
+
+/* ===== 48. Mobile form/modal fit fix =====
+   Ensures ALL popup forms, modals, and dialogs fit perfectly on mobile
+   screens. Replaces the aggressive !important rules with targeted fixes. */
+@media (max-width: 767px) {
+  /* Override the previous aggressive modal CSS — let modals use their
+     own positioning but ensure they never overflow the viewport */
+  .dialog-premium,
+  [class*="dialog-premium"] {
+    max-width: calc(100vw - 16px) !important;
+    width: calc(100vw - 16px) !important;
+    max-height: 90vh !important;
+    margin: 8px !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* shadcn Dialog content — fit mobile screen */
+  [data-radix-dialog-content],
+  [role="dialog"] > div:not(.mobile-drawer):not(.mobile-bottom-nav) {
+    max-width: calc(100vw - 16px) !important;
+    width: calc(100vw - 16px) !important;
+    max-height: 90vh !important;
+    margin: 8px auto !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Card premium — don't clip content on mobile */
+  .card-premium {
+    overflow: visible !important;
+    max-width: 100% !important;
+  }
+
+  /* All inputs inside modals/cards — never overflow */
+  .card-premium input,
+  .card-premium select,
+  .card-premium textarea,
+  .dialog-premium input,
+  .dialog-premium select,
+  .dialog-premium textarea,
+  [role="dialog"] input,
+  [role="dialog"] select,
+  [role="dialog"] textarea {
+    max-width: 100% !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Grid layouts inside forms — stack on mobile */
+  .card-premium .grid-cols-2,
+  .dialog-premium .grid-cols-2 {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Flex layouts that might overflow — allow wrapping */
+  .card-premium .flex,
+  .dialog-premium .flex {
+    flex-wrap: wrap;
+  }
+
+  /* Ensure content inside scrollable modals can scroll properly */
+  .card-premium > div,
+  .dialog-premium > div {
+    min-width: 0 !important;
+  }
+}
+
+/* ===== END mobile form fit fix ===== */

@@ -56,8 +56,16 @@ export async function POST(req: NextRequest) {
     ];
 
     for (const s of settings) {
-      // Skip password if it's the mask (don't overwrite with dots)
-      if (s.key === "smtp.password" && s.value === "••••••••") continue;
+      // Skip password if:
+      // 1. It's the mask "••••••••" (loaded from GET, user didn't change it)
+      // 2. It's undefined (frontend explicitly sent undefined to preserve existing)
+      // 3. It's empty string AND the user didn't explicitly clear it
+      // This prevents accidentally wiping the saved password on save.
+      if (s.key === "smtp.password") {
+        if (s.value === "••••••••") continue;       // mask — don't overwrite
+        if (password === undefined) continue;         // undefined — preserve existing
+        if (s.value === "" && !body.passwordExplicitlyCleared) continue; // empty — preserve
+      }
 
       const existing = await db.systemSetting.findFirst({ where: { key: s.key } });
       if (existing) {

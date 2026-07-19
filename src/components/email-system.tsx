@@ -271,18 +271,25 @@ export function EmailSystem({ onBack }: { onBack: () => void }) {
   const handleSaveSettings = async () => {
     setSavingSettings(true);
     try {
+      // Only send password if the user actually typed a new one.
+      // If it's the mask "••••••••" (loaded from GET), send undefined
+      // so the API preserves the existing password.
+      const passwordToSend = smtpPass === "••••••••" ? undefined : smtpPass;
+
       const res = await authedFetch("/api/email/settings", {
         method: "POST",
         body: JSON.stringify({
           host: smtpHost,
           port: smtpPort,
           user: smtpUser,
-          password: smtpPass === "••••••••" ? undefined : smtpPass, // don't overwrite with mask
+          password: passwordToSend,
           from: smtpFrom || smtpUser,
         }),
       });
       if (res.ok) {
         toast({ title: "Settings saved", description: "SMTP configuration updated" });
+        // If we sent a new password, reset the field to mask
+        if (passwordToSend) setSmtpPass("••••••••");
       } else {
         const data = await res.json().catch(() => ({}));
         toast({ title: "Save failed", description: data.error, variant: "destructive" });
