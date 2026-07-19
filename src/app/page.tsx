@@ -3714,6 +3714,40 @@ function CartPreviewModal({
   );
 }
 
+// ===== Helper: Build WhatsApp receipt text from payment data =====
+function buildWhatsAppReceiptText(payment: any): string {
+  const lines: string[] = [
+    `*SYLHN COMPANY LTD*`,
+    `Grocery Store · East Legon, Accra`,
+    `+233 59 276 6044`,
+    ``,
+    `*Invoice:* ${payment.invoiceNumber}`,
+    `*Date:* ${new Date(payment.timestamp).toLocaleString('en-GB')}`,
+    `*Cashier:* ${payment.cashier || 'N/A'}`,
+    payment.customer ? `*Customer:* ${payment.customer}` : '',
+    ``,
+    `*Items:*`,
+  ].filter(Boolean);
+
+  for (const item of payment.items) {
+    lines.push(`${item.emoji || '📦'} ${item.name}`);
+    lines.push(`   ${item.quantity} × ${CURRENCY}${item.price.toFixed(2)} = ${CURRENCY}${item.total.toFixed(2)}`);
+  }
+
+  lines.push(``);
+  lines.push(`*Subtotal:* ${CURRENCY}${payment.subtotal.toFixed(2)}`);
+  if (payment.discount > 0) lines.push(`*Discount:* -${CURRENCY}${payment.discount.toFixed(2)}`);
+  lines.push(`*VAT:* ${CURRENCY}${payment.tax.toFixed(2)}`);
+  lines.push(`*TOTAL: ${CURRENCY}${payment.total.toFixed(2)}*`);
+  lines.push(``);
+  lines.push(`*Paid:* ${CURRENCY}${payment.amountPaid.toFixed(2)} (${payment.method})`);
+  lines.push(`*Change:* ${CURRENCY}${payment.change.toFixed(2)}`);
+  lines.push(``);
+  lines.push(`Thank you for shopping with us! 🙏`);
+
+  return lines.join("\n");
+}
+
 // ===== Receipt Modal =====
 function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: () => void }) {
   // Premium: WhatsApp + QR code for receipt delivery
@@ -3819,17 +3853,12 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
 
   // Premium: print via Bluetooth thermal printer (falls back to browser print)
   const handleThermalPrint = async () => {
-    const saved = await ensureSaleSaved();
-    if (!saved) {
-      toast({ title: 'Could not save sale to server', description: 'Try again or check your connection', variant: 'destructive' });
-      return;
-    }
+    // Don't block on ensureSaleSaved — just try to print
     try {
-      // Dynamically import to avoid loading the printer lib on every receipt render
       const { isPrinterConnected, buildReceiptBytes, printBytes } = await import("@/lib/thermal-printer");
       if (!isPrinterConnected()) {
         // Fall back to browser print
-        window.print();
+        handleBrowserPrint();
         return;
       }
       const bytes = buildReceiptBytes({
@@ -3860,29 +3889,209 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
       toast({ title: 'Receipt printed', description: 'Sent to thermal printer' });
     } catch (e: any) {
       console.warn('Thermal print failed, falling back to browser print:', e);
-      window.print();
+      handleBrowserPrint();
     }
   };
 
-  // Premium: send via WhatsApp
+  // Browser print — works in iframe using srcdoc
+  const handleBrowserPrint = () => {
+    const itemsHtml = payment.items.map((item: any) => `
+      <tr>
+        <td style="padding:2px 8px;text-align:left">${item.emoji || ''} ${item.name}</td>
+        <td style="padding:2px 8px;text-align:right">${item.quantity}</td>
+        <td style="padding:2px 8px;text-align:right">${formatGHS(item.total)}</td>
+      </tr>`).join("");
+    const html = `<!DOCTYPE html><html><head><title>Receipt ${payment.invoiceNumber}</title>
+      <style>
+        body{font-family:monospace;font-size:12px;max-width:300px;margin:0 auto;padding:20px}
+        h2{text-align:center;font-size:14px}
+        table{width:100%;border-collapse:collapse;margin:10px 0}
+        th{border-bottom:1px solid #000;padding:4px 8px;text-align:left;font-size:11px}
+        .total{font-size:16px;font-weight:bold;text-align:right;margin-top:10px}
+        .center{text-align:center}
+        @media print{body{padding:0}}
+      </style></head><body>
+      <h2>${COMPANY.name}</h2>
+      <p class="center">${COMPANY.address}<br/>${COMPANY.contact}</p>
+      <hr/>
+      <p>Invoice: ${payment.invoiceNumber}<br/>
+      Date: ${new Date(payment.timestamp).toLocaleString('en-GB')}<br/>
+      Cashier: ${payment.cashier || 'N/A'}<br/>
+      Customer: ${payment.customer || 'Walk-in'}</p>
+      <hr/>
+      <table><thead><tr><th>Item</th><th style="text-align:right">Qty</th><th style="text-align:right">Total</th></tr></thead>
+      <tbody>${itemsHtml}</tbody></table>
+      <hr/>
+      <p>Subtotal: ${formatGHS(payment.subtotal)}</p>
+      ${payment.discount > 0 ? `<p>Discount: -${formatGHS(payment.discount)}</p>` : ''}
+      <p>Tax: ${formatGHS(payment.tax)}</p>
+      <p class="total">TOTAL: ${formatGHS(payment.total)}</p>
+      <p>Paid: ${formatGHS(payment.amountPaid)} (${payment.method})</p>
+      <p>Change: ${formatGHS(payment.change)}</p>
+      <hr/>
+      <p class="center">Thank you for shopping!<br/>Have a fresh & healthy day</p>
+      </body></html>`;
+    printHTML(html);
+  };
+
+  // CSV export — works in iframe using Blob + anchor click
+  const handleCSVExport = () => {
+    const rows = [
+      ["Field", "Value"],
+      ["Invoice", payment.invoiceNumber],
+      ["Date", new Date(payment.timestamp).toLocaleString('en-GB')],
+      ["Cashier", payment.cashier || 'N/A'],
+      ["Customer", payment.customer || 'Walk-in'],
+      ["Subtotal", payment.subtotal.toFixed(2)],
+      ["Discount", payment.discount.toFixed(2)],
+      ["Tax", payment.tax.toFixed(2)],
+      ["Total", payment.total.toFixed(2)],
+      ["Amount Paid", payment.amountPaid.toFixed(2)],
+      ["Change", payment.change.toFixed(2)],
+      ["Payment Method", payment.method],
+      ["", ""],
+      ["Items", ""],
+      ...payment.items.map((item: any) => [`${item.emoji || ''} ${item.name}`, `${item.quantity} x ${formatGHS(item.price)} = ${formatGHS(item.total)}`]),
+    ];
+    const csv = rows.map(r => r.map(c => `"${c}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `receipt-${payment.invoiceNumber}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast({ title: "Receipt exported as CSV" });
+  };
+
+  // PDF export — opens browser print dialog (user selects Save as PDF)
+  const handlePDFExport = () => {
+    const itemsHtml = payment.items.map((item: any) => `
+      <tr>
+        <td style="padding:2px 8px;text-align:left">${item.emoji || ''} ${item.name}</td>
+        <td style="padding:2px 8px;text-align:right">${item.quantity}</td>
+        <td style="padding:2px 8px;text-align:right">${formatGHS(item.total)}</td>
+      </tr>`).join("");
+    const html = `<!DOCTYPE html><html><head><title>Receipt ${payment.invoiceNumber}</title>
+      <style>
+        body{font-family:Arial,sans-serif;font-size:12px;max-width:400px;margin:0 auto;padding:30px}
+        h2{text-align:center;font-size:16px;color:#059669}
+        table{width:100%;border-collapse:collapse;margin:10px 0}
+        th{border-bottom:2px solid #059669;padding:4px 8px;text-align:left;font-size:11px}
+        .total{font-size:18px;font-weight:bold;text-align:right;margin-top:10px;color:#059669}
+        .center{text-align:center}
+        hr{border:none;border-top:1px dashed #ccc;margin:10px 0}
+      </style></head><body>
+      <h2>${COMPANY.name}</h2>
+      <p class="center">${COMPANY.address}<br/>${COMPANY.contact}</p>
+      <hr/>
+      <p><strong>Invoice:</strong> ${payment.invoiceNumber}<br/>
+      <strong>Date:</strong> ${new Date(payment.timestamp).toLocaleString('en-GB')}<br/>
+      <strong>Cashier:</strong> ${payment.cashier || 'N/A'}<br/>
+      <strong>Customer:</strong> ${payment.customer || 'Walk-in'}</p>
+      <hr/>
+      <table><thead><tr><th>Item</th><th style="text-align:right">Qty</th><th style="text-align:right">Total</th></tr></thead>
+      <tbody>${itemsHtml}</tbody></table>
+      <hr/>
+      <p>Subtotal: ${formatGHS(payment.subtotal)}</p>
+      ${payment.discount > 0 ? `<p>Discount: -${formatGHS(payment.discount)}</p>` : ''}
+      <p>Tax: ${formatGHS(payment.tax)}</p>
+      <p class="total">TOTAL: ${formatGHS(payment.total)}</p>
+      <p>Paid: ${formatGHS(payment.amountPaid)} (${payment.method})</p>
+      <p>Change: ${formatGHS(payment.change)}</p>
+      <hr/>
+      <p class="center">Thank you for shopping!<br/>Have a fresh &amp; healthy day</p>
+      </body></html>`;
+    printHTML(html);
+    toast({ title: "Select 'Save as PDF' in the print dialog" });
+  };
+
+  // Universal print function — uses iframe with srcdoc (works in preview iframe)
+  const printHTML = (html: string) => {
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    iframe.setAttribute('srcdoc', html);
+    document.body.appendChild(iframe);
+    iframe.onload = () => {
+      try {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+      } catch (e) {
+        console.warn('Print failed:', e);
+      }
+      setTimeout(() => {
+        try { document.body.removeChild(iframe); } catch {}
+      }, 2000);
+    };
+  };
+
+  // Premium: send via WhatsApp — generate receipt text and open wa.me link
+  // Works in preview iframe by using window.location.href redirect
   const handleSendWhatsApp = async () => {
     const saved = await ensureSaleSaved();
     if (!saved) {
       toast({ title: 'Could not save sale to server', description: 'Try again or check your connection', variant: 'destructive' });
       return;
     }
-    const phone = prompt('Enter customer phone number (with country code, e.g. +233241234567), or leave blank to open WhatsApp Web without a specific contact:');
+    const phone = prompt('Enter customer phone number (with country code, e.g. +233247075044), or leave blank to open WhatsApp Web:');
+    if (phone === null) return; // user cancelled
+
     try {
       const res = await authedFetch(`/api/receipt/whatsapp?saleId=${payment.saleId}${phone ? `&phone=${encodeURIComponent(phone)}` : ''}`);
       const data = await res.json();
       if (res.ok && data.success) {
-        window.open(data.waLink, '_blank');
+        // Try multiple methods to open the WhatsApp link (iframe blocks window.open)
+        // Method 1: Try window.open
+        const newWin = window.open(data.waLink, '_blank');
+        if (!newWin) {
+          // Method 2: Create a link and click it (works in iframes)
+          const a = document.createElement('a');
+          a.href = data.waLink;
+          a.target = '_blank';
+          a.rel = 'noopener noreferrer';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        }
         toast({ title: 'WhatsApp opened', description: `Receipt for ${data.invoiceNumber} ready to send` });
       } else {
-        toast({ title: 'Failed to generate WhatsApp receipt', description: data.error || '', variant: 'destructive' });
+        // If API fails, build the WhatsApp link directly from payment data
+        const receiptText = buildWhatsAppReceiptText(payment);
+        const normalizedPhone = phone.replace(/[\s+\-()]/g, "");
+        const waLink = normalizedPhone
+          ? `https://wa.me/${normalizedPhone}?text=${encodeURIComponent(receiptText)}`
+          : `https://wa.me/?text=${encodeURIComponent(receiptText)}`;
+        const a = document.createElement('a');
+        a.href = waLink;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        toast({ title: 'WhatsApp opened', description: `Receipt ready to send to ${phone || 'WhatsApp Web'}` });
       }
     } catch (e: any) {
-      toast({ title: 'Network error', description: e?.message || '', variant: 'destructive' });
+      // Fallback: build receipt from payment data and open WhatsApp directly
+      const receiptText = buildWhatsAppReceiptText(payment);
+      const normalizedPhone = phone ? phone.replace(/[\s+\-()]/g, "") : "";
+      const waLink = normalizedPhone
+        ? `https://wa.me/${normalizedPhone}?text=${encodeURIComponent(receiptText)}`
+        : `https://wa.me/?text=${encodeURIComponent(receiptText)}`;
+      const a = document.createElement('a');
+      a.href = waLink;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      toast({ title: 'WhatsApp opened', description: `Receipt ready to send` });
     }
   };
 
@@ -4032,7 +4241,7 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
           </div>
         </div>
 
-        {/* Premium: action row with Print, Browser Print, Export, QR, WhatsApp, New Sale */}
+        {/* Premium: action row with Print, Export, QR, WhatsApp, New Sale */}
         <div className="flex-shrink-0 px-4 py-3 border-t border-slate-200 bg-slate-50 space-y-2">
           {/* Row 1: Print + Export */}
           <div className="grid grid-cols-4 gap-2">
@@ -4045,61 +4254,7 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
               Thermal
             </button>
             <button
-              onClick={() => {
-                // Browser print — use hidden iframe (works in preview iframe)
-                const itemsHtml = payment.items.map((item: any) => `
-                  <tr>
-                    <td style="padding:2px 8px;text-align:left">${item.emoji || ''} ${item.name}</td>
-                    <td style="padding:2px 8px;text-align:right">${item.quantity}</td>
-                    <td style="padding:2px 8px;text-align:right">${formatGHS(item.total)}</td>
-                  </tr>`).join("");
-                const html = `<!DOCTYPE html><html><head><title>Receipt ${payment.invoiceNumber}</title>
-                  <style>
-                    body{font-family:monospace;font-size:12px;max-width:300px;margin:0 auto;padding:20px}
-                    h2{text-align:center;font-size:14px}
-                    table{width:100%;border-collapse:collapse;margin:10px 0}
-                    th{border-bottom:1px solid #000;padding:4px 8px;text-align:left;font-size:11px}
-                    .total{font-size:16px;font-weight:bold;text-align:right;margin-top:10px}
-                    .center{text-align:center}
-                    @media print{body{padding:0}}
-                  </style></head><body>
-                  <h2>${COMPANY.name}</h2>
-                  <p class="center">${COMPANY.address}<br/>${COMPANY.contact}</p>
-                  <hr/>
-                  <p>Invoice: ${payment.invoiceNumber}<br/>
-                  Date: ${new Date(payment.timestamp).toLocaleString('en-GB')}<br/>
-                  Cashier: ${payment.cashier || 'N/A'}<br/>
-                  Customer: ${payment.customer || 'Walk-in'}</p>
-                  <hr/>
-                  <table><thead><tr><th>Item</th><th style="text-align:right">Qty</th><th style="text-align:right">Total</th></tr></thead>
-                  <tbody>${itemsHtml}</tbody></table>
-                  <hr/>
-                  <p>Subtotal: ${formatGHS(payment.subtotal)}</p>
-                  ${payment.discount > 0 ? `<p>Discount: -${formatGHS(payment.discount)}</p>` : ''}
-                  <p>Tax: ${formatGHS(payment.tax)}</p>
-                  <p class="total">TOTAL: ${formatGHS(payment.total)}</p>
-                  <p>Paid: ${formatGHS(payment.amountPaid)} (${payment.method})</p>
-                  <p>Change: ${formatGHS(payment.change)}</p>
-                  <hr/>
-                  <p class="center">Thank you for shopping!<br/>Have a fresh &amp; healthy day</p>
-                  </body></html>`;
-                // Create a hidden iframe and print from it
-                const iframe = document.createElement('iframe');
-                iframe.style.position = 'fixed';
-                iframe.style.right = '0';
-                iframe.style.bottom = '0';
-                iframe.style.width = '0';
-                iframe.style.height = '0';
-                iframe.style.border = '0';
-                document.body.appendChild(iframe);
-                iframe.contentDocument?.write(html);
-                iframe.contentDocument?.close();
-                setTimeout(() => {
-                  iframe.contentWindow?.focus();
-                  iframe.contentWindow?.print();
-                  setTimeout(() => document.body.removeChild(iframe), 1000);
-                }, 300);
-              }}
+              onClick={handleBrowserPrint}
               className="h-10 rounded-xl bg-white ring-1 ring-slate-200 hover:bg-slate-100 text-slate-700 font-semibold text-xs flex items-center justify-center gap-1.5"
               title="Print receipt"
             >
@@ -4107,36 +4262,7 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
               Print
             </button>
             <button
-              onClick={() => {
-                // Export as CSV — use Blob download (works in iframe)
-                const rows = [
-                  ["Field", "Value"],
-                  ["Invoice", payment.invoiceNumber],
-                  ["Date", new Date(payment.timestamp).toLocaleString('en-GB')],
-                  ["Cashier", payment.cashier || 'N/A'],
-                  ["Customer", payment.customer || 'Walk-in'],
-                  ["Subtotal", payment.subtotal.toFixed(2)],
-                  ["Discount", payment.discount.toFixed(2)],
-                  ["Tax", payment.tax.toFixed(2)],
-                  ["Total", payment.total.toFixed(2)],
-                  ["Amount Paid", payment.amountPaid.toFixed(2)],
-                  ["Change", payment.change.toFixed(2)],
-                  ["Payment Method", payment.method],
-                  ["", ""],
-                  ["Items", ""],
-                  ...payment.items.map((item: any) => [`${item.emoji || ''} ${item.name}`, `${item.quantity} x ${formatGHS(item.price)} = ${formatGHS(item.total)}`]),
-                ];
-                const csv = rows.map(r => r.map(c => `"${c}"`).join(",")).join("\n");
-                const blob = new Blob([csv], { type: "text/csv" });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement("a");
-                a.href = url; a.download = `receipt-${payment.invoiceNumber}.csv`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-                toast({ title: "Receipt exported as CSV" });
-              }}
+              onClick={handleCSVExport}
               className="h-10 rounded-xl bg-white ring-1 ring-slate-200 hover:bg-slate-100 text-slate-700 font-semibold text-xs flex items-center justify-center gap-1.5"
               title="Export as CSV"
             >
@@ -4144,61 +4270,7 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
               CSV
             </button>
             <button
-              onClick={() => {
-                // Export as PDF — use hidden iframe print (user selects Save as PDF)
-                const itemsHtml = payment.items.map((item: any) => `
-                  <tr>
-                    <td style="padding:2px 8px;text-align:left">${item.emoji || ''} ${item.name}</td>
-                    <td style="padding:2px 8px;text-align:right">${item.quantity}</td>
-                    <td style="padding:2px 8px;text-align:right">${formatGHS(item.total)}</td>
-                  </tr>`).join("");
-                const html = `<!DOCTYPE html><html><head><title>Receipt ${payment.invoiceNumber}</title>
-                  <style>
-                    body{font-family:Arial,sans-serif;font-size:12px;max-width:400px;margin:0 auto;padding:30px}
-                    h2{text-align:center;font-size:16px;color:#059669}
-                    table{width:100%;border-collapse:collapse;margin:10px 0}
-                    th{border-bottom:2px solid #059669;padding:4px 8px;text-align:left;font-size:11px}
-                    .total{font-size:18px;font-weight:bold;text-align:right;margin-top:10px;color:#059669}
-                    .center{text-align:center}
-                    hr{border:none;border-top:1px dashed #ccc;margin:10px 0}
-                  </style></head><body>
-                  <h2>${COMPANY.name}</h2>
-                  <p class="center">${COMPANY.address}<br/>${COMPANY.contact}</p>
-                  <hr/>
-                  <p><strong>Invoice:</strong> ${payment.invoiceNumber}<br/>
-                  <strong>Date:</strong> ${new Date(payment.timestamp).toLocaleString('en-GB')}<br/>
-                  <strong>Cashier:</strong> ${payment.cashier || 'N/A'}<br/>
-                  <strong>Customer:</strong> ${payment.customer || 'Walk-in'}</p>
-                  <hr/>
-                  <table><thead><tr><th>Item</th><th style="text-align:right">Qty</th><th style="text-align:right">Total</th></tr></thead>
-                  <tbody>${itemsHtml}</tbody></table>
-                  <hr/>
-                  <p>Subtotal: ${formatGHS(payment.subtotal)}</p>
-                  ${payment.discount > 0 ? `<p>Discount: -${formatGHS(payment.discount)}</p>` : ''}
-                  <p>Tax: ${formatGHS(payment.tax)}</p>
-                  <p class="total">TOTAL: ${formatGHS(payment.total)}</p>
-                  <p>Paid: ${formatGHS(payment.amountPaid)} (${payment.method})</p>
-                  <p>Change: ${formatGHS(payment.change)}</p>
-                  <hr/>
-                  <p class="center">Thank you for shopping!<br/>Have a fresh &amp; healthy day</p>
-                  </body></html>`;
-                const iframe = document.createElement('iframe');
-                iframe.style.position = 'fixed';
-                iframe.style.right = '0';
-                iframe.style.bottom = '0';
-                iframe.style.width = '0';
-                iframe.style.height = '0';
-                iframe.style.border = '0';
-                document.body.appendChild(iframe);
-                iframe.contentDocument?.write(html);
-                iframe.contentDocument?.close();
-                setTimeout(() => {
-                  iframe.contentWindow?.focus();
-                  iframe.contentWindow?.print();
-                  setTimeout(() => document.body.removeChild(iframe), 1000);
-                }, 300);
-                toast({ title: "Select 'Save as PDF' in the print dialog" });
-              }}
+              onClick={handlePDFExport}
               className="h-10 rounded-xl bg-white ring-1 ring-slate-200 hover:bg-slate-100 text-slate-700 font-semibold text-xs flex items-center justify-center gap-1.5"
               title="Export as PDF"
             >
