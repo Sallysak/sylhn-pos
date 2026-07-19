@@ -1,15 +1,14 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ShoppingCart, Home, BarChart3, Menu, X, LogOut, User, Package,
   Truck, Phone, Settings, FileText, Wrench, Shield, Bell, Download,
   Wallet, Receipt, TrendingUp, Clock, AlertTriangle, ChevronRight,
-  RefreshCw, Wifi, WifiOff, Sparkles, Calculator, Moon, Sun, Mail,
+  RefreshCw, Sparkles, Calculator, Moon, Sun, Mail,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { getQueueSize, getQueuedSales, flushQueue, isOnline, onQueueChange, type QueuedSale } from "@/lib/offline-queue";
 
 export interface MobileNavTab {
   id: string;
@@ -40,7 +39,6 @@ const MORE_DESTINATIONS = [
   { id: "receipt-archive", label: "Receipts", icon: FileText, color: "text-slate-600", bg: "bg-slate-50" },
   { id: "maintenance", label: "Maintenance", icon: Wrench, color: "text-orange-600", bg: "bg-orange-50" },
   { id: "email-system", label: "Email System", icon: Mail, color: "text-blue-600", bg: "bg-blue-50" },
-  { id: "sync-settings", label: "Sync Settings", icon: RefreshCw, color: "text-blue-600", bg: "bg-blue-50" },
   { id: "admin-panel", label: "Admin Panel", icon: Shield, color: "text-purple-600", bg: "bg-purple-50" },
 ];
 
@@ -52,52 +50,7 @@ const AI_DESTINATIONS = [
 
 export function MobileNav({ active, onNavigate, cartCount, user, onLogout }: MobileNavProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [queueSize, setQueueSize] = useState(0);
-  const [queuedSales, setQueuedSales] = useState<QueuedSale[]>([]);
-  const [online, setOnline] = useState(isOnline());
-  const [syncing, setSyncing] = useState(false);
   const { toast } = useToast();
-
-  // Subscribe to queue changes
-  useEffect(() => {
-    const refresh = async () => {
-      setQueueSize(await getQueueSize());
-      setQueuedSales(await getQueuedSales());
-      setOnline(isOnline());
-    };
-    refresh();
-    const unsub = onQueueChange(refresh);
-    // Poll every 5s as a fallback (in case the event misses)
-    const interval = setInterval(refresh, 5000);
-    return () => { unsub(); clearInterval(interval); };
-  }, []);
-
-  const handleSync = useCallback(async () => {
-    if (syncing) return;
-    setSyncing(true);
-    try {
-      const result = await flushQueue();
-      if (result.synced > 0) {
-        toast({
-          title: `${result.synced} sale(s) synced`,
-          description: result.failed > 0 ? `${result.failed} failed — see queue` : "All queued sales uploaded",
-          variant: result.failed > 0 ? "destructive" : "default",
-        });
-      } else if (result.failed > 0) {
-        toast({
-          title: "Sync failed",
-          description: `${result.failed} sale(s) could not be synced`,
-          variant: "destructive",
-        });
-      } else {
-        toast({ title: "Queue is empty", description: "No pending sales to sync" });
-      }
-    } catch (e: any) {
-      toast({ title: "Sync error", description: e?.message || "", variant: "destructive" });
-    } finally {
-      setSyncing(false);
-    }
-  }, [syncing, toast]);
 
   // Top 5 destinations shown as bottom tabs
   const tabs: MobileNavTab[] = [
@@ -105,7 +58,7 @@ export function MobileNav({ active, onNavigate, cartCount, user, onLogout }: Mob
     { id: "cart", label: "Cart", icon: ShoppingCart, badge: cartCount },
     { id: "dashboard", label: "Dashboard", icon: BarChart3 },
     { id: "reports", label: "Reports", icon: FileText },
-    { id: "more", label: "More", icon: Menu, badge: queueSize > 0 ? queueSize : undefined },
+    { id: "more", label: "More", icon: Menu },
   ];
 
   const handleTabClick = (tabId: string) => {
@@ -121,21 +74,6 @@ export function MobileNav({ active, onNavigate, cartCount, user, onLogout }: Mob
 
   return (
     <>
-      {/* Offline indicator banner */}
-      <AnimatePresence>
-        {!online && (
-          <motion.div
-            initial={{ y: -40, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: -40, opacity: 0 }}
-            className="offline-indicator haptic-tap"
-          >
-            <WifiOff className="h-3 w-3 inline mr-1.5 -mt-0.5" />
-            Offline mode — sales will be queued and synced when you reconnect
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* Bottom Tab Bar */}
       <nav className="mobile-bottom-nav mobile-only" role="navigation" aria-label="Primary">
         <div className="mobile-bottom-nav-inner">
@@ -207,57 +145,7 @@ export function MobileNav({ active, onNavigate, cartCount, user, onLogout }: Mob
                     <X className="h-4 w-4" />
                   </button>
                 </div>
-
-                {/* Sync status */}
-                <button
-                  onClick={handleSync}
-                  disabled={syncing || queueSize === 0}
-                  className="w-full h-9 rounded-lg bg-white/15 hover:bg-white/25 disabled:opacity-50 text-white text-xs font-semibold flex items-center justify-center gap-2 transition haptic-tap relative z-10 backdrop-blur-sm ring-1 ring-white/20"
-                >
-                  {syncing ? (
-                    <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                  ) : online ? (
-                    <Wifi className="h-3.5 w-3.5" />
-                  ) : (
-                    <WifiOff className="h-3.5 w-3.5" />
-                  )}
-                  {queueSize > 0
-                    ? `${queueSize} sale(s) queued — tap to sync`
-                    : online ? "All sales synced" : "Offline — will sync on reconnect"
-                  }
-                </button>
               </div>
-
-              {/* Queue preview (if any) */}
-              {queuedSales.length > 0 && (
-                <div className="flex-shrink-0 px-3 py-2 bg-amber-50 border-b border-amber-100">
-                  <div className="text-[10px] font-bold text-amber-700 uppercase mb-1.5 px-2">
-                    Queued Sales ({queuedSales.length})
-                  </div>
-                  <div className="max-h-32 overflow-y-auto no-scrollbar space-y-1">
-                    {queuedSales.slice(0, 5).map(q => (
-                      <div key={q.id} className="bg-white rounded-lg px-2.5 py-1.5 ring-1 ring-amber-200 flex items-center justify-between">
-                        <div className="min-w-0 flex-1">
-                          <div className="text-[10px] font-mono text-slate-700 truncate">{q.preview.invoiceNumber}</div>
-                          <div className="text-[9px] text-slate-500">
-                            {q.preview.itemCount} items · ₵{q.preview.total.toFixed(2)}
-                          </div>
-                        </div>
-                        <div className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${
-                          q.status === "failed" ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700"
-                        }`}>
-                          {q.status}
-                        </div>
-                      </div>
-                    ))}
-                    {queuedSales.length > 5 && (
-                      <div className="text-[10px] text-amber-700 text-center py-1">
-                        + {queuedSales.length - 5} more
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
 
               {/* Destinations list */}
               <div className="flex-1 overflow-y-auto py-2">

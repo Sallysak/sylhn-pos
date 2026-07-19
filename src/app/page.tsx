@@ -38,11 +38,9 @@ import { ManagerApproval } from "@/components/manager-approval";
 import { PrinterPairing } from "@/components/printer-pairing";
 import { AiAssistant } from "@/components/ai-assistant";
 import { SpeedDial } from "@/components/speed-dial";
-import { queueSale, flushQueue, onQueueChange, isOnline, getQueueSize } from "@/lib/offline-queue";
 import { saveCart, loadCart, clearCart as clearPersistedCart } from "@/lib/cart-persistence";
 import { saveSessionToken, clearSessionToken, getSessionToken, authedFetch } from "@/lib/client-auth";
 import { clearAuthState, saveUserSession, getCachedUser, hasUnsavedBusinessData } from "@/lib/session-data";
-import { pullChanges, startAutoPull, schedulePull, getCachedProducts, type PulledData } from "@/lib/sync";
 
 // ===== Lazy-loaded components (code-split for faster initial load) =====
 // Each form is loaded on-demand only when the user navigates to it.
@@ -74,7 +72,6 @@ const AdminLogin = dynamic(() => import("@/components/admin-panel").then(m => ({
 const AdminPanel = dynamic(() => import("@/components/admin-panel").then(m => ({ default: m.AdminPanel })), { ssr: false, loading: loadingFallback });
 const OperationsDashboard = dynamic(() => import("@/components/operations-dashboard").then(m => ({ default: m.OperationsDashboard })), { ssr: false, loading: loadingFallback });
 const ReceiptArchive = dynamic(() => import("@/components/receipt-archive").then(m => ({ default: m.ReceiptArchive })), { ssr: false, loading: loadingFallback });
-const SyncSettings = dynamic(() => import("@/components/sync-settings").then(m => ({ default: m.SyncSettings })), { ssr: false, loading: loadingFallback });
 
 // ===== Server → Client product transformer =====
 // The /api/products endpoint returns Prisma-shaped products (with `quantity`
@@ -110,15 +107,16 @@ export default function POSPage() {
   const [openMenu, setOpenMenu] = useState<string | null>(null);
 
   // ===== Shared Data State =====
-  // NOTE: The server is the SINGLE SOURCE OF TRUTH for products/groups.
-  // localStorage is used only as a read-only cache for offline display.
-  // We never write the products array back to localStorage from this component
-  // — that was the source of the "lost update" bug in multi-cashier use.
-  // The cache is updated by pullChanges() in src/lib/sync.ts.
+  // Products are fetched from the server on login and refreshed every 30s.
   const [products, setProducts] = useState<Product[]>(() => {
     if (typeof window !== 'undefined') {
-      const cached = getCachedProducts();
-      if (cached && cached.length > 0) return cached as Product[];
+      try {
+        const cached = localStorage.getItem('sylhn-products-cache');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed as Product[];
+        }
+      } catch {}
     }
     return INITIAL_PRODUCTS;
   });
@@ -167,8 +165,6 @@ export default function POSPage() {
     reason?: string;
     onApproved: () => void;
   } | null>(null);
-  // Premium: offline queue tracking (for mobile nav badge)
-  const [queueSize, setQueueSize] = useState(0);
   const [mobileCartOpen, setMobileCartOpen] = useState(false);
   // Premium: Bluetooth printer pairing modal
   const [showPrinterPairing, setShowPrinterPairing] = useState(false);
@@ -210,9 +206,8 @@ export default function POSPage() {
   const menuRef = useRef<HTMLDivElement>(null);
 
   // ===== Persist session-only state to localStorage =====
-  // NOTE: products/groups are NOT persisted here. The server is the source of
-  // truth — those are fetched via pullChanges() in src/lib/sync.ts and cached
-  // by the sync module (not by this component).
+  // NOTE: products/groups are NOT persisted here. They are fetched from
+  // the server every 30 seconds.
   // What we DO persist:
   //   - history: local stock movement log (for the History tab — server has
   //     its own StockHistory table that's the authoritative source)
@@ -233,20 +228,6 @@ export default function POSPage() {
     setNow(new Date());
   }, []);
   /* eslint-enable react-hooks/set-state-in-effect */
-
-  // Premium: offline sale queue tracking
-  useEffect(() => {
-    const refreshQueue = async () => {
-      try { setQueueSize(await getQueueSize()); } catch {}
-    };
-    refreshQueue();
-    const unsub = onQueueChange(refreshQueue);
-    // Auto-flush on mount (in case we have queued sales from a previous offline session)
-    if (isOnline()) {
-      setTimeout(() => { flushQueue().catch(() => {}); }, 2000);
-    }
-    return unsub;
-  }, []);
 
   // ===== Session restore on page load =====
   // SECURITY: We only restore from the SERVER session (httpOnly cookie).
@@ -723,119 +704,23 @@ export default function POSPage() {
     })();
   }, [loggedInUser]);
 
-  // ===== Server-Sync: pull products from server on login + every 15s =====
-  // This is the FIX for the multi-cashier "lost update" bug. The server is the
-  // single source of truth — clients only pull (never push the products array).
-  // After login: immediate pull + start 15-second auto-pull interval.
-  // The auto-pull refreshes product stock counts so this cashier sees other
-  // cashiers' sales within 15 seconds.
+  // ===== Fetch products from server on login + refresh every 30s =====
   useEffect(() => {
     if (!loggedInUser) return;
-    // Initial pull (immediate, includes groups for the Stock Management page)
-    pullChanges({ includeGroups: true }).then(result => {
-      if (result.success && result.data?.products && result.data.products.length > 0) {
-        setProducts(result.data.products.map(serverProductToClientProduct));
-      }
-    }).catch(() => {});
-    // Start auto-pull (every 15s) — refreshes products only (groups change rarely)
-    const stopAutoPull = startAutoPull((data) => {
-      if (data.products && data.products.length > 0) {
-        setProducts(prev => {
-          // Preserve local optimistic updates for items in the cart (so the
-          // UI doesn't flicker back to the server's stale count between an
-          // optimistic update and the server's eventual consistency).
-          // We replace the entire list but keep cart-item stock counts as-is
-          // if the server's count is HIGHER than our optimistic count (which
-          // would mean another cashier restocked while we were selling).
-          const cartProductIds = new Set(cart.map(c => c.productId));
-          const serverMap = new Map(data.products.map((p: any) => [p.id, p]));
-          return prev.map(localP => {
-            const serverP = serverMap.get(localP.id);
-            if (!serverP) return localP;  // not on server (maybe just deleted) — keep local
-            const serverStock = Number(serverP.quantity) || 0;
-            // If this product is in the cart, keep the lower of (local, server)
-            // to avoid flicker. Otherwise use the server's authoritative count.
-            if (cartProductIds.has(localP.id) && localP.stock < serverStock) {
-              return { ...localP, ...serverProductToClientProduct(serverP), stock: localP.stock };
-            }
-            return serverProductToClientProduct(serverP);
-          });
-        });
-      }
-    });
-    return stopAutoPull;
-  }, [loggedInUser, cart]);
-
-  // ===== Real-time updates via Server-Sent Events (SSE) =====
-  // Opens a long-lived connection to /api/realtime/stream. When another
-  // cashier makes a sale (or voids/refunds), the server pushes a
-  // "stock-update" event instantly — this cashier's screen updates within
-  // ~100ms instead of waiting for the 15-second poll.
-  //
-  // The browser auto-reconnects if the connection drops (default 3s).
-  // If SSE isn't supported (rare), the 15-second poll still works as a
-  // fallback.
-  useEffect(() => {
-    if (!loggedInUser) return;
-    if (typeof window === "undefined" || !("EventSource" in window)) return;
-
-    let es: EventSource | null = null;
-    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-
-    const connect = () => {
+    const fetchProducts = async () => {
       try {
-        es = new EventSource("/api/realtime/stream", { withCredentials: true });
-
-        // Live stock updates — when another cashier sells/voids/refunds,
-        // update this cashier's screen instantly.
-        es.addEventListener("stock-update", (e: MessageEvent) => {
-          try {
-            const data = JSON.parse(e.data);
-            if (!data.productId || typeof data.newQuantity !== "number") return;
-            setProducts(prev => prev.map(p =>
-              p.id === data.productId
-                ? { ...p, stock: data.newQuantity, quantity: data.newQuantity }
-                : p
-            ));
-          } catch { /* ignore malformed event */ }
-        });
-
-        // Live sale notifications — could be used for a toast or dashboard
-        // refresh. For now, we just refresh the daily total + txn count.
-        es.addEventListener("sale-complete", (e: MessageEvent) => {
-          try {
-            const data = JSON.parse(e.data);
-            // Only count sales from OTHER cashiers (this cashier's sale is
-            // already counted locally). We can't tell from the event whose
-            // sale it is, so we skip our own by checking the cashier name.
-            // This is a best-effort refresh — the Z-Report at end of day is
-            // the authoritative source.
-            if (data.cashierName && loggedInUser.fullName !== data.cashierName) {
-              setDailyTotal(prev => prev + (data.total || 0));
-              setTransactionCount(prev => prev + 1);
-            }
-          } catch { /* ignore */ }
-        });
-
-        es.onerror = () => {
-          // Browser auto-reconnects, but if it fails repeatedly, we close
-          // and retry after 5s. The 15-second poll is still running as a
-          // fallback, so we don't lose data.
-          if (es) es.close();
-          es = null;
-          reconnectTimer = setTimeout(connect, 5000);
-        };
-      } catch {
-        // EventSource construction failed — fall back to polling only
-      }
+        const res = await authedFetch("/api/products");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.products && data.products.length > 0) {
+            setProducts(data.products.map(serverProductToClientProduct));
+          }
+        }
+      } catch { /* ignore */ }
     };
-
-    connect();
-
-    return () => {
-      if (es) es.close();
-      if (reconnectTimer) clearTimeout(reconnectTimer);
-    };
+    fetchProducts();
+    const interval = setInterval(fetchProducts, 30000);
+    return () => clearInterval(interval);
   }, [loggedInUser]);
 
   // Premium: Dark Mode — auto-switch based on time (6pm-6am) + manual toggle
@@ -1214,20 +1099,12 @@ export default function POSPage() {
       customer: customerName || undefined,
     };
     // Reduce stock levels locally (optimistic — UI updates immediately).
-    // The server is the source of truth and will correct any drift within
-    // 15s via the auto-pull, or immediately via schedulePull() below.
+    // The server has the authoritative count; the 30s refresh will sync.
     setProducts(prev => prev.map(p => {
       const cartItem = cart.find(c => c.productId === p.id);
       if (!cartItem) return p;
       return { ...p, stock: Math.max(0, p.stock - cartItem.quantity) };
     }));
-    // Trigger a debounced server pull to refresh product list with
-    // authoritative stock counts (in case other cashiers also sold items).
-    schedulePull(2000, (data) => {
-      if (data.products && data.products.length > 0) {
-        setProducts(data.products.map(serverProductToClientProduct));
-      }
-    });
     // Add history entries locally
     const newHistory = cart.map(item => ({
       id: `h-${Date.now()}-${item.productId}`,
@@ -1471,7 +1348,6 @@ export default function POSPage() {
         { label: "User Management", icon: Users, action: () => setView("maintenance") },
         { label: "Backup Database", icon: Database, action: () => setView("maintenance") },
         { separator: true },
-        { label: "☁️ Server Sync", icon: RefreshCw, action: () => setView("sync-settings") },
         { separator: true },
         { label: "Cashier Shift", icon: Clock, action: () => setView("maintenance") },
         { label: "Security & Permissions", icon: Lock, action: () => setView("maintenance") },
@@ -1497,9 +1373,6 @@ export default function POSPage() {
   }
   if (view === "receipt-archive") {
     return <ReceiptArchive onBack={() => setView("pos")} />;
-  }
-  if (view === "sync-settings") {
-    return <SyncSettings onBack={() => setView("pos")} />;
   }
   if (view === "stock") {
     return <StockManagement onBack={() => { setView("pos"); setOpenStockQtyReport(false); }} products={products} setProducts={setProducts} groups={groups} setGroups={setGroups} history={history} setHistory={setHistory} initialView={initialStockView} openQtyReport={openStockQtyReport} onNavigateToPurchase={() => setView("purchase-form")} />;
