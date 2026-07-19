@@ -4008,66 +4008,120 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
     toast({ title: "Select 'Save as PDF' in the print dialog" });
   };
 
-  // Universal print function — uses iframe with srcdoc (works in preview iframe)
+  // Universal print function — uses multiple methods (works in preview iframe)
   const printHTML = (html: string) => {
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'fixed';
-    iframe.style.right = '0';
-    iframe.style.bottom = '0';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
-    iframe.style.border = '0';
-    iframe.setAttribute('srcdoc', html);
-    document.body.appendChild(iframe);
-    iframe.onload = () => {
-      try {
-        iframe.contentWindow?.focus();
-        iframe.contentWindow?.print();
-      } catch (e) {
-        console.warn('Print failed:', e);
-      }
-      setTimeout(() => {
-        try { document.body.removeChild(iframe); } catch {}
-      }, 2000);
-    };
-  };
+    let printed = false;
 
-  // Premium: send via WhatsApp — generate receipt text and open wa.me link
-  // Works in preview iframe by using window.location.href redirect
-  const handleSendWhatsApp = async () => {
-    const saved = await ensureSaleSaved();
-    if (!saved) {
-      toast({ title: 'Could not save sale to server', description: 'Try again or check your connection', variant: 'destructive' });
-      return;
-    }
-    const phone = prompt('Enter customer phone number (with country code, e.g. +233247075044), or leave blank to open WhatsApp Web:');
-    if (phone === null) return; // user cancelled
-
+    // Method 1: Hidden iframe with srcdoc
     try {
-      const res = await authedFetch(`/api/receipt/whatsapp?saleId=${payment.saleId}${phone ? `&phone=${encodeURIComponent(phone)}` : ''}`);
-      const data = await res.json();
-      if (res.ok && data.success) {
-        // Try multiple methods to open the WhatsApp link (iframe blocks window.open)
-        // Method 1: Try window.open
-        const newWin = window.open(data.waLink, '_blank');
-        if (!newWin) {
-          // Method 2: Create a link and click it (works in iframes)
+      const iframe = document.createElement('iframe');
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = '0';
+      iframe.setAttribute('srcdoc', html);
+      document.body.appendChild(iframe);
+      iframe.onload = () => {
+        try {
+          iframe.contentWindow?.focus();
+          iframe.contentWindow?.print();
+          printed = true;
+        } catch (e) {
+          console.warn('iframe print failed:', e);
+        }
+        setTimeout(() => {
+          try { document.body.removeChild(iframe); } catch {}
+        }, 3000);
+      };
+      // Fallback: if onload doesn't fire in 2s, try contentDocument
+      setTimeout(() => {
+        if (!printed && iframe.contentDocument) {
+          try {
+            iframe.contentDocument.open();
+            iframe.contentDocument.write(html);
+            iframe.contentDocument.close();
+            iframe.contentWindow?.focus();
+            iframe.contentWindow?.print();
+            printed = true;
+          } catch {}
+        }
+      }, 1000);
+    } catch {}
+
+    // Method 2: If iframe fails, open in new window (may be blocked in iframe)
+    setTimeout(() => {
+      if (!printed) {
+        try {
+          const topWin = window.top || window;
+          const win = topWin.open('', '_blank', 'width=400,height=600');
+          if (win) {
+            win.document.write(html);
+            win.document.close();
+            setTimeout(() => { win.focus(); win.print(); }, 300);
+            printed = true;
+          }
+        } catch {}
+      }
+    }, 1500);
+
+    // Method 3: Last resort — navigate to a data URL (leaves the app)
+    setTimeout(() => {
+      if (!printed) {
+        try {
+          const blob = new Blob([html], { type: 'text/html' });
+          const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
-          a.href = data.waLink;
-          a.target = '_blank';
-          a.rel = 'noopener noreferrer';
+          a.href = url;
+          a.download = `receipt-${payment.invoiceNumber}.html`;
           document.body.appendChild(a);
           a.click();
           document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          toast({ title: 'Receipt saved as HTML', description: 'Open the downloaded file to print' });
+        } catch (e) {
+          console.warn('All print methods failed:', e);
+          toast({ title: 'Print failed', description: 'Try the Thermal button or save as HTML', variant: 'destructive' });
         }
-        toast({ title: 'WhatsApp opened', description: `Receipt for ${data.invoiceNumber} ready to send` });
-      } else {
-        // If API fails, build the WhatsApp link directly from payment data
-        const receiptText = buildWhatsAppReceiptText(payment);
-        const normalizedPhone = phone.replace(/[\s+\-()]/g, "");
-        const waLink = normalizedPhone
-          ? `https://wa.me/${normalizedPhone}?text=${encodeURIComponent(receiptText)}`
-          : `https://wa.me/?text=${encodeURIComponent(receiptText)}`;
+      }
+    }, 2500);
+  };
+
+  // Premium: send via WhatsApp — generate receipt text and open wa.me link
+  // Uses multiple fallback methods to open the link (iframe blocks most)
+  const handleSendWhatsApp = async () => {
+    const phone = prompt('Enter customer phone number (with country code, e.g. +233247075044), or leave blank for WhatsApp Web:');
+    if (phone === null) return;
+
+    // Build receipt text directly from payment data (no server needed)
+    const receiptText = buildWhatsAppReceiptText(payment);
+    const normalizedPhone = phone ? phone.replace(/[\s+\-()]/g, "") : "";
+    const waLink = normalizedPhone
+      ? `https://wa.me/${normalizedPhone}?text=${encodeURIComponent(receiptText)}`
+      : `https://wa.me/?text=${encodeURIComponent(receiptText)}`;
+
+    // Try multiple methods to open the link (iframe blocks most)
+    let opened = false;
+
+    // Method 1: Try window.open on top window (escapes iframe)
+    try {
+      const topWin = window.top || window;
+      const newWin = topWin.open(waLink, '_blank');
+      if (newWin) opened = true;
+    } catch {}
+
+    // Method 2: Try regular window.open
+    if (!opened) {
+      try {
+        const newWin = window.open(waLink, '_blank');
+        if (newWin) opened = true;
+      } catch {}
+    }
+
+    // Method 3: Create a link and click it
+    if (!opened) {
+      try {
         const a = document.createElement('a');
         a.href = waLink;
         a.target = '_blank';
@@ -4075,23 +4129,32 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-        toast({ title: 'WhatsApp opened', description: `Receipt ready to send to ${phone || 'WhatsApp Web'}` });
+        opened = true;
+      } catch {}
+    }
+
+    // Method 4: If all else fails, show the link for the user to copy
+    if (!opened) {
+      // Copy to clipboard as fallback
+      try {
+        navigator.clipboard.writeText(waLink);
+        toast({
+          title: 'WhatsApp link copied to clipboard',
+          description: 'Paste it in your browser to send the receipt. Link also shown below.',
+        });
+      } catch {
+        toast({
+          title: 'Could not open WhatsApp automatically',
+          description: 'Please copy this link: ' + waLink.substring(0, 60) + '...',
+          variant: 'destructive',
+        });
       }
-    } catch (e: any) {
-      // Fallback: build receipt from payment data and open WhatsApp directly
-      const receiptText = buildWhatsAppReceiptText(payment);
-      const normalizedPhone = phone ? phone.replace(/[\s+\-()]/g, "") : "";
-      const waLink = normalizedPhone
-        ? `https://wa.me/${normalizedPhone}?text=${encodeURIComponent(receiptText)}`
-        : `https://wa.me/?text=${encodeURIComponent(receiptText)}`;
-      const a = document.createElement('a');
-      a.href = waLink;
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      toast({ title: 'WhatsApp opened', description: `Receipt ready to send` });
+      // Also try location.href as last resort
+      setTimeout(() => {
+        try { window.location.href = waLink; } catch {}
+      }, 500);
+    } else {
+      toast({ title: 'WhatsApp opened', description: `Receipt ready to send to ${phone || 'WhatsApp Web'}` });
     }
   };
 
@@ -4125,8 +4188,8 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
           </div>
         </div>
 
-        {/* Receipt body — native scroll (not ScrollArea) so buttons are always visible */}
-        <div className="flex-1 overflow-y-auto min-h-0 scroll-premium" style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
+        {/* Receipt body — SCROLLABLE, with max height so buttons are ALWAYS visible */}
+        <div className="overflow-y-auto min-h-0 scroll-premium" style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y', maxHeight: '50vh' }}>
         <div className="px-6 py-4 font-mono text-xs">
             <div className="text-center mb-3">
               <div className="font-bold text-sm text-slate-800">{COMPANY.name}</div>
