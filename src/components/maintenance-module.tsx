@@ -53,59 +53,69 @@ export function MaintenanceModule({ onBack, cashier, dailyTotal, transactionCoun
   // Persist maintenance users
   useEffect(() => { try { localStorage.setItem('sylhn-maintenance-users', JSON.stringify(users)); } catch {} }, [users]);
 
+  // Each tab has a full label (desktop) and a short label (mobile)
   const tabs = [
-    { id: "settings" as const, label: "System Settings", icon: Settings2 },
-    { id: "users" as const, label: "User Management", icon: Users },
-    { id: "backup" as const, label: "Backup & Restore", icon: Database },
-    { id: "shift" as const, label: "Cashier Shift", icon: Clock },
-    { id: "security" as const, label: "Security", icon: Lock },
-    { id: "about" as const, label: "About", icon: Info },
+    { id: "settings" as const, label: "System Settings", short: "Settings", icon: Settings2 },
+    { id: "users" as const, label: "User Management", short: "Users", icon: Users },
+    { id: "backup" as const, label: "Backup & Restore", short: "Backup", icon: Database },
+    { id: "shift" as const, label: "Cashier Shift", short: "Shift", icon: Clock },
+    { id: "security" as const, label: "Security", short: "Security", icon: Lock },
+    { id: "about" as const, label: "About", short: "About", icon: Info },
   ];
 
   return (
-    <div className="h-screen flex flex-col bg-gradient-to-br from-slate-50 to-slate-100">
-      <header className="flex-shrink-0 bg-gradient-to-r from-slate-700 via-slate-800 to-slate-900 text-white shadow-lg">
-        <div className="flex items-center justify-between px-6 py-3">
-          <div className="flex items-center gap-4">
-            <button onClick={onBack} className="h-9 w-9 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center transition">
+    <div className="min-h-[100dvh] flex flex-col bg-gradient-to-br from-slate-50 to-slate-100 lg:h-screen">
+      <header className="flex-shrink-0 bg-gradient-to-r from-slate-700 via-slate-800 to-slate-900 text-white shadow-lg sticky top-0 z-30">
+        <div className="flex items-center justify-between px-3 sm:px-6 py-3 gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <button onClick={onBack} className="h-9 w-9 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center transition active:scale-90 flex-shrink-0" aria-label="Back">
               <ArrowLeft className="h-4 w-4" />
             </button>
-            <div className="flex items-center gap-2.5">
-              <div className="h-9 w-9 rounded-xl bg-white/15 backdrop-blur flex items-center justify-center ring-1 ring-white/20">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="h-9 w-9 rounded-xl bg-white/15 backdrop-blur flex items-center justify-center ring-1 ring-white/20 flex-shrink-0">
                 <Settings2 className="h-5 w-5" />
               </div>
-              <div>
-                <div className="font-bold text-base leading-tight">System Maintenance</div>
-                <div className="text-[10px] text-slate-300/90">{COMPANY.name}</div>
+              <div className="min-w-0">
+                <div className="font-bold text-sm sm:text-base leading-tight truncate">System Maintenance</div>
+                <div className="text-[10px] text-slate-300/90 truncate">{COMPANY.name}</div>
               </div>
             </div>
           </div>
-          <div className="text-right">
+          <div className="text-right hidden sm:block flex-shrink-0">
             <div className="text-xs text-slate-300/80">{COMPANY.address}</div>
             <div className="text-xs font-mono text-slate-300">{COMPANY.contact}</div>
           </div>
         </div>
       </header>
 
+      {/* Tab bar — premium horizontally-scrollable on mobile, full on desktop */}
       <nav className="flex-shrink-0 bg-white border-b border-slate-200 shadow-sm">
-        <div className="flex items-center gap-1 px-6 py-2">
-          {tabs.map(t => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={cn(
-                "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all",
-                tab === t.id ? "bg-gradient-to-r from-slate-700 to-slate-800 text-white shadow-md" : "text-slate-600 hover:bg-slate-100"
-              )}
-            >
-              <t.icon className="h-4 w-4" />
-              {t.label}
-            </button>
-          ))}
+        <div className="flex items-center gap-1.5 px-3 sm:px-6 py-2 overflow-x-auto scrollbar-hide">
+          {tabs.map(t => {
+            const Icon = t.icon;
+            const isActive = tab === t.id;
+            return (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all whitespace-nowrap flex-shrink-0 active:scale-95",
+                  isActive
+                    ? "bg-gradient-to-r from-slate-700 to-slate-800 text-white shadow-md"
+                    : "text-slate-600 hover:bg-slate-100"
+                )}
+              >
+                <Icon className="h-4 w-4 flex-shrink-0" />
+                {/* Short label on mobile, full label on desktop */}
+                <span className="sm:hidden">{t.short}</span>
+                <span className="hidden sm:inline">{t.label}</span>
+              </button>
+            );
+          })}
         </div>
       </nav>
 
-      <main className="flex-1 overflow-hidden p-6">
+      <main className="flex-1 overflow-hidden p-3 sm:p-6">
         <AnimatePresence mode="wait">
           <motion.div
             key={tab}

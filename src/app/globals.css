@@ -2286,3 +2286,52 @@ html.dark .status-error-premium {
 }
 
 /* ===== END PREMIUM MOBILE POLISH ===== */
+
+/* ===== 46. Mobile viewport fix for module pages =====
+   Many components use `h-screen flex flex-col` or `min-h-[100dvh] flex flex-col`
+   which assumes the page owns the full viewport. On mobile the bottom nav
+   (60px) sits on top of that, hiding content. This rule adjusts the height on
+   mobile so content fits above the bottom nav, and adds bottom padding so the
+   nav doesn't cover the bottom of the page. */
+@media (max-width: 1023px) {
+  /* Page-level containers that own the full viewport — leave room for the
+     bottom nav (60px) + safe-area. */
+  .h-screen.flex.flex-col,
+  .min-h-\[100dvh\].flex.flex-col,
+  .min-h-screen.flex.flex-col {
+    height: auto !important;
+    min-height: calc(100dvh - 60px - env(safe-area-inset-bottom, 0px)) !important;
+    padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+  /* But don't apply to the main POS page (it has its own pb-[72px] already) */
+  .pb-\[72px\].h-screen.flex.flex-col,
+  .pb-\[72px\].min-h-\[100dvh\].flex.flex-col {
+    padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+}
+
+/* ===== 47. Premium scrollable tab bar =====
+   Replaces the rigid `flex` tab bar in maintenance/stock/reports modules
+   with a horizontally-scrollable bar on mobile. The tabs themselves remain
+   the same; this just makes the container scroll and hides the scrollbar. */
+@media (max-width: 1023px) {
+  /* Any nav with multiple tab buttons should be scrollable on mobile */
+  nav.flex-shrink-0 > .flex.items-center.gap-1 {
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+    gap: 6px !important;
+  }
+  nav.flex-shrink-0 > .flex.items-center.gap-1::-webkit-scrollbar {
+    display: none;
+  }
+  /* Tab buttons themselves shouldn't shrink — show full label */
+  nav.flex-shrink-0 > .flex.items-center.gap-1 > button {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+}
+
+/* ===== END mobile viewport + tab fixes ===== */
