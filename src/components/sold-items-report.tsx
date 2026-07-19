@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { COMPANY, formatGHS, type Product } from "@/lib/pos-data";
+import { COMPANY, CURRENCY, formatGHS, type Product } from "@/lib/pos-data";
 
 // Sample sold items transactions
 interface SoldItem {
@@ -213,22 +213,22 @@ export function SoldItemsReport({ onBack }: SoldItemsReportProps) {
     <div className="h-screen flex flex-col bg-gradient-to-br from-slate-100 to-slate-200">
       {/* Header */}
       <header className="flex-shrink-0 bg-gradient-to-r from-emerald-700 via-emerald-600 to-teal-600 text-white shadow-lg">
-        <div className="flex items-center justify-between px-6 py-3">
-          <div className="flex items-center gap-4">
-            <button onClick={onBack} className="h-9 w-9 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center transition">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3 gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <button onClick={onBack} className="h-9 w-9 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center transition active:scale-90 flex-shrink-0">
               <ArrowLeft className="h-4 w-4" />
             </button>
-            <div className="flex items-center gap-2.5">
-              <div className="h-9 w-9 rounded-xl bg-white/15 backdrop-blur flex items-center justify-center ring-1 ring-white/20">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="h-9 w-9 rounded-xl bg-white/15 backdrop-blur flex items-center justify-center ring-1 ring-white/20 flex-shrink-0">
                 <FileBarChart2 className="h-5 w-5" />
               </div>
-              <div>
-                <div className="font-bold text-base leading-tight">Sold Items Report</div>
-                <div className="text-[10px] text-emerald-100/90">{COMPANY.name}</div>
+              <div className="min-w-0">
+                <div className="font-bold text-base leading-tight truncate">Sold Items Report</div>
+                <div className="text-[10px] text-emerald-100/90 truncate">{COMPANY.name}</div>
               </div>
             </div>
           </div>
-          <div className="text-right">
+          <div className="text-right hidden sm:block flex-shrink-0">
             <div className="text-xs text-emerald-100/80">{COMPANY.address}</div>
             <div className="text-xs font-mono text-emerald-100">{COMPANY.contact}</div>
           </div>
@@ -236,31 +236,79 @@ export function SoldItemsReport({ onBack }: SoldItemsReportProps) {
       </header>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4">
-        {/* Minimal Date Filter + Export Bar */}
-        <div className="max-w-3xl mx-auto mb-3 flex items-center justify-between gap-2 flex-wrap print:hidden">
-          <div className="flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-emerald-600" />
-            <span className="text-xs font-semibold text-slate-600">From:</span>
-            <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="h-9 px-2 rounded-lg border border-slate-300 text-xs outline-none focus:ring-2 focus:ring-emerald-400" />
-            <span className="text-xs font-semibold text-slate-600">To:</span>
-            <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="h-9 px-2 rounded-lg border border-slate-300 text-xs outline-none focus:ring-2 focus:ring-emerald-400" />
+      <div className="flex-1 overflow-y-auto p-3 sm:p-4">
+        {/* Date Filter + Export Bar — premium mobile-friendly */}
+        <div className="max-w-3xl mx-auto mb-3 space-y-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Calendar className="h-4 w-4 text-emerald-600 flex-shrink-0" />
+            <span className="text-[10px] sm:text-xs font-semibold text-slate-600">From:</span>
+            <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="h-9 sm:h-9 px-2 rounded-lg border border-slate-300 text-xs outline-none focus:ring-2 focus:ring-emerald-400" />
+            <span className="text-[10px] sm:text-xs font-semibold text-slate-600">To:</span>
+            <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="h-9 sm:h-9 px-2 rounded-lg border border-slate-300 text-xs outline-none focus:ring-2 focus:ring-emerald-400" />
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => window.print()} className="h-9 px-3 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition">
+            <button onClick={() => window.print()} className="flex-1 sm:flex-none h-9 px-3 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center justify-center gap-1.5 transition">
               <Printer className="h-3.5 w-3.5" /> Print
             </button>
-            <button onClick={handleExportPDF} className="h-9 px-3 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-700 text-xs font-semibold flex items-center gap-1.5 transition">
+            <button onClick={handleExportPDF} className="flex-1 sm:flex-none h-9 px-3 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-700 text-xs font-semibold flex items-center justify-center gap-1.5 transition">
               <FileText className="h-3.5 w-3.5" /> PDF
             </button>
-            <button onClick={handleExportExcel} className="h-9 px-3 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-700 text-xs font-semibold flex items-center gap-1.5 transition">
+            <button onClick={handleExportExcel} className="flex-1 sm:flex-none h-9 px-3 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-700 text-xs font-semibold flex items-center justify-center gap-1.5 transition">
               <Download className="h-3.5 w-3.5" /> Excel
             </button>
           </div>
         </div>
 
-        {/* The Report — ONLY company header + title + table */}
-        <div className="max-w-3xl mx-auto bg-white shadow-xl" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
+        {/* ===== Mobile: Premium KPI tiles + card list (below md) ===== */}
+        <div className="md:hidden max-w-3xl mx-auto space-y-3">
+          {/* KPI tiles */}
+          <div className="grid grid-cols-2 gap-2">
+            <div className="bg-gradient-to-br from-emerald-500 to-teal-600 text-white p-3 rounded-xl shadow-sm">
+              <div className="text-[10px] uppercase tracking-wider opacity-80 font-semibold">Total Qty Sold</div>
+              <div className="text-2xl font-bold mt-0.5">{totals.qty}</div>
+            </div>
+            <div className="bg-gradient-to-br from-indigo-500 to-blue-600 text-white p-3 rounded-xl shadow-sm">
+              <div className="text-[10px] uppercase tracking-wider opacity-80 font-semibold">Total Revenue</div>
+              <div className="text-2xl font-bold mt-0.5 font-mono">{CURRENCY}{formatNum(totals.amount)}</div>
+            </div>
+          </div>
+
+          {/* Card list grouped by category */}
+          {filtered.length === 0 ? (
+            <div className="bg-white rounded-xl p-8 text-center text-slate-400 text-sm">
+              <FileBarChart2 className="h-10 w-10 mx-auto mb-3 opacity-30" />
+              No sold items found in the selected date range
+            </div>
+          ) : (
+            Object.entries(grouped).map(([group, items]) => (
+              <div key={group} className="bg-white rounded-xl shadow-sm ring-1 ring-slate-200 overflow-hidden">
+                {/* Category header */}
+                <div className="bg-slate-100 px-3 py-2 border-b border-slate-200 flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">{group}</span>
+                  <span className="text-[10px] text-slate-500">{items.length} items</span>
+                </div>
+                {/* Item rows */}
+                <div className="divide-y divide-slate-100">
+                  {items.map(item => (
+                    <div key={item.id} className="p-3 flex items-center justify-between gap-2 active:bg-slate-50 transition">
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs font-medium text-slate-800 truncate">{item.details}</div>
+                        <div className="text-[10px] text-slate-500 font-mono">{item.partNo}</div>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <div className="text-xs font-bold text-slate-800">{item.qty} sold</div>
+                        <div className="text-[10px] text-emerald-600 font-mono font-semibold">{CURRENCY}{formatNum(item.amount)}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* ===== Desktop: traditional report (md+) ===== */}
+        <div className="hidden md:block max-w-3xl mx-auto bg-white shadow-xl" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
           {/* Company Header (centered) */}
           <div className="px-8 pt-6 pb-3 text-center border-b-2 border-slate-800 relative">
             <div className="text-lg font-bold text-slate-900 uppercase leading-tight">{COMPANY.name}</div>

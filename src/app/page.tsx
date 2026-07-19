@@ -2631,197 +2631,219 @@ function PaymentModal({ total, subtotal, tax, discount, itemCount, invoiceNumber
         animate={{ scale: 1, y: 0 }}
         exit={{ scale: 0.9, y: 30 }}
         onClick={(e) => e.stopPropagation()}
-        className="dialog-premium shadow-premium-xl w-full max-w-md max-h-[90vh] overflow-y-auto scroll-premium"
+        className="dialog-premium shadow-premium-xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden"
       >
-        <div className="gradient-premium-emerald text-white px-6 py-4 flex items-center justify-between relative overflow-hidden">
+        {/* Header — premium gradient with total due prominent */}
+        <div className="gradient-premium-emerald text-white px-5 py-4 flex items-center justify-between relative overflow-hidden flex-shrink-0">
           <div className="pointer-events-none absolute -top-12 -right-12 h-40 w-40 rounded-full bg-white/10 blur-3xl" />
-          <div className="relative z-10">
-            <div className="text-xs opacity-80 font-semibold">PAYMENT · Invoice #{invoiceNumber || '------'}</div>
-            <div className="text-lg font-bold">{itemCount} items</div>
+          <div className="relative z-10 flex-1 min-w-0">
+            <div className="text-[10px] sm:text-xs opacity-80 font-semibold uppercase tracking-wider truncate">PAYMENT · Invoice #{invoiceNumber || '------'}</div>
+            <div className="text-base sm:text-lg font-bold">{itemCount} items</div>
           </div>
-          <button onClick={onClose} className="h-8 w-8 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center transition active:scale-90 relative z-10">
+          <button onClick={onClose} className="h-9 w-9 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center transition active:scale-90 relative z-10 flex-shrink-0" aria-label="Close">
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="px-6 py-5 bg-gradient-to-b from-slate-50 to-white border-b border-slate-200/80 text-center">
-          <div className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Total Due</div>
-          <div className="text-5xl font-bold font-mono text-gradient-emerald mt-1">{formatGHS(total)}</div>
-          {customerName && <div className="text-xs text-slate-500 mt-1">Customer: {customerName}</div>}
-          <div className="flex justify-center gap-4 mt-2 text-[11px] text-slate-500">
+        {/* Total Due — premium hero amount (mobile-optimized) */}
+        <div className="px-5 py-4 bg-gradient-to-b from-slate-50 to-white border-b border-slate-200/80 text-center flex-shrink-0">
+          <div className="text-[10px] sm:text-xs text-slate-500 font-semibold uppercase tracking-wider">Total Due</div>
+          <div className="text-4xl sm:text-5xl font-bold font-mono text-gradient-emerald mt-1 leading-none">{formatGHS(total)}</div>
+          {customerName && <div className="text-xs text-slate-500 mt-2">Customer: {customerName}</div>}
+          <div className="flex justify-center gap-3 sm:gap-4 mt-2 text-[10px] sm:text-[11px] text-slate-500">
             <span>Sub: {formatGHS(subtotal)}</span>
             <span>{TAX_NAME}: {formatGHS(tax)}</span>
             {discount > 0 && <span className="text-rose-500">Disc: -{formatGHS(discount)}</span>}
           </div>
         </div>
 
-        <div className="px-6 py-4">
-          <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Payment Method</div>
-          <div className="grid grid-cols-3 gap-2">
-            {paymentMethods.map(pm => (
-              <button
-                key={pm.id}
-                onClick={() => { setMethod(pm.id); setMomoStatus("idle"); setMomoError(null); }}
-                className={cn(
-                  "flex flex-col items-center gap-1 py-3 rounded-xl ring-2 transition active:scale-95",
-                  method === pm.id ? "ring-emerald-500 bg-emerald-50" : "ring-slate-200 hover:ring-slate-300 bg-white"
-                )}
-              >
-                <span className="text-2xl">{pm.icon}</span>
-                <span className="text-[11px] font-semibold text-slate-700">{pm.name}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {method === "cash" && (
-          <div className="px-6 pb-4">
-            <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Cash Received</div>
-            <input
-              type="number"
-              value={amountInput}
-              onChange={(e) => setAmountInput(e.target.value)}
-              autoFocus
-              placeholder="0.00"
-              className="input-premium w-full h-12 px-4 text-2xl font-mono font-bold text-right"
-            />
-            <div className="grid grid-cols-6 gap-1.5 mt-2">
-              {quickCashAmounts.map(amt => (
+        {/* Scrollable body */}
+        <div className="overflow-y-auto min-h-0 scroll-premium flex-1">
+          {/* Payment Method — premium segmented control style on mobile */}
+          <div className="px-5 pt-4 pb-3">
+            <div className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Payment Method</div>
+            <div className="grid grid-cols-3 gap-2">
+              {paymentMethods.map(pm => (
                 <button
-                  key={amt}
-                  onClick={() => setAmountInput(amt.toString())}
-                  className="btn-premium py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-700 transition"
+                  key={pm.id}
+                  onClick={() => { setMethod(pm.id); setMomoStatus("idle"); setMomoError(null); }}
+                  className={cn(
+                    "flex flex-col items-center gap-1 py-3 rounded-xl ring-2 transition active:scale-95",
+                    method === pm.id ? "ring-emerald-500 bg-emerald-50" : "ring-slate-200 hover:ring-slate-300 bg-white"
+                  )}
                 >
-                  {CURRENCY}{amt}
+                  <span className="text-2xl">{pm.icon}</span>
+                  <span className="text-[10px] sm:text-[11px] font-semibold text-slate-700">{pm.name}</span>
                 </button>
               ))}
             </div>
-            <button
-              onClick={() => setAmountInput(total.toFixed(2))}
-              className="btn-premium w-full mt-1.5 py-1.5 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-xs font-bold text-emerald-700 transition"
-            >
-              Exact Amount {formatGHS(total)}
-            </button>
-
-            {amountPaid > 0 && (
-              <div className="mt-3 p-3 rounded-xl bg-slate-800 text-white flex justify-between items-center">
-                <span className="text-xs font-semibold uppercase opacity-80">Change Due</span>
-                <span className={cn("text-2xl font-bold font-mono", change >= 0 ? "text-emerald-400" : "text-rose-400")}>
-                  {formatGHS(Math.abs(change))}
-                </span>
-              </div>
-            )}
           </div>
-        )}
 
-        {method === "momo" && (
-          <div className="px-6 pb-4 space-y-3">
-            {momoStatus === "idle" && (
-              <>
-                <div>
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Customer Phone Number</label>
-                  <div className="relative">
-                    <Smartphone className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                    <input
-                      type="tel"
-                      value={momoPhone}
-                      onChange={(e) => setMomoPhone(e.target.value)}
-                      placeholder="233XXXXXXXXX"
-                      autoFocus
-                      className="input-premium w-full h-12 pl-11 pr-4 text-sm font-mono font-bold"
-                    />
-                  </div>
-                  <div className="text-[10px] text-slate-400 mt-1.5">
-                    Enter the customer's phone number in international format (e.g. 233241234567).
-                    They'll receive a prompt to approve the payment.
-                  </div>
-                </div>
-                <button
-                  onClick={initiateMomo}
-                  disabled={momoPhone.length < 10}
-                  className="btn-premium w-full h-12 rounded-xl gradient-premium-amber hover:shadow-glow-emerald disabled:opacity-50 text-white text-sm font-bold flex items-center justify-center gap-2 transition"
-                >
-                  <Smartphone className="h-4 w-4" />
-                  Send Payment Request · {formatGHS(total)}
-                </button>
-              </>
-            )}
-
-            {momoStatus === "initiating" && (
-              <div className="p-6 rounded-xl bg-amber-50 text-center">
-                <Loader2 className="h-8 w-8 animate-spin text-amber-600 mx-auto mb-3" />
-                <div className="text-sm font-semibold text-amber-800">Initiating payment...</div>
-                <div className="text-xs text-amber-600 mt-1">Contacting MTN MoMo API</div>
-              </div>
-            )}
-
-            {momoStatus === "pending" && (
-              <div className="p-6 rounded-xl bg-blue-50 text-center">
-                <div className="h-12 w-12 rounded-full bg-blue-500 flex items-center justify-center mx-auto mb-3 pulse-ring">
-                  <Smartphone className="h-6 w-6 text-white" />
-                </div>
-                <div className="text-sm font-bold text-blue-800">Awaiting customer approval</div>
-                <div className="text-xs text-blue-600 mt-1">
-                  A payment prompt has been sent to <span className="font-mono font-bold">{momoPhone}</span>.
-                  Ask the customer to approve it on their phone.
-                </div>
-                <div className="flex items-center justify-center gap-1 mt-3 text-xs text-blue-500">
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  Polling for confirmation...
-                </div>
-                {momoRef && momoRef.startsWith("manual-") && (
+          {method === "cash" && (
+            <div className="px-5 pb-4">
+              <div className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Cash Received</div>
+              {/* Large, auto-focus amount input — premium number-pad style */}
+              <input
+                type="number"
+                value={amountInput}
+                onChange={(e) => setAmountInput(e.target.value)}
+                autoFocus
+                placeholder="0.00"
+                inputMode="decimal"
+                className="input-premium w-full h-14 sm:h-12 px-4 text-2xl sm:text-2xl font-mono font-bold text-right tracking-tight"
+              />
+              {/* Premium quick-cash grid — 3 cols on mobile (bigger tap targets) */}
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5 mt-2">
+                {quickCashAmounts.map(amt => (
                   <button
-                    onClick={() => setMomoStatus("confirmed")}
-                    className="btn-premium mt-4 w-full h-10 rounded-lg gradient-premium-emerald hover:shadow-glow-emerald text-white text-xs font-bold transition"
+                    key={amt}
+                    onClick={() => setAmountInput(amt.toString())}
+                    className={cn(
+                      "btn-premium py-2.5 sm:py-1.5 rounded-lg text-xs sm:text-xs font-bold transition active:scale-95",
+                      amountPaid === amt ? "bg-emerald-500 text-white" : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                    )}
                   >
-                    <Check className="h-3.5 w-3.5" /> I've received the money — Confirm
+                    {CURRENCY}{amt}
                   </button>
-                )}
+                ))}
               </div>
-            )}
+              {/* Premium Exact Amount button — always visible */}
+              <button
+                onClick={() => setAmountInput(total.toFixed(2))}
+                className="btn-premium w-full mt-1.5 py-3 sm:py-1.5 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-xs sm:text-xs font-bold text-emerald-700 transition active:scale-95"
+              >
+                Exact Amount {formatGHS(total)}
+              </button>
 
-            {momoStatus === "confirmed" && (
-              <div className="p-6 rounded-xl bg-emerald-50 text-center">
-                <div className="h-12 w-12 rounded-full gradient-premium-emerald flex items-center justify-center mx-auto mb-3 shadow-glow-emerald">
-                  <Check className="h-6 w-6 text-white" />
+              {/* Change Due — premium hero card (mobile-emphasized) */}
+              {amountPaid > 0 && (
+                <div className={cn(
+                  "mt-3 p-4 rounded-xl flex justify-between items-center transition-all",
+                  change >= 0 ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white" : "bg-rose-600 text-white"
+                )}>
+                  <div>
+                    <div className="text-[10px] font-semibold uppercase opacity-80 tracking-wider">{change >= 0 ? 'Change Due' : 'Still Owed'}</div>
+                    <div className="text-[10px] opacity-70 mt-0.5">Paid {formatGHS(amountPaid)} of {formatGHS(total)}</div>
+                  </div>
+                  <span className="text-3xl font-bold font-mono tracking-tight">
+                    {formatGHS(Math.abs(change))}
+                  </span>
                 </div>
-                <div className="text-sm font-bold text-emerald-800">Payment confirmed!</div>
-                <div className="text-xs text-emerald-600 mt-1">{formatGHS(total)} received via Mobile Money</div>
-              </div>
-            )}
-
-            {momoStatus === "failed" && (
-              <div className="p-6 rounded-xl bg-rose-50 text-center">
-                <AlertTriangle className="h-8 w-8 text-rose-600 mx-auto mb-3" />
-                <div className="text-sm font-bold text-rose-800">Payment failed</div>
-                <div className="text-xs text-rose-600 mt-1">{momoError || "The customer rejected or the payment timed out"}</div>
-                <button
-                  onClick={() => { setMomoStatus("idle"); setMomoError(null); }}
-                  className="btn-premium mt-3 w-full h-10 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-700 text-xs font-bold transition"
-                >
-                  Try Again
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-
-        {method === "card" && (
-          <div className="px-6 pb-4">
-            <div className="p-4 rounded-xl bg-blue-50 text-center">
-              <div className="text-3xl mb-2">💳</div>
-              <div className="text-sm font-semibold text-slate-700">Insert/tap card on terminal</div>
-              <div className="text-xs text-slate-500 mt-1">Confirm on payment terminal</div>
+              )}
             </div>
-          </div>
-        )}
+          )}
 
-        <div className="px-6 pb-6">
+          {method === "momo" && (
+            <div className="px-5 pb-4 space-y-3">
+              {momoStatus === "idle" && (
+                <>
+                  <div>
+                    <label className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Customer Phone Number</label>
+                    <div className="relative">
+                      <Smartphone className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                      <input
+                        type="tel"
+                        value={momoPhone}
+                        onChange={(e) => setMomoPhone(e.target.value)}
+                        placeholder="233XXXXXXXXX"
+                        autoFocus
+                        inputMode="tel"
+                        className="input-premium w-full h-12 pl-11 pr-4 text-base sm:text-sm font-mono font-bold"
+                      />
+                    </div>
+                    <div className="text-[10px] text-slate-400 mt-1.5">
+                      Enter the customer's phone number in international format (e.g. 233241234567).
+                      They'll receive a prompt to approve the payment.
+                    </div>
+                  </div>
+                  <button
+                    onClick={initiateMomo}
+                    disabled={momoPhone.length < 10}
+                    className="btn-premium w-full h-12 rounded-xl gradient-premium-amber hover:shadow-glow-emerald disabled:opacity-50 text-white text-sm font-bold flex items-center justify-center gap-2 transition active:scale-95"
+                  >
+                    <Smartphone className="h-4 w-4" />
+                    Send Payment Request · {formatGHS(total)}
+                  </button>
+                </>
+              )}
+
+              {momoStatus === "initiating" && (
+                <div className="p-6 rounded-xl bg-amber-50 text-center">
+                  <Loader2 className="h-8 w-8 animate-spin text-amber-600 mx-auto mb-3" />
+                  <div className="text-sm font-semibold text-amber-800">Initiating payment...</div>
+                  <div className="text-xs text-amber-600 mt-1">Contacting MTN MoMo API</div>
+                </div>
+              )}
+
+              {momoStatus === "pending" && (
+                <div className="p-6 rounded-xl bg-blue-50 text-center">
+                  <div className="h-12 w-12 rounded-full bg-blue-500 flex items-center justify-center mx-auto mb-3 pulse-ring">
+                    <Smartphone className="h-6 w-6 text-white" />
+                  </div>
+                  <div className="text-sm font-bold text-blue-800">Awaiting customer approval</div>
+                  <div className="text-xs text-blue-600 mt-1">
+                    A payment prompt has been sent to <span className="font-mono font-bold">{momoPhone}</span>.
+                    Ask the customer to approve it on their phone.
+                  </div>
+                  <div className="flex items-center justify-center gap-1 mt-3 text-xs text-blue-500">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Polling for confirmation...
+                  </div>
+                  {momoRef && momoRef.startsWith("manual-") && (
+                    <button
+                      onClick={() => setMomoStatus("confirmed")}
+                      className="btn-premium mt-4 w-full h-11 rounded-lg gradient-premium-emerald hover:shadow-glow-emerald text-white text-xs font-bold transition active:scale-95"
+                    >
+                      <Check className="h-3.5 w-3.5" /> I've received the money — Confirm
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {momoStatus === "confirmed" && (
+                <div className="p-6 rounded-xl bg-emerald-50 text-center">
+                  <div className="h-12 w-12 rounded-full gradient-premium-emerald flex items-center justify-center mx-auto mb-3 shadow-glow-emerald">
+                    <Check className="h-6 w-6 text-white" />
+                  </div>
+                  <div className="text-sm font-bold text-emerald-800">Payment confirmed!</div>
+                  <div className="text-xs text-emerald-600 mt-1">{formatGHS(total)} received via Mobile Money</div>
+                </div>
+              )}
+
+              {momoStatus === "failed" && (
+                <div className="p-6 rounded-xl bg-rose-50 text-center">
+                  <AlertTriangle className="h-8 w-8 text-rose-600 mx-auto mb-3" />
+                  <div className="text-sm font-bold text-rose-800">Payment failed</div>
+                  <div className="text-xs text-rose-600 mt-1">{momoError || "The customer rejected or the payment timed out"}</div>
+                  <button
+                    onClick={() => { setMomoStatus("idle"); setMomoError(null); }}
+                    className="btn-premium mt-3 w-full h-11 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-700 text-xs font-bold transition active:scale-95"
+                  >
+                    Try Again
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {method === "card" && (
+            <div className="px-5 pb-4">
+              <div className="p-4 rounded-xl bg-blue-50 text-center">
+                <div className="text-3xl mb-2">💳</div>
+                <div className="text-sm font-semibold text-slate-700">Insert/tap card on terminal</div>
+                <div className="text-xs text-slate-500 mt-1">Confirm on payment terminal</div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Sticky CTA — always visible (premium mobile pattern) */}
+        <div className="px-5 pb-5 pt-3 border-t border-slate-200 bg-white flex-shrink-0">
           <button
             onClick={handleComplete}
             disabled={!canComplete}
             className={cn(
-              "btn-premium w-full h-14 rounded-xl font-bold text-base flex items-center justify-center gap-2 transition",
+              "btn-premium w-full h-14 rounded-xl font-bold text-base flex items-center justify-center gap-2 transition active:scale-95",
               canComplete ? "gradient-premium-emerald hover:shadow-glow-emerald text-white" : "bg-slate-200 text-slate-400 cursor-not-allowed"
             )}
           >

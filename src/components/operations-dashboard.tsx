@@ -496,8 +496,97 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
           {/* ===== OVERVIEW TAB ===== */}
           {tab === "overview" && (
             <motion.div key="overview" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-6">
-              {/* KPI Cards */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+              {/* ===== Mobile: Hero KPI card (single, prominent) + 2x2 grid ===== */}
+              <div className="md:hidden space-y-3">
+                {/* Hero KPI — today's revenue, most important metric */}
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-500 via-teal-500 to-emerald-600 text-white p-5 shadow-lg">
+                  <div className="absolute -top-8 -right-8 h-32 w-32 rounded-full bg-white/10 blur-2xl" />
+                  <div className="absolute -bottom-6 -left-6 h-24 w-24 rounded-full bg-white/5 blur-xl" />
+                  <div className="relative z-10">
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="text-[11px] uppercase tracking-wider font-semibold opacity-80">Today's Revenue</div>
+                      {kpis.totalRevenue > 0 && (
+                        <div className="flex items-center gap-0.5 text-xs font-semibold bg-white/20 px-2 py-0.5 rounded-full">
+                          <ArrowUpRight className="h-3 w-3" /> Live
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-4xl font-bold font-mono tracking-tight leading-none">{formatGHS(kpis.totalRevenue)}</div>
+                    <div className="flex items-center gap-3 mt-3 text-[11px] opacity-90">
+                      <span className="flex items-center gap-1">
+                        <ShoppingCart className="h-3 w-3" />
+                        {kpis.transactionCount} txn{kpis.transactionCount !== 1 ? 's' : ''}
+                      </span>
+                      <span>·</span>
+                      <span>Avg {formatGHS(kpis.avgTransaction)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Secondary KPIs in 2x2 grid */}
+                <div className="grid grid-cols-2 gap-2">
+                  <MiniKpiCard label="Stock Value" value={formatGHS(kpis.stockValue)} icon={<Boxes className="h-4 w-4" />} gradient="from-purple-500 to-pink-600" />
+                  <MiniKpiCard label="Potential Profit" value={formatGHS(kpis.potentialProfit)} icon={<TrendingUp className="h-4 w-4" />} gradient="from-amber-500 to-orange-600" />
+                  <MiniKpiCard label="Low Stock Items" value={String(products.filter(p => p.quantity <= p.reorderLevel).length)} icon={<AlertTriangle className="h-4 w-4" />} gradient="from-rose-500 to-red-600" />
+                  <MiniKpiCard label="Expiring Soon" value={String(products.filter(p => {
+                    if (!p.expiryDate) return false;
+                    const days = (new Date(p.expiryDate).getTime() - Date.now()) / 86400000;
+                    return days >= 0 && days <= 7;
+                  }).length)} icon={<Clock className="h-4 w-4" />} gradient="from-blue-500 to-indigo-600" />
+                </div>
+
+                {/* Action Needed section — only shows items that need attention */}
+                {(products.filter(p => p.quantity <= p.reorderLevel).length > 0 ||
+                  products.filter(p => {
+                    if (!p.expiryDate) return false;
+                    const days = (new Date(p.expiryDate).getTime() - Date.now()) / 86400000;
+                    return days >= 0 && days <= 7;
+                  }).length > 0) && (
+                  <div className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 overflow-hidden">
+                    <div className="bg-gradient-to-r from-amber-50 to-rose-50 px-4 py-3 border-b border-amber-200">
+                      <div className="flex items-center gap-2">
+                        <div className="h-7 w-7 rounded-lg bg-amber-100 flex items-center justify-center">
+                          <AlertCircle className="h-4 w-4 text-amber-600" />
+                        </div>
+                        <h3 className="text-sm font-bold text-slate-800">Action Needed</h3>
+                      </div>
+                    </div>
+                    <div className="divide-y divide-slate-100 max-h-64 overflow-y-auto">
+                      {/* Low stock items */}
+                      {products.filter(p => p.quantity <= p.reorderLevel).slice(0, 5).map(p => (
+                        <div key={p.id} className="p-3 flex items-center gap-3">
+                          <div className="h-8 w-8 rounded-lg bg-rose-50 flex items-center justify-center text-base flex-shrink-0">{p.emoji}</div>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-xs font-semibold text-slate-800 truncate">{p.name}</div>
+                            <div className="text-[10px] text-rose-600">Only {p.quantity} left (reorder at {p.reorderLevel})</div>
+                          </div>
+                          <Badge className="text-[9px] bg-rose-100 text-rose-700 flex-shrink-0">LOW</Badge>
+                        </div>
+                      ))}
+                      {/* Expiring soon items */}
+                      {products.filter(p => {
+                        if (!p.expiryDate) return false;
+                        const days = (new Date(p.expiryDate).getTime() - Date.now()) / 86400000;
+                        return days >= 0 && days <= 7;
+                      }).slice(0, 5).map(p => (
+                        <div key={p.id} className="p-3 flex items-center gap-3">
+                          <div className="h-8 w-8 rounded-lg bg-amber-50 flex items-center justify-center text-base flex-shrink-0">{p.emoji}</div>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-xs font-semibold text-slate-800 truncate">{p.name}</div>
+                            <div className="text-[10px] text-amber-600">
+                              Expires in {Math.ceil((new Date(p.expiryDate!).getTime() - Date.now()) / 86400000)} day(s)
+                            </div>
+                          </div>
+                          <Badge className="text-[9px] bg-amber-100 text-amber-700 flex-shrink-0">EXPIRY</Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* ===== Desktop: original 4-card grid (md+) ===== */}
+              <div className="hidden md:grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                 <KpiCard label="Today's Sales" value={formatGHS(kpis.totalRevenue)} icon={<DollarSign className="h-5 w-5" />} gradient="from-emerald-500 to-teal-600" trend={kpis.totalRevenue > 0 ? "up" : undefined} />
                 <KpiCard label="Avg. Sale" value={formatGHS(kpis.avgTransaction)} icon={<BarChart3 className="h-5 w-5" />} gradient="from-blue-500 to-indigo-600" />
                 <KpiCard label="Stock Value" value={formatGHS(kpis.stockValue)} icon={<Boxes className="h-5 w-5" />} gradient="from-purple-500 to-pink-600" />
@@ -1062,6 +1151,24 @@ function KpiCard({ label, value, icon, gradient, trend }: {
         <div className="text-base sm:text-xl font-bold text-slate-900 mt-1">{value}</div>
       </div>
     </motion.div>
+  );
+}
+
+// ===== Mini KPI Card — compact tile for mobile 2x2 grid =====
+function MiniKpiCard({ label, value, icon, gradient }: {
+  label: string; value: string; icon: React.ReactNode; gradient: string;
+}) {
+  return (
+    <div className="bg-white rounded-xl shadow-sm ring-1 ring-slate-200 p-3 relative overflow-hidden">
+      <div className={cn("absolute -top-4 -right-4 h-16 w-16 rounded-full blur-2xl opacity-20 bg-gradient-to-br", gradient)} />
+      <div className="relative">
+        <div className={cn("h-7 w-7 rounded-lg bg-gradient-to-br flex items-center justify-center text-white mb-2", gradient)}>
+          {icon}
+        </div>
+        <div className="text-[9px] font-semibold text-slate-500 uppercase tracking-wide truncate">{label}</div>
+        <div className="text-base font-bold text-slate-900 mt-0.5 font-mono truncate">{value}</div>
+      </div>
+    </div>
   );
 }
 

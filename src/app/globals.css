@@ -1471,7 +1471,7 @@
     min-height: 44px;
   }
   /* Smaller inputs stay small but readable */
-  input.text-[10px], input.text-[11px], input.text-xs,
+  input.text-\[10px\], input.text-\[11px\], input.text-xs,
   input.h-7, input.h-8 {
     font-size: 14px !important;
   }
