@@ -333,9 +333,9 @@ export function FinancialOperations({ onBack, dailyTotal, initialTab = "expenses
 
       {/* Tabs */}
       <nav className="flex-shrink-0 bg-white border-b border-slate-200 shadow-sm">
-        <div className="flex items-center gap-1 px-6 py-2">
+        <div className="flex items-center gap-1.5 px-3 sm:px-6 py-2 overflow-x-auto scrollbar-hide">
           {tabs.map(t => (
-            <button key={t.id} onClick={() => setTab(t.id)} className={cn("flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all", tab === t.id ? "bg-gradient-to-r from-rose-600 to-pink-600 text-white shadow-md" : "text-slate-600 hover:bg-slate-100")}>
+            <button key={t.id} onClick={() => setTab(t.id)} className={cn("flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all whitespace-nowrap flex-shrink-0 active:scale-95", tab === t.id ? "bg-gradient-to-r from-rose-600 to-pink-600 text-white shadow-md" : "text-slate-600 hover:bg-slate-100")}>
               <t.icon className="h-4 w-4" /> {t.label}
             </button>
           ))}

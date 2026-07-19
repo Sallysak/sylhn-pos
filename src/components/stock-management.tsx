@@ -154,16 +154,16 @@ export function StockManagement({ onBack, products, setProducts, groups, setGrou
         </div>
       </header>
 
-      {/* Sub Navigation */}
+      {/* Sub Navigation — horizontally scrollable on mobile */}
       <nav className="flex-shrink-0 bg-white border-b border-slate-200 shadow-sm">
-        <div className="flex items-center gap-1 px-6 py-2">
+        <div className="flex items-center gap-1.5 px-3 sm:px-6 py-2 overflow-x-auto scrollbar-hide">
           {[
-            { id: "stock-file-popup" as const, label: "Stock File", icon: FileText },
-            { id: "stock-search-popup" as const, label: "Stock Search", icon: FileSearch },
-            { id: "add-modify" as const, label: "Add / Modify Stock", icon: Plus },
-            { id: "group-maintenance" as const, label: "Group Maintenance", icon: Layers },
-            { id: "quantity-adjustment" as const, label: "Quantity Adjustment", icon: ArrowUpDown },
-            { id: "history" as const, label: "Stock History", icon: History },
+            { id: "stock-file-popup" as const, label: "Stock File", short: "File", icon: FileText },
+            { id: "stock-search-popup" as const, label: "Stock Search", short: "Search", icon: FileSearch },
+            { id: "add-modify" as const, label: "Add / Modify Stock", short: "Modify", icon: Plus },
+            { id: "group-maintenance" as const, label: "Group Maintenance", short: "Groups", icon: Layers },
+            { id: "quantity-adjustment" as const, label: "Quantity Adjustment", short: "Qty Adj", icon: ArrowUpDown },
+            { id: "history" as const, label: "Stock History", short: "History", icon: History },
           ].map(tab => {
             const isPopupTab = tab.id === "stock-file-popup" || tab.id === "stock-search-popup" || tab.id === "quantity-adjustment";
             const isActivePopup = (tab.id === "stock-file-popup" && showStockFilePopup) || (tab.id === "stock-search-popup" && showStockSearchPopup) || (tab.id === "quantity-adjustment" && showQtyAdjustmentPopup);
@@ -177,14 +177,15 @@ export function StockManagement({ onBack, products, setProducts, groups, setGrou
                   else setView(tab.id);
                 }}
                 className={cn(
-                  "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all",
+                  "flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all whitespace-nowrap flex-shrink-0 active:scale-95",
                   (!isPopupTab && view === tab.id) || isActivePopup
                     ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md"
-                    : "text-slate-600 hover:bg-slate-100"
+                    : "text-slate-600 hover:bg-slate-100 bg-slate-50"
                 )}
               >
                 <tab.icon className="h-4 w-4" />
-                {tab.label}
+                <span className="sm:hidden">{tab.short}</span>
+                <span className="hidden sm:inline">{tab.label}</span>
               </button>
             );
           })}

@@ -139,37 +139,52 @@ export function PopupWindow({
   };
 
   // ============ MOBILE RENDER PATH ============
-  // On mobile, render a full-screen overlay with a sticky title bar + scrollable content.
-  // No dragging or resizing — that desktop UX doesn't work on touch.
+  // On mobile, render a bottom-sheet overlay with a sticky title bar + scrollable content.
+  // Leaves the stock management header and tab bar visible at the top.
   if (isMobile) {
     return (
       <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: 12 }}
-        transition={{ duration: 0.18 }}
-        className="fixed inset-0 z-[100] flex flex-col bg-white"
-        style={{ paddingTop: "env(safe-area-inset-top)" }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.2 }}
+        className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm flex items-end justify-center"
+        onClick={onClose}
       >
-        <div
-          className="flex items-center justify-between flex-shrink-0 h-12 px-3 text-white select-none"
-          style={{ backgroundColor: titleBarColor }}
+        <motion.div
+          initial={{ y: "100%" }}
+          animate={{ y: 0 }}
+          exit={{ y: "100%" }}
+          transition={{ type: "spring", damping: 30, stiffness: 340 }}
+          onClick={(e) => e.stopPropagation()}
+          className="bg-white w-full max-h-[88vh] rounded-t-3xl shadow-2xl flex flex-col overflow-hidden"
         >
-          <div className="flex items-center gap-2 text-sm font-bold min-w-0">
-            <span className="truncate">{title}</span>
+          {/* Grab handle */}
+          <div className="flex-shrink-0 flex justify-center pt-2 pb-1">
+            <div className="w-10 h-1 bg-slate-300 rounded-full" />
           </div>
-          <button
-            onClick={onClose}
-            className="h-9 w-9 hover:bg-white/25 active:bg-white/35 flex items-center justify-center text-white transition rounded-md flex-shrink-0"
-            title="Close"
-            aria-label="Close"
+          {/* Title bar */}
+          <div
+            className="flex items-center justify-between flex-shrink-0 h-11 px-4 text-white select-none rounded-t-xl"
+            style={{ backgroundColor: titleBarColor }}
           >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-        <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 overscroll-contain">
-          {children}
-        </div>
+            <div className="flex items-center gap-2 text-sm font-bold min-w-0">
+              <span className="truncate">{title}</span>
+            </div>
+            <button
+              onClick={onClose}
+              className="h-8 w-8 hover:bg-white/25 active:bg-white/35 flex items-center justify-center text-white transition rounded-md flex-shrink-0"
+              title="Close"
+              aria-label="Close"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          {/* Scrollable content */}
+          <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 overscroll-contain">
+            {children}
+          </div>
+        </motion.div>
       </motion.div>
     );
   }
