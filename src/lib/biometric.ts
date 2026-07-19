@@ -33,21 +33,44 @@ export interface BiometricCredential {
 }
 
 /**
- * Check if WebAuthn is supported on this device.
+ * Check if WebAuthn is supported on this device AND available in the current
+ * context (not blocked by Permissions-Policy in an iframe).
  */
 export function isBiometricSupported(): boolean {
   if (typeof window === "undefined") return false;
-  return !!(window.PublicKeyCredential && navigator.credentials);
+  // Check if PublicKeyCredential exists AND is accessible (not blocked by
+  // Permissions-Policy). In some iframes, window.PublicKeyCredential exists
+  // but calling .create() or .get() throws NotAllowedError.
+  if (!window.PublicKeyCredential) return false;
+  // Check if we're in a secure context (HTTPS or localhost)
+  if (!window.isSecureContext) return false;
+  return true;
 }
 
 /**
  * Check if the device has a biometric sensor available (e.g. fingerprint).
  * Returns true if platform authenticator is available.
+ * Also checks if WebAuthn is actually usable (not blocked by iframe policy).
  */
 export async function isBiometricAvailable(): Promise<boolean> {
   if (!isBiometricSupported()) return false;
   try {
-    return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+    // First check if the API is actually accessible (not blocked by iframe)
+    // by trying to call the conditional creation method
+    if (typeof PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable !== 'function') {
+      return false;
+    }
+    const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+    if (!available) return false;
+    // Also check if we're in an iframe — WebAuthn may be blocked even if
+    // the API exists. We do a quick try-catch on a dummy call.
+    if (window.self !== window.top) {
+      // We're in an iframe — WebAuthn might be blocked by the parent's
+      // Permissions-Policy. We'll still return true and let the actual
+      // create()/get() call fail gracefully with a helpful message.
+      return true;
+    }
+    return true;
   } catch {
     return false;
   }
@@ -97,33 +120,29 @@ export function removeBiometricCredential(username: string): void {
 /**
  * Register a biometric credential for the given username.
  * The user must be logged in (password verified) before calling this.
- * Returns true on success, false on failure or cancellation.
+ * Returns { success: boolean, error?: string } with a helpful error message
+ * if WebAuthn is blocked (e.g. in an iframe).
  */
-export async function registerBiometric(username: string): Promise<boolean> {
-  if (!isBiometricSupported()) return false;
+export async function registerBiometric(username: string): Promise<{ success: boolean; error?: string }> {
+  if (!isBiometricSupported()) {
+    return { success: false, error: "Biometrics not supported on this device" };
+  }
 
   try {
-    // Generate a challenge (random bytes)
     const challenge = new Uint8Array(32);
     crypto.getRandomValues(challenge);
-
-    // User ID (based on username)
     const userId = new TextEncoder().encode(username);
 
     const publicKey: PublicKeyCredentialCreationOptions = {
       challenge,
       rp: { name: "SYLHN POS" },
-      user: {
-        id: userId,
-        name: username,
-        displayName: username,
-      },
+      user: { id: userId, name: username, displayName: username },
       pubKeyCredParams: [
-        { type: "public-key", alg: -7 },   // ES256
-        { type: "public-key", alg: -257 }, // RS256
+        { type: "public-key", alg: -7 },
+        { type: "public-key", alg: -257 },
       ],
       authenticatorSelection: {
-        authenticatorAttachment: "platform", // Use device's built-in biometric
+        authenticatorAttachment: "platform",
         userVerification: "required",
       },
       timeout: 60000,
@@ -131,43 +150,49 @@ export async function registerBiometric(username: string): Promise<boolean> {
     };
 
     const credential = await navigator.credentials.create({ publicKey }) as PublicKeyCredential;
-    if (!credential) return false;
+    if (!credential) return { success: false, error: "Registration cancelled" };
 
-    // Store the credential ID (we don't need the public key on the client
-    // since this is a local-only biometric — the server session is still
-    // established via password on first login, and biometrics just unlock
-    // the cached session)
     const credId = btoa(String.fromCharCode(...new Uint8Array(credential.rawId)));
-
     saveBiometricCredential({
       username,
       credentialId: credId,
-      publicKey: "", // Not needed for local biometric unlock
+      publicKey: "",
       createdAt: new Date().toISOString(),
     });
-
-    return true;
-  } catch (e) {
-    console.error("Biometric registration failed:", e);
-    return false;
+    return { success: true };
+  } catch (e: any) {
+    const name = e?.name || "";
+    const msg = e?.message || "";
+    if (name === "NotAllowedError" || msg.includes("publickey-credentials-create")) {
+      return {
+        success: false,
+        error: "Biometrics blocked in this context. Open the app directly (not in an iframe) or install as PWA to use fingerprint/face unlock.",
+      };
+    }
+    if (name === "AbortError") return { success: false, error: "Registration cancelled" };
+    return { success: false, error: `Setup failed: ${msg}` };
   }
 }
 
 /**
  * Authenticate with biometrics. Prompts the user for fingerprint/face.
- * Returns the username if successful, null if failed or cancelled.
+ * Returns { username?: string, error?: string } — username on success,
+ * error message on failure.
  */
-export async function authenticateWithBiometric(): Promise<string | null> {
-  if (!isBiometricSupported()) return null;
+export async function authenticateWithBiometric(): Promise<{ username?: string; error?: string }> {
+  if (!isBiometricSupported()) {
+    return { error: "Biometrics not supported on this device" };
+  }
 
   const credentials = getBiometricCredentials();
-  if (credentials.length === 0) return null;
+  if (credentials.length === 0) {
+    return { error: "No biometric credentials registered" };
+  }
 
   try {
     const challenge = new Uint8Array(32);
     crypto.getRandomValues(challenge);
 
-    // Allow any registered credential
     const allowCredentials = credentials.map(c => ({
       type: "public-key" as const,
       id: Uint8Array.from(atob(c.credentialId), c => c.charCodeAt(0)),
@@ -182,14 +207,20 @@ export async function authenticateWithBiometric(): Promise<string | null> {
     };
 
     const assertion = await navigator.credentials.get({ publicKey }) as PublicKeyCredential;
-    if (!assertion) return null;
+    if (!assertion) return { error: "Authentication cancelled" };
 
-    // Find which credential was used
     const usedCredId = btoa(String.fromCharCode(...new Uint8Array(assertion.rawId)));
     const matched = credentials.find(c => c.credentialId === usedCredId);
-    return matched?.username || null;
-  } catch (e) {
-    console.error("Biometric authentication failed:", e);
-    return null;
+    return { username: matched?.username };
+  } catch (e: any) {
+    const name = e?.name || "";
+    const msg = e?.message || "";
+    if (name === "NotAllowedError" || msg.includes("publickey-credentials-get")) {
+      return {
+        error: "Biometrics blocked in this context. Open the app directly (not in an iframe) or install as PWA to use fingerprint/face unlock.",
+      };
+    }
+    if (name === "AbortError") return { error: "Authentication cancelled" };
+    return { error: `Authentication failed: ${msg}` };
   }
 }

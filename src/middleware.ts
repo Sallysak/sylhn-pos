@@ -24,7 +24,8 @@ function isPreviewOrigin(origin: string): boolean {
 const DEV_HEADERS: Record<string, string> = {
   "X-Content-Type-Options": "nosniff",
   "Referrer-Policy": "strict-origin-when-cross-origin",
-  "Permissions-Policy": "camera=(), microphone=(), geolocation=(), interest-cohort=()",
+  // Allow WebAuthn (biometrics) + camera (barcode scanner) in iframes
+  "Permissions-Policy": "publickey-credentials-create=(self), publickey-credentials-get=(self), camera=(self), microphone=(), geolocation=(), interest-cohort=()",
   "Cross-Origin-Opener-Policy": "cross-origin",
   "Cross-Origin-Resource-Policy": "cross-origin",
   "Content-Security-Policy": [
@@ -41,7 +42,8 @@ const PROD_HEADERS: Record<string, string> = {
   "X-Content-Type-Options": "nosniff",
   "Referrer-Policy": "strict-origin-when-cross-origin",
   "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
-  "Permissions-Policy": "camera=(), microphone=(), geolocation=(), interest-cohort=()",
+  // Allow WebAuthn (biometrics) + camera (barcode scanner) in iframes
+  "Permissions-Policy": "publickey-credentials-create=(self), publickey-credentials-get=(self), camera=(self), microphone=(), geolocation=(), interest-cohort=()",
   "Cross-Origin-Opener-Policy": "cross-origin",
   "Cross-Origin-Resource-Policy": "cross-origin",
   // Allow framing from same origin AND preview platform

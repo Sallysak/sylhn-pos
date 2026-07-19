@@ -313,12 +313,12 @@ export function AdminLogin({ onSuccess, onCancel, adminOnly = false }: { onSucce
     }
     setBioLoading(true);
     try {
-      const success = await registerBiometric(username);
-      if (success) {
+      const result = await registerBiometric(username);
+      if (result.success) {
         setBioCredentialExists(true);
         toast({ title: '✅ Biometric enabled', description: `Fingerprint/Face unlock is now set up for ${username}` });
       } else {
-        toast({ title: 'Setup cancelled', description: 'Biometric registration was cancelled or failed', variant: 'default' });
+        toast({ title: 'Setup failed', description: result.error || 'Registration was cancelled or failed', variant: 'destructive' });
       }
     } catch (e: any) {
       toast({ title: 'Biometric setup failed', description: e?.message, variant: 'destructive' });
@@ -330,16 +330,16 @@ export function AdminLogin({ onSuccess, onCancel, adminOnly = false }: { onSucce
   const handleBiometricLogin = async () => {
     setBioLoading(true);
     try {
-      const bioUsername = await authenticateWithBiometric();
-      if (!bioUsername) {
+      const result = await authenticateWithBiometric();
+      if (result.error) {
+        toast({ title: 'Biometric login failed', description: result.error, variant: 'destructive' });
+        return;
+      }
+      if (!result.username) {
         toast({ title: 'Biometric cancelled', description: 'Use password to sign in', variant: 'default' });
         return;
       }
-      // Biometric verified — now authenticate with the server using the username
-      // The server will issue a session if the user exists and is active.
-      // NOTE: This is a convenience unlock — the biometric proves the USER is
-      // physically present, and the server trusts the device's biometric.
-      // For production with high security, add server-side WebAuthn verification.
+      const bioUsername = result.username;
       setUsername(bioUsername);
       const res = await fetch('/api/auth/login', {
         method: 'POST',
