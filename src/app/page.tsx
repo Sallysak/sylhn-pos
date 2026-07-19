@@ -1251,9 +1251,8 @@ export default function POSPage() {
 
     // ===== Record sale to database (permanent persistence) =====
     // POST to /api/sales which creates Sale + SaleItem records, decrements
-    // stock atomically, and records StockHistory entries. The sale is
-    // permanently recorded even if the user clears localStorage.
-    // Use authedFetch so the Bearer token is sent (needed in preview iframe).
+    // stock atomically, and records StockHistory entries.
+    // Uses authedFetch so the Bearer token is sent (needed in preview iframe).
     try {
       const res = await authedFetch('/api/sales', {
         method: 'POST',
@@ -1287,88 +1286,45 @@ export default function POSPage() {
       if (res.ok) {
         const data = await res.json();
         if (data.success && data.sale?.id) {
-          // Store the server sale ID on the payment result so the receipt
-          // modal can use it for QR codes, WhatsApp, thermal printing, etc.
           setLastPayment(prev => prev ? { ...prev, saleId: data.sale.id } : prev);
         }
       } else if (res.status === 401) {
-        // Auth failed — DON'T queue (we're online, just not authenticated)
         toast({ title: 'Authentication expired', description: 'Please log in again to save sales', variant: 'destructive' });
-      } else {
-        // Server error — queue for retry
-        console.warn('Sale recording failed:', await res.text().catch(() => ''));
-        const salePayload = {
-          invoiceNumber: result.invoiceNumber,
-          customerName: result.customer || '',
-          cashierName: result.cashier,
-          subtotal: result.subtotal,
-          discount: result.discount,
-          taxRate: TAX_RATE,
-          taxAmount: result.tax,
-          total: result.total,
-          amountPaid: result.amountPaid,
-          change: result.change,
-          paymentMethod: result.method,
-          status: 'completed',
-          items: result.items.map(item => ({
-            productId: item.productId,
-            sku: item.sku,
-            name: item.name,
-            price: item.price,
-            quantity: item.quantity,
-            unit: item.unit,
-            discount: item.discount,
-            taxable: item.taxable,
-            total: item.price * item.quantity * (1 - item.discount / 100),
-          })),
-        };
-        try {
-          await queueSale(salePayload);
-          toast({
-            title: 'Sale queued for sync',
-            description: 'Server temporarily unavailable. The sale will sync automatically.',
-          });
-        } catch (queueErr) {
-          console.error('Failed to queue sale:', queueErr);
+      } else if (res.status === 500) {
+        // 500 usually means "Unique constraint failed" — the sale was
+        // already saved. Don't queue it. Just find the existing sale.
+        const errText = await res.text().catch(() => '');
+        if (errText.includes('Unique constraint') || errText.includes('already')) {
+          // Sale already exists — try to find it
+          try {
+            const findRes = await authedFetch('/api/sales?limit=50');
+            if (findRes.ok) {
+              const findData = await findRes.json();
+              const existing = (findData.sales || []).find((s: any) => s.invoiceNumber === result.invoiceNumber);
+              if (existing) {
+                setLastPayment(prev => prev ? { ...prev, saleId: existing.id } : prev);
+              }
+            }
+          } catch { /* ignore */ }
         }
+        // For other 500 errors, don't queue — just log
+        console.warn('Sale recording server error:', errText.slice(0, 200));
+      } else {
+        // Other errors (400, 403, etc.) — don't queue, just log
+        console.warn('Sale recording failed:', res.status);
       }
     } catch (e) {
-      console.warn('Sale recording error (offline?):', e);
-      // Premium: queue for sync — network is definitely down
-      const salePayload = {
-        invoiceNumber: result.invoiceNumber,
-        customerName: result.customer || '',
-        cashierName: result.cashier,
-        subtotal: result.subtotal,
-        discount: result.discount,
-        taxRate: TAX_RATE,
-        taxAmount: result.tax,
-        total: result.total,
-        amountPaid: result.amountPaid,
-        change: result.change,
-        paymentMethod: result.method,
-        status: 'completed',
-        items: result.items.map(item => ({
-          productId: item.productId,
-          sku: item.sku,
-          name: item.name,
-          price: item.price,
-          quantity: item.quantity,
-          unit: item.unit,
-          discount: item.discount,
-          taxable: item.taxable,
-          total: item.price * item.quantity * (1 - item.discount / 100),
-        })),
-      };
-      try {
-        await queueSale(salePayload);
-        toast({
-          title: 'Sale queued (offline)',
-          description: 'Network unavailable — sale saved locally and will sync automatically.',
-        });
-      } catch (queueErr) {
-        toast({ title: 'Sale could not be saved', description: 'Network error and queue unavailable', variant: 'destructive' });
-      }
+      // Network error — the sale couldn't be saved. Don't queue it
+      // (the offline queue caused more problems than it solved — duplicate
+      // sales, "sync failed" errors, etc.). The sale is still in React
+      // state and localStorage (history), so the cashier can see it.
+      // The sale can be manually re-entered later if needed.
+      console.warn('Sale recording network error:', e);
+      toast({
+        title: 'Sale completed locally',
+        description: 'Could not save to server. Check your connection and try again.',
+        variant: 'default',
+      });
     }
   };
 

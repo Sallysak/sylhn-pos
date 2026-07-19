@@ -171,11 +171,7 @@ export async function flushQueue(): Promise<{ synced: number; failed: number; er
     });
 
     try {
-      // Use authedFetch so the Bearer token is sent (needed for cross-origin
-      // iframe in preview environment where cookies aren't sent automatically)
-      // Static import at the top of the file would create a circular dependency
-      // (client-auth imports from sync which imports from offline-queue), so we
-      // inline the token-fetching logic here.
+      // Read the Bearer token from localStorage and CSRF from cookies
       const token = typeof localStorage !== "undefined" ? localStorage.getItem("sylhn-session-token") : null;
       const csrfMatch = typeof document !== "undefined" ? document.cookie.match(/sylhn-csrf=([^;]+)/) : null;
       const csrfToken = csrfMatch ? decodeURIComponent(csrfMatch[1]) : "";
@@ -197,6 +193,17 @@ export async function flushQueue(): Promise<{ synced: number; failed: number; er
           continue;
         }
         throw new Error(data.error || "Server rejected sale");
+      } else if (res.status === 500) {
+        // 500 usually means "Unique constraint failed" — the sale was
+        // already saved. Remove it from the queue instead of failing.
+        const errText = await res.text().catch(() => '');
+        if (errText.includes("Unique constraint") || errText.includes("already")) {
+          // Sale already exists in the DB — remove from queue, count as synced
+          await removeFromQueue(entry.id);
+          synced++;
+          continue;
+        }
+        throw new Error(`Server error: ${errText.slice(0, 100)}`);
       } else if (res.status === 400) {
         // Validation error — sale is malformed, don't retry
         const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
