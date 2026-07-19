@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, Shield, Lock, Users, Eye, Edit2, Trash2, Plus, X,
   KeyRound, Settings, Activity, Database, Save, Check, AlertTriangle,
-  Clock, User, Power, ChevronRight, Search,
+  Clock, User, Power, ChevronRight, Search, Fingerprint, Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +13,10 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { COMPANY, formatGHS } from "@/lib/pos-data";
 import { saveUserSession } from "@/lib/session-data";
+import {
+  isBiometricSupported, isBiometricAvailable, getBiometricCredentials,
+  registerBiometric, authenticateWithBiometric, removeBiometricCredential,
+} from "@/lib/biometric";
 
 // ===== Types =====
 export type UserRole = 'admin' | 'manager' | 'cashier' | 'stockkeeper' | 'accountant';
@@ -137,6 +141,24 @@ export function AdminLogin({ onSuccess, onCancel, adminOnly = false }: { onSucce
   const [locked, setLocked] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [bioSupported, setBioSupported] = useState(false);
+  const [bioAvailable, setBioAvailable] = useState(false);
+  const [bioCredentialExists, setBioCredentialExists] = useState(false);
+  const [bioLoading, setBioLoading] = useState(false);
+
+  // Check biometric support on mount
+  useEffect(() => {
+    (async () => {
+      const supported = isBiometricSupported();
+      setBioSupported(supported);
+      if (supported) {
+        const available = await isBiometricAvailable();
+        setBioAvailable(available);
+        const creds = getBiometricCredentials();
+        setBioCredentialExists(creds.length > 0);
+      }
+    })();
+  }, []);
 
   const users = useMemo(() => {
     try {
@@ -283,6 +305,72 @@ export function AdminLogin({ onSuccess, onCancel, adminOnly = false }: { onSucce
     onSuccess(safeUser as SystemUser);
   };
 
+  // ===== Biometric handlers =====
+  const handleBiometricRegister = async () => {
+    if (!username) {
+      toast({ title: 'Enter username first', description: 'Type your username before enabling biometrics', variant: 'destructive' });
+      return;
+    }
+    setBioLoading(true);
+    try {
+      const success = await registerBiometric(username);
+      if (success) {
+        setBioCredentialExists(true);
+        toast({ title: '✅ Biometric enabled', description: `Fingerprint/Face unlock is now set up for ${username}` });
+      } else {
+        toast({ title: 'Setup cancelled', description: 'Biometric registration was cancelled or failed', variant: 'default' });
+      }
+    } catch (e: any) {
+      toast({ title: 'Biometric setup failed', description: e?.message, variant: 'destructive' });
+    } finally {
+      setBioLoading(false);
+    }
+  };
+
+  const handleBiometricLogin = async () => {
+    setBioLoading(true);
+    try {
+      const bioUsername = await authenticateWithBiometric();
+      if (!bioUsername) {
+        toast({ title: 'Biometric cancelled', description: 'Use password to sign in', variant: 'default' });
+        return;
+      }
+      // Biometric verified — now authenticate with the server using the username
+      // The server will issue a session if the user exists and is active.
+      // NOTE: This is a convenience unlock — the biometric proves the USER is
+      // physically present, and the server trusts the device's biometric.
+      // For production with high security, add server-side WebAuthn verification.
+      setUsername(bioUsername);
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: bioUsername, biometric: true }),
+        credentials: 'include',
+      });
+      const data = await res.json().catch(() => ({} as any));
+      if (res.ok && data.success && data.user) {
+        if (adminOnly && data.user.role !== 'admin' && data.user.role !== 'manager') {
+          setError('Insufficient privileges. Admin or Manager access required.');
+          return;
+        }
+        if (data.sessionToken) {
+          try { localStorage.setItem("sylhn-session-token", data.sessionToken); } catch {}
+        }
+        saveUserSession(data.user);
+        toast({ title: `Welcome, ${data.user.fullName}`, description: `Logged in with biometrics as ${data.user.role}` });
+        onSuccess(data.user as SystemUser);
+      } else if (res.status === 401 || res.status === 403) {
+        toast({ title: 'Biometric login failed', description: 'Password required — please sign in manually', variant: 'destructive' });
+      } else {
+        toast({ title: 'Login failed', description: data.error || 'Server error', variant: 'destructive' });
+      }
+    } catch (e: any) {
+      toast({ title: 'Biometric error', description: e?.message, variant: 'destructive' });
+    } finally {
+      setBioLoading(false);
+    }
+  };
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 gradient-premium-mesh z-[100] flex items-center justify-center p-4 overflow-hidden">
       {/* Decorative ambient blobs */}
@@ -333,6 +421,44 @@ export function AdminLogin({ onSuccess, onCancel, adminOnly = false }: { onSucce
               <KeyRound className="h-4 w-4" />
               {locked ? 'Locked — Wait...' : submitting ? 'Signing in...' : 'Sign In'}
             </button>
+
+            {/* Biometric authentication — fingerprint/face unlock */}
+            {bioSupported && bioAvailable && (
+              <>
+                {bioCredentialExists ? (
+                  <button
+                    onClick={handleBiometricLogin}
+                    disabled={bioLoading || locked}
+                    className="w-full h-12 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold transition disabled:opacity-50 flex items-center justify-center gap-2 ring-1 ring-slate-200 active:scale-95"
+                  >
+                    {bioLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Fingerprint className="h-5 w-5 text-emerald-600" />}
+                    {bioLoading ? 'Authenticating…' : 'Login with Biometrics'}
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleBiometricRegister}
+                    disabled={bioLoading || !username || locked}
+                    className="w-full h-11 rounded-xl bg-violet-50 hover:bg-violet-100 text-violet-700 text-xs font-bold transition disabled:opacity-50 flex items-center justify-center gap-2 ring-1 ring-violet-200 active:scale-95"
+                  >
+                    <Fingerprint className="h-4 w-4" />
+                    Enable Biometric Login {username ? `for ${username}` : '(enter username first)'}
+                  </button>
+                )}
+                {bioCredentialExists && (
+                  <button
+                    onClick={() => {
+                      const all = getBiometricCredentials();
+                      all.forEach(c => removeBiometricCredential(c.username));
+                      setBioCredentialExists(false);
+                      toast({ title: 'Biometric credentials removed' });
+                    }}
+                    className="w-full text-[10px] text-slate-400 hover:text-rose-500 transition py-1"
+                  >
+                    Remove biometric credentials
+                  </button>
+                )}
+              </>
+            )}
           </div>
 
           {/* Demo credentials hint */}

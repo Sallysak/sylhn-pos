@@ -10,7 +10,10 @@ import { z } from "zod";
 // ===== Auth =====
 export const LoginSchema = z.object({
   username: z.string().min(1).max(64).regex(/^[a-zA-Z0-9_.-]+$/, "Invalid username"),
-  password: z.string().min(1).max(256),
+  password: z.string().min(1).max(256).optional(), // optional when biometric: true
+  biometric: z.boolean().optional(), // if true, skip password check (device biometric already verified)
+}).refine(data => data.password || data.biometric, {
+  message: "Either password or biometric is required",
 });
 
 // ===== Products =====

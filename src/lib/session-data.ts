@@ -66,13 +66,15 @@ const AUTH_KEYS = [
 ];
 
 // ===== Business data keys (PERSISTED on logout) =====
+// IMPORTANT: This list must match the actual keys used in setItem() calls
+// across the app. Any mismatch means data gets orphaned on clearBusinessData().
 const BUSINESS_DATA_KEYS = [
   "sylhn-held-orders",
   "sylhn-history",
   "sylhn-daily-total",
   "sylhn-txn-count",
   "sylhn-products-cache",
-  "sylhn-groups-cache",
+  "sylhn-groups",                // was "sylhn-groups-cache" — FIXED to match actual key
   "sylhn-suppliers-cache",
   "sylhn-sync-state",
   "sylhn-products-cursor",
@@ -82,6 +84,21 @@ const BUSINESS_DATA_KEYS = [
   "sylhn-stocktake-notifications",
   "sylhn-stocktake-last-notified",
   "sylhn-auto-pull-enabled",
+  // Added missing keys that are written by various modules:
+  "sylhn-maintenance-users",     // Maintenance → User Management
+  "sylhn-purchase-orders",       // Purchase module
+  "sylhn-purchase-suppliers",    // Supplier form
+  "sylhn-purchase-transactions", // Purchase transactions
+  "sylhn-tel-call-log",          // Telephone module
+  "sylhn-tel-customers",         // Telephone customers
+  "sylhn-tel-phone-orders",      // Telephone orders
+  "sylhn-variance-thresholds",   // Stocktake variance thresholds
+  "sylhn-po-draft-from-reorder", // Purchase order draft
+  "sylhn-settings",              // System settings (Maintenance)
+  "sylhn-system-settings",       // System settings (alternate key)
+  "sylhn-smtp-config",           // Email SMTP config (legacy localStorage)
+  "sylhn-email-history",         // Email history (legacy localStorage)
+  "sylhn-audit-log",             // Local audit log
 ];
 
 /**

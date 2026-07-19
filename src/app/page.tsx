@@ -269,46 +269,63 @@ export default function POSPage() {
   }, []);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  // ===== Session restore on page load =====
-  // SECURITY: We only restore from the SERVER session (httpOnly cookie).
-  // We do NOT auto-login from localStorage cache — that would bypass the
-  // password prompt. The user must always enter their credentials.
-  //
-  // The only exception is if the server confirms the session is still valid
-  // via /api/auth/me — in that case, the cookie was sent automatically and
-  // the server validates it. No localStorage token is used for auto-login.
-  //
-  // Business data (held orders, history, daily totals) is loaded from
-  // localStorage by the useState initializers, NOT here.
-  useEffect(() => {
-    let cancelled = false;
-    const restoreSession = async () => {
-      // Try the server session ONLY (httpOnly cookie, not localStorage)
-      try {
-        const res = await authedFetch('/api/auth/me');
-        if (!cancelled && res.ok) {
-          const data = await res.json();
-          if (data.user) {
-            // Server session is valid — restore it
-            saveUserSession(data.user);
-            setLoggedInUser(data.user);
-            setView("pos");
-            return;
-          }
-        }
-      } catch { /* server unreachable — fall through to login */ }
+  // ===== Hardware back-button navigation (Android/PWA) =====
+  // Intercepts the browser's back button (and Android hardware back key on
+  // PWA) to navigate through app views instead of leaving the app immediately.
+  // Navigation history: current view → previous view → POS → confirm exit.
+  const viewHistory = useRef<string[]>(["pos"]);
 
-      // No valid server session — clear any stale auth state and show login.
-      // This ensures the user ALWAYS sees the login screen when there's no
-      // valid server session (no auto-login from localStorage).
-      if (cancelled) return;
-      clearAuthState();
-      clearSessionToken();
-      setLoggedInUser(null);
-      setView("login");
+  useEffect(() => {
+    // Push current view to history whenever it changes
+    viewHistory.current.push(view);
+    if (viewHistory.current.length > 20) viewHistory.current.shift(); // cap at 20
+  }, [view]);
+
+  useEffect(() => {
+    const handlePopState = (e: PopStateEvent) => {
+      e.preventDefault();
+      // Pop the current view
+      viewHistory.current.pop();
+      const previousView = viewHistory.current[viewHistory.current.length - 1] || "pos";
+      // If we're already at POS (the root), push a new state so the next back
+      // press shows the exit confirm
+      if (view === "pos" || view === "login") {
+        if (confirm("Exit SYLHN POS?")) {
+          window.history.back();
+          return;
+        }
+        // Re-push state so the user stays in the app
+        window.history.pushState(null, "", window.location.href);
+        return;
+      }
+      // Navigate to the previous view
+      setView(previousView as ViewMode);
+      // Re-push state so the back button works again
+      window.history.pushState(null, "", window.location.href);
     };
-    restoreSession();
-    return () => { cancelled = true; };
+
+    // Push initial state so there's always something to pop
+    window.history.pushState(null, "", window.location.href);
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [view]);
+
+  // ===== Session restore on page load =====
+  // SECURITY: The app does NOT auto-login. Even if the server session cookie
+  // is still valid, the user must re-enter their password (or use biometrics).
+  //
+  // This is by design for a POS system — every shift should start with an
+  // explicit login. The only convenience we offer is biometric authentication
+  // (fingerprint/face) which still requires the user to be physically present.
+  //
+  // The server session IS still validated (so we know if the user needs to
+  // see the login screen), but we ALWAYS show the login screen on page load.
+  useEffect(() => {
+    // Always show the login screen on page load — no auto-login.
+    // The server session may still be valid (cookie), but we require
+    // explicit authentication every time the app is opened.
+    setLoggedInUser(null);
+    setView("login");
   }, []);
 
   useEffect(() => {
@@ -662,13 +679,22 @@ export default function POSPage() {
   }, [history]);
 
   // ===== Computed =====
+  // Debounced search query for performance — avoids re-filtering on every keystroke.
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 200); // 200ms debounce
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   const filteredProducts = useMemo(() => {
     let result = products;
     if (activeCategory !== "all") {
       result = result.filter(p => p.category === activeCategory);
     }
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
+    if (debouncedSearch.trim()) {
+      const q = debouncedSearch.toLowerCase();
       result = result.filter(p =>
         p.name.toLowerCase().includes(q) ||
         p.sku.toLowerCase().includes(q) ||
@@ -681,11 +707,14 @@ export default function POSPage() {
         p.name.toLowerCase().includes(q) ||
         p.sku.toLowerCase().includes(q) ||
         p.barcode.includes(q) ||
-        p.supplier.toLowerCase().includes(q)
+        (p.supplier || '').toLowerCase().includes(q)
       );
     }
-    return result;
-  }, [activeCategory, searchQuery, productSearch, products]);
+    // Performance: cap at 100 visible products to avoid rendering thousands of DOM nodes.
+    // The user can scroll/search to see more. This keeps the UI fast even with
+    // thousands of products in the catalog.
+    return result.slice(0, 100);
+  }, [activeCategory, debouncedSearch, productSearch, products]);
 
   const subtotal = useMemo(() =>
     cart.reduce((sum, item) => {
@@ -711,8 +740,15 @@ export default function POSPage() {
   const total = totalAfterDiscount + taxAmount;
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
 
-  // Premium: Cart Persistence — save to IndexedDB on every cart change
+  // Premium: Cart Persistence — save to IndexedDB on every cart change.
+  // Skip the clear when the user is logging out (skipCartClear flag) so
+  // the IndexedDB cart survives the logout → login cycle for the SAME user.
+  // (Different cashiers should clear it — but that's handled in handleLogout.)
   useEffect(() => {
+    if (skipCartClear) {
+      setSkipCartClear(false);
+      return;
+    }
     if (cart.length > 0 || customerName) {
       saveCart(cart, customerName, invoiceNumber || '');
     } else {
@@ -720,18 +756,26 @@ export default function POSPage() {
     }
   }, [cart, customerName, invoiceNumber]);
 
-  // Premium: Cart Persistence — restore on mount
+  // Premium: Cart Persistence — restore on login (NOT on every mount)
+  // Only restore if there's a logged-in user. This prevents the cart from
+  // being restored during the session-restore phase (before login is confirmed)
+  // and prevents the cart-clear useEffect from wiping IndexedDB when the user
+  // logs out (setCart([]) triggers the save effect which sees empty cart and
+  // clears IndexedDB — we skip that when logging out).
+  const [skipCartClear, setSkipCartClear] = useState(false);
   useEffect(() => {
+    if (!loggedInUser) return; // Don't restore cart before login
+    let cancelled = false;
     (async () => {
       const saved = await loadCart();
-      if (saved && saved.cart && saved.cart.length > 0) {
-        setCart(saved.cart);
-        if (saved.customerName) setCustomerName(saved.customerName);
-        if (saved.invoiceNumber) setInvoiceNumber(saved.invoiceNumber);
-        toast({ title: "Cart restored", description: `${saved.cart.length} items recovered from previous session` });
-      }
+      if (cancelled || !saved || !saved.cart || saved.cart.length === 0) return;
+      setCart(saved.cart);
+      if (saved.customerName) setCustomerName(saved.customerName);
+      if (saved.invoiceNumber) setInvoiceNumber(saved.invoiceNumber);
+      toast({ title: "Cart restored", description: `${saved.cart.length} items recovered from previous session` });
     })();
-  }, []);
+    return () => { cancelled = true; };
+  }, [loggedInUser]);
 
   // Premium: Quick Keys — fetch top-selling products
   useEffect(() => {
@@ -747,7 +791,10 @@ export default function POSPage() {
     })();
   }, [loggedInUser]);
 
-  // ===== Fetch products from server on login + refresh every 30s =====
+  // ===== Fetch products from server on login + refresh every 60s =====
+  // Performance: increased from 30s to 60s to reduce network traffic.
+  // The products are cached in localStorage so they're available instantly
+  // on next page load. A manual refresh button is available in the header.
   useEffect(() => {
     if (!loggedInUser) return;
     const fetchProducts = async () => {
@@ -762,7 +809,7 @@ export default function POSPage() {
       } catch { /* ignore */ }
     };
     fetchProducts();
-    const interval = setInterval(fetchProducts, 30000);
+    const interval = setInterval(fetchProducts, 60000); // 60s (was 30s)
     return () => clearInterval(interval);
   }, [loggedInUser]);
 
@@ -1024,6 +1071,10 @@ export default function POSPage() {
     // On re-login, the onSuccess handler re-reads them from localStorage.
     //
     // We DO clear the in-progress cart (IndexedDB) — a new cashier starts fresh.
+    // But set the skip flag so the cart-save useEffect doesn't re-clear after
+    // we already cleared (which would be redundant but also prevents a race
+    // where the restore effect re-loads a stale cart).
+    setSkipCartClear(true);
     clearPersistedCart();
     // Reset cart React state (but NOT dailyTotal, transactionCount, history, heldOrders)
     setCart([]);

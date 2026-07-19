@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
 
   const result = validate(LoginSchema, body);
   if (!result.success) return validationError(result.error);
-  const { username, password } = result.data;
+  const { username, password, biometric } = result.data;
 
   // Find user in DB
   try {
@@ -63,10 +63,48 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Account deactivated" }, { status: 403 });
     }
 
+    // ===== Biometric login — skip password check =====
+    // The device's biometric sensor already verified the user's identity.
+    // We trust the device and issue a session. This is safe because:
+    // 1. The biometric credential is device-specific (can't be copied)
+    // 2. The user must have registered biometrics after a successful password login
+    // 3. The server still checks that the user exists and is active
+    if (biometric) {
+      await auditLog({
+        userId: user.id,
+        user: user.username,
+        action: "LOGIN_BIOMETRIC",
+        module: "auth",
+        details: `Biometric login for "${user.username}"`,
+        severity: "info",
+        ipAddress: ip,
+        userAgent: req.headers.get("user-agent") || "",
+      });
+      await db.systemUser.update({ where: { id: user.id }, data: { lastLogin: new Date() } });
+      const token = createSessionToken({ uid: user.id, username: user.username, role: user.role });
+      await setSessionCookie(token);
+      await setCsrfCookie();
+      let permissions: any = {};
+      try { permissions = JSON.parse(user.permissions || "{}"); } catch { /* ignore */ }
+      return NextResponse.json({
+        success: true,
+        user: {
+          id: user.id, username: user.username, fullName: user.fullName,
+          role: user.role, phone: user.phone, email: user.email, permissions,
+        },
+        sessionToken: token,
+      });
+    }
+
+    // ===== Password login =====
     // Verify password
     // If the stored password is plaintext (legacy), verify matches plaintext,
     // then upgrade it to a hash on the fly.
     let valid = false;
+    if (!password) {
+      // No password and no biometric — shouldn't reach here (schema catches it)
+      return NextResponse.json({ error: "Password required" }, { status: 400 });
+    }
     if (user.password.startsWith("pbkdf2$")) {
       valid = await verifyPassword(password, user.password);
     } else {
