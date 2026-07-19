@@ -2103,11 +2103,12 @@ export default function POSPage() {
         </div>
       )}
 
-      {/* ===== Main Content — product grid on TOP, cart/invoice BELOW ===== */}
-
-      <main className="flex-1 flex flex-col lg:overflow-hidden p-2 sm:p-3 gap-2 sm:gap-3">
-        {/* ===== Product Grid — at the TOP ===== */}
-        <section className="flex flex-col card-premium shadow-premium lg:overflow-hidden min-w-0 min-h-0 flex-1">
+      {/* ===== Main Content — product grid on LEFT, cart/invoice on RIGHT (desktop) =====
+          On mobile: stacked vertically (product grid top, cart below).
+          On desktop: side-by-side (product grid left, cart right). */}
+      <main className="flex-1 flex flex-col lg:flex-row lg:overflow-hidden p-2 sm:p-3 gap-2 sm:gap-3">
+        {/* ===== Product Grid — LEFT side on desktop, TOP on mobile ===== */}
+        <section className="flex flex-col card-premium shadow-premium lg:overflow-hidden min-w-0 min-h-0 lg:flex-1">
           <div className="flex-shrink-0 flex items-center justify-between px-3 sm:px-5 py-3 bg-gradient-to-r from-slate-50 to-white border-b border-slate-200/80">
             <div className="flex items-center gap-2 sm:gap-3 min-w-0">
               <div className="flex items-center gap-2">
@@ -2220,10 +2221,12 @@ export default function POSPage() {
           </div>
         </section>
 
-        {/* ===== Cart/Invoice Panel — BELOW the product grid ===== */}
+        {/* ===== Cart/Invoice Panel — RIGHT side on desktop, BELOW on mobile =====
+            Shows everything: cart header, client info, part no input, cart items,
+            totals, function buttons, and numeric keypad (0-9). */}
         <section className={cn(
-          "flex flex-col card-premium shadow-premium-lg transition-all duration-300 flex-shrink-0",
-          showSidebar ? "w-full" : "w-0 min-w-0 max-h-0 overflow-hidden opacity-0"
+          "flex flex-col card-premium shadow-premium-lg transition-all duration-300",
+          showSidebar ? "w-full lg:w-[42%] lg:min-w-[400px] lg:flex-none" : "w-0 min-w-0 max-h-0 overflow-hidden opacity-0 lg:w-0"
         )}>
           <AnimatePresence>
             {showSidebar && (
@@ -2231,7 +2234,7 @@ export default function POSPage() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="flex flex-col w-full"
+                className="flex flex-col w-full lg:h-full lg:overflow-y-auto scroll-premium"
               >
                 {/* Cart Header — Premium Gradient */}
                 <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 gradient-premium-emerald text-white relative">
@@ -2309,10 +2312,10 @@ export default function POSPage() {
                   </button>
                 </div>
 
-                {/* ===== Two-column layout: cart items on left, totals+buttons on right (desktop) ===== */}
-                <div className="flex flex-col lg:flex-row lg:items-stretch">
-                  {/* Cart Items Table — left side on desktop, full width on mobile */}
-                  <div className="flex-1 flex flex-col min-h-0 max-h-[30vh] lg:max-h-[35vh]">
+                {/* ===== Cart layout: items on top, totals+buttons below (stacked) ===== */}
+                <div className="flex flex-col">
+                  {/* Cart Items Table */}
+                  <div className="flex-1 flex flex-col min-h-0 max-h-[25vh] lg:max-h-[30vh]">
                     {/* Table Header — same for all screen sizes */}
                     <div className="flex-shrink-0 grid grid-cols-[1fr_60px_50px_80px] lg:grid-cols-[140px_1fr_60px_90px_50px_90px] gap-1 px-2 py-1 text-[10px] font-bold text-slate-700 border-b border-slate-400" style={{ backgroundColor: '#ADD8E6' }}>
                       <div className="lg:hidden"># · Item / Part No.</div>
@@ -2419,8 +2422,8 @@ export default function POSPage() {
                     </div>
                   </div>
 
-                  {/* Right side: Totals + Function buttons (desktop only, side-by-side with cart) */}
-                  <div className="flex-shrink-0 lg:w-[320px] flex flex-col border-t lg:border-t-0 lg:border-l border-slate-200">
+                  {/* Totals + Function buttons (below cart items, stacked) */}
+                  <div className="flex-shrink-0 flex flex-col border-t border-slate-200">
                     {/* Held Orders */}
                     {heldOrders.length > 0 && (
                       <div className="flex-shrink-0 px-3 py-2 bg-amber-50 border-b border-amber-200 max-h-24 overflow-y-auto">
