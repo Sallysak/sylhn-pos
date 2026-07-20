@@ -899,12 +899,47 @@ function WipeDataSection() {
         setResult(data);
         toast({
           title: "✅ Data wiped successfully",
-          description: "All business data cleared. User accounts preserved.",
+          description: "All business data cleared. Clearing local cache and reloading…",
         });
         setConfirming(false);
         setConfirmText("");
         // Reset backup flag — next wipe requires a fresh backup
         setBackupDownloadedAt(null);
+
+        // ===== CRITICAL: Clear all local caches =====
+        // The app caches products, sales, history etc. in localStorage for
+        // offline PWA mode. If we don't clear these, the UI will keep
+        // showing the wiped data (because the fetch guard used to skip
+        // empty arrays — see page.tsx fetchProducts).
+        try {
+          const keysToClear = [
+            'sylhn-products-cache',
+            'sylhn-groups',
+            'sylhn-history',
+            'sylhn-held-orders',
+            'sylhn-daily-total',
+            'sylhn-txn-count',
+            'sylhn-recent-sales',
+            'sylhn-variance-thresholds',
+            'sylhn-session',
+            'sylhn-login-attempts',
+            'sylhn-biometric-credentials',
+            // Keep: sylhn-theme, sylhn-dark-mode, sylhn-session-token (so user stays logged in)
+          ];
+          for (const key of keysToClear) {
+            localStorage.removeItem(key);
+          }
+          // Broadcast event so any open components (e.g. POS screen) can
+          // reset their in-memory state before the page reloads.
+          window.dispatchEvent(new CustomEvent('sylhn:data-wiped'));
+        } catch { /* ignore */ }
+
+        // Force a full page reload after a short delay so the toast
+        // is visible. This guarantees all React state resets and the
+        // app re-fetches from the (now empty) server.
+        setTimeout(() => {
+          window.location.href = "/?t=" + Date.now();  // cache-bust
+        }, 1500);
       } else {
         toast({ title: "Wipe failed", description: data.error, variant: "destructive" });
       }

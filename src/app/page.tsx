@@ -245,8 +245,10 @@ export default function POSPage() {
     if (productsSaveTimer.current) clearTimeout(productsSaveTimer.current);
     productsSaveTimer.current = setTimeout(() => {
       try {
-        // Only cache if we have real data (not the initial seed fallback)
-        if (products && products.length > 0) {
+        // Always cache — even an empty array — so that wiped data clears
+        // the cache instead of leaving stale products in localStorage.
+        // (Previous guard `products.length > 0` prevented cache clearing.)
+        if (Array.isArray(products)) {
           localStorage.setItem('sylhn-products-cache', JSON.stringify(products));
         }
       } catch { /* localStorage may be full — silently ignore */ }
@@ -805,6 +807,10 @@ export default function POSPage() {
   // Performance: increased from 30s to 60s to reduce network traffic.
   // The products are cached in localStorage so they're available instantly
   // on next page load. A manual refresh button is available in the header.
+  // CRITICAL: We always update local state with whatever the server returns,
+  // including an EMPTY array (e.g. after data wipe). The previous guard
+  // `data.products.length > 0` prevented the cache from ever being cleared,
+  // so wiped data kept showing up in the UI.
   useEffect(() => {
     if (!loggedInUser) return;
     const fetchProducts = async () => {
@@ -812,7 +818,7 @@ export default function POSPage() {
         const res = await authedFetch("/api/products");
         if (res.ok) {
           const data = await res.json();
-          if (data.products && data.products.length > 0) {
+          if (Array.isArray(data.products)) {
             setProducts(data.products.map(serverProductToClientProduct));
           }
         }
