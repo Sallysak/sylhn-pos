@@ -237,8 +237,8 @@ export function SoldItemsReport({ onBack }: SoldItemsReportProps) {
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-3 sm:p-4">
-        {/* Date Filter + Export Bar — premium mobile-friendly */}
-        <div className="max-w-3xl mx-auto mb-3 space-y-2">
+        {/* Date Filter + Export Bar — premium mobile-friendly (hidden when printing) */}
+        <div className="no-print max-w-3xl mx-auto mb-3 space-y-2">
           <div className="flex items-center gap-2 flex-wrap">
             <Calendar className="h-4 w-4 text-emerald-600 flex-shrink-0" />
             <span className="text-[10px] sm:text-xs font-semibold text-slate-600">From:</span>
@@ -307,8 +307,8 @@ export function SoldItemsReport({ onBack }: SoldItemsReportProps) {
           )}
         </div>
 
-        {/* ===== Desktop: traditional report (md+) ===== */}
-        <div className="hidden md:block max-w-3xl mx-auto bg-white shadow-xl" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
+        {/* ===== Desktop: traditional report (md+) — printable ===== */}
+        <div className="printable-report hidden md:block max-w-3xl mx-auto bg-white shadow-xl" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
           {/* Company Header (centered) */}
           <div className="px-8 pt-6 pb-3 text-center border-b-2 border-slate-800 relative">
             <div className="text-lg font-bold text-slate-900 uppercase leading-tight">{COMPANY.name}</div>

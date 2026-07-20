@@ -186,6 +186,7 @@ export function ReceiptArchive({ onBack }: ReceiptArchiveProps) {
       </div>
       <div class="footer">
         <p>Thank you for shopping with us!</p>
+        <p style="margin-top:5px;font-size:10px;color:#dc2626;font-weight:bold">Goods sold are not returnable.</p>
         <p style="margin-top:5px;font-size:9px;">This receipt was reprinted on ${new Date().toLocaleString('en-GB')}</p>
       </div>
       </body></html>

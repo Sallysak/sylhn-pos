@@ -4213,6 +4213,7 @@ function buildWhatsAppReceiptText(payment: any, verifyUrl?: string): string {
   lines.push(`*Change:* ${CURRENCY}${safeNum(payment.change).toFixed(2)}`);
   lines.push(``);
   lines.push(`Thank you for shopping with us! 🙏`);
+  lines.push(`Goods sold are not returnable.`);
   // Append a tappable online receipt link so customers can view the full
   // receipt in any browser (no WhatsApp needed) — works on the customer's
   // phone even if they don't have WhatsApp installed.
@@ -4373,6 +4374,8 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
       <hr style="border:none;border-top:1px dashed #94a3b8;margin:8px 0"/>
       <div style="text-align:center;font-size:11px;color:#64748b">
         Thank you for shopping!<br/>Have a fresh &amp; healthy day
+        <br/><br/>
+        <strong>Goods sold are not returnable.</strong>
       </div>
     </div>`;
   }, [payment]);
@@ -4452,6 +4455,7 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
               <div className="text-center text-slate-500 text-[10px] mt-3">
                 <div className="font-bold">Thank you for shopping!</div>
                 <div>Have a fresh & healthy day 🌿</div>
+                <div className="mt-2 text-rose-600 font-bold text-[10px]">Goods sold are not returnable.</div>
               </div>
             </div>
           </div>

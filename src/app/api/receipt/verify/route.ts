@@ -224,9 +224,9 @@ function renderReceiptHtml(sale: any): string {
 
     <!-- Footer -->
     <div class="footer">
-      <p class="footer-verified">Verified on <strong>${new Date().toLocaleString('en-GB')}</strong></p>
       <p class="footer-merchant">SYLHN POS · East Legon, Accra, Ghana</p>
       <p class="qr-hint">This page was reached by scanning the QR code on the printed receipt.</p>
+      <p style="font-size:11px;color:#dc2626;font-weight:bold;margin-top:8px">Goods sold are not returnable.</p>
     </div>
   </div>
 </body>

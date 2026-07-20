@@ -2556,3 +2556,63 @@ html.dark .status-error-premium {
     opacity: 1;
   }
 }
+
+/* ===== 51. PRINT ISOLATION — reports show ONLY report content =====
+   When printing (Ctrl+P or window.print()), ALL UI chrome is hidden:
+   - Headers, sidebars, buttons, inputs, dropdowns → hidden
+   - Only elements with .printable-report class are visible
+   - Page breaks handled properly for multi-page reports
+*/
+@media print {
+  /* Hide EVERYTHING by default */
+  body * {
+    visibility: hidden !important;
+  }
+
+  /* Show only the printable report and its children */
+  .printable-report,
+  .printable-report * {
+    visibility: visible !important;
+  }
+
+  /* Position the report at the top of the page */
+  .printable-report {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 10px !important;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    background: white !important;
+  }
+
+  /* Hide elements explicitly marked as no-print */
+  .no-print,
+  .print:hidden,
+  header,
+  nav,
+  .mobile-bottom-nav,
+  .header-premium,
+  .speed-dial,
+  button {
+    display: none !important;
+  }
+
+  /* Ensure tables don't break across pages */
+  table { page-break-inside: auto; }
+  tr { page-break-inside: avoid; page-break-after: auto; }
+  thead { display: table-header-group; }
+  tfoot { display: table-footer-group; }
+
+  /* Page margins */
+  @page {
+    size: A4;
+    margin: 15mm;
+  }
+}
+
+/* ===== END print isolation ===== */

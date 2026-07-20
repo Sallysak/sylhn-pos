@@ -1350,8 +1350,8 @@ function PurchaseReport({ transactions }: { transactions: PurchaseTransaction[] 
 
   return (
     <div className="h-full overflow-y-auto bg-slate-200/50 p-4">
-      {/* Minimal Date Filter + Export Bar */}
-      <div className="max-w-3xl mx-auto mb-3 flex items-center justify-between gap-2 flex-wrap print:hidden">
+      {/* Minimal Date Filter + Export Bar (hidden when printing) */}
+      <div className="no-print max-w-3xl mx-auto mb-3 flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2">
           <Calendar className="h-4 w-4 text-amber-600" />
           <span className="text-xs font-semibold text-slate-600">From:</span>
@@ -1372,8 +1372,8 @@ function PurchaseReport({ transactions }: { transactions: PurchaseTransaction[] 
         </div>
       </div>
 
-      {/* The Report — ONLY company header + title + table */}
-      <div className="max-w-3xl mx-auto bg-white shadow-xl" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
+      {/* The Report — ONLY company header + title + table (printable) */}
+      <div className="printable-report max-w-3xl mx-auto bg-white shadow-xl" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
         {/* Company Header */}
         <div className="px-8 pt-6 pb-3 flex items-start justify-between border-b-2 border-slate-800">
           <div className="flex items-center gap-3">
