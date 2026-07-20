@@ -159,20 +159,70 @@ ZAI_API_KEY="your-zai-api-key"
 
 ## Deployment
 
-### Option 1: Vercel (recommended)
+### Database (Required) — PostgreSQL
 
-1. Push to GitHub
-2. Import project at https://vercel.com/new
-3. Add all env vars in Vercel dashboard
-4. Deploy
+This app uses **PostgreSQL** for persistent storage. SQLite is no longer
+supported in production because serverless /tmp filesystems are ephemeral
+and data was being wiped on every cold start (causing "Invalid credentials"
+errors).
+
+Pick ONE of these providers:
+
+#### Option A — Vercel Postgres (easiest if deploying on Vercel)
+1. In Vercel dashboard → **Storage** tab → **Create Database** → **Postgres**
+2. Name it `sylhn-pos-db`
+3. After creation, Vercel auto-injects `POSTGRES_URL` (and pooled variants)
+4. Copy the **pooled** URL (`POSTGRES_POOL_URL` or similar, ending with `?pgbouncer=true`) and set it as `DATABASE_URL` in your project env vars
+
+#### Option B — Supabase (free tier, generous)
+1. Create account at https://supabase.com
+2. Create new project
+3. Settings → Database → Connection string → **URI** (transaction mode / pooled)
+4. Set `DATABASE_URL` to that connection string (append `?pgbouncer=true` if not present)
+
+#### Option C — Neon (free tier, serverless Postgres)
+1. Create account at https://neon.tech
+2. Create new project
+3. Copy the pooled connection string
+4. Set `DATABASE_URL` to that string (should include `?sslmode=require`)
+
+#### Option D — Self-hosted Postgres
+```bash
+# Quick local Postgres via Docker
+docker run -d --name sylhn-pg \
+  -e POSTGRES_PASSWORD=postgres \
+  -e POSTGRES_DB=sylhn_pos \
+  -p 5432:5432 \
+  postgres:16
+
+# Set DATABASE_URL=postgresql://postgres:postgres@localhost:5432/sylhn_pos
+```
+
+### Option 1: Deploy on Vercel (recommended)
+
+1. Push the repo to GitHub
+2. Go to https://vercel.com/new and import the repo
+3. In **Environment Variables**, add:
+   - `DATABASE_URL` — your Postgres connection string (from step above)
+   - `JWT_SECRET` — generate with `openssl rand -hex 32`
+4. Deploy — the build runs `prisma generate && next build`
+5. On first request, the app auto-provisions the schema (via `prisma db push`) and seeds default users
+6. Login with `admin` / `admin123`
 
 ### Option 2: Self-hosted (VPS)
 
 ```bash
-# Build
+# 1. Set env vars (use a real Postgres URL, not SQLite)
+export DATABASE_URL="postgresql://user:pass@host:5432/sylhn_pos"
+export JWT_SECRET="$(openssl rand -hex 32)"
+
+# 2. Provision schema (one-time)
+npx prisma db push
+
+# 3. Build
 bun run build
 
-# Start production server
+# 4. Start production server
 bun run start
 
 # Or use PM2 for process management
@@ -193,6 +243,12 @@ pm2 startup
    - **Daily summary at 08:00**: `POST https://your-domain/api/notifications/daily-summary` with header `x-cron-secret: your-secret`
 5. **Install PWA** — open the app on your phone, tap "Add to Home Screen"
 6. **Set up registers** — Maintenance → System Settings → Registers (if multi-terminal)
+
+### Troubleshooting
+
+- **"Invalid credentials" on login** — visit `/api/db-health` to confirm the DB has the default users. If not, visit `/api/setup` (POST) to seed them.
+- **Schema errors / "relation does not exist"** — the app runs `prisma db push` on first request. If that fails (e.g. due to permissions), run `npx prisma db push` manually against your `DATABASE_URL`.
+- **Biometric login fails after deploy** — biometrics are device-specific. Log in with password, then re-enable biometrics from the login screen.
 
 ## Default Users
 

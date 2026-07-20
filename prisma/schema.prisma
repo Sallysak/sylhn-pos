@@ -2,7 +2,8 @@
 // Comprehensive relational model linking Stock, Purchase, Sale, POS,
 // Supplier, Maintenance, Telephone, and Audit modules.
 //
-// Database: SQLite (local file). All foreign keys use cuid() IDs.
+// Database: PostgreSQL (Vercel Postgres / Supabase / Neon).
+// All foreign keys use cuid() IDs.
 // Soft deletes via `active` flags where retention matters (products, suppliers,
 // users). Hard deletes via Cascade only for line items owned by a parent
 // transaction (SaleItem → Sale, PurchaseItem → Purchase).
@@ -12,13 +13,12 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
-  // SQLite WAL (Write-Ahead Logging) mode enables concurrent readers during writes
-  // — critical for a multi-cashier POS where one terminal writes a sale while
-  // another reads the product list. Prisma sets this per-connection via the
-  // `journal_mode=WAL` pragma in `db.ts` (see `__prismaWalSetup`).
-  // This comment is informational — Prisma doesn't have a native WAL flag.
+  // PostgreSQL handles concurrency natively (MVCC) — no WAL pragma needed
+  // (that was a SQLite-specific optimization). Direct connection string OR
+  // pooled URL both work; for Vercel serverless prefer the pooled URL
+  // (e.g. ?pgbouncer=true) to avoid exhausting connection slots.
 }
 
 // ============================================================

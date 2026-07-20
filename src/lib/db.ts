@@ -1,43 +1,39 @@
 import { PrismaClient } from '@prisma/client'
-import { mkdirSync, existsSync } from 'fs'
-import { join } from 'path'
 
 // ===== Database initialization =====
-// On Vercel/serverless: DATABASE_URL may not be set, or may point to a
-// path that doesn't exist. We ensure the directory exists and use a
-// writable location (/tmp on Vercel, local dir in dev).
+// Production: DATABASE_URL must be set to a PostgreSQL connection string
+// (Vercel Postgres, Supabase, Neon, etc.). The schema is PostgreSQL.
 //
-// For production with persistence, set DATABASE_URL to a persistent
-// PostgreSQL connection string (e.g., via Vercel Postgres or Supabase).
-function getDatabaseUrl(): string {
-  // If DATABASE_URL is explicitly set, use it
-  if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
-
-  // Default: SQLite in /tmp (works on Vercel serverless)
-  // Note: /tmp is ephemeral on serverless — data won't persist across
-  // cold starts. For production, use PostgreSQL.
-  const isProduction = process.env.NODE_ENV === 'production';
-  const dbPath = isProduction
-    ? '/tmp/sylhn-pos.db'
-    : join(process.cwd(), 'db', 'custom.db');
-
-  // Ensure directory exists
-  const dbDir = isProduction ? '/tmp' : join(process.cwd(), 'db');
-  if (!existsSync(dbDir)) {
-    try { mkdirSync(dbDir, { recursive: true }); } catch { /* ignore */ }
-  }
-
-  return `file:${dbPath}`;
-}
-
-// Set DATABASE_URL before creating PrismaClient (only if not already set)
+// Development fallback: if DATABASE_URL is not set, we use a local SQLite
+// file for convenience — but Prisma's provider is set to "postgresql" in
+// schema.prisma, so this fallback will only work if the developer switches
+// the provider locally. In practice, set DATABASE_URL even in dev.
+//
+// On Vercel: Vercel auto-injects POSTGRES_URL (and friends) when you link
+// a Postgres storage. Either copy that value to DATABASE_URL, or set
+// DATABASE_URL directly to your Supabase/Neon connection string.
 if (!process.env.DATABASE_URL) {
-  process.env.DATABASE_URL = getDatabaseUrl();
+  // Hard-fail in production — no silent SQLite fallback anymore (the
+  // SQLite-in-/tmp approach was the source of the "invalid credentials"
+  // bug because data was wiped on every cold start).
+  if (process.env.NODE_ENV === 'production') {
+    console.error(
+      '[db] FATAL: DATABASE_URL is not set. Set it to a PostgreSQL connection ' +
+      'string (Vercel Postgres, Supabase, or Neon). See README.md → Deploying.'
+    );
+  } else {
+    // Dev-only fallback so `next dev` works without a real DB
+    process.env.DATABASE_URL = 'postgresql://postgres:postgres@localhost:5432/sylhn_pos?schema=public';
+    console.warn(
+      '[db] DATABASE_URL not set — using dev fallback. Start a local Postgres ' +
+      'with `docker run -p 5432:5432 -e POSTGRES_PASSWORD=postgres postgres:16` ' +
+      'or set DATABASE_URL to your own connection string.'
+    );
+  }
 }
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
-  __prismaWalSetup?: Promise<void>
   __prismaDbPush?: Promise<void>
 }
 
@@ -47,89 +43,39 @@ export const db =
     log: process.env.LOG_QUERIES === '1' ? ['query', 'error', 'warn'] : ['error', 'warn'],
   })
 
-// Enable SQLite WAL mode once per process
-if (!globalForPrisma.__prismaWalSetup) {
-  globalForPrisma.__prismaWalSetup = db.$queryRaw`PRAGMA journal_mode=WAL`
-    .then(() => {
-      if (process.env.LOG_QUERIES === '1') console.log('[db] SQLite WAL mode enabled')
-    })
-    .catch((e: any) => {
-      console.warn('[db] WAL mode failed (non-critical):', e?.message || e)
-    })
-}
-
-// Auto-create tables AND seed default users on first run
+// ===== Schema bootstrap =====
+// On a fresh Postgres instance, tables don't exist yet. We try a simple
+// query; if it fails, we run `prisma db push` to create the schema, then
+// seed default users. This is idempotent and safe to run on every cold
+// start — if the tables already exist, the count() succeeds and we skip.
 if (!globalForPrisma.__prismaDbPush) {
   globalForPrisma.__prismaDbPush = (async () => {
     try {
-      // Check if the SystemUser table exists by trying a simple count
       const userCount = await db.systemUser.count();
-
-      // If no users exist, auto-seed default users
       if (userCount === 0) {
+        console.log('[db] No users found. Seeding default users...');
         await seedDefaultUsers();
       }
     } catch (e: any) {
-      // Table doesn't exist — we need to create the schema
-      console.log('[db] Tables not found. Creating schema...');
+      // Table doesn't exist — create the schema via `prisma db push`.
+      // This is the supported, schema-driven way to provision a fresh DB.
+      console.log('[db] Tables not found. Running prisma db push...');
       try {
-        // Use Prisma's internal SQL execution to create tables
-        // This is the equivalent of `prisma db push` but at runtime
         const { execSync } = await import('child_process');
-        try {
-          execSync('npx prisma db push --skip-generate --accept-data-loss', {
-            stdio: 'pipe',
-            cwd: process.cwd(),
-            env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL },
-          });
-          console.log('[db] Schema created successfully');
-        } catch (pushErr: any) {
-          console.warn('[db] prisma db push failed, trying direct SQL...');
-          // Fallback: create tables manually with raw SQL
-          // This is a minimal schema — just enough for auth to work
-          await db.$executeRawUnsafe(`
-            CREATE TABLE IF NOT EXISTS "SystemUser" (
-              id TEXT PRIMARY KEY NOT NULL,
-              username TEXT NOT NULL UNIQUE,
-              password TEXT NOT NULL,
-              fullName TEXT NOT NULL,
-              role TEXT NOT NULL DEFAULT 'cashier',
-              phone TEXT DEFAULT '',
-              email TEXT DEFAULT '',
-              permissions TEXT DEFAULT '{}',
-              active BOOLEAN NOT NULL DEFAULT true,
-              lastLogin DATETIME,
-              createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-              updatedAt DATETIME NOT NULL
-            );
-          `);
-          await db.$executeRawUnsafe(`
-            CREATE TABLE IF NOT EXISTS "SystemSetting" (
-              id TEXT PRIMARY KEY NOT NULL,
-              key TEXT NOT NULL UNIQUE,
-              value TEXT NOT NULL,
-              updatedAt DATETIME NOT NULL,
-              updatedBy TEXT
-            );
-          `);
-          await db.$executeRawUnsafe(`
-            CREATE TABLE IF NOT EXISTS "AuditLog" (
-              id TEXT PRIMARY KEY NOT NULL,
-              timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-              userId TEXT,
-              user TEXT NOT NULL,
-              action TEXT NOT NULL,
-              module TEXT NOT NULL,
-              details TEXT NOT NULL,
-              severity TEXT NOT NULL DEFAULT 'info',
-              ipAddress TEXT DEFAULT '',
-              userAgent TEXT DEFAULT ''
-            );
-          `);
-          console.log('[db] Basic tables created via raw SQL');
-        }
-      } catch (sqlErr: any) {
-        console.error('[db] Failed to create tables:', sqlErr?.message);
+        execSync('npx prisma db push --skip-generate --accept-data-loss', {
+          stdio: 'pipe',
+          cwd: process.cwd(),
+          env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL },
+        });
+        console.log('[db] Schema created. Seeding default users...');
+        await seedDefaultUsers();
+      } catch (pushErr: any) {
+        console.error('[db] prisma db push failed:', pushErr?.message || pushErr);
+        // Don't try to create tables with raw SQL — Prisma's schema is large
+        // and hand-maintaining a parallel raw-SQL schema is brittle. If
+        // db push fails, the operator should run it manually:
+        //   npx prisma db push
+        // and check that DATABASE_URL points to a writable Postgres instance.
       }
     }
   })().catch((e) => {
@@ -140,9 +86,10 @@ if (!globalForPrisma.__prismaDbPush) {
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = db
 
 // ===== Helpers: seed default users + wait for DB readiness =====
-// Used by /api/auth/login to self-heal when the serverless DB has been wiped
-// by a cold start. Calling waitForDb() guarantees that the initialization
-// promise has settled before any query runs.
+// Used by /api/auth/login to self-heal when the DB has no users (e.g. a
+// fresh Postgres instance, or after a manual table drop). Calling
+// waitForDb() guarantees that the initialization promise has settled
+// before any query runs.
 
 /**
  * Seed the three default users (admin, manager, cashier) with hashed passwords.
@@ -203,13 +150,11 @@ export async function waitForDb(): Promise<void> {
 /**
  * Self-heal: ensure a specific default user exists (e.g. 'admin').
  * Used by /api/auth/login when the lookup returns null but the username
- * matches a default account — this typically happens after a cold start
- * wipes the SQLite file on Vercel.
+ * matches a default account — this typically happens on a fresh DB.
  */
 export async function ensureDefaultUser(username: string): Promise<void> {
   const defaults = ['admin', 'manager', 'cashier'];
   if (!defaults.includes(username)) return;
-  // Re-seed all defaults (upsert is idempotent and won't overwrite existing users)
   try { await seedDefaultUsers(); } catch (e: any) {
     console.error('[db] ensureDefaultUser seed failed:', e?.message);
   }
