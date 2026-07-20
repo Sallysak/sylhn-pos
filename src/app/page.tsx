@@ -194,7 +194,7 @@ export default function POSPage() {
   const [showSidebar, setShowSidebar] = useState(true);
   const [showFindProduct, setShowFindProduct] = useState(false);
   const [showCartPreview, setShowCartPreview] = useState(false);
-  const [initialStockView, setInitialStockView] = useState<"stock-file" | "stock-search" | "add-modify" | "group-maintenance" | "quantity-adjustment" | "history">("stock-file");
+  const [initialStockView, setInitialStockView] = useState<"stock-file" | "stock-search" | "add-modify" | "group-maintenance" | "quantity-adjustment" | "history">("add-modify");
   const [openStockQtyReport, setOpenStockQtyReport] = useState(false);
   const [showStockList, setShowStockList] = useState(false);
   const [partNoInput, setPartNoInput] = useState("");
@@ -2316,8 +2316,8 @@ export default function POSPage() {
                 <div className="flex flex-col">
                   {/* Cart Items Table */}
                   <div className="flex-1 flex flex-col min-h-0 max-h-[25vh] lg:max-h-[30vh]">
-                    {/* Table Header — mobile: all columns visible */}
-                    <div className="flex-shrink-0 grid grid-cols-[1fr_50px_45px_65px] lg:grid-cols-[140px_1fr_60px_90px_50px_90px] gap-1 px-2 py-1.5 text-[9px] font-bold text-slate-600 border-b-2 border-slate-300 bg-slate-100 uppercase tracking-wide">
+                    {/* Table Header — mobile: all columns visible, matching item grid */}
+                    <div className="flex-shrink-0 grid grid-cols-[1fr_50px_45px_55px_20px] lg:grid-cols-[140px_1fr_60px_90px_50px_90px] gap-1 px-2 py-1.5 text-[9px] font-bold text-slate-600 border-b-2 border-slate-300 bg-slate-100 uppercase tracking-wide">
                       <div className="lg:hidden">Item</div>
                       <div className="hidden lg:block">Part No.</div>
                       <div className="hidden lg:block">Part Details</div>
@@ -2325,6 +2325,7 @@ export default function POSPage() {
                       <div className="text-center hidden lg:block">Price</div>
                       <div className="text-center">Disc%</div>
                       <div className="text-right">Total</div>
+                      <div className="lg:hidden"></div>
                     </div>
 
                     {/* Items List — scrolls */}
@@ -2352,7 +2353,7 @@ export default function POSPage() {
                                 }}
                               >
                                 {/* === MOBILE LAYOUT — professional grid matching headers === */}
-                                <div className="lg:hidden grid grid-cols-[1fr_50px_45px_65px] gap-1 items-center">
+                                <div className="lg:hidden grid grid-cols-[1fr_50px_45px_55px_20px] gap-1 items-center">
                                   {/* Col 1: Item (emoji + name + SKU) */}
                                   <div className="min-w-0 flex items-center gap-1.5">
                                     <span className="text-[8px] font-mono text-slate-400 flex-shrink-0">{index + 1}</span>
@@ -2383,13 +2384,14 @@ export default function POSPage() {
                                       placeholder="0"
                                     />
                                   </div>
-                                  {/* Col 4: Total + remove */}
-                                  <div className="flex items-center justify-end gap-1 flex-shrink-0">
+                                  {/* Col 4: Total (aligned right, under Total header) */}
+                                  <div className="flex items-center justify-end flex-shrink-0">
                                     <span className="font-mono font-bold text-[11px]">{formatGHS(lineFinal)}</span>
-                                    <button onClick={(e) => { e.stopPropagation(); removeLine(index); }} className="h-3.5 w-3.5 rounded bg-rose-100 text-rose-500 hover:bg-rose-200 flex items-center justify-center transition active:scale-90 flex-shrink-0">
-                                      <Trash2 className="h-2 w-2" />
-                                    </button>
                                   </div>
+                                  {/* Col 5: Delete button (separate column, doesn't affect Total alignment) */}
+                                  <button onClick={(e) => { e.stopPropagation(); removeLine(index); }} className="h-4 w-4 rounded bg-rose-50 text-rose-400 hover:bg-rose-100 hover:text-rose-600 flex items-center justify-center transition active:scale-90 flex-shrink-0">
+                                    <Trash2 className="h-2.5 w-2.5" />
+                                  </button>
                                 </div>
 
                                 {/* === DESKTOP LAYOUT (grid) === */}
