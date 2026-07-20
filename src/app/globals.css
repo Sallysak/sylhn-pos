@@ -2429,13 +2429,14 @@ html.dark .status-error-premium {
     padding: 0 !important;
   }
 
-  /* === Modal containers — become bottom sheets === */
-  .fixed.inset-0[class*="bg-black"] > div[class*="bg-white"],
-  .fixed.inset-0[class*="bg-black"] > div[class*="rounded"],
-  .fixed.inset-0[class*="bg-slate-900"] > div[class*="bg-white"],
-  .fixed.inset-0[class*="bg-slate-900"] > div[class*="rounded"],
-  .fixed.inset-0[class*="bg-slate-900"] > div[class*="dialog-premium"],
-  .fixed.inset-0[class*="bg-black"] > div[class*="dialog-premium"] {
+  /* === Modal containers — become bottom sheets ===
+     EXCEPT .compact-modal which stays centered and small */
+  .fixed.inset-0[class*="bg-black"] > div[class*="bg-white"]:not(.compact-modal),
+  .fixed.inset-0[class*="bg-black"] > div[class*="rounded"]:not(.compact-modal),
+  .fixed.inset-0[class*="bg-slate-900"] > div[class*="bg-white"]:not(.compact-modal),
+  .fixed.inset-0[class*="bg-slate-900"] > div[class*="rounded"]:not(.compact-modal),
+  .fixed.inset-0[class*="bg-slate-900"] > div[class*="dialog-premium"]:not(.compact-modal),
+  .fixed.inset-0[class*="bg-black"] > div[class*="dialog-premium"]:not(.compact-modal) {
     position: fixed !important;
     bottom: 0 !important;
     left: 0 !important;
@@ -2518,3 +2519,40 @@ html.dark .status-error-premium {
 }
 
 /* ===== END universal mobile modal fix ===== */
+
+/* ===== 50. Compact modal — stays small and centered on mobile =====
+   Add .compact-modal-overlay to the overlay and .compact-modal to the
+   modal container. They stay centered with their own max-width/height. */
+@media (max-width: 1023px) {
+  /* Overlay — keep centered, don't push to bottom */
+  .compact-modal-overlay {
+    align-items: center !important;
+    padding: 12px !important;
+  }
+
+  /* Modal container — compact, centered, NOT full-width */
+  .compact-modal {
+    position: relative !important;
+    bottom: auto !important;
+    left: auto !important;
+    right: auto !important;
+    top: auto !important;
+    width: 100% !important;
+    max-width: 28rem !important;  /* 448px — compact */
+    max-height: 80vh !important;
+    border-radius: 16px !important;
+    margin: 0 !important;
+    animation: compactModalIn 0.25s cubic-bezier(0.32, 0.72, 0, 1) !important;
+  }
+}
+
+@keyframes compactModalIn {
+  from {
+    transform: scale(0.92) translateY(10px);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}

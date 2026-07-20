@@ -690,7 +690,7 @@ function ProductForm({ product, groups, onSave, onClose }: {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-0 sm:p-4"
+      className="compact-modal-overlay fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4"
       onClick={onClose}
     >
       <motion.div
@@ -698,7 +698,7 @@ function ProductForm({ product, groups, onSave, onClose }: {
         animate={{ scale: 1, y: 0 }}
         exit={{ scale: 0.95, y: 20 }}
         onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl w-full max-w-lg max-h-[92vh] sm:max-h-[88vh] overflow-hidden flex flex-col"
+        className="compact-modal bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] sm:max-h-[85vh] overflow-hidden flex flex-col"
       >
         {/* Header — compact */}
         <div className="flex items-center justify-between px-4 sm:px-5 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white flex-shrink-0">
