@@ -67,43 +67,7 @@ if (!globalForPrisma.__prismaDbPush) {
 
       // If no users exist, auto-seed default users
       if (userCount === 0) {
-        console.log('[db] No users found. Auto-seeding default users...');
-        try {
-          const { hashPassword } = await import('./auth');
-          const adminHash = await hashPassword('admin123');
-          const managerHash = await hashPassword('manager123');
-          const cashierHash = await hashPassword('cashier123');
-
-          const allPerms = JSON.stringify({
-            pos: true, sales: true, stock: true, purchase: true, accounts: true,
-            telephone: true, maintenance: true, financeOps: true,
-            canVoid: true, canDiscount: true, canAdjustStock: true,
-            canDeleteProducts: true, canExport: true,
-          });
-          const managerPerms = JSON.stringify({
-            pos: true, sales: true, stock: true, purchase: true, accounts: true,
-            telephone: true, maintenance: false, financeOps: true,
-            canVoid: true, canDiscount: true, canAdjustStock: true,
-            canDeleteProducts: false, canExport: true,
-          });
-          const cashierPerms = JSON.stringify({
-            pos: true, sales: true, stock: false, purchase: false, accounts: false,
-            telephone: true, maintenance: false, financeOps: false,
-            canVoid: false, canDiscount: true, canAdjustStock: false,
-            canDeleteProducts: false, canExport: false,
-          });
-
-          await db.systemUser.createMany({
-            data: [
-              { username: 'admin', password: adminHash, fullName: 'System Administrator', role: 'admin', phone: '+233592766044', email: 'admin@sylhn.com', permissions: allPerms, active: true },
-              { username: 'manager', password: managerHash, fullName: 'Store Manager', role: 'manager', phone: '+233 24 111 2222', email: 'manager@sylhn.com', permissions: managerPerms, active: true },
-              { username: 'cashier', password: cashierHash, fullName: 'Sarah Johnson', role: 'cashier', phone: '+233 24 333 4444', email: 'sarah@sylhn.com', permissions: cashierPerms, active: true },
-            ],
-          });
-          console.log('[db] Default users created: admin/admin123, manager/manager123, cashier/cashier123');
-        } catch (seedErr: any) {
-          console.error('[db] Auto-seed failed:', seedErr?.message);
-        }
+        await seedDefaultUsers();
       }
     } catch (e: any) {
       // Table doesn't exist — we need to create the schema
@@ -174,3 +138,79 @@ if (!globalForPrisma.__prismaDbPush) {
 }
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = db
+
+// ===== Helpers: seed default users + wait for DB readiness =====
+// Used by /api/auth/login to self-heal when the serverless DB has been wiped
+// by a cold start. Calling waitForDb() guarantees that the initialization
+// promise has settled before any query runs.
+
+/**
+ * Seed the three default users (admin, manager, cashier) with hashed passwords.
+ * Safe to call multiple times — uses upsert so existing rows are untouched.
+ */
+export async function seedDefaultUsers(): Promise<void> {
+  const { hashPassword } = await import('./auth');
+  const adminHash = await hashPassword('admin123');
+  const managerHash = await hashPassword('manager123');
+  const cashierHash = await hashPassword('cashier123');
+
+  const allPerms = JSON.stringify({
+    pos: true, sales: true, stock: true, purchase: true, accounts: true,
+    telephone: true, maintenance: true, financeOps: true,
+    canVoid: true, canDiscount: true, canAdjustStock: true,
+    canDeleteProducts: true, canExport: true,
+  });
+  const managerPerms = JSON.stringify({
+    pos: true, sales: true, stock: true, purchase: true, accounts: true,
+    telephone: true, maintenance: false, financeOps: true,
+    canVoid: true, canDiscount: true, canAdjustStock: true,
+    canDeleteProducts: false, canExport: true,
+  });
+  const cashierPerms = JSON.stringify({
+    pos: true, sales: true, stock: false, purchase: false, accounts: false,
+    telephone: true, maintenance: false, financeOps: false,
+    canVoid: false, canDiscount: true, canAdjustStock: false,
+    canDeleteProducts: false, canExport: false,
+  });
+
+  const crypto = await import('crypto');
+  const users = [
+    { username: 'admin', password: adminHash, fullName: 'System Administrator', role: 'admin', phone: '+233592766044', email: 'admin@sylhn.com', permissions: allPerms, active: true },
+    { username: 'manager', password: managerHash, fullName: 'Store Manager', role: 'manager', phone: '+233 24 111 2222', email: 'manager@sylhn.com', permissions: managerPerms, active: true },
+    { username: 'cashier', password: cashierHash, fullName: 'Sarah Johnson', role: 'cashier', phone: '+233 24 333 4444', email: 'sarah@sylhn.com', permissions: cashierPerms, active: true },
+  ];
+
+  for (const u of users) {
+    await db.systemUser.upsert({
+      where: { username: u.username },
+      update: {}, // don't overwrite an existing user's password
+      create: { id: crypto.randomUUID(), ...u },
+    });
+  }
+  console.log('[db] Default users ensured: admin/admin123, manager/manager123, cashier/cashier123');
+}
+
+/**
+ * Wait for the DB initialization (table creation + auto-seed) to settle.
+ * Call this at the top of any API route that needs the schema to be ready.
+ */
+export async function waitForDb(): Promise<void> {
+  if (globalForPrisma.__prismaDbPush) {
+    try { await globalForPrisma.__prismaDbPush; } catch { /* already logged */ }
+  }
+}
+
+/**
+ * Self-heal: ensure a specific default user exists (e.g. 'admin').
+ * Used by /api/auth/login when the lookup returns null but the username
+ * matches a default account — this typically happens after a cold start
+ * wipes the SQLite file on Vercel.
+ */
+export async function ensureDefaultUser(username: string): Promise<void> {
+  const defaults = ['admin', 'manager', 'cashier'];
+  if (!defaults.includes(username)) return;
+  // Re-seed all defaults (upsert is idempotent and won't overwrite existing users)
+  try { await seedDefaultUsers(); } catch (e: any) {
+    console.error('[db] ensureDefaultUser seed failed:', e?.message);
+  }
+}

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { db, waitForDb, ensureDefaultUser } from "@/lib/db";
 import {
   hashPassword,
   verifyPassword,
@@ -32,9 +32,27 @@ export async function POST(req: NextRequest) {
   if (!result.success) return validationError(result.error);
   const { username, password, biometric } = result.data;
 
-  // Find user in DB
+  // Wait for DB initialization (table creation + auto-seed) to settle.
+  // This is critical on Vercel serverless where the SQLite file in /tmp
+  // may have been wiped by a cold start — the seed runs in the background
+  // and would otherwise race with this query.
+  await waitForDb();
+
+  // Find user in DB — with self-healing retry
   try {
-    const user = await db.systemUser.findUnique({ where: { username } });
+    let user = await db.systemUser.findUnique({ where: { username } });
+
+    // Self-heal: if a default account is missing (cold-start wiped the DB),
+    // re-seed defaults and retry the lookup once.
+    if (!user) {
+      const defaults = ["admin", "manager", "cashier"];
+      if (defaults.includes(username)) {
+        console.log(`[auth/login] Default user "${username}" not found — re-seeding defaults and retrying…`);
+        await ensureDefaultUser(username);
+        user = await db.systemUser.findUnique({ where: { username } });
+      }
+    }
+
     if (!user) {
       // Check if ANY users exist — if not, tell the user to run setup
       const userCount = await db.systemUser.count();

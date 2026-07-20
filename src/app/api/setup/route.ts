@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { hashPassword } from "@/lib/auth";
+import { db, waitForDb, seedDefaultUsers } from "@/lib/db";
 
 // POST /api/setup — one-time initial setup
 // Creates default admin user with password "admin123" if no users exist.
@@ -8,6 +7,7 @@ import { hashPassword } from "@/lib/auth";
 //
 // After first login, the admin should change their password immediately.
 export async function POST(req: NextRequest) {
+  await waitForDb();
   const userCount = await db.systemUser.count();
   if (userCount > 0) {
     return NextResponse.json({
@@ -17,36 +17,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const adminHash = await hashPassword("admin123");
-    const managerHash = await hashPassword("manager123");
-    const cashierHash = await hashPassword("cashier123");
-
-    const allPerms = JSON.stringify({
-      pos: true, sales: true, stock: true, purchase: true, accounts: true,
-      telephone: true, maintenance: true, financeOps: true,
-      canVoid: true, canDiscount: true, canAdjustStock: true,
-      canDeleteProducts: true, canExport: true,
-    });
-    const managerPerms = JSON.stringify({
-      pos: true, sales: true, stock: true, purchase: true, accounts: true,
-      telephone: true, maintenance: false, financeOps: true,
-      canVoid: true, canDiscount: true, canAdjustStock: true,
-      canDeleteProducts: false, canExport: true,
-    });
-    const cashierPerms = JSON.stringify({
-      pos: true, sales: true, stock: false, purchase: false, accounts: false,
-      telephone: true, maintenance: false, financeOps: false,
-      canVoid: false, canDiscount: true, canAdjustStock: false,
-      canDeleteProducts: false, canExport: false,
-    });
-
-    await db.systemUser.createMany({
-      data: [
-        { username: "admin", password: adminHash, fullName: "System Administrator", role: "admin", phone: "+233592766044", email: "admin@sylhn.com", permissions: allPerms, active: true },
-        { username: "manager", password: managerHash, fullName: "Store Manager", role: "manager", phone: "+233 24 111 2222", email: "manager@sylhn.com", permissions: managerPerms, active: true },
-        { username: "cashier", password: cashierHash, fullName: "Sarah Johnson", role: "cashier", phone: "+233 24 333 4444", email: "sarah@sylhn.com", permissions: cashierPerms, active: true },
-      ],
-    });
+    await seedDefaultUsers();
 
     // Default system settings
     const settings = [
@@ -78,6 +49,7 @@ export async function POST(req: NextRequest) {
 
 // GET /api/setup — check if setup is needed
 export async function GET() {
+  await waitForDb();
   const userCount = await db.systemUser.count();
   return NextResponse.json({ setupNeeded: userCount === 0, userCount });
 }

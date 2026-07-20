@@ -372,7 +372,17 @@ export function AdminLogin({ onSuccess, onCancel, adminOnly = false }: { onSucce
         toast({ title: `Welcome, ${data.user.fullName}`, description: `Logged in with biometrics as ${data.user.role}` });
         onSuccess(data.user as SystemUser);
       } else if (res.status === 401 || res.status === 403) {
-        toast({ title: 'Biometric login failed', description: 'Password required — please sign in manually', variant: 'destructive' });
+        // The server doesn't recognize this user anymore (e.g. serverless DB
+        // was wiped on cold start and the default users were re-seeded).
+        // Clear the stale local biometric credential so the user can re-register
+        // after a fresh password login.
+        removeBiometricCredential(bioUsername);
+        setBioCredentialExists(false);
+        toast({
+          title: 'Biometric login failed',
+          description: 'Your fingerprint is valid but the server no longer recognizes this account. Please sign in with your password, then re-enable biometrics.',
+          variant: 'destructive',
+        });
       } else {
         toast({ title: 'Login failed', description: data.error || 'Server error', variant: 'destructive' });
       }
