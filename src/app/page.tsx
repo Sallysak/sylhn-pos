@@ -2316,15 +2316,15 @@ export default function POSPage() {
                 <div className="flex flex-col">
                   {/* Cart Items Table */}
                   <div className="flex-1 flex flex-col min-h-0 max-h-[25vh] lg:max-h-[30vh]">
-                    {/* Table Header — same for all screen sizes */}
-                    <div className="flex-shrink-0 grid grid-cols-[1fr_60px_50px_80px] lg:grid-cols-[140px_1fr_60px_90px_50px_90px] gap-1 px-2 py-1 text-[10px] font-bold text-slate-700 border-b border-slate-400" style={{ backgroundColor: '#ADD8E6' }}>
-                      <div className="lg:hidden"># · Item / Part No.</div>
+                    {/* Table Header — mobile: all columns visible */}
+                    <div className="flex-shrink-0 grid grid-cols-[1fr_50px_45px_65px] lg:grid-cols-[140px_1fr_60px_90px_50px_90px] gap-1 px-2 py-1.5 text-[9px] font-bold text-slate-600 border-b-2 border-slate-300 bg-slate-100 uppercase tracking-wide">
+                      <div className="lg:hidden">Item</div>
                       <div className="hidden lg:block">Part No.</div>
                       <div className="hidden lg:block">Part Details</div>
-                      <div className="text-right hidden lg:block">Qty</div>
-                      <div className="text-right hidden lg:block">Amount GHC</div>
-                      <div className="text-center hidden lg:block">Disc%</div>
-                      <div className="text-right">Total GHC</div>
+                      <div className="text-center">Qty</div>
+                      <div className="text-center hidden lg:block">Price</div>
+                      <div className="text-center">Disc%</div>
+                      <div className="text-right">Total</div>
                     </div>
 
                     {/* Items List — scrolls */}
@@ -2351,38 +2351,42 @@ export default function POSPage() {
                                   color: isSelected ? '#1565C0' : '#424242',
                                 }}
                               >
-                                {/* === MOBILE LAYOUT === */}
-                                <div className="lg:hidden grid grid-cols-[1fr_auto_auto_auto] gap-1 items-center">
-                                  <div className="min-w-0 flex items-center gap-1">
+                                {/* === MOBILE LAYOUT — professional grid matching headers === */}
+                                <div className="lg:hidden grid grid-cols-[1fr_50px_45px_65px] gap-1 items-center">
+                                  {/* Col 1: Item (emoji + name + SKU) */}
+                                  <div className="min-w-0 flex items-center gap-1.5">
                                     <span className="text-[8px] font-mono text-slate-400 flex-shrink-0">{index + 1}</span>
-                                    <span className="text-sm flex-shrink-0">{item.emoji}</span>
+                                    <span className="text-base flex-shrink-0">{item.emoji}</span>
                                     <div className="min-w-0">
-                                      <div className="font-semibold text-[11px] truncate">{item.name}</div>
-                                      <div className="text-[8px] font-mono text-slate-400 truncate">{item.sku} · {formatGHS(item.price)}</div>
+                                      <div className="font-semibold text-[11px] truncate leading-tight">{item.name}</div>
+                                      <div className="text-[8px] font-mono text-slate-400 truncate leading-tight">{item.sku} · {formatGHS(item.price)}</div>
                                     </div>
                                   </div>
-                                  <div className="flex items-center gap-0.5 justify-center w-10 flex-shrink-0">
-                                    <button onClick={(e) => { e.stopPropagation(); updateQuantity(index, -1); }} className="h-5 w-5 rounded bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition">
-                                      <Minus className="h-2.5 w-2.5" />
+                                  {/* Col 2: Qty with compact +/- buttons */}
+                                  <div className="flex items-center gap-0.5 justify-center flex-shrink-0">
+                                    <button onClick={(e) => { e.stopPropagation(); updateQuantity(index, -1); }} className="h-4 w-4 rounded bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition active:scale-90">
+                                      <Minus className="h-2 w-2" />
                                     </button>
-                                    <span className="w-5 text-center font-mono font-semibold text-[10px]">{item.quantity.toFixed(item.unit === 'kg' ? 2 : 0)}</span>
-                                    <button onClick={(e) => { e.stopPropagation(); updateQuantity(index, 1); }} className="h-5 w-5 rounded bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition">
-                                      <Plus className="h-2.5 w-2.5" />
+                                    <span className="w-6 text-center font-mono font-bold text-[10px]">{item.quantity.toFixed(item.unit === 'kg' ? 2 : 0)}</span>
+                                    <button onClick={(e) => { e.stopPropagation(); updateQuantity(index, 1); }} className="h-4 w-4 rounded bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition active:scale-90">
+                                      <Plus className="h-2 w-2" />
                                     </button>
                                   </div>
-                                  <div className="flex items-center justify-center w-10 flex-shrink-0">
+                                  {/* Col 3: Discount input */}
+                                  <div className="flex items-center justify-center flex-shrink-0">
                                     <input
                                       type="number"
                                       value={item.discount || ''}
                                       onClick={(e) => { e.stopPropagation(); setSelectedCartIndex(index); }}
                                       onChange={(e) => applyDiscount(index, parseFloat(e.target.value) || 0)}
-                                      className="w-8 h-5 text-center text-[9px] font-mono font-bold rounded border-2 border-violet-400 bg-violet-50 outline-none focus:border-violet-600 focus:ring-2 focus:ring-violet-400/40 transition"
+                                      className="w-9 h-5 text-center text-[9px] font-mono font-bold rounded border border-violet-300 bg-violet-50 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-400/40 transition"
                                       placeholder="0"
                                     />
                                   </div>
-                                  <div className="flex items-center justify-end gap-1 w-14 flex-shrink-0">
+                                  {/* Col 4: Total + remove */}
+                                  <div className="flex items-center justify-end gap-1 flex-shrink-0">
                                     <span className="font-mono font-bold text-[11px]">{formatGHS(lineFinal)}</span>
-                                    <button onClick={(e) => { e.stopPropagation(); removeLine(index); }} className="h-4 w-4 rounded-md bg-rose-100 text-rose-600 hover:bg-rose-200 flex items-center justify-center transition">
+                                    <button onClick={(e) => { e.stopPropagation(); removeLine(index); }} className="h-3.5 w-3.5 rounded bg-rose-100 text-rose-500 hover:bg-rose-200 flex items-center justify-center transition active:scale-90 flex-shrink-0">
                                       <Trash2 className="h-2 w-2" />
                                     </button>
                                   </div>
