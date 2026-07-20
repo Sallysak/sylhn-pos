@@ -698,10 +698,11 @@ function ProductForm({ product, groups, onSave, onClose }: {
         animate={{ scale: 1, y: 0 }}
         exit={{ scale: 0.95, y: 20 }}
         onClick={(e) => e.stopPropagation()}
-        className="compact-modal bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] sm:max-h-[85vh] overflow-hidden flex flex-col"
+        className="compact-modal bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col"
+        style={{ maxHeight: '85vh' }}
       >
         {/* Header — compact */}
-        <div className="flex items-center justify-between px-4 sm:px-5 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white flex-shrink-0">
+        <div className="flex items-center justify-between px-4 sm:px-5 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white flex-shrink-0 rounded-t-2xl">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="h-8 w-8 rounded-lg bg-white/15 flex items-center justify-center text-lg flex-shrink-0">
               {form.emoji || (product ? <Edit2 className="h-4 w-4" /> : <Plus className="h-4 w-4" />)}
@@ -716,7 +717,8 @@ function ProductForm({ product, groups, onSave, onClose }: {
           </button>
         </div>
 
-        <ScrollArea className="flex-1 min-h-0">
+        {/* Scrollable content — ALL controls accessible via vertical scroll */}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0" style={{ WebkitOverflowScrolling: 'touch' }}>
           <div className="p-4 sm:p-5 space-y-4">
 
             {/* ===== Section 1: Basic Info ===== */}
@@ -804,10 +806,10 @@ function ProductForm({ product, groups, onSave, onClose }: {
             </FormSection>
 
           </div>
-        </ScrollArea>
+        </div>
 
-        {/* Sticky CTA — always visible */}
-        <div className="flex-shrink-0 px-4 sm:px-5 py-3 border-t border-slate-200 bg-white flex gap-2">
+        {/* Sticky CTA — always visible at bottom */}
+        <div className="flex-shrink-0 px-4 sm:px-5 py-3 border-t border-slate-200 bg-white flex gap-2 rounded-b-2xl">
           <Button variant="outline" onClick={onClose} className="flex-shrink-0 h-11 px-4 text-sm">Cancel</Button>
           <Button
             onClick={() => form.name && onSave(form)}
@@ -829,21 +831,17 @@ function ProductForm({ product, groups, onSave, onClose }: {
             background: white;
             font-size: 14px;
             outline: none;
-            transition: all 0.15s;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
+            transition: border-color 0.15s, box-shadow 0.15s;
             box-sizing: border-box;
+            min-width: 0;
           }
           :global(.form-input:focus) {
             border-color: rgb(16 185 129);
             box-shadow: 0 0 0 3px rgb(16 185 129 / 0.1);
-            overflow: visible;
           }
           @media (max-width: 639px) {
             :global(.form-input) {
               font-size: 16px;
-              height: 2.5rem;
             }
           }
         `}</style>
