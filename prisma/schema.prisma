@@ -86,6 +86,10 @@ model AuditLog {
   @@index([module])
   @@index([severity])
   @@index([action])
+  // Composite for audit log filtering by module + time range (most common query)
+  @@index([module, timestamp])
+  @@index([severity, timestamp])
+  @@index([userId, timestamp])
 }
 
 model SystemSetting {
@@ -351,6 +355,10 @@ model Product {
   @@index([name])
   @@index([active])
   @@index([barcode])
+  // Composite for low-stock report (WHERE active=true AND quantity <= reorderLevel)
+  @@index([active, quantity])
+  // Composite for expiry alerts (WHERE active=true AND expiryDate <= ...)
+  @@index([active, expiryDate])
 }
 
 // Many-to-many: a product can be supplied by many suppliers, and a supplier
@@ -400,6 +408,9 @@ model StockHistory {
   @@index([saleId])
   @@index([purchaseId])
   @@index([stocktakeId])
+  // Composite for product movement history (most common query)
+  @@index([productId, createdAt])
+  @@index([action, createdAt])
 }
 
 // ============================================================
@@ -439,6 +450,8 @@ model Supplier {
 
   @@index([name])
   @@index([active])
+  // Composite for outstanding-debt reports (WHERE active=true AND balance > 0)
+  @@index([active, balance])
 }
 
 // Separate supplier payment model — tracks individual payments against
@@ -535,6 +548,12 @@ model Sale {
   @@index([paymentMethod])
   @@index([voidedAt])
   @@index([refundedAt])
+  // Composite indexes for high-frequency report queries
+  @@index([status, createdAt])              // sales reports: WHERE status='completed' AND createdAt BETWEEN ...
+  @@index([customerId, status, createdAt])  // customer credit account statement
+  @@index([cashierId, status, createdAt])   // cashier performance reports
+  @@index([isCreditSale, creditSettledAt])  // outstanding credit balance queries
+  @@index([shiftId, status])                // shift reconciliation
 }
 
 model SaleItem {
@@ -558,6 +577,8 @@ model SaleItem {
 
   @@index([saleId])
   @@index([productId])
+  // Composite for sold-items-by-product report (JOIN sale for date filter)
+  @@index([productId, saleId])
 }
 
 // Multi-payment split (premium) — a sale can be paid with cash + momo + points
@@ -742,6 +763,8 @@ model Customer {
   @@index([active])
   @@index([tier])
   @@index([lastVisitAt])
+  // Composite for outstanding credit balance queries
+  @@index([active, balance])
 }
 
 // Telephone directory — separate from customers (directory can include

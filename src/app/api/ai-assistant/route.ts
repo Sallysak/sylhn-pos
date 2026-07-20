@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
 import { rateLimitApiRead, rateLimitResponse, getClientIp } from "@/lib/rate-limit";
 import { auditLog } from "@/lib/audit";
-import ZAI from "z-ai-web-dev-sdk";
+import { chat, isZaiConfigured } from "@/lib/zai";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -210,20 +210,25 @@ Guidelines:
 Current business data (JSON):
 ${JSON.stringify(businessContext, null, 2)}`;
 
-    const messages = [
-      { role: "assistant", content: systemPrompt },
-      ...(body.conversationHistory || []).slice(-6),  // keep last 6 messages for context
+    const messages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
+      { role: "system", content: systemPrompt },
+      ...((body.conversationHistory || []).slice(-6) as Array<{ role: "system" | "user" | "assistant"; content: string }>),
       { role: "user", content: question },
     ];
 
     // ===== Call the LLM =====
-    const zai = await ZAI.create();
-    const completion = await zai.chat.completions.create({
+    if (!(await isZaiConfigured())) {
+      return NextResponse.json({
+        error: "AI assistant not configured",
+        details: "Set ZAI_API_KEY and ZAI_TOKEN env vars on Vercel. See README.md → AI Setup.",
+        setupHint: true,
+      }, { status: 503 });
+    }
+
+    const response = await chat({
       messages,
       thinking: { type: "disabled" },
     });
-
-    const response = completion.choices[0]?.message?.content || "I'm sorry, I couldn't generate a response. Please try rephrasing your question.";
 
     // Audit (don't log the full response — just that the user asked)
     await auditLog({

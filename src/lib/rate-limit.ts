@@ -88,6 +88,102 @@ export function rateLimitSeed(ip: string): RateLimitResult {
   return rateLimit(`seed:${ip}`, 3, 60 * 60);
 }
 
+// ===== Account lockout (per-user, brute force protection) =====
+//
+// After 5 failed login attempts for a specific username, the account is
+// locked for 15 minutes. Successful login clears the counter.
+//
+// This is SEPARATE from IP rate limiting — even if an attacker uses
+// 1000 different IPs, they only get 5 attempts per username per 15min.
+
+export const ACCOUNT_LOCKOUT_THRESHOLD = 5;
+export const ACCOUNT_LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+
+interface AccountLockout {
+  failCount: number;
+  lockedUntil: number; // 0 if not locked
+}
+
+const accountLockouts = new Map<string, AccountLockout>();
+
+export interface AccountLockoutResult {
+  locked: boolean;
+  failCount: number;
+  remainingAttempts: number;
+  lockedUntil: number; // epoch ms
+  retryAfter: number; // seconds
+}
+
+/** Check if an account is currently locked. Call BEFORE password verify. */
+export function checkAccountLockout(username: string): AccountLockoutResult {
+  cleanupAccountLockouts();
+  const key = `lockout:${username.toLowerCase()}`;
+  const state = accountLockouts.get(key);
+
+  if (!state || state.lockedUntil < Date.now()) {
+    // Not locked (or lockout expired)
+    return {
+      locked: false,
+      failCount: state?.failCount || 0,
+      remainingAttempts: ACCOUNT_LOCKOUT_THRESHOLD - (state?.failCount || 0),
+      lockedUntil: 0,
+      retryAfter: 0,
+    };
+  }
+
+  // Currently locked
+  const retryAfter = Math.ceil((state.lockedUntil - Date.now()) / 1000);
+  return {
+    locked: true,
+    failCount: state.failCount,
+    remainingAttempts: 0,
+    lockedUntil: state.lockedUntil,
+    retryAfter: Math.max(0, retryAfter),
+  };
+}
+
+/** Record a failed login attempt. Locks the account if threshold reached. */
+export function recordFailedLogin(username: string): AccountLockoutResult {
+  cleanupAccountLockouts();
+  const key = `lockout:${username.toLowerCase()}`;
+  const now = Date.now();
+  const existing = accountLockouts.get(key);
+  const failCount = (existing?.failCount || 0) + 1;
+  const locked = failCount >= ACCOUNT_LOCKOUT_THRESHOLD;
+  const lockedUntil = locked ? now + ACCOUNT_LOCKOUT_DURATION_MS : 0;
+
+  accountLockouts.set(key, { failCount, lockedUntil });
+
+  return {
+    locked,
+    failCount,
+    remainingAttempts: Math.max(0, ACCOUNT_LOCKOUT_THRESHOLD - failCount),
+    lockedUntil,
+    retryAfter: locked ? Math.ceil((lockedUntil - now) / 1000) : 0,
+  };
+}
+
+/** Clear lockout on successful login. */
+export function clearAccountLockout(username: string): void {
+  const key = `lockout:${username.toLowerCase()}`;
+  accountLockouts.delete(key);
+}
+
+function cleanupAccountLockouts() {
+  const now = Date.now();
+  // Run cleanup at most every 5 minutes
+  if (now - lastCleanup < CLEANUP_INTERVAL) return;
+  for (const [key, state] of accountLockouts) {
+    // Remove entries where lockout has expired AND no recent failures
+    if (state.lockedUntil < now && state.failCount === 0) {
+      accountLockouts.delete(key);
+    } else if (state.lockedUntil < now && state.lockedUntil > 0) {
+      // Lockout expired — reset fail count but keep entry to track
+      accountLockouts.set(key, { failCount: 0, lockedUntil: 0 });
+    }
+  }
+}
+
 // ===== Helper: extract client IP =====
 
 export function getClientIp(req: Request): string {

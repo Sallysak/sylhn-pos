@@ -8,8 +8,12 @@ import {
   setCsrfCookie,
 } from "@/lib/auth";
 import { LoginSchema, validate, validationError } from "@/lib/validation";
-import { rateLimitLogin, rateLimitResponse, getClientIp } from "@/lib/rate-limit";
+import {
+  rateLimitLogin, rateLimitResponse, getClientIp,
+  checkAccountLockout, recordFailedLogin, clearAccountLockout,
+} from "@/lib/rate-limit";
 import { auditLog } from "@/lib/audit";
+import { sanitizeString } from "@/lib/sanitize";
 
 // POST /api/auth/login — authenticate user, set session cookie
 export async function POST(req: NextRequest) {
@@ -31,6 +35,18 @@ export async function POST(req: NextRequest) {
   const result = validate(LoginSchema, body);
   if (!result.success) return validationError(result.error);
   const { username, password, biometric } = result.data;
+  const safeUsername = sanitizeString(username, 64);
+
+  // ===== Per-account lockout check (brute force protection) =====
+  // Even if an attacker uses 1000 IPs, they only get 5 tries per username.
+  const lockoutState = checkAccountLockout(safeUsername);
+  if (lockoutState.locked) {
+    return NextResponse.json({
+      error: `Account locked after ${lockoutState.failCount} failed attempts. Try again in ${lockoutState.retryAfter} seconds.`,
+      locked: true,
+      retryAfter: lockoutState.retryAfter,
+    }, { status: 429, headers: { "Retry-After": String(lockoutState.retryAfter) } });
+  }
 
   // Wait for DB initialization (table creation + auto-seed) to settle.
   // This is critical on Vercel serverless where the SQLite file in /tmp
@@ -40,20 +56,23 @@ export async function POST(req: NextRequest) {
 
   // Find user in DB — with self-healing retry
   try {
-    let user = await db.systemUser.findUnique({ where: { username } });
+    let user = await db.systemUser.findUnique({ where: { username: safeUsername } });
 
     // Self-heal: if a default account is missing (cold-start wiped the DB),
     // re-seed defaults and retry the lookup once.
     if (!user) {
       const defaults = ["admin", "manager", "cashier"];
-      if (defaults.includes(username)) {
-        console.log(`[auth/login] Default user "${username}" not found — re-seeding defaults and retrying…`);
-        await ensureDefaultUser(username);
-        user = await db.systemUser.findUnique({ where: { username } });
+      if (defaults.includes(safeUsername)) {
+        console.log(`[auth/login] Default user "${safeUsername}" not found — re-seeding defaults and retrying…`);
+        await ensureDefaultUser(safeUsername);
+        user = await db.systemUser.findUnique({ where: { username: safeUsername } });
       }
     }
 
     if (!user) {
+      // Record failed attempt for lockout tracking (even for unknown users —
+      // prevents username enumeration via lockout behavior)
+      const failState = recordFailedLogin(safeUsername);
       // Check if ANY users exist — if not, tell the user to run setup
       const userCount = await db.systemUser.count();
       const errorMsg = userCount === 0
@@ -62,15 +81,19 @@ export async function POST(req: NextRequest) {
 
       await auditLog({
         userId: "",
-        user: username,
+        user: safeUsername,
         action: "LOGIN_FAILED",
         module: "auth",
-        details: `Failed login for unknown username "${username}"${userCount === 0 ? " (no users in DB — setup needed)" : ""}`,
+        details: `Failed login for unknown username "${safeUsername}"${userCount === 0 ? " (no users in DB — setup needed)" : ""} (attempt ${failState.failCount}/${5})`,
         severity: "warning",
         ipAddress: ip,
         userAgent: req.headers.get("user-agent") || "",
       });
-      return NextResponse.json({ error: errorMsg, setupNeeded: userCount === 0 }, { status: 401 });
+      return NextResponse.json({
+        error: errorMsg,
+        setupNeeded: userCount === 0,
+        remainingAttempts: failState.remainingAttempts,
+      }, { status: 401 });
     }
     if (!user.active) {
       await auditLog({
@@ -143,18 +166,33 @@ export async function POST(req: NextRequest) {
     }
 
     if (!valid) {
+      // Record failed attempt → may trigger lockout
+      const failState = recordFailedLogin(safeUsername);
       await auditLog({
         userId: user.id,
         user: user.username,
         action: "LOGIN_FAILED",
         module: "auth",
-        details: `Failed login for "${user.username}" (bad password)`,
-        severity: "warning",
+        details: `Failed login for "${user.username}" (bad password) — attempt ${failState.failCount}/5${failState.locked ? " — ACCOUNT LOCKED for 15 min" : ""}`,
+        severity: failState.locked ? "critical" : "warning",
         ipAddress: ip,
         userAgent: req.headers.get("user-agent") || "",
       });
-      return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+      if (failState.locked) {
+        return NextResponse.json({
+          error: `Account locked after 5 failed attempts. Try again in ${failState.retryAfter} seconds.`,
+          locked: true,
+          retryAfter: failState.retryAfter,
+        }, { status: 429, headers: { "Retry-After": String(failState.retryAfter) } });
+      }
+      return NextResponse.json({
+        error: "Invalid credentials",
+        remainingAttempts: failState.remainingAttempts,
+      }, { status: 401 });
     }
+
+    // ===== Successful login — clear account lockout counter =====
+    clearAccountLockout(safeUsername);
 
     // Update lastLogin
     await db.systemUser.update({

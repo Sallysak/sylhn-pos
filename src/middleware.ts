@@ -24,16 +24,25 @@ function isPreviewOrigin(origin: string): boolean {
 const DEV_HEADERS: Record<string, string> = {
   "X-Content-Type-Options": "nosniff",
   "Referrer-Policy": "strict-origin-when-cross-origin",
+  "X-Frame-Options": "SAMEORIGIN",
   // Allow WebAuthn (biometrics) + camera (barcode scanner) in iframes
   "Permissions-Policy": "publickey-credentials-create=(self), publickey-credentials-get=(self), camera=(self), microphone=(), geolocation=(), interest-cohort=()",
   "Cross-Origin-Opener-Policy": "cross-origin",
   "Cross-Origin-Resource-Policy": "cross-origin",
   "Content-Security-Policy": [
-    "default-src * 'self' 'unsafe-inline' 'unsafe-eval' data: blob:",
+    "default-src 'self'",
+    // Allow loading from common CDN + the app's own preview domains
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://vercel.live",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "font-src 'self' data: https://fonts.gstatic.com",
+    "img-src 'self' data: blob: https:",
+    "connect-src 'self' https://internal-api.z.ai https://world.openfoodfacts.org https://vercel.live",
+    "media-src 'self' data: blob:",
     "frame-ancestors *",
     "form-action 'self'",
     "base-uri 'self'",
     "object-src 'none'",
+    "upgrade-insecure-requests",
   ].join("; "),
 };
 
@@ -42,17 +51,26 @@ const PROD_HEADERS: Record<string, string> = {
   "X-Content-Type-Options": "nosniff",
   "Referrer-Policy": "strict-origin-when-cross-origin",
   "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+  "X-Frame-Options": "SAMEORIGIN",
   // Allow WebAuthn (biometrics) + camera (barcode scanner) in iframes
   "Permissions-Policy": "publickey-credentials-create=(self), publickey-credentials-get=(self), camera=(self), microphone=(), geolocation=(), interest-cohort=()",
   "Cross-Origin-Opener-Policy": "cross-origin",
   "Cross-Origin-Resource-Policy": "cross-origin",
   // Allow framing from same origin AND preview platform
   "Content-Security-Policy": [
-    "default-src * 'self' 'unsafe-inline' 'unsafe-eval' data: blob:",
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "font-src 'self' data: https://fonts.gstatic.com",
+    "img-src 'self' data: blob: https:",
+    // Only allow API calls to self + the Z.AI API + OpenFoodFacts barcode lookup
+    "connect-src 'self' https://internal-api.z.ai https://world.openfoodfacts.org",
+    "media-src 'self' data: blob:",
     "frame-ancestors 'self' https://*.space-z.ai https://*.z.ai",
     "form-action 'self'",
     "base-uri 'self'",
     "object-src 'none'",
+    "upgrade-insecure-requests",
   ].join("; "),
 };
 

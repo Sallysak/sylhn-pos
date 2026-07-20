@@ -41,7 +41,40 @@ export const db =
   globalForPrisma.prisma ??
   new PrismaClient({
     log: process.env.LOG_QUERIES === '1' ? ['query', 'error', 'warn'] : ['error', 'warn'],
+    // Connection pool tuning for serverless (Neon Postgres / Vercel Postgres).
+    // Neon's free tier allows ~20 concurrent connections; without tuning,
+    // each serverless instance would open num_cpus * 2 + 1 connections and
+    // quickly exhaust the pool across cold starts.
+    //
+    // We append connection_limit=5 + pool_timeout=10s to the URL if the user
+    // hasn't already set them. This keeps each serverless instance to ≤5
+    // connections, so 4 concurrent instances = 20 connections (the Neon limit).
+    datasources: {
+      db: {
+        url: tuneDatabaseUrl(process.env.DATABASE_URL),
+      },
+    },
   })
+
+/**
+ * Append serverless-friendly connection pool params to a Postgres URL.
+ * - connection_limit=5: max connections per serverless instance
+ * - pool_timeout=10: seconds to wait for a connection before erroring
+ * - connect_timeout=30: seconds to wait for initial connection
+ *
+ * If the URL already has these params, they're preserved.
+ * If the URL is not a postgres URL (e.g. SQLite file:), it's returned as-is.
+ */
+function tuneDatabaseUrl(url: string | undefined): string | undefined {
+  if (!url) return url;
+  if (!url.startsWith("postgresql://") && !url.startsWith("postgres://")) return url;
+
+  const params = new URLSearchParams(url.split("?")[1] || "");
+  if (!params.has("connection_limit")) params.set("connection_limit", "5");
+  if (!params.has("pool_timeout")) params.set("pool_timeout", "10");
+  if (!params.has("connect_timeout")) params.set("connect_timeout", "30");
+  return url.split("?")[0] + "?" + params.toString();
+}
 
 // ===== Schema bootstrap =====
 // On a fresh Postgres instance, tables don't exist yet. We try a simple
@@ -159,3 +192,49 @@ export async function ensureDefaultUser(username: string): Promise<void> {
     console.error('[db] ensureDefaultUser seed failed:', e?.message);
   }
 }
+
+/**
+ * Run a Prisma transaction with automatic retry on transient errors.
+ *
+ * PostgreSQL (especially with PgBouncer on serverless) can throw:
+ *   - P2034: "Transaction was rolled back due to a concurrent update"
+ *   - P2024: "Timed out fetching a new connection from the connection pool"
+ *   - P1001: "Can't reach database server"
+ *
+ * This helper retries up to 3 times with exponential backoff (50ms, 100ms, 200ms).
+ *
+ * Usage:
+ *   const result = await withRetry(async (tx) => {
+ *     const sale = await tx.sale.create({ ... });
+ *     await tx.product.updateMany({ ... });
+ *     return sale;
+ *   });
+ */
+export async function withRetry<T>(
+  fn: (tx: any) => Promise<T>,
+  options: { maxRetries?: number; baseDelayMs?: number } = {}
+): Promise<T> {
+  const maxRetries = options.maxRetries ?? 3;
+  const baseDelayMs = options.baseDelayMs ?? 50;
+
+  let lastError: any;
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await db.$transaction(fn);
+    } catch (e: any) {
+      lastError = e;
+      const code = e?.code || "";
+      // Retryable Prisma error codes
+      const retryable = ["P2034", "P2024", "P1001", "P1017", "P5020"];
+      if (!retryable.includes(code) || attempt === maxRetries - 1) {
+        throw e;
+      }
+      // Exponential backoff
+      const delay = baseDelayMs * Math.pow(2, attempt);
+      await new Promise(r => setTimeout(r, delay));
+      console.warn(`[db] Transaction retry ${attempt + 1}/${maxRetries} after ${delay}ms (${code}: ${e?.message})`);
+    }
+  }
+  throw lastError;
+}
+

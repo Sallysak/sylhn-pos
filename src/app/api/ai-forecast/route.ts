@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
 import { rateLimitApiRead, rateLimitResponse, getClientIp } from "@/lib/rate-limit";
 import { auditLog } from "@/lib/audit";
-import ZAI from "z-ai-web-dev-sdk";
+import { chat as zaiChat, isZaiConfigured } from "@/lib/zai";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -361,25 +361,27 @@ export async function GET(req: NextRequest) {
     // ===== Call LLM for natural-language summary =====
     let aiSummary = "";
     try {
-      const topUrgent = sorted.filter(f => f.urgency === "critical" || f.urgency === "high").slice(0, 10);
-      const trendingUp = sorted.filter(f => f.trend === "increasing").slice(0, 5);
-      const trendingDown = sorted.filter(f => f.trend === "decreasing").slice(0, 5);
-      const zai = await ZAI.create();
-      const completion = await zai.chat.completions.create({
-        messages: [
-          {
-            role: "assistant",
-            content: `You are SYLHN AI, a demand forecasting assistant for a grocery store in Ghana. Analyze the forecast data and write a concise, actionable summary for the store owner. Use GHS for money. Structure your response as:
+      if (!(await isZaiConfigured())) {
+        aiSummary = "AI summary unavailable — Z.AI not configured. See README.md → AI Setup.";
+      } else {
+        const topUrgent = sorted.filter(f => f.urgency === "critical" || f.urgency === "high").slice(0, 10);
+        const trendingUp = sorted.filter(f => f.trend === "increasing").slice(0, 5);
+        const trendingDown = sorted.filter(f => f.trend === "decreasing").slice(0, 5);
+        aiSummary = await zaiChat({
+          messages: [
+            {
+              role: "system",
+              content: `You are SYLHN AI, a demand forecasting assistant for a grocery store in Ghana. Analyze the forecast data and write a concise, actionable summary for the store owner. Use GHS for money. Structure your response as:
 1. **Critical Reorders** — products that will stock out within 7 days
 2. **Trending Up** — products selling faster (stock more)
 3. **Trending Down** — products selling slower (reduce orders)
 4. **Seasonality Insight** — which day of week sells most
 5. **Projected Revenue** — total for next ${forecastDays} days
 Keep it under 250 words. Be specific — name products and quantities.`,
-          },
-          {
-            role: "user",
-            content: `Forecast for next ${forecastDays} days:
+            },
+            {
+              role: "user",
+              content: `Forecast for next ${forecastDays} days:
 Summary: ${JSON.stringify(summary)}
 Avg forecast accuracy so far: ${avgAccuracy !== null ? avgAccuracy + "%" : "N/A (first forecast)"}
 Evaluated past forecasts: ${evaluatedForecasts.length}
@@ -392,11 +394,11 @@ ${JSON.stringify(trendingUp.map(f => ({ name: f.name, trendPct: f.trendPct, velo
 
 Trending down:
 ${JSON.stringify(trendingDown.map(f => ({ name: f.name, trendPct: f.trendPct, velocity: f.avgDailyVelocity })), null, 2)}`,
-          },
-        ],
-        thinking: { type: "disabled" },
-      });
-      aiSummary = completion.choices[0]?.message?.content || "";
+            },
+          ],
+          thinking: { type: "disabled" },
+        });
+      }
     } catch (e) {
       console.warn("LLM summary failed:", e);
       aiSummary = "AI summary unavailable. See the data below for forecast details.";
