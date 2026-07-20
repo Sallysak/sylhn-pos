@@ -38,6 +38,17 @@ model SystemUser {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   lastLogin    DateTime?
+  // Advanced security: TOTP 2FA fields
+  twoFactorEnabled     Boolean   @default(false)
+  twoFactorSecret      String?   // base32-encoded TOTP secret (encrypted at rest via lib/data-protection)
+  twoFactorBackupCodes String?   // JSON array of hashed backup codes (sha256)
+  twoFactorEnabledAt   DateTime?
+  // Session security
+  lastPasswordChange   DateTime? @default(now())
+  passwordResetRequired Boolean  @default(false)
+  // Login security tracking
+  failedLoginAttempts  Int       @default(0)
+  lockedUntil          DateTime?
 
   // Relations — every module that records "who did this" links back here.
   auditLogs         AuditLog[]
@@ -577,8 +588,11 @@ model SaleItem {
 
   @@index([saleId])
   @@index([productId])
+  @@index([sku])
   // Composite for sold-items-by-product report (JOIN sale for date filter)
   @@index([productId, saleId])
+  // Composite for sold-items report (filter by SKU within a date range via JOIN)
+  @@index([sku, saleId])
 }
 
 // Multi-payment split (premium) — a sale can be paid with cash + momo + points

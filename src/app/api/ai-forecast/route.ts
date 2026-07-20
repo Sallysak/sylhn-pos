@@ -358,15 +358,15 @@ export async function GET(req: NextRequest) {
       ? Math.round(evaluatedForecasts.reduce((s, f) => s + (f.accuracyPct || 0), 0) / evaluatedForecasts.length * 100) / 100
       : null;
 
-    // ===== Call LLM for natural-language summary =====
+    // ===== Call LLM for natural-language summary (or generate rule-based summary) =====
     let aiSummary = "";
+    let aiSource: "llm" | "rules" = "rules";
+    const topUrgent = sorted.filter(f => f.urgency === "critical" || f.urgency === "high").slice(0, 10);
+    const trendingUp = sorted.filter(f => f.trend === "increasing").slice(0, 5);
+    const trendingDown = sorted.filter(f => f.trend === "decreasing").slice(0, 5);
+
     try {
-      if (!(await isZaiConfigured())) {
-        aiSummary = "AI summary unavailable — Z.AI not configured. See README.md → AI Setup.";
-      } else {
-        const topUrgent = sorted.filter(f => f.urgency === "critical" || f.urgency === "high").slice(0, 10);
-        const trendingUp = sorted.filter(f => f.trend === "increasing").slice(0, 5);
-        const trendingDown = sorted.filter(f => f.trend === "decreasing").slice(0, 5);
+      if (await isZaiConfigured()) {
         aiSummary = await zaiChat({
           messages: [
             {
@@ -398,10 +398,56 @@ ${JSON.stringify(trendingDown.map(f => ({ name: f.name, trendPct: f.trendPct, ve
           ],
           thinking: { type: "disabled" },
         });
+        aiSource = "llm";
+      } else {
+        // ===== Rule-based summary (LLM not configured) =====
+        // Find peak day across all forecasts
+        const dayCounts: Record<string, number> = {};
+        for (const f of sorted) {
+          const pd = (f as any).seasonality?.peakDay;
+          if (pd) dayCounts[pd] = (dayCounts[pd] || 0) + 1;
+        }
+        const peakDay = Object.entries(dayCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || "—";
+        aiSummary = [
+          `**Demand forecast summary — next ${forecastDays} days**`,
+          ``,
+          `**1. Critical Reorders (${summary.criticalCount} products):**`,
+          ...(topUrgent.length > 0
+            ? topUrgent.slice(0, 5).map(f => `   • **${f.name}** — ${f.currentStock} units in stock, will run out in ~${f.projectedStockoutDays || "?"} days. Reorder ${f.recommendedReorderQty} units (confidence ${(f.confidenceScore * 100).toFixed(0)}%).`)
+            : [`   ✅ No critical stockouts projected.`]),
+          ``,
+          `**2. Trending Up (${trendingUp.length} products):**`,
+          ...(trendingUp.length > 0
+            ? trendingUp.map(f => `   • **${f.name}** — sales velocity up ${f.trendPct.toFixed(1)}% (avg ${f.avgDailyVelocity.toFixed(1)} units/day).`)
+            : [`   No significant upward trends.`]),
+          ``,
+          `**3. Trending Down (${trendingDown.length} products):**`,
+          ...(trendingDown.length > 0
+            ? trendingDown.map(f => `   • **${f.name}** — sales velocity down ${Math.abs(f.trendPct).toFixed(1)}% (avg ${f.avgDailyVelocity.toFixed(1)} units/day).`)
+            : [`   No significant downward trends.`]),
+          ``,
+          `**4. Seasonality:** Peak sales day is **${peakDay}**.`,
+          ``,
+          `**5. Projected Revenue:** GHS ${summary.totalProjectedRevenue.toFixed(2)} over next ${forecastDays} days.`,
+          ``,
+          `**Recommended reorder cost:** GHS ${summary.totalReorderCost.toFixed(2)} (${summary.criticalCount + summary.highCount} products need restocking).`,
+          ``,
+          `_${avgAccuracy !== null ? `Forecast accuracy: ${avgAccuracy}% (based on ${evaluatedForecasts.length} past evaluations).` : "Forecast accuracy will be computed once we have past data to compare against."}_`,
+        ].join("\n");
       }
     } catch (e) {
       console.warn("LLM summary failed:", e);
-      aiSummary = "AI summary unavailable. See the data below for forecast details.";
+      // Generate rule-based summary as fallback
+      aiSummary = [
+        `**Demand forecast summary — next ${forecastDays} days**`,
+        ``,
+        `**Critical Reorders:** ${summary.criticalCount} products`,
+        `**High Priority:** ${summary.highCount} products`,
+        `**Projected Revenue:** GHS ${summary.totalProjectedRevenue.toFixed(2)}`,
+        `**Reorder Cost:** GHS ${summary.totalReorderCost.toFixed(2)}`,
+        ``,
+        `_(LLM unavailable — showing data-driven summary. See the table below for product-level details.)_`,
+      ].join("\n");
     }
 
     await auditLog({
@@ -419,6 +465,7 @@ ${JSON.stringify(trendingDown.map(f => ({ name: f.name, trendPct: f.trendPct, ve
       forecastDays,
       summary,
       aiSummary,
+      aiSource,
       forecasts: sorted,
       accuracy: {
         avgAccuracyPct: avgAccuracy,

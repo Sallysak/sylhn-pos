@@ -61,21 +61,32 @@ export function rateLimit(
 
 // ===== Pre-configured limits =====
 
-/** Login: 10 attempts per 15 minutes per IP (increased from 5 for UX). */
+/** Login: 5 attempts per 15 minutes per IP (tightened from 10 for security).
+ *  Combined with per-account lockout (5 failed attempts → 15-min account lock). */
 export function rateLimitLogin(ip: string): RateLimitResult {
-  return rateLimit(`login:${ip}`, 10, 15 * 60);
+  return rateLimit(`login:${ip}`, 5, 15 * 60);
 }
 
-/** General API write: 120 requests per minute per IP (increased from 60). */
+/** General API write: 60 requests per minute per IP (tightened from 120).
+ *  Production apps should aim for ~60/min for write endpoints. */
 export function rateLimitApiWrite(ip: string): RateLimitResult {
-  return rateLimit(`api-write:${ip}`, 120, 60);
+  return rateLimit(`api-write:${ip}`, 60, 60);
 }
 
-/** General API read: 300 requests per minute per IP (increased from 120 —
- *  the session restore calls /api/auth/me on every page load, and the POS
- *  UI makes frequent read calls for products, sales, etc.) */
+/** General API read: 200 requests per minute per IP (tightened from 300). */
 export function rateLimitApiRead(ip: string): RateLimitResult {
-  return rateLimit(`api-read:${ip}`, 300, 60);
+  return rateLimit(`api-read:${ip}`, 200, 60);
+}
+
+/** Sensitive operations (wipe data, restore backup, user management):
+ *  10 requests per minute per IP — very tight. */
+export function rateLimitSensitive(ip: string): RateLimitResult {
+  return rateLimit(`sensitive:${ip}`, 10, 60);
+}
+
+/** AI queries: 20 requests per minute per IP — LLM calls are expensive. */
+export function rateLimitAi(ip: string): RateLimitResult {
+  return rateLimit(`ai:${ip}`, 20, 60);
 }
 
 /** Email sending: 5 per hour per IP (anti-spam). */

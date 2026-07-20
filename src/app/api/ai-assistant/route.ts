@@ -4,6 +4,7 @@ import { requireAuth } from "@/lib/auth";
 import { rateLimitApiRead, rateLimitResponse, getClientIp } from "@/lib/rate-limit";
 import { auditLog } from "@/lib/audit";
 import { chat, isZaiConfigured } from "@/lib/zai";
+import { generateRuleBasedResponse, type BusinessContext } from "@/lib/ai-rules";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -11,13 +12,13 @@ export const maxDuration = 60;
 // POST /api/ai-assistant
 // Premium: AI Business Assistant — natural language queries about the store.
 //
-// The assistant gathers relevant business data (sales, products, suppliers,
-// customers, inventory, expenses) and sends it as context to the LLM along
-// with the user's question. The LLM responds with insights, recommendations,
-// and actionable advice.
+// Primary path: uses Z.AI LLM (if ZAI_API_KEY + ZAI_TOKEN are configured).
+// Fallback: rule-based response generator (ALWAYS returns useful insights,
+//           even when LLM is not configured). This ensures the assistant
+//           never returns a 503 — every question gets a data-driven answer.
 //
 // Body: { question: string, conversationHistory?: [{role, content}] }
-// Returns: { response: string, context: { ...dataUsed } }
+// Returns: { response: string, context: { ...dataUsed }, source: "llm" | "rules" }
 export async function POST(req: NextRequest) {
   let user;
   try { user = await requireAuth(); } catch (e) { return e as Response; }
@@ -216,19 +217,28 @@ ${JSON.stringify(businessContext, null, 2)}`;
       { role: "user", content: question },
     ];
 
-    // ===== Call the LLM =====
-    if (!(await isZaiConfigured())) {
-      return NextResponse.json({
-        error: "AI assistant not configured",
-        details: "Set ZAI_API_KEY and ZAI_TOKEN env vars on Vercel. See README.md → AI Setup.",
-        setupHint: true,
-      }, { status: 503 });
-    }
+    // ===== Call the LLM (or fall back to rule-based response) =====
+    let response: string;
+    let source: "llm" | "rules";
 
-    const response = await chat({
-      messages,
-      thinking: { type: "disabled" },
-    });
+    if (await isZaiConfigured()) {
+      try {
+        response = await chat({
+          messages,
+          thinking: { type: "disabled" },
+        });
+        source = "llm";
+      } catch (e: any) {
+        // LLM call failed (rate limit, network, etc.) — fall back to rules
+        console.warn("[ai-assistant] LLM call failed, falling back to rules:", e?.message);
+        response = generateRuleBasedResponse(question, businessContext as BusinessContext);
+        source = "rules";
+      }
+    } else {
+      // LLM not configured — use rule-based response (still data-driven)
+      response = generateRuleBasedResponse(question, businessContext as BusinessContext);
+      source = "rules";
+    }
 
     // Audit (don't log the full response — just that the user asked)
     await auditLog({
@@ -236,7 +246,7 @@ ${JSON.stringify(businessContext, null, 2)}`;
       user: user.username,
       action: "AI_QUERY",
       module: "dashboard",
-      details: `AI assistant queried: "${question.slice(0, 100)}${question.length > 100 ? "..." : ""}"`,
+      details: `AI assistant queried (source=${source}): "${question.slice(0, 100)}${question.length > 100 ? "..." : ""}"`,
       severity: "info",
       ipAddress: ip,
       userAgent: req.headers.get("user-agent") || "",
@@ -246,6 +256,7 @@ ${JSON.stringify(businessContext, null, 2)}`;
       success: true,
       response,
       question,
+      source,
       timestamp: now.toISOString(),
       contextUsed: {
         salesToday: todaySales.length,
