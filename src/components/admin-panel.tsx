@@ -266,6 +266,10 @@ export function AdminLogin({ onSuccess, onCancel, adminOnly = false }: { onSucce
       // 401 / 403 = invalid credentials (server responded, so NOT offline)
       // Do NOT fall back to local — the server explicitly said "invalid".
       // Just record the failed attempt.
+      if (data.setupNeeded) {
+        setError('No users in database. Run setup first — visit /api/setup in your browser, then try again with admin/admin123');
+        return;
+      }
       failAttempt(data.error || 'Invalid credentials');
     } catch (err) {
       // fetch() throws TypeError when the server is unreachable (network error).

@@ -36,18 +36,23 @@ export async function POST(req: NextRequest) {
   try {
     const user = await db.systemUser.findUnique({ where: { username } });
     if (!user) {
-      // Audit failed login (no PII)
+      // Check if ANY users exist — if not, tell the user to run setup
+      const userCount = await db.systemUser.count();
+      const errorMsg = userCount === 0
+        ? "No users found. Visit /api/setup to create default users (admin/admin123)"
+        : "Invalid credentials";
+
       await auditLog({
         userId: "",
         user: username,
         action: "LOGIN_FAILED",
         module: "auth",
-        details: `Failed login for unknown username "${username}"`,
+        details: `Failed login for unknown username "${username}"${userCount === 0 ? " (no users in DB — setup needed)" : ""}`,
         severity: "warning",
         ipAddress: ip,
         userAgent: req.headers.get("user-agent") || "",
       });
-      return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+      return NextResponse.json({ error: errorMsg, setupNeeded: userCount === 0 }, { status: 401 });
     }
     if (!user.active) {
       await auditLog({
