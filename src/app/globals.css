@@ -2592,7 +2592,7 @@ html.dark .status-error-premium {
 
   /* Hide elements explicitly marked as no-print */
   .no-print,
-  .print:hidden,
+  .print-hide,
   header,
   nav,
   .mobile-bottom-nav,
