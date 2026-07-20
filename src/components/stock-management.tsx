@@ -698,81 +698,73 @@ function ProductForm({ product, groups, onSave, onClose }: {
         animate={{ scale: 1, y: 0 }}
         exit={{ scale: 0.95, y: 20 }}
         onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl w-full max-w-2xl max-h-[100vh] sm:max-h-[90vh] overflow-hidden flex flex-col"
+        className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl w-full max-w-lg max-h-[92vh] sm:max-h-[88vh] overflow-hidden flex flex-col"
       >
-        {/* Header — premium gradient with emoji picker quick-access */}
-        <div className="flex items-center justify-between px-5 sm:px-6 py-4 bg-gradient-to-r from-emerald-600 to-teal-600 text-white flex-shrink-0">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="h-10 w-10 rounded-xl bg-white/15 flex items-center justify-center text-xl flex-shrink-0">
-              {form.emoji || (product ? <Edit2 className="h-5 w-5" /> : <Plus className="h-5 w-5" />)}
+        {/* Header — compact */}
+        <div className="flex items-center justify-between px-4 sm:px-5 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white flex-shrink-0">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="h-8 w-8 rounded-lg bg-white/15 flex items-center justify-center text-lg flex-shrink-0">
+              {form.emoji || (product ? <Edit2 className="h-4 w-4" /> : <Plus className="h-4 w-4" />)}
             </div>
             <div className="min-w-0">
-              <h3 className="text-base sm:text-lg font-bold truncate">{product ? "Edit Product" : "Add New Product"}</h3>
-              <p className="text-[10px] sm:text-xs opacity-80 truncate">{form.name || "Untitled product"}</p>
+              <h3 className="text-sm sm:text-base font-bold truncate">{product ? "Edit Product" : "Add New Product"}</h3>
+              <p className="text-[10px] opacity-80 truncate">{form.name || "Untitled product"}</p>
             </div>
           </div>
-          <button onClick={onClose} className="h-9 w-9 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center transition active:scale-90 flex-shrink-0" aria-label="Close">
+          <button onClick={onClose} className="h-8 w-8 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center transition active:scale-90 flex-shrink-0" aria-label="Close">
             <X className="h-4 w-4" />
           </button>
         </div>
 
         <ScrollArea className="flex-1 min-h-0">
-          <div className="p-5 sm:p-6 space-y-6 sm:space-y-4">
+          <div className="p-4 sm:p-5 space-y-4">
 
             {/* ===== Section 1: Basic Info ===== */}
             <FormSection title="Basic Info" icon={<Tag className="h-3.5 w-3.5" />}>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                <FormField label="Product Name" icon={<Tag className="h-3.5 w-3.5" />} full>
+              <div className="space-y-2.5">
+                <FormField label="Product Name" icon={<Tag className="h-3.5 w-3.5" />}>
                   <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="form-input" placeholder="e.g. Fresh Tomatoes" />
                 </FormField>
-                <div className="grid grid-cols-[1fr_80px] gap-2 sm:gap-3">
+                <div className="grid grid-cols-[1fr_60px] gap-2">
                   <FormField label="SKU" icon={<Barcode className="h-3.5 w-3.5" />}>
                     <input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} className="form-input" />
                   </FormField>
-                  <FormField label="Emoji">
-                    <input value={form.emoji} onChange={(e) => setForm({ ...form, emoji: e.target.value })} className="form-input text-center text-xl" maxLength={2} />
+                  <FormField label="Icon">
+                    <input value={form.emoji} onChange={(e) => setForm({ ...form, emoji: e.target.value })} className="form-input text-center text-lg" maxLength={2} />
                   </FormField>
                 </div>
-                <FormField label="Barcode" full>
-                  <input value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} className="form-input" placeholder="941563812092 (optional)" inputMode="numeric" />
+                <FormField label="Barcode (optional)">
+                  <input value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} className="form-input" placeholder="941563812092" inputMode="numeric" />
                 </FormField>
               </div>
             </FormSection>
 
             {/* ===== Section 2: Pricing ===== */}
             <FormSection title="Pricing" icon={<DollarSign className="h-3.5 w-3.5" />}>
-              <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                <FormField label="Cost Price (GHS)" icon={<DollarSign className="h-3.5 w-3.5" />}>
+              <div className="grid grid-cols-2 gap-2.5">
+                <FormField label="Cost Price (GHS)">
                   <input type="number" step="0.01" value={form.costPrice} onChange={(e) => setForm({ ...form, costPrice: parseFloat(e.target.value) || 0 })} className="form-input" inputMode="decimal" />
                 </FormField>
-                <FormField label="Selling Price (GHS)" icon={<DollarSign className="h-3.5 w-3.5" />}>
+                <FormField label="Selling Price (GHS)">
                   <input type="number" step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: parseFloat(e.target.value) || 0 })} className="form-input" inputMode="decimal" />
                 </FormField>
               </div>
               {profitMargin && (
-                <div className="mt-3 p-3 sm:p-4 rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 ring-1 ring-emerald-200 flex items-center justify-between">
-                  <div>
-                    <div className="text-[10px] sm:text-xs font-semibold text-emerald-700 uppercase tracking-wider">Profit Margin</div>
-                    <div className="text-[10px] text-emerald-600 mt-0.5">Per {form.unit}</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-base sm:text-lg font-bold text-emerald-700">{formatGHS(profitMargin.amount)}</div>
-                    <div className="text-[10px] sm:text-xs text-emerald-600">{profitMargin.pct.toFixed(1)}% margin</div>
-                  </div>
+                <div className="mt-2 p-2.5 rounded-lg bg-emerald-50 ring-1 ring-emerald-200 flex items-center justify-between">
+                  <span className="text-[10px] font-semibold text-emerald-700 uppercase">Margin</span>
+                  <span className="text-sm font-bold text-emerald-700">{formatGHS(profitMargin.amount)} ({profitMargin.pct.toFixed(1)}%)</span>
                 </div>
               )}
-              <FormField label="Taxable" full>
-                <label className="flex items-center gap-2.5 cursor-pointer p-2 -m-2 rounded-lg hover:bg-slate-50 transition">
-                  <input type="checkbox" checked={form.taxable} onChange={(e) => setForm({ ...form, taxable: e.target.checked })} className="h-5 w-5 rounded accent-emerald-600" />
-                  <span className="text-sm text-slate-700">Apply VAT (15%) on this product</span>
-                </label>
-              </FormField>
+              <label className="flex items-center gap-2 cursor-pointer pt-1">
+                <input type="checkbox" checked={form.taxable} onChange={(e) => setForm({ ...form, taxable: e.target.checked })} className="h-4 w-4 rounded accent-emerald-600" />
+                <span className="text-xs text-slate-600">Apply VAT (15%)</span>
+              </label>
             </FormSection>
 
             {/* ===== Section 3: Inventory ===== */}
             <FormSection title="Inventory" icon={<Package className="h-3.5 w-3.5" />}>
-              <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                <FormField label="Current Stock">
+              <div className="grid grid-cols-2 gap-2.5">
+                <FormField label="Stock Qty">
                   <input type="number" value={form.stock} onChange={(e) => setForm({ ...form, stock: parseInt(e.target.value) || 0 })} className="form-input" inputMode="numeric" />
                 </FormField>
                 <FormField label="Reorder Level">
@@ -783,42 +775,44 @@ function ProductForm({ product, groups, onSave, onClose }: {
                     {["kg", "each", "box", "pack", "btl", "loaf", "can", "jar", "bag", "tub", "block", "head", "dz"].map(u => <option key={u} value={u}>{u}</option>)}
                   </select>
                 </FormField>
-                <FormField label="Batch Number">
+                <FormField label="Batch No.">
                   <input value={form.batchNumber} onChange={(e) => setForm({ ...form, batchNumber: e.target.value })} className="form-input" />
                 </FormField>
               </div>
             </FormSection>
 
-            {/* ===== Section 4: Categorization & Supplier ===== */}
+            {/* ===== Section 4: Categorization ===== */}
             <FormSection title="Categorization" icon={<Layers className="h-3.5 w-3.5" />}>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                <FormField label="Stock Group" full>
+              <div className="space-y-2.5">
+                <FormField label="Stock Group">
                   <select value={form.groupId} onChange={(e) => setForm({ ...form, groupId: e.target.value, category: e.target.value })} className="form-input">
                     {groups.map(g => <option key={g.id} value={g.id}>{g.icon} {g.name}</option>)}
                   </select>
                 </FormField>
-                <FormField label="Supplier" full>
-                  <input value={form.supplier} onChange={(e) => setForm({ ...form, supplier: e.target.value })} className="form-input" placeholder="Supplier name (optional)" />
+                <FormField label="Supplier (optional)">
+                  <input value={form.supplier} onChange={(e) => setForm({ ...form, supplier: e.target.value })} className="form-input" placeholder="Supplier name" />
                 </FormField>
-                <FormField label="Received Date" icon={<Calendar className="h-3.5 w-3.5" />}>
-                  <input type="date" value={form.receivedDate} onChange={(e) => setForm({ ...form, receivedDate: e.target.value })} className="form-input" />
-                </FormField>
-                <FormField label="Expiry Date" icon={<Calendar className="h-3.5 w-3.5" />}>
-                  <input type="date" value={form.expiryDate} onChange={(e) => setForm({ ...form, expiryDate: e.target.value })} className="form-input" />
-                </FormField>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <FormField label="Received Date">
+                    <input type="date" value={form.receivedDate} onChange={(e) => setForm({ ...form, receivedDate: e.target.value })} className="form-input" />
+                  </FormField>
+                  <FormField label="Expiry Date">
+                    <input type="date" value={form.expiryDate} onChange={(e) => setForm({ ...form, expiryDate: e.target.value })} className="form-input" />
+                  </FormField>
+                </div>
               </div>
             </FormSection>
 
           </div>
         </ScrollArea>
 
-        {/* Sticky CTA — always visible (premium mobile pattern) */}
-        <div className="flex-shrink-0 px-5 sm:px-6 py-3 sm:py-4 border-t border-slate-200 bg-white flex gap-2">
-          <Button variant="outline" onClick={onClose} className="flex-shrink-0 h-12 sm:h-10 px-4">Cancel</Button>
+        {/* Sticky CTA — always visible */}
+        <div className="flex-shrink-0 px-4 sm:px-5 py-3 border-t border-slate-200 bg-white flex gap-2">
+          <Button variant="outline" onClick={onClose} className="flex-shrink-0 h-11 px-4 text-sm">Cancel</Button>
           <Button
             onClick={() => form.name && onSave(form)}
             disabled={!form.name}
-            className="flex-1 h-12 sm:h-10 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-sm font-bold"
+            className="flex-1 h-11 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-sm font-bold"
           >
             <Save className="h-4 w-4" />
             {product ? "Update Product" : "Add Product"}
@@ -828,23 +822,28 @@ function ProductForm({ product, groups, onSave, onClose }: {
         <style jsx>{`
           :global(.form-input) {
             width: 100%;
-            height: 2.75rem;
-            padding: 0 0.75rem;
-            border-radius: 0.625rem;
+            height: 2.5rem;
+            padding: 0 0.625rem;
+            border-radius: 0.5rem;
             border: 1px solid rgb(226 232 240);
             background: white;
-            font-size: 16px; /* 16px prevents iOS zoom-on-focus */
+            font-size: 14px;
             outline: none;
             transition: all 0.15s;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            box-sizing: border-box;
           }
           :global(.form-input:focus) {
             border-color: rgb(16 185 129);
             box-shadow: 0 0 0 3px rgb(16 185 129 / 0.1);
+            overflow: visible;
           }
-          @media (min-width: 640px) {
+          @media (max-width: 639px) {
             :global(.form-input) {
+              font-size: 16px;
               height: 2.5rem;
-              font-size: 0.875rem;
             }
           }
         `}</style>
