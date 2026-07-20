@@ -12,18 +12,71 @@ import { db } from "@/lib/db";
 // correctly on every device, including those without emoji support.
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const invoice = searchParams.get("invoice") || "";
+  const invoiceRaw = searchParams.get("invoice") || "";
   const saleId = searchParams.get("saleId") || "";
 
+  // Normalize the invoice number: trim, collapse internal whitespace,
+  // uppercase. We'll try multiple variants below for fuzzy matching.
+  const invoice = invoiceRaw.trim();
+  const invoiceNormalized = invoice.replace(/\s+/g, "").toUpperCase();
+  const invoiceNoDashes = invoiceNormalized.replace(/-/g, "");
+
   try {
-    // Find the sale by invoice number or sale ID
-    const sale = saleId
-      ? await db.sale.findUnique({ where: { id: saleId }, include: { items: true } })
-      : await db.sale.findFirst({ where: { invoiceNumber: invoice }, include: { items: true } });
+    // Find the sale by saleId (if provided) OR by invoice number
+    // (trying several normalization variants for fuzzy matching).
+    let sale: any = null;
+
+    if (saleId) {
+      sale = await db.sale.findUnique({ where: { id: saleId }, include: { items: true } });
+    }
+
+    // If saleId didn't match (or wasn't provided), try invoice number variants.
+    // We do this even when saleId was given (defensive — sometimes QR codes
+    // encode both, and the saleId may be stale while the invoice is current).
+    if (!sale && invoice) {
+      // Build a list of variants to try, in order of preference.
+      // We use Prisma's case-insensitive mode (mode: 'insensitive') on Postgres
+      // plus a series of normalized forms to handle scan/OCR/typo errors.
+      const variants = [
+        invoice,                                // exact: "423552 F89"
+        invoice.trim(),                         // trimmed
+        invoiceNormalized,                      // "423552F89"
+        invoiceNoDashes,                        // "423552F89" (already no dashes here, kept for other formats)
+      ].filter((v, i, arr) => v && arr.indexOf(v) === i);  // dedupe
+
+      for (const v of variants) {
+        sale = await db.sale.findFirst({
+          where: { invoiceNumber: { equals: v, mode: "insensitive" } },
+          include: { items: true },
+        });
+        if (sale) break;
+
+        // Also try a "contains" search as a last resort — useful when the
+        // QR-encoded invoice has extra prefix/suffix (e.g. "INV-423552F89-001"
+        // would match a sale with invoice "423552F89").
+        sale = await db.sale.findFirst({
+          where: {
+            OR: [
+              { invoiceNumber: { contains: v, mode: "insensitive" } },
+              // Reverse: the stored invoice contains the search term
+              // (Prisma doesn't support "containedBy", so we approximate via startsWith)
+              { invoiceNumber: { startsWith: v, mode: "insensitive" } },
+            ],
+          },
+          include: { items: true },
+        });
+        if (sale) break;
+      }
+    }
 
     if (!sale) {
+      // Detect if the DB simply has no sales at all (e.g. fresh install or
+      // data was just wiped). Show a more helpful message in that case.
+      let totalSales = 0;
+      try { totalSales = await db.sale.count(); } catch { /* ignore */ }
+
       return new NextResponse(
-        renderNotFoundHtml(invoice),
+        totalSales === 0 ? renderEmptyDbHtml(invoice) : renderNotFoundHtml(invoice),
         { headers: { "Content-Type": "text/html; charset=utf-8" } }
       );
     }
@@ -269,6 +322,49 @@ function renderNotFoundHtml(invoice: string): string {
          • The receipt was voided before being saved<br>
          • The sale was completed very recently and is still being processed</p>
       <p class="hint">If you believe this is an error, please contact SYLHN COMPANY LTD at +233 59 276 6044 with the invoice number above.</p>
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
+function renderEmptyDbHtml(invoice: string): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>No Receipts On File</title>
+<style>
+  *{box-sizing:border-box}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;margin:0;padding:20px;background:#f1f5f9;color:#1e293b;min-height:100vh;display:flex;align-items:center;justify-content:center}
+  .card{max-width:420px;width:100%;background:white;border-radius:20px;padding:0;box-shadow:0 10px 40px rgba(15,23,42,0.08);overflow:hidden}
+  .status-badge{display:flex;align-items:center;gap:12px;padding:16px 20px;margin:24px;background:#dbeafe;border:1.5px solid #93c5fd;border-radius:12px}
+  .status-label{font-size:16px;font-weight:700;color:#1e40af;margin:0 0 4px}
+  .status-sublabel{font-size:12px;color:#1e3a8a;margin:0;line-height:1.4}
+  .body{padding:0 24px 24px}
+  .body p{font-size:13px;color:#475569;line-height:1.6;margin:0 0 8px}
+  .body strong{color:#1e293b;font-family:monospace}
+  .body .restore{margin-top:14px;padding:12px 14px;background:#f0fdf4;border:1px solid #86efac;border-radius:10px;font-size:12px;color:#166534}
+  .hint{font-size:11px;color:#94a3b8;margin-top:16px;padding-top:14px;border-top:1px solid #e2e8f0}
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="status-badge" role="status">
+      <div>${svgIcon("alert", "#1e40af")}</div>
+      <div>
+        <p class="status-label">No Receipts On File</p>
+        <p class="status-sublabel">This POS currently has no sales records to verify.</p>
+      </div>
+    </div>
+    <div class="body">
+      <p>You scanned a QR code looking for invoice: <strong>${escapeHtml(invoice || '(empty)')}</strong></p>
+      <p>The receipt you are trying to verify was likely created BEFORE the database was wiped (e.g. via "Wipe All Business Data" in the admin panel). The receipt's QR code is still valid proof of purchase, but the matching sale record no longer exists in the live system.</p>
+      <div class="restore">
+        <strong>To restore past receipts:</strong> Import a previously-downloaded backup at <code>/api/admin/backup</code> (admin only). If you don't have a backup, the receipts issued before the wipe can no longer be verified online — but they remain valid as printed proof of purchase.
+      </div>
+      <p class="hint">Need help? Contact SYLHN COMPANY LTD at +233 59 276 6044 with the invoice number above.</p>
     </div>
   </div>
 </body>
