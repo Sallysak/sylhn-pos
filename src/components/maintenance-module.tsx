@@ -820,14 +820,67 @@ function SecuritySettings() {
 }
 
 // ===== Wipe All Data Section (Danger Zone) =====
+// SAFETY: The wipe button is DISABLED until the user downloads a fresh
+// backup in the current session. This prevents the "I wiped without a
+// backup" scenario that wiped out receipt verifiability for old receipts.
 function WipeDataSection() {
   const { toast } = useToast();
   const [confirming, setConfirming] = useState(false);
   const [confirmText, setConfirmText] = useState("");
   const [wiping, setWiping] = useState(false);
+  const [backingUp, setBackingUp] = useState(false);
+  const [backupDownloadedAt, setBackupDownloadedAt] = useState<Date | null>(null);
   const [result, setResult] = useState<any>(null);
 
+  // ===== Download a backup JSON file before wiping =====
+  // The backup endpoint returns the file as an attachment — we trigger
+  // a browser download by fetching it as a blob and creating an <a> link.
+  const handleDownloadBackup = async () => {
+    setBackingUp(true);
+    try {
+      const res = await fetch("/api/admin/backup", { credentials: "include" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
+      const blob = await res.blob();
+      // Generate filename with timestamp
+      const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+      const filename = `sylhn-backup-${ts}.json`;
+      // Trigger browser download
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setBackupDownloadedAt(new Date());
+      toast({
+        title: "✅ Backup downloaded",
+        description: `${filename} (${(blob.size / 1024).toFixed(1)} KB) — save this file somewhere safe. You can now wipe data.`,
+      });
+    } catch (e: any) {
+      toast({
+        title: "Backup failed",
+        description: e?.message || "Could not download backup. Wipe is blocked until backup succeeds.",
+        variant: "destructive",
+      });
+    } finally {
+      setBackingUp(false);
+    }
+  };
+
   const handleWipe = async () => {
+    if (!backupDownloadedAt) {
+      toast({
+        title: "Backup required",
+        description: "Download a backup first — wiped data cannot be recovered.",
+        variant: "destructive",
+      });
+      return;
+    }
     if (confirmText !== "WIPE_ALL_DATA") {
       toast({ title: "Confirmation text doesn't match", description: 'Type "WIPE_ALL_DATA" exactly', variant: "destructive" });
       return;
@@ -850,6 +903,8 @@ function WipeDataSection() {
         });
         setConfirming(false);
         setConfirmText("");
+        // Reset backup flag — next wipe requires a fresh backup
+        setBackupDownloadedAt(null);
       } else {
         toast({ title: "Wipe failed", description: data.error, variant: "destructive" });
       }
@@ -859,6 +914,10 @@ function WipeDataSection() {
       setWiping(false);
     }
   };
+
+  const backupAgeMin = backupDownloadedAt
+    ? Math.floor((Date.now() - backupDownloadedAt.getTime()) / 60000)
+    : null;
 
   return (
     <div className="rounded-2xl ring-2 ring-rose-300 bg-gradient-to-br from-rose-50 to-white overflow-hidden">
@@ -885,6 +944,43 @@ function WipeDataSection() {
           <p className="font-semibold pt-1">User accounts are PRESERVED so you can still log in afterwards.</p>
         </div>
 
+        {/* ===== Step 1: Download backup (REQUIRED before wipe) ===== */}
+        <div className={`rounded-xl p-3 ring-1 ${backupDownloadedAt ? "bg-emerald-50 ring-emerald-200" : "bg-amber-50 ring-amber-300"}`}>
+          <div className="flex items-start gap-2">
+            <div className={`h-6 w-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${backupDownloadedAt ? "bg-emerald-600 text-white" : "bg-amber-500 text-white"}`}>
+              {backupDownloadedAt ? "✓" : "1"}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-xs font-bold text-slate-800">Download a backup first</div>
+              {backupDownloadedAt ? (
+                <div className="text-[11px] text-emerald-700 mt-0.5">
+                  ✓ Backup downloaded {backupAgeMin === 0 ? "just now" : `${backupAgeMin} min ago`}. You can proceed to wipe.
+                </div>
+              ) : (
+                <div className="text-[11px] text-amber-700 mt-0.5">
+                  Required — wiped data cannot be recovered. Saves all sales, products, customers, suppliers as a JSON file.
+                </div>
+              )}
+              <button
+                onClick={handleDownloadBackup}
+                disabled={backingUp}
+                className={`mt-2 h-8 px-3 rounded-lg text-xs font-bold flex items-center gap-1.5 transition active:scale-95 ${
+                  backupDownloadedAt
+                    ? "bg-emerald-100 hover:bg-emerald-200 text-emerald-700"
+                    : "bg-amber-500 hover:bg-amber-600 text-white"
+                } disabled:opacity-50`}
+              >
+                {backingUp ? (
+                  <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Downloading…</>
+                ) : (
+                  <><Download className="h-3.5 w-3.5" /> {backupDownloadedAt ? "Download again" : "Download backup now"}</>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* ===== Step 2: Wipe data (DISABLED until backup is downloaded) ===== */}
         {result ? (
           <div className="p-3 rounded-lg bg-emerald-50 ring-1 ring-emerald-200 text-xs space-y-1">
             <div className="font-bold text-emerald-700">✅ Wipe complete</div>
@@ -932,11 +1028,23 @@ function WipeDataSection() {
         ) : (
           <button
             onClick={() => setConfirming(true)}
-            className="w-full h-10 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-sm font-bold flex items-center justify-center gap-2 transition active:scale-95"
+            disabled={!backupDownloadedAt}
+            className={`w-full h-10 rounded-lg text-white text-sm font-bold flex items-center justify-center gap-2 transition ${
+              backupDownloadedAt
+                ? "bg-rose-600 hover:bg-rose-700 active:scale-95"
+                : "bg-slate-300 cursor-not-allowed"
+            }`}
+            title={backupDownloadedAt ? "Click to proceed with wipe" : "Download a backup first to enable this button"}
           >
             <Trash2 className="h-4 w-4" />
-            Wipe All Business Data
+            {backupDownloadedAt ? "Wipe All Business Data" : "🔒 Download backup first to enable wipe"}
           </button>
+        )}
+
+        {!backupDownloadedAt && !result && (
+          <div className="text-[10px] text-amber-700 italic text-center">
+            ⚠️ The wipe button is locked until you download a backup. This prevents accidental data loss.
+          </div>
         )}
       </div>
     </div>
