@@ -75,6 +75,7 @@ const OperationsDashboard = dynamic(() => import("@/components/operations-dashbo
 const ReceiptArchive = dynamic(() => import("@/components/receipt-archive").then(m => ({ default: m.ReceiptArchive })), { ssr: false, loading: loadingFallback });
 const FeaturesMap = dynamic(() => import("@/components/features-map").then(m => ({ default: m.FeaturesMap })), { ssr: false, loading: loadingFallback });
 const AdminHub = dynamic(() => import("@/components/admin-hub").then(m => ({ default: m.AdminHub })), { ssr: false, loading: loadingFallback });
+const KeyboardShortcutsOverlay = dynamic(() => import("@/components/keyboard-shortcuts").then(m => ({ default: m.KeyboardShortcutsOverlay })), { ssr: false });
 
 // ===== Server → Client product transformer =====
 // The /api/products endpoint returns Prisma-shaped products (with `quantity`
@@ -1987,6 +1988,13 @@ export default function POSPage() {
             >
               <Sparkles className="h-4 w-4" /> <span className="hidden sm:inline">AI</span>
             </button>
+            <button
+              onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: '?' }))}
+              className="btn-premium h-9 w-9 rounded-lg bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition ring-1 ring-white/20 flex-shrink-0"
+              title="Keyboard Shortcuts (?)"
+            >
+              <span className="text-xs font-bold">?</span>
+            </button>
             <button onClick={() => handleLogout()} className="btn-premium h-9 px-3 rounded-lg bg-rose-500/30 hover:bg-rose-500/50 ring-1 ring-rose-300/30 text-white text-xs font-bold flex items-center gap-1.5 transition flex-shrink-0" title="Sign out">
               <LogOut className="h-4 w-4" /> <span>Logout</span>
             </button>
@@ -2170,6 +2178,20 @@ export default function POSPage() {
                     whileHover={{ y: -3, scale: 1.02 }}
                     whileTap={{ scale: 0.97 }}
                     onClick={() => addToCart(product)}
+                    onDoubleClick={(e) => {
+                      e.preventDefault();
+                      // Double-click: add 5 units at once (bulk add)
+                      for (let i = 0; i < 5; i++) addToCart(product);
+                      toast({ title: `Added 5 × ${product.emoji} ${product.name}`, duration: 1200 });
+                    }}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      // Right-click / long-press: show stock info
+                      toast({
+                        title: `${product.emoji} ${product.name}`,
+                        description: `Stock: ${product.stock} ${product.unit} · Price: ${formatGHS(product.price)} · SKU: ${product.sku}`,
+                      });
+                    }}
                     className="product-card-premium flex flex-col items-center text-center"
                   >
                     {inCart && (
@@ -4557,6 +4579,9 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
           </div>
         </div>
       )}
+
+      {/* ===== Premium: Keyboard Shortcuts Overlay (press ? to toggle) ===== */}
+      <KeyboardShortcutsOverlay />
     </>
   );
 }
