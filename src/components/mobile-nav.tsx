@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useTheme } from "next-themes";
 import {
   ShoppingCart, Home, BarChart3, Menu, X, LogOut, User, Package,
   Truck, Phone, PhoneCall, Settings, FileText, Wrench, Shield, Bell, Download,
@@ -103,6 +104,7 @@ const AI_DESTINATIONS: { id: string; label: string; icon: any; color: string; bg
 export function MobileNav({ active, onNavigate, cartCount, user, onLogout }: MobileNavProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const { toast } = useToast();
+  const { setTheme } = useTheme();
 
   // Top 5 destinations shown as bottom tabs — premium icon set
   const tabs: MobileNavTab[] = [
@@ -336,15 +338,9 @@ export function MobileNav({ active, onNavigate, cartCount, user, onLogout }: Mob
               <div className="flex-shrink-0 px-3 py-3 border-t border-slate-200 bg-gradient-to-b from-white to-slate-50/50 space-y-2">
                 <button
                   onClick={() => {
-                    // Toggle dark mode
+                    // Toggle via next-themes (persists to localStorage, updates <html> class)
                     const isDark = document.documentElement.classList.contains("dark");
-                    if (isDark) {
-                      document.documentElement.classList.remove("dark");
-                      localStorage.setItem("sylhn-dark-mode", "false");
-                    } else {
-                      document.documentElement.classList.add("dark");
-                      localStorage.setItem("sylhn-dark-mode", "true");
-                    }
+                    setTheme(isDark ? "light" : "dark");
                   }}
                   className="w-full h-11 rounded-xl bg-gradient-to-r from-violet-50 to-indigo-50 hover:from-violet-100 hover:to-indigo-100 text-violet-700 dark:text-violet-300 font-semibold text-sm flex items-center justify-center gap-2 transition haptic-tap ring-1 ring-violet-200 dark:ring-violet-800 active:scale-95"
                 >

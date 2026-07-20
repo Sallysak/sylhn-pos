@@ -286,3 +286,42 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: "Failed to update rule" }, { status: 500 });
   }
 }
+
+// DELETE /api/auto-replenish?id=... — delete a rule
+export async function DELETE(req: NextRequest) {
+  let user;
+  try { user = await requireAuth(); requirePermission(user.role, "purchase"); } catch (e) { return e as Response; }
+
+  const ip = getClientIp(req);
+  const rl = rateLimitApiWrite(ip);
+  if (!rl.allowed) return rateLimitResponse(rl);
+
+  const { searchParams } = new URL(req.url);
+  const id = searchParams.get("id");
+  if (!id) {
+    return NextResponse.json({ error: "id query parameter is required" }, { status: 400 });
+  }
+
+  try {
+    const rule = await db.autoReplenishRule.delete({
+      where: { id: String(id) },
+      include: { product: true },
+    });
+
+    await auditLog({
+      userId: user.uid,
+      user: user.username,
+      action: "DELETE",
+      module: "stock",
+      details: `Auto-replenish rule deleted for ${rule.product?.name || "(unknown product)"}`,
+      severity: "warning",
+      ipAddress: ip,
+      userAgent: req.headers.get("user-agent") || "",
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (e: any) {
+    console.error("DELETE /api/auto-replenish error:", e);
+    return NextResponse.json({ error: "Failed to delete rule" }, { status: 500 });
+  }
+}

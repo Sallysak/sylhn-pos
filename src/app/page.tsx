@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useTheme } from "next-themes";
 import dynamic from "next/dynamic";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -15,7 +16,7 @@ import {
   FileBarChart2, BookOpen, PhoneCall, Archive, Settings2, Lock,
   FileSearch, Copy, Image as ImageIcon, Tags,
   Smartphone, RefreshCw, Sparkles, Loader2, AlertTriangle, Calculator as CalcIcon, Mail, Send,
-  ExternalLink,
+  ExternalLink, Moon, Sun,
 } from "lucide-react";
 import {
   products as INITIAL_PRODUCTS, categories, paymentMethods, quickCashAmounts,
@@ -75,6 +76,8 @@ const OperationsDashboard = dynamic(() => import("@/components/operations-dashbo
 const ReceiptArchive = dynamic(() => import("@/components/receipt-archive").then(m => ({ default: m.ReceiptArchive })), { ssr: false, loading: loadingFallback });
 const FeaturesMap = dynamic(() => import("@/components/features-map").then(m => ({ default: m.FeaturesMap })), { ssr: false, loading: loadingFallback });
 const AdminHub = dynamic(() => import("@/components/admin-hub").then(m => ({ default: m.AdminHub })), { ssr: false, loading: loadingFallback });
+const CreditManagement = dynamic(() => import("@/components/credit-management").then(m => ({ default: m.CreditManagement })), { ssr: false, loading: loadingFallback });
+const AutoReplenishRules = dynamic(() => import("@/components/auto-replenish-rules").then(m => ({ default: m.AutoReplenishRules })), { ssr: false, loading: loadingFallback });
 const KeyboardShortcutsOverlay = dynamic(() => import("@/components/keyboard-shortcuts").then(m => ({ default: m.KeyboardShortcutsOverlay })), { ssr: false });
 
 // ===== Server → Client product transformer =====
@@ -176,8 +179,14 @@ export default function POSPage() {
   const [showAiAssistant, setShowAiAssistant] = useState(false);
   // Premium: Quick Keys bar
   const [quickKeys, setQuickKeys] = useState<any[]>([]);
-  // Premium: Dark mode
+  // Premium: Dark mode — synced with next-themes (persists, hydrates safely)
+  const { theme, setTheme } = useTheme();
   const [darkMode, setDarkMode] = useState(false);
+
+  // Keep local darkMode state in sync with next-themes (after mount)
+  useEffect(() => {
+    setDarkMode(document.documentElement.classList.contains("dark"));
+  }, [theme]);
   // Premium: Cash denomination calculator
   const [showCashCalc, setShowCashCalc] = useState(false);
   const [showStdCalc, setShowStdCalc] = useState(false);
@@ -814,23 +823,14 @@ export default function POSPage() {
     return () => clearInterval(interval);
   }, [loggedInUser]);
 
-  // Premium: Dark Mode — auto-switch based on time (6pm-6am) + manual toggle
-  useEffect(() => {
-    const hour = new Date().getHours();
-    const autoDark = hour >= 18 || hour < 6;
-    const saved = localStorage.getItem("sylhn-dark-mode");
-    const isDark = saved !== null ? saved === "true" : autoDark;
-    setDarkMode(isDark);
-    if (isDark) document.documentElement.classList.add("dark");
-    else document.documentElement.classList.remove("dark");
-  }, []);
+  // Dark mode is now handled by next-themes (see ThemeProvider in layout.tsx).
+  // The local `darkMode` state is kept in sync via the useEffect above.
 
   const toggleDarkMode = () => {
-    const newMode = !darkMode;
-    setDarkMode(newMode);
-    localStorage.setItem("sylhn-dark-mode", String(newMode));
-    if (newMode) document.documentElement.classList.add("dark");
-    else document.documentElement.classList.remove("dark");
+    // Use next-themes for proper persistence + hydration
+    const isDark = document.documentElement.classList.contains("dark");
+    setTheme(isDark ? "light" : "dark");
+    // local state will sync via the useEffect above
   };
 
   // Premium: Listen for AI assistant open event (from MobileNav drawer)
@@ -1412,6 +1412,9 @@ export default function POSPage() {
           { label: "Cash Reconciliation", icon: Wallet, action: () => { setFinanceTab("cash-recon"); setView("finance-ops"); } },
           { label: "Mobile Money", icon: Smartphone, action: () => { setFinanceTab("mobile-money"); setView("finance-ops"); } },
           { separator: true },
+          { label: "💳 Credit Management", icon: CreditCard, action: () => setView("credit-management" as ViewMode) },
+          { label: "🔄 Auto Replenish Rules", icon: RotateCcw, action: () => setView("auto-replenish" as ViewMode) },
+          { separator: true },
         ] : []),
         { label: "Stock Value Report", icon: DollarSign, action: () => { setAccountsReport("stock-value"); setView("accounts-reports"); } },
         { label: "Cost Price Report", icon: FileText, action: () => { setAccountsReport("cost-price"); setView("accounts-reports"); } },
@@ -1735,6 +1738,34 @@ export default function POSPage() {
       </>
     );
   }
+  if (view === "credit-management") {
+    return (
+      <>
+        <CreditManagement />
+        <MobileNav
+          active={view}
+          onNavigate={(v) => { if (v === "cart") setMobileCartOpen(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
+          cartCount={cart.reduce((s, i) => s + i.quantity, 0)}
+          user={loggedInUser ? { fullName: loggedInUser.fullName, role: loggedInUser.role } : null}
+          onLogout={() => handleLogout()}
+        />
+      </>
+    );
+  }
+  if (view === "auto-replenish") {
+    return (
+      <>
+        <AutoReplenishRules onBack={() => setView("pos")} />
+        <MobileNav
+          active={view}
+          onNavigate={(v) => { if (v === "cart") setMobileCartOpen(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
+          cartCount={cart.reduce((s, i) => s + i.quantity, 0)}
+          user={loggedInUser ? { fullName: loggedInUser.fullName, role: loggedInUser.role } : null}
+          onLogout={() => handleLogout()}
+        />
+      </>
+    );
+  }
   if (view === "finance-ops") {
     return (
       <>
@@ -1956,13 +1987,13 @@ export default function POSPage() {
               </div>
             </div>
             <InstallButton />
-            {/* Premium: Dark Mode toggle */}
+            {/* Premium: Dark Mode toggle — uses Lucide icons, hydrates safely */}
             <button
               onClick={toggleDarkMode}
               className="btn-premium h-9 w-9 rounded-lg gradient-premium-glass hover:bg-white/20 ring-1 ring-white/25 text-white flex items-center justify-center transition flex-shrink-0"
               title={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
             >
-              {darkMode ? "☀️" : "🌙"}
+              {darkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </button>
             {/* Premium: Cash Calculator */}
             <button

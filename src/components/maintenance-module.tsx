@@ -6,7 +6,7 @@ import {
   ArrowLeft, Settings2, Users, Database, Clock, Lock, Zap, Store,
   Power, Save, Plus, X, Edit2, Trash2, Shield, Download, Upload,
   CheckCircle2, AlertTriangle, KeyRound, Bell, Globe, Palette,
-  UserCog, HardDrive, RefreshCw, Info,
+  UserCog, HardDrive, RefreshCw, Info, Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -805,12 +805,139 @@ function SecuritySettings() {
             </div>
           </SettingsSection>
 
+          {/* Danger Zone — Wipe All Business Data */}
+          <WipeDataSection />
+
           <div className="flex justify-end pt-4 border-t border-slate-200">
             <Button onClick={handleSave} className="bg-gradient-to-r from-slate-700 to-slate-800 hover:from-slate-800 hover:to-slate-900">
               {saved ? <><CheckCircle2 className="h-4 w-4" /> Saved!</> : <><Save className="h-4 w-4" /> Save Security Settings</>}
             </Button>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ===== Wipe All Data Section (Danger Zone) =====
+function WipeDataSection() {
+  const { toast } = useToast();
+  const [confirming, setConfirming] = useState(false);
+  const [confirmText, setConfirmText] = useState("");
+  const [wiping, setWiping] = useState(false);
+  const [result, setResult] = useState<any>(null);
+
+  const handleWipe = async () => {
+    if (confirmText !== "WIPE_ALL_DATA") {
+      toast({ title: "Confirmation text doesn't match", description: 'Type "WIPE_ALL_DATA" exactly', variant: "destructive" });
+      return;
+    }
+    setWiping(true);
+    setResult(null);
+    try {
+      const res = await fetch("/api/admin/wipe-data", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirm: "WIPE_ALL_DATA" }),
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setResult(data);
+        toast({
+          title: "✅ Data wiped successfully",
+          description: "All business data cleared. User accounts preserved.",
+        });
+        setConfirming(false);
+        setConfirmText("");
+      } else {
+        toast({ title: "Wipe failed", description: data.error, variant: "destructive" });
+      }
+    } catch (e: any) {
+      toast({ title: "Network error", description: e?.message, variant: "destructive" });
+    } finally {
+      setWiping(false);
+    }
+  };
+
+  return (
+    <div className="rounded-2xl ring-2 ring-rose-300 bg-gradient-to-br from-rose-50 to-white overflow-hidden">
+      <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-rose-100 to-rose-50 border-b border-rose-200">
+        <div className="h-9 w-9 rounded-lg bg-rose-600 text-white flex items-center justify-center">
+          <AlertTriangle className="h-5 w-5" />
+        </div>
+        <div>
+          <h3 className="text-sm font-bold text-rose-900 uppercase tracking-wider">Danger Zone</h3>
+          <p className="text-xs text-rose-700">Wipe all business data — irreversible</p>
+        </div>
+      </div>
+      <div className="p-4 space-y-3">
+        <div className="text-xs text-slate-700 space-y-1.5">
+          <p className="font-semibold">This will permanently delete:</p>
+          <ul className="list-disc pl-5 space-y-0.5 text-slate-600">
+            <li>All sales transactions, sale items, payments, refunds</li>
+            <li>All products, stock groups, stock history</li>
+            <li>All customers, suppliers, supplier payments</li>
+            <li>All purchases, purchase orders, auto-replenish rules</li>
+            <li>All expenses, email logs, backups</li>
+            <li>All cashier shifts, audit logs, system settings</li>
+          </ul>
+          <p className="font-semibold pt-1">User accounts are PRESERVED so you can still log in afterwards.</p>
+        </div>
+
+        {result ? (
+          <div className="p-3 rounded-lg bg-emerald-50 ring-1 ring-emerald-200 text-xs space-y-1">
+            <div className="font-bold text-emerald-700">✅ Wipe complete</div>
+            <div className="text-emerald-700">Counts deleted:</div>
+            <pre className="text-[10px] font-mono text-emerald-800 bg-emerald-100/50 p-2 rounded max-h-40 overflow-y-auto">{JSON.stringify(result.counts, null, 2)}</pre>
+            <Button variant="outline" size="sm" className="mt-2" onClick={() => setResult(null)}>
+              Dismiss
+            </Button>
+          </div>
+        ) : confirming ? (
+          <div className="space-y-2">
+            <div className="p-3 rounded-lg bg-amber-50 ring-1 ring-amber-200 text-xs text-amber-800">
+              <strong>Type WIPE_ALL_DATA below to confirm.</strong> This is your last chance to cancel.
+            </div>
+            <input
+              type="text"
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+              placeholder="Type WIPE_ALL_DATA here"
+              className="w-full h-10 px-3 rounded-lg border-2 border-rose-300 font-mono text-sm outline-none focus:border-rose-500"
+              autoFocus
+            />
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => { setConfirming(false); setConfirmText(""); }}
+                disabled={wiping}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="flex-1 bg-rose-600 hover:bg-rose-700 text-white"
+                onClick={handleWipe}
+                disabled={wiping || confirmText !== "WIPE_ALL_DATA"}
+              >
+                {wiping ? (
+                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Wiping…</>
+                ) : (
+                  <><Trash2 className="h-4 w-4 mr-2" /> Permanently Wipe Data</>
+                )}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => setConfirming(true)}
+            className="w-full h-10 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-sm font-bold flex items-center justify-center gap-2 transition active:scale-95"
+          >
+            <Trash2 className="h-4 w-4" />
+            Wipe All Business Data
+          </button>
+        )}
       </div>
     </div>
   );

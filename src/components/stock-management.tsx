@@ -8,7 +8,7 @@ import {
   Filter, ChevronRight, Calendar, User, Tag, DollarSign, Barcode,
   ArrowUpDown, ArrowUp, ArrowDown, RotateCcw,
   FileText, Copy, Image as ImageIcon, Tags, FileSearch, FolderTree, SlidersHorizontal,
-  Monitor, Printer, Folder, FileBarChart, Download, Mail, MessageSquare, Send,
+  Monitor, Printer, Folder, FileBarChart, Download, Mail, MessageSquare, Send, ScanLine,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,7 @@ import { generateReport, exportReportToPDF, exportReportToExcel, exportReportToC
 import type { StockView, ReportData } from "@/lib/pos-types";
 import { PopupWindow } from "@/components/popup-window";
 import { StockQuantityAdjustment } from "@/components/stock-quantity-adjustment";
+import { ProductScanner, type ScannedProduct } from "@/components/product-scanner";
 
 interface StockManagementProps {
   onBack: () => void;
@@ -660,6 +661,7 @@ function ProductForm({ product, groups, onSave, onClose }: {
   onSave: (p: Product) => void;
   onClose: () => void;
 }) {
+  const { toast } = useToast();
   const [form, setForm] = useState<Product>(product || {
     id: `p-${Date.now()}`,
     sku: `NEW-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -679,6 +681,26 @@ function ProductForm({ product, groups, onSave, onClose }: {
     expiryDate: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
     supplier: "",
   });
+
+  const [showScanner, setShowScanner] = useState(false);
+
+  // Handle scan result — pre-fill form fields from OpenFoodFacts lookup
+  const handleScanResult = (result: ScannedProduct) => {
+    setForm(prev => ({
+      ...prev,
+      barcode: result.barcode,
+      ...(result.name && { name: result.name }),
+      ...(result.category && { category: result.category, groupId: result.category }),
+      ...(result.emoji && { emoji: result.emoji }),
+    }));
+    setShowScanner(false);
+    if (result.source === "openfoodfacts") {
+      toast({
+        title: "Product auto-filled",
+        description: `Looked up: ${result.name || result.barcode}`,
+      });
+    }
+  };
 
   // Compute profit margin live (premium UX — instant feedback)
   const profitMargin = form.price > 0 && form.costPrice > 0
@@ -735,8 +757,19 @@ function ProductForm({ product, groups, onSave, onClose }: {
                     <input value={form.emoji} onChange={(e) => setForm({ ...form, emoji: e.target.value })} className="form-input text-center text-lg" maxLength={2} />
                   </FormField>
                 </div>
-                <FormField label="Barcode (optional)">
-                  <input value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} className="form-input" placeholder="941563812092" inputMode="numeric" />
+                <FormField label="Barcode (scan or type)">
+                  <div className="flex gap-1.5">
+                    <input value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} className="form-input flex-1" placeholder="941563812092" inputMode="numeric" />
+                    <button
+                      type="button"
+                      onClick={() => setShowScanner(true)}
+                      className="flex-shrink-0 h-[34px] px-3 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold flex items-center gap-1.5 transition active:scale-95"
+                      title="Scan barcode with camera (auto-looks up product info)"
+                    >
+                      <ScanLine className="h-3.5 w-3.5" />
+                      Scan
+                    </button>
+                  </div>
                 </FormField>
               </div>
             </FormSection>
@@ -846,6 +879,14 @@ function ProductForm({ product, groups, onSave, onClose }: {
           }
         `}</style>
       </motion.div>
+      <AnimatePresence>
+        {showScanner && (
+          <ProductScanner
+            onResult={handleScanResult}
+            onClose={() => setShowScanner(false)}
+          />
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
