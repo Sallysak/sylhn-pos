@@ -1424,14 +1424,17 @@ export default function POSPage() {
       id: "stock",
       label: "Stock",
       items: hasPermission('stock') ? [
+        { header: "Browse" },
         { label: "Stock File", icon: FileText, action: () => { setInitialStockView("stock-file"); setView("stock"); } },
         { label: "Stock Search", icon: FileSearch, action: () => { setInitialStockView("stock-search"); setView("stock"); } },
+        { header: "Manage" },
         { label: "Add / Modify Stock", icon: Package, action: () => { setInitialStockView("add-modify"); setView("stock"); } },
         { label: "Group Maintenance", icon: Layers, action: () => { setInitialStockView("group-maintenance"); setView("stock"); } },
         ...(hasPermission('canAdjustStock') ? [{ label: "Quantity Adjustment", icon: ArrowUpDown, action: () => { setInitialStockView("quantity-adjustment"); setView("stock"); } }] : []),
+        { header: "History" },
         { label: "Stock History", icon: History, action: () => { setInitialStockView("history"); setView("stock"); } },
         { label: "📊 Stock History Pro", icon: TrendingUp, action: () => setView("stock-history-pro") },
-        { separator: true },
+        { header: "Reports" },
         { label: "Stock Qty Report", icon: FileBarChart, action: () => { setOpenStockQtyReport(true); setInitialStockView("add-modify"); setView("stock"); } },
         ...(hasPermission('canExport') ? [
           { label: "Stock Reports", icon: FileBarChart, action: () => setView("reports") },
@@ -1446,14 +1449,15 @@ export default function POSPage() {
       id: "purchase",
       label: "Purchase",
       items: hasPermission('purchase') ? [
-        { label: "Purchase", icon: FileText, action: () => setView("purchase-form") },
-        { label: "Supplier", icon: Users, action: () => setView("supplier-form") },
+        { header: "Orders" },
+        { label: "New Purchase", icon: FileText, action: () => setView("purchase-form") },
         { label: "Purchase Orders", icon: Archive, action: () => setView("purchase") },
         { label: "Receive Stock", icon: Package, action: () => setView("purchase") },
-        { separator: true },
-        { label: "Purchase History", icon: History, action: () => setView("purchase") },
+        { header: "Suppliers" },
+        { label: "Supplier Directory", icon: Users, action: () => setView("supplier-form") },
         { label: "Supplier Payments", icon: DollarSign, action: () => setView("purchase") },
-        { separator: true },
+        { header: "History & Reports" },
+        { label: "Purchase History", icon: History, action: () => setView("purchase") },
         { label: "Purchase Report", icon: FileBarChart2, action: () => setView("purchase") },
       ] : [],
     },
@@ -1461,30 +1465,30 @@ export default function POSPage() {
       id: "accounts",
       label: "Accounts",
       items: hasPermission('accounts') ? [
+        { header: "Sales Reports" },
         { label: "Daily Sales Summary", icon: TrendingUp, action: () => { setAccountsReport("daily-sales"); setView("accounts-reports"); } },
         { label: "Daily Sales Detail", icon: FileText, action: () => { setAccountsReport("daily-sales-detail"); setView("accounts-reports"); } },
         { label: "Monthly Summary", icon: BarChart3, action: () => { setAccountsReport("monthly-summary"); setView("accounts-reports"); } },
         { label: "Monthly Detail", icon: FileBarChart2, action: () => { setAccountsReport("monthly-detail"); setView("accounts-reports"); } },
-        { separator: true },
+        { header: "Profit & Tax" },
         { label: "Profit & Loss", icon: BarChart3, action: () => { setAccountsReport("profit-loss"); setView("accounts-reports"); } },
         { label: "VAT Tax Report", icon: Percent, action: () => { setAccountsReport("vat-tax"); setView("accounts-reports"); } },
         { label: "GRA e-VAT Filing (JSON)", icon: FileText, action: () => { window.open("/api/reports/vat-filing/e-file?format=json&year=" + new Date().getFullYear() + "&month=" + (new Date().getMonth() + 1), "_blank"); } },
         { label: "GRA e-VAT Filing (XML)", icon: FileText, action: () => { window.open("/api/reports/vat-filing/e-file?format=xml&year=" + new Date().getFullYear() + "&month=" + (new Date().getMonth() + 1), "_blank"); } },
-        { separator: true },
         ...(hasPermission('financeOps') ? [
+          { header: "Finance Operations" },
           { label: "Expense Management", icon: Wallet, action: () => { setFinanceTab("expenses"); setView("finance-ops"); } },
           { label: "Cash Reconciliation", icon: Wallet, action: () => { setFinanceTab("cash-recon"); setView("finance-ops"); } },
           { label: "Mobile Money", icon: Smartphone, action: () => { setFinanceTab("mobile-money"); setView("finance-ops"); } },
-          { separator: true },
           { label: "💳 Credit Management", icon: CreditCard, action: () => setView("credit-management" as ViewMode) },
           { label: "🔄 Auto Replenish Rules", icon: RotateCcw, action: () => setView("auto-replenish" as ViewMode) },
-          { separator: true },
         ] : []),
+        { header: "Inventory Reports" },
         { label: "Stock Value Report", icon: DollarSign, action: () => { setAccountsReport("stock-value"); setView("accounts-reports"); } },
         { label: "Cost Price Report", icon: FileText, action: () => { setAccountsReport("cost-price"); setView("accounts-reports"); } },
         { label: "Stock Performance", icon: TrendingUp, action: () => { setAccountsReport("stock-performance"); setView("accounts-reports"); } },
         { label: "Stock Group Report", icon: Layers, action: () => { setAccountsReport("stock-group"); setView("accounts-reports"); } },
-        { separator: true },
+        { header: "Accounting" },
         { label: "General Ledger", icon: BookOpen, action: () => { setAccountsReport("general-ledger"); setView("accounts-reports"); } },
         { label: "Trial Balance", icon: FileBarChart2, action: () => { setAccountsReport("trial-balance"); setView("accounts-reports"); } },
       ] : [],
@@ -1506,17 +1510,17 @@ export default function POSPage() {
       id: "maintenance",
       label: "Maintenance",
       items: hasPermission('maintenance') ? [
+        { header: "System" },
         { label: "System Settings", icon: Settings2, action: () => setView("maintenance") },
-        { label: "User Management", icon: Users, action: () => setView("maintenance") },
         { label: "Backup Database", icon: Database, action: () => setView("maintenance") },
-        { separator: true },
-        { separator: true },
-        { label: "Cashier Shift", icon: Clock, action: () => setView("maintenance") },
-        { label: "Security & Permissions", icon: Lock, action: () => setView("maintenance") },
-        { separator: true },
-        { label: "Admin Panel", icon: Shield, action: () => setView("admin-login") },
-        { separator: true },
         { label: "📧 Email System", icon: Mail, action: () => setView("email-system" as any) },
+        { header: "Security" },
+        { label: "User Management", icon: Users, action: () => setView("maintenance") },
+        { label: "Security & Permissions", icon: Lock, action: () => setView("maintenance") },
+        { label: "Admin Panel", icon: Shield, action: () => setView("admin-login") },
+        { header: "Operations" },
+        { label: "Cashier Shift", icon: Clock, action: () => setView("maintenance") },
+        { header: "About" },
         { label: "About SYLHN POS", icon: Store, action: () => setView("maintenance") },
         { label: "Exit", icon: Power, action: () => handleLogout(true) },
       ] : [
@@ -1975,11 +1979,14 @@ export default function POSPage() {
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -5 }}
                       transition={{ duration: 0.15 }}
-                      className="absolute top-full left-0 mt-1 w-60 bg-white rounded-xl shadow-2xl ring-1 ring-slate-200 overflow-hidden z-50 py-1"
+                      className="absolute top-full left-0 mt-1 w-64 bg-white rounded-xl shadow-2xl ring-1 ring-slate-200 overflow-hidden z-50 py-1 max-h-[70vh] overflow-y-auto"
                     >
                       {menu.items.map((item, i) => {
                         if ('separator' in item) {
                           return <div key={i} className="h-px bg-slate-100 my-1" />;
+                        }
+                        if ('header' in item) {
+                          return <div key={i} className="px-3 py-1 text-[9px] font-bold uppercase tracking-wider text-slate-400 bg-slate-50/50">{item.header}</div>;
                         }
                         return (
                           <button
@@ -2138,6 +2145,9 @@ export default function POSPage() {
                   {menus.find(m => m.id === openMenu)?.items.map((item, i) => {
                     if ('separator' in item) {
                       return <div key={i} className="h-px bg-slate-100 my-1.5 mx-4" />;
+                    }
+                    if ('header' in item) {
+                      return <div key={i} className="px-4 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 bg-slate-50">{item.header}</div>;
                     }
                     return (
                       <button

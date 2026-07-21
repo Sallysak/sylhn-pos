@@ -819,7 +819,11 @@ function ProductForm({ product, groups, onSave, onClose }: {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       className="compact-modal-overlay fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4"
-      onClick={onClose}
+      onMouseDown={(e) => {
+        // Only close if the click started ON the overlay itself (not inside the modal)
+        // This prevents accidental closes from click-drag selections that end on the overlay
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
       <motion.div
         initial={{ scale: 0.95, y: 20 }}
@@ -1400,7 +1404,7 @@ function GroupForm({ group, onSave, onClose }: {
   ];
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-0 sm:p-4" onClick={onClose}>
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-0 sm:p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <motion.div
         initial={{ scale: 0.92, y: 20, opacity: 0 }}
         animate={{ scale: 1, y: 0, opacity: 1 }}

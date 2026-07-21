@@ -486,6 +486,128 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
     return { totalCost, totalRevenue, totalProfit };
   }, [profitData, filteredProfitData, profitSearch, profitDateFrom, profitDateTo]);
 
+  // ===== Export helpers for dashboard tabs =====
+  const handleExportExpiry = (format: "print" | "pdf" | "excel" | "csv") => {
+    const rpt: ReportData = {
+      type: "expiry",
+      title: "Expiry Tracking Report",
+      subtitle: `${filteredExpiryProducts.length} products · ${new Date().toLocaleString()}`,
+      columns: [
+        { key: "name", label: "Product" },
+        { key: "sku", label: "SKU" },
+        { key: "expiryDate", label: "Expiry Date" },
+        { key: "daysUntilExpiry", label: "Days Left", align: "right" },
+        { key: "quantity", label: "Stock", align: "right" },
+        { key: "stockValueAtRisk", label: "Value at Risk", align: "right", format: (v: any) => formatGHS(Number(v)) },
+        { key: "urgency", label: "Urgency" },
+      ],
+      rows: filteredExpiryProducts.map(p => ({
+        name: p.name, sku: p.sku,
+        expiryDate: typeof p.expiryDate === "string" ? p.expiryDate.split("T")[0] : "",
+        daysUntilExpiry: (p as any).daysUntilExpiry,
+        quantity: p.quantity,
+        stockValueAtRisk: (p as any).stockValueAtRisk,
+        urgency: (p as any).urgency,
+      })),
+      summary: [
+        { label: "Total Products", value: String(filteredExpiryProducts.length) },
+        { label: "Value at Risk", value: formatGHS(expiryValueAtRisk) },
+        { label: "Generated", value: new Date().toLocaleString() },
+      ],
+    };
+    if (format === "print") printReport(rpt);
+    else if (format === "pdf") exportReportToPDF(rpt);
+    else if (format === "excel") exportReportToExcel(rpt);
+    else exportReportToCSV(rpt);
+    toast({ title: format.toUpperCase() + " exported", description: `${filteredExpiryProducts.length} expiry items` });
+  };
+
+  const handleExportSales = (format: "print" | "pdf" | "excel" | "csv") => {
+    const rpt: ReportData = {
+      type: "sales-history",
+      title: "Sales History Report",
+      subtitle: `${filteredSales.length} records · ${new Date().toLocaleString()}`,
+      columns: [
+        { key: "invoiceNumber", label: "Invoice" },
+        { key: "createdAt", label: "Date" },
+        { key: "customerName", label: "Customer" },
+        { key: "cashierName", label: "Cashier" },
+        { key: "total", label: "Total", align: "right", format: (v: any) => formatGHS(Number(v)) },
+        { key: "paymentMethod", label: "Method" },
+        { key: "status", label: "Status" },
+      ],
+      rows: filteredSales.map(s => ({
+        invoiceNumber: s.invoiceNumber,
+        createdAt: s.createdAt ? new Date(s.createdAt).toLocaleString() : "",
+        customerName: s.customerName || "Walk-in",
+        cashierName: s.cashierName || "",
+        total: s.total,
+        paymentMethod: s.paymentMethod,
+        status: s.status,
+      })),
+      summary: [
+        { label: "Total Sales", value: String(filteredSales.length) },
+        { label: "Total Revenue", value: formatGHS(filteredSales.reduce((s, x) => s + (x.total || 0), 0)) },
+        { label: "Generated", value: new Date().toLocaleString() },
+      ],
+    };
+    if (format === "print") printReport(rpt);
+    else if (format === "pdf") exportReportToPDF(rpt);
+    else if (format === "excel") exportReportToExcel(rpt);
+    else exportReportToCSV(rpt);
+    toast({ title: format.toUpperCase() + " exported", description: `${filteredSales.length} sales records` });
+  };
+
+  const handleExportProfit = (format: "print" | "pdf" | "excel" | "csv") => {
+    const data = filteredProfitData.length > 0 ? filteredProfitData : profitData;
+    const rpt: ReportData = {
+      type: "profit-analysis",
+      title: "Profit Margin Analysis",
+      subtitle: `${data.length} products · ${new Date().toLocaleString()}`,
+      columns: [
+        { key: "name", label: "Product" },
+        { key: "sku", label: "SKU" },
+        { key: "costPrice", label: "Cost", align: "right", format: (v: any) => formatGHS(Number(v)) },
+        { key: "price", label: "Price", align: "right", format: (v: any) => formatGHS(Number(v)) },
+        { key: "margin", label: "Margin", align: "right", format: (v: any) => formatGHS(Number(v)) },
+        { key: "marginPct", label: "Margin %", align: "right", format: (v: any) => Number(v).toFixed(1) + "%" },
+        { key: "stockValue", label: "Stock Value", align: "right", format: (v: any) => formatGHS(Number(v)) },
+        { key: "potentialProfit", label: "Potential Profit", align: "right", format: (v: any) => formatGHS(Number(v)) },
+        { key: "health", label: "Health" },
+      ],
+      rows: data.map(p => ({
+        name: p.name, sku: p.sku,
+        costPrice: p.costPrice, price: p.price,
+        margin: (p as any).margin,
+        marginPct: (p as any).marginPct,
+        stockValue: (p as any).stockValue,
+        potentialProfit: (p as any).potentialProfit,
+        health: (p as any).health,
+      })),
+      summary: [
+        { label: "Total Products", value: String(data.length) },
+        { label: "Total Cost", value: formatGHS(profitSummary.totalCost) },
+        { label: "Total Revenue", value: formatGHS(profitSummary.totalRevenue) },
+        { label: "Total Profit", value: formatGHS(profitSummary.totalProfit) },
+      ],
+    };
+    if (format === "print") printReport(rpt);
+    else if (format === "pdf") exportReportToPDF(rpt);
+    else if (format === "excel") exportReportToExcel(rpt);
+    else exportReportToCSV(rpt);
+    toast({ title: format.toUpperCase() + " exported", description: `${data.length} products` });
+  };
+
+  // Reusable export button bar
+  const ExportButtons = ({ onExport }: { onExport: (f: "print" | "pdf" | "excel" | "csv") => void }) => (
+    <div className="flex items-center gap-1.5 ml-auto">
+      <button onClick={() => onExport("print")} className="h-7 px-2.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-semibold flex items-center gap-1 transition" title="Print"><Printer className="h-3 w-3" /> Print</button>
+      <button onClick={() => onExport("pdf")} className="h-7 px-2.5 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-700 text-[10px] font-semibold flex items-center gap-1 transition" title="PDF"><FileText className="h-3 w-3" /> PDF</button>
+      <button onClick={() => onExport("excel")} className="h-7 px-2.5 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-700 text-[10px] font-semibold flex items-center gap-1 transition" title="Excel"><Download className="h-3 w-3" /> Excel</button>
+      <button onClick={() => onExport("csv")} className="h-7 px-2.5 rounded-lg bg-blue-100 hover:bg-blue-200 text-blue-700 text-[10px] font-semibold flex items-center gap-1 transition" title="CSV"><Download className="h-3 w-3" /> CSV</button>
+    </div>
+  );
+
   // ===== Refund handler =====
   const handleRefund = async (sale: SaleRecord) => {
     if (!confirm(`Refund sale ${sale.invoiceNumber}? This will restore stock and mark the sale as refunded.`)) return;
@@ -988,14 +1110,17 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
                     <ShoppingCart className="h-4 w-4 text-blue-500" /> Sales History
                     <Badge variant="outline" className="text-[10px]">{filteredSales.length} records</Badge>
                   </h2>
-                  <div className="relative flex-1 max-w-xs">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                    <Input
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Search invoice, customer, cashier..."
-                      className="pl-9 h-9 text-xs"
-                    />
+                  <div className="flex items-center gap-3">
+                    <ExportButtons onExport={handleExportSales} />
+                    <div className="relative w-48">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                      <Input
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Search invoice, customer, cashier..."
+                        className="pl-9 h-9 text-xs"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -1375,7 +1500,10 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
                   <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2">
                     <Clock className="h-4 w-4 text-rose-500" /> Expiry Tracking
                   </h2>
-                  <Badge variant="outline" className="text-[10px] bg-rose-50 text-rose-700">{formatGHS(expiryValueAtRisk)} at risk</Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="text-[10px] bg-rose-50 text-rose-700">{formatGHS(expiryValueAtRisk)} at risk</Badge>
+                    <ExportButtons onExport={handleExportExpiry} />
+                  </div>
                 </div>
 
                 {/* ===== Multi-Filter Bar ===== */}
@@ -1496,9 +1624,12 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
                 </div>
               </div>
               <div className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 p-4 sm:p-6">
-                <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-4">
-                  <Percent className="h-4 w-4 text-emerald-500" /> Profit Margin Analysis
-                </h2>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                    <Percent className="h-4 w-4 text-emerald-500" /> Profit Margin Analysis
+                  </h2>
+                  <ExportButtons onExport={handleExportProfit} />
+                </div>
 
                 {/* ===== Multi-Filter Bar ===== */}
                 <div className="mb-4 p-3 rounded-xl bg-slate-50 ring-1 ring-slate-200 space-y-2">
