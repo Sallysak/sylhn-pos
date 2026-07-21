@@ -25,6 +25,7 @@ import type { StockView, ReportData } from "@/lib/pos-types";
 import { PopupWindow } from "@/components/popup-window";
 import { StockQuantityAdjustment } from "@/components/stock-quantity-adjustment";
 import { ProductScanner, type ScannedProduct } from "@/components/product-scanner";
+import { authedFetch } from "@/lib/client-auth";
 
 interface StockManagementProps {
   onBack: () => void;
@@ -438,8 +439,66 @@ function AddModifyStock({ products, setProducts, groups, setHistory }: {
     p.barcode.includes(search)
   );
 
-  const handleSave = (product: Product) => {
+  const handleSave = async (product: Product) => {
     const isNew = !products.find(p => p.id === product.id);
+    // ===== Persist to server FIRST =====
+    // Without this, the next /api/products fetch (every 60s) would overwrite
+    // local state and the new product would vanish from the UI.
+    try {
+      const payload = {
+        sku: product.sku,
+        barcode: product.barcode || "",
+        name: product.name,
+        emoji: product.emoji || "📦",
+        category: product.category || "other",
+        description: "",
+        price: Number(product.price) || 0,
+        costPrice: Number(product.costPrice) || 0,
+        quantity: Number(product.stock ?? product.quantity ?? 0),
+        unit: product.unit || "each",
+        reorderLevel: Number(product.reorderLevel) || 5,
+        taxable: product.taxable !== false,
+        batchNumber: product.batchNumber || "",
+        expiryDate: product.expiryDate || null,
+        receivedDate: product.receivedDate || null,
+        groupId: product.groupId || null,
+        active: product.active !== false,
+      };
+
+      if (isNew) {
+        // Create via POST /api/products
+        const res = await authedFetch("/api/products", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          toast({ title: "Failed to save product", description: data.error || `HTTP ${res.status}`, variant: "destructive" });
+          return;
+        }
+        // If server returned the created product, use its id (so future updates
+        // hit PUT /api/products/[id] correctly).
+        if (data.product?.id) {
+          product = { ...product, id: data.product.id };
+        }
+      } else {
+        // Update via PUT /api/products/[id]
+        const res = await authedFetch(`/api/products/${product.id}`, {
+          method: "PUT",
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          toast({ title: "Failed to update product", description: data.error || `HTTP ${res.status}`, variant: "destructive" });
+          return;
+        }
+      }
+    } catch (e: any) {
+      toast({ title: "Network error", description: e?.message || "Could not reach server", variant: "destructive" });
+      return;
+    }
+
+    // ===== Local state update (only after server confirms) =====
     if (isNew) {
       setProducts(prev => [...prev, product]);
       setHistory(prev => [...prev, {
@@ -477,24 +536,38 @@ function AddModifyStock({ products, setProducts, groups, setHistory }: {
     setEditing(null);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     const product = products.find(p => p.id === id);
-    setProducts(prev => prev.filter(p => p.id !== id));
-    if (product) {
-      setHistory(prev => [...prev, {
-        id: `h-${Date.now()}`,
-        productId: id,
-        productName: product.name,
-        sku: product.sku,
-        action: 'removed',
-        quantityChange: -product.stock,
-        newQuantity: 0,
-        timestamp: new Date().toISOString(),
-        user: "Sarah Johnson",
-        reason: "Product removed from inventory",
-        reference: `DEL-${Date.now().toString().slice(-6)}`,
-      }]);
+    if (!product) return;
+
+    // ===== Delete from server FIRST =====
+    try {
+      const res = await authedFetch(`/api/products/${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        toast({ title: "Failed to delete product", description: data.error || `HTTP ${res.status}`, variant: "destructive" });
+        return;
+      }
+    } catch (e: any) {
+      toast({ title: "Network error", description: e?.message || "Could not reach server", variant: "destructive" });
+      return;
     }
+
+    // ===== Local state update =====
+    setProducts(prev => prev.filter(p => p.id !== id));
+    setHistory(prev => [...prev, {
+      id: `h-${Date.now()}`,
+      productId: id,
+      productName: product.name,
+      sku: product.sku,
+      action: 'removed',
+      quantityChange: -product.stock,
+      newQuantity: 0,
+      timestamp: new Date().toISOString(),
+      user: "Sarah Johnson",
+      reason: "Product removed from inventory",
+      reference: `DEL-${Date.now().toString().slice(-6)}`,
+    }]);
     toast({ title: "Product deleted", variant: "default" });
   };
 
@@ -1772,8 +1845,60 @@ function StockFileView({ products, setProducts, groups, history, setHistory }: {
     setShowCloneConfirm(selected);
   };
 
-  const handleSave = (product: Product) => {
+  const handleSave = async (product: Product) => {
     const isNew = !products.find(p => p.id === product.id);
+    // ===== Persist to server FIRST =====
+    try {
+      const payload = {
+        sku: product.sku,
+        barcode: product.barcode || "",
+        name: product.name,
+        emoji: product.emoji || "📦",
+        category: product.category || "other",
+        description: "",
+        price: Number(product.price) || 0,
+        costPrice: Number(product.costPrice) || 0,
+        quantity: Number(product.stock ?? product.quantity ?? 0),
+        unit: product.unit || "each",
+        reorderLevel: Number(product.reorderLevel) || 5,
+        taxable: product.taxable !== false,
+        batchNumber: product.batchNumber || "",
+        expiryDate: product.expiryDate || null,
+        receivedDate: product.receivedDate || null,
+        groupId: product.groupId || null,
+        active: product.active !== false,
+      };
+
+      if (isNew) {
+        const res = await authedFetch("/api/products", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          toast({ title: "Failed to save product", description: data.error || `HTTP ${res.status}`, variant: "destructive" });
+          return;
+        }
+        if (data.product?.id) {
+          product = { ...product, id: data.product.id };
+        }
+      } else {
+        const res = await authedFetch(`/api/products/${product.id}`, {
+          method: "PUT",
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          toast({ title: "Failed to update product", description: data.error || `HTTP ${res.status}`, variant: "destructive" });
+          return;
+        }
+      }
+    } catch (e: any) {
+      toast({ title: "Network error", description: e?.message || "Could not reach server", variant: "destructive" });
+      return;
+    }
+
+    // ===== Local state update (only after server confirms) =====
     if (isNew) {
       setProducts(prev => [...prev, product]);
       setHistory(prev => [...prev, {
@@ -1811,7 +1936,7 @@ function StockFileView({ products, setProducts, groups, history, setHistory }: {
     setEditingProduct(null);
   };
 
-  const confirmClone = () => {
+  const confirmClone = async () => {
     if (!showCloneConfirm) return;
     const cloned: Product = {
       ...showCloneConfirm,
@@ -1822,6 +1947,46 @@ function StockFileView({ products, setProducts, groups, history, setHistory }: {
       batchNumber: `B-CLN-${Date.now().toString().slice(-4)}`,
       stock: 0,
     };
+
+    // ===== Persist to server FIRST =====
+    try {
+      const payload = {
+        sku: cloned.sku,
+        barcode: cloned.barcode || "",
+        name: cloned.name,
+        emoji: cloned.emoji || "📦",
+        category: cloned.category || "other",
+        description: "",
+        price: Number(cloned.price) || 0,
+        costPrice: Number(cloned.costPrice) || 0,
+        quantity: Number(cloned.stock ?? cloned.quantity ?? 0),
+        unit: cloned.unit || "each",
+        reorderLevel: Number(cloned.reorderLevel) || 5,
+        taxable: cloned.taxable !== false,
+        batchNumber: cloned.batchNumber || "",
+        expiryDate: cloned.expiryDate || null,
+        receivedDate: cloned.receivedDate || null,
+        groupId: cloned.groupId || null,
+        active: cloned.active !== false,
+      };
+      const res = await authedFetch("/api/products", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast({ title: "Failed to clone product", description: data.error || `HTTP ${res.status}`, variant: "destructive" });
+        return;
+      }
+      if (data.product?.id) {
+        cloned.id = data.product.id;
+      }
+    } catch (e: any) {
+      toast({ title: "Network error", description: e?.message || "Could not reach server", variant: "destructive" });
+      return;
+    }
+
+    // ===== Local state update =====
     setProducts(prev => [...prev, cloned]);
     setHistory(prev => [...prev, {
       id: `h-${Date.now()}`,
@@ -2058,8 +2223,26 @@ function StockFileView({ products, setProducts, groups, history, setHistory }: {
                 </div>
                 <QuickQtyAdjust
                   product={showQtyAdjust}
-                  onConfirm={(newQty, reason) => {
+                  onConfirm={async (newQty, reason) => {
                     const change = newQty - showQtyAdjust.stock;
+
+                    // ===== Persist to server FIRST (PUT /api/products/[id]) =====
+                    try {
+                      const res = await authedFetch(`/api/products/${showQtyAdjust.id}`, {
+                        method: "PUT",
+                        body: JSON.stringify({ quantity: newQty }),
+                      });
+                      if (!res.ok) {
+                        const data = await res.json().catch(() => ({}));
+                        toast({ title: "Failed to adjust quantity", description: data.error || `HTTP ${res.status}`, variant: "destructive" });
+                        return;
+                      }
+                    } catch (e: any) {
+                      toast({ title: "Network error", description: e?.message || "Could not reach server", variant: "destructive" });
+                      return;
+                    }
+
+                    // ===== Local state update =====
                     setProducts(prev => prev.map(p => p.id === showQtyAdjust.id ? { ...p, stock: newQty } : p));
                     setHistory(prev => [...prev, {
                       id: `h-${Date.now()}`,
