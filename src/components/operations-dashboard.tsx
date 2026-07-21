@@ -94,6 +94,21 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSale, setSelectedSale] = useState<SaleRecord | null>(null);
 
+  // ===== Expiry tab: multi-filter =====
+  const [expirySearch, setExpirySearch] = useState("");
+  const [expiryDateFrom, setExpiryDateFrom] = useState("");
+  const [expiryDateTo, setExpiryDateTo] = useState("");
+
+  // ===== Sales history tab: multi-filter =====
+  const [salesSearch, setSalesSearch] = useState("");
+  const [salesDateFrom, setSalesDateFrom] = useState("");
+  const [salesDateTo, setSalesDateTo] = useState("");
+
+  // ===== Profit analysis tab: multi-filter =====
+  const [profitSearch, setProfitSearch] = useState("");
+  const [profitDateFrom, setProfitDateFrom] = useState("");
+  const [profitDateTo, setProfitDateTo] = useState("");
+
   // ===== Reorder tab: multi-filter + editable suggested qty + PO report =====
   const [reorderSearch, setReorderSearch] = useState("");
   const [reorderCategory, setReorderCategory] = useState("all");
@@ -237,15 +252,27 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
 
   // ===== Filtered sales (for sales history tab) =====
   const filteredSales = useMemo(() => {
-    if (!searchQuery) return sales;
-    const q = searchQuery.toLowerCase();
-    return sales.filter(s =>
-      s.invoiceNumber?.toLowerCase().includes(q) ||
-      s.customerName?.toLowerCase().includes(q) ||
-      s.cashierName?.toLowerCase().includes(q) ||
-      s.paymentMethod?.toLowerCase().includes(q)
-    );
-  }, [sales, searchQuery]);
+    let list = sales;
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter(s =>
+        s.invoiceNumber?.toLowerCase().includes(q) ||
+        s.customerName?.toLowerCase().includes(q) ||
+        s.cashierName?.toLowerCase().includes(q) ||
+        s.paymentMethod?.toLowerCase().includes(q)
+      );
+    }
+    // Date range filter
+    if (salesDateFrom || salesDateTo) {
+      list = list.filter(s => {
+        const sDate = s.createdAt ? new Date(s.createdAt).toISOString().split("T")[0] : "";
+        if (salesDateFrom && sDate < salesDateFrom) return false;
+        if (salesDateTo && sDate > salesDateTo) return false;
+        return true;
+      });
+    }
+    return list;
+  }, [sales, searchQuery, salesDateFrom, salesDateTo]);
 
   // ===== Reorder alerts =====
   // Compute the base reorder list (products at or below reorder level).
@@ -375,6 +402,24 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
 
   const expiryValueAtRisk = expiryProducts.reduce((sum, p) => sum + (p as any).stockValueAtRisk, 0);
 
+  // ===== Filtered expiry products (search + date range) =====
+  const filteredExpiryProducts = useMemo(() => {
+    return expiryProducts.filter(p => {
+      if (expirySearch) {
+        const q = expirySearch.toLowerCase();
+        if (!(p.name || "").toLowerCase().includes(q) &&
+            !(p.sku || "").toLowerCase().includes(q) &&
+            !(p.barcode || "").toLowerCase().includes(q)) return false;
+      }
+      if (expiryDateFrom || expiryDateTo) {
+        const pDate = typeof p.expiryDate === "string" ? p.expiryDate.split("T")[0] : new Date(p.expiryDate as any).toISOString().split("T")[0];
+        if (expiryDateFrom && pDate < expiryDateFrom) return false;
+        if (expiryDateTo && pDate > expiryDateTo) return false;
+      }
+      return true;
+    });
+  }, [expiryProducts, expirySearch, expiryDateFrom, expiryDateTo]);
+
   // ===== Profit analysis =====
   const profitData = useMemo(() => {
     return products
@@ -394,12 +439,52 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
       .sort((a, b) => b.potentialProfit - a.potentialProfit);
   }, [products]);
 
+  // ===== Filtered profit data (search + date range by receivedDate) =====
+  const filteredProfitData = useMemo(() => {
+    return profitData.filter(p => {
+      if (profitSearch) {
+        const q = profitSearch.toLowerCase();
+        if (!(p.name || "").toLowerCase().includes(q) &&
+            !(p.sku || "").toLowerCase().includes(q) &&
+            !(p.barcode || "").toLowerCase().includes(q)) return false;
+      }
+      if (profitDateFrom || profitDateTo) {
+        const rd = (p as any).receivedDate;
+        if (!rd) return false;
+        const pDate = typeof rd === "string" ? rd.split("T")[0] : new Date(rd).toISOString().split("T")[0];
+        if (profitDateFrom && pDate < profitDateFrom) return false;
+        if (profitDateTo && pDate > profitDateTo) return false;
+      }
+      return true;
+    });
+  }, [profitData, profitSearch, profitDateFrom, profitDateTo]);
+
+  // ===== Filtered sales (search + date range) =====
+  const filteredSalesHistory = useMemo(() => {
+    return sales.filter(s => {
+      if (salesSearch) {
+        const q = salesSearch.toLowerCase();
+        if (!(s.invoiceNumber || "").toLowerCase().includes(q) &&
+            !(s.customerName || "").toLowerCase().includes(q) &&
+            !(s.cashierName || "").toLowerCase().includes(q) &&
+            !(s.paymentMethod || "").toLowerCase().includes(q)) return false;
+      }
+      if (salesDateFrom || salesDateTo) {
+        const sDate = s.createdAt ? new Date(s.createdAt).toISOString().split("T")[0] : "";
+        if (salesDateFrom && sDate < salesDateFrom) return false;
+        if (salesDateTo && sDate > salesDateTo) return false;
+      }
+      return true;
+    });
+  }, [sales, salesSearch, salesDateFrom, salesDateTo]);
+
   const profitSummary = useMemo(() => {
-    const totalCost = profitData.reduce((s, p) => s + p.stockValue, 0);
-    const totalRevenue = profitData.reduce((s, p) => s + (p.quantity * p.price), 0);
-    const totalProfit = profitData.reduce((s, p) => s + p.potentialProfit, 0);
+    const data = filteredProfitData.length > 0 || (!profitSearch && !profitDateFrom && !profitDateTo) ? filteredProfitData : profitData;
+    const totalCost = data.reduce((s, p) => s + p.stockValue, 0);
+    const totalRevenue = data.reduce((s, p) => s + (p.quantity * p.price), 0);
+    const totalProfit = data.reduce((s, p) => s + p.potentialProfit, 0);
     return { totalCost, totalRevenue, totalProfit };
-  }, [profitData]);
+  }, [profitData, filteredProfitData, profitSearch, profitDateFrom, profitDateTo]);
 
   // ===== Refund handler =====
   const handleRefund = async (sale: SaleRecord) => {
@@ -914,6 +999,19 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
                   </div>
                 </div>
 
+                {/* Date range filter */}
+                <div className="mb-4 p-3 rounded-xl bg-slate-50 ring-1 ring-slate-200 flex flex-wrap items-center gap-2">
+                  <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500 uppercase">
+                    <Calendar className="h-3 w-3" /> Sale date between:
+                  </div>
+                  <input type="date" value={salesDateFrom} onChange={(e) => setSalesDateFrom(e.target.value)} className="h-8 px-2 rounded-lg border border-slate-200 bg-white text-xs outline-none cursor-pointer" />
+                  <span className="text-[10px] text-slate-400">to</span>
+                  <input type="date" value={salesDateTo} onChange={(e) => setSalesDateTo(e.target.value)} className="h-8 px-2 rounded-lg border border-slate-200 bg-white text-xs outline-none cursor-pointer" />
+                  {(salesDateFrom || salesDateTo) && (
+                    <button onClick={() => { setSalesDateFrom(""); setSalesDateTo(""); }} className="text-[10px] text-rose-500 hover:text-rose-700 font-semibold ml-auto">Clear dates</button>
+                  )}
+                </div>
+
                 {loadingSales ? (
                   <div className="text-center py-12 text-slate-400 text-sm">
                     <RefreshCw className="h-8 w-8 mx-auto mb-2 animate-spin opacity-40" /> Loading sales...
@@ -1267,10 +1365,10 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
           {tab === "expiry" && (
             <motion.div key="expiry" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-4">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <ExpiryStat label="Expired" count={expiryProducts.filter(p => (p as any).urgency === "expired").length} color="text-rose-600 bg-rose-50" />
-                <ExpiryStat label="≤ 7 days" count={expiryProducts.filter(p => (p as any).urgency === "critical").length} color="text-rose-600 bg-rose-50" />
-                <ExpiryStat label="≤ 14 days" count={expiryProducts.filter(p => (p as any).urgency === "warning").length} color="text-amber-600 bg-amber-50" />
-                <ExpiryStat label="≤ 30 days" count={expiryProducts.filter(p => (p as any).urgency === "soon").length} color="text-yellow-600 bg-yellow-50" />
+                <ExpiryStat label="Expired" count={filteredExpiryProducts.filter(p => (p as any).urgency === "expired").length} color="text-rose-600 bg-rose-50" />
+                <ExpiryStat label="≤ 7 days" count={filteredExpiryProducts.filter(p => (p as any).urgency === "critical").length} color="text-rose-600 bg-rose-50" />
+                <ExpiryStat label="≤ 14 days" count={filteredExpiryProducts.filter(p => (p as any).urgency === "warning").length} color="text-amber-600 bg-amber-50" />
+                <ExpiryStat label="≤ 30 days" count={filteredExpiryProducts.filter(p => (p as any).urgency === "soon").length} color="text-yellow-600 bg-yellow-50" />
               </div>
               <div className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 p-4 sm:p-6">
                 <div className="flex items-center justify-between mb-4">
@@ -1279,9 +1377,46 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
                   </h2>
                   <Badge variant="outline" className="text-[10px] bg-rose-50 text-rose-700">{formatGHS(expiryValueAtRisk)} at risk</Badge>
                 </div>
+
+                {/* ===== Multi-Filter Bar ===== */}
+                {expiryProducts.length > 0 && (
+                  <div className="mb-4 p-3 rounded-xl bg-slate-50 ring-1 ring-slate-200 space-y-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500 uppercase">
+                        <Filter className="h-3 w-3" /> Filters:
+                      </div>
+                      <div className="relative flex-1 min-w-[180px]">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                        <input
+                          type="text"
+                          value={expirySearch}
+                          onChange={(e) => setExpirySearch(e.target.value)}
+                          placeholder="Search by name, SKU, or barcode…"
+                          className="w-full h-8 pl-8 pr-3 rounded-lg border border-slate-200 bg-white text-xs outline-none focus:ring-2 focus:ring-rose-400"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-200">
+                      <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500 uppercase">
+                        <Calendar className="h-3 w-3" /> Expiry between:
+                      </div>
+                      <input type="date" value={expiryDateFrom} onChange={(e) => setExpiryDateFrom(e.target.value)} className="h-8 px-2 rounded-lg border border-slate-200 bg-white text-xs outline-none cursor-pointer" />
+                      <span className="text-[10px] text-slate-400">to</span>
+                      <input type="date" value={expiryDateTo} onChange={(e) => setExpiryDateTo(e.target.value)} className="h-8 px-2 rounded-lg border border-slate-200 bg-white text-xs outline-none cursor-pointer" />
+                      {(expirySearch || expiryDateFrom || expiryDateTo) && (
+                        <button onClick={() => { setExpirySearch(""); setExpiryDateFrom(""); setExpiryDateTo(""); }} className="text-[10px] text-rose-500 hover:text-rose-700 font-semibold ml-auto">Clear</button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {expiryProducts.length === 0 ? (
                   <div className="text-center py-12 text-slate-400 text-sm">
                     <CheckCircle2 className="h-8 w-8 mx-auto mb-2 text-emerald-400" /> No products expiring soon
+                  </div>
+                ) : filteredExpiryProducts.length === 0 ? (
+                  <div className="text-center py-12 text-slate-400 text-sm">
+                    <Filter className="h-8 w-8 mx-auto mb-2 opacity-30" /> No products match your filters
                   </div>
                 ) : (
                   <div className="mobile-scroll-x">
@@ -1297,7 +1432,7 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
                         </tr>
                       </thead>
                       <tbody>
-                        {expiryProducts.map(p => (
+                        {filteredExpiryProducts.map(p => (
                           <tr key={p.id} className="border-b border-slate-100 hover:bg-slate-50">
                             <td className="py-2 px-2">
                               <div className="flex items-center gap-2">
@@ -1364,6 +1499,37 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
                 <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-4">
                   <Percent className="h-4 w-4 text-emerald-500" /> Profit Margin Analysis
                 </h2>
+
+                {/* ===== Multi-Filter Bar ===== */}
+                <div className="mb-4 p-3 rounded-xl bg-slate-50 ring-1 ring-slate-200 space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500 uppercase">
+                      <Filter className="h-3 w-3" /> Filters:
+                    </div>
+                    <div className="relative flex-1 min-w-[180px]">
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                      <input
+                        type="text"
+                        value={profitSearch}
+                        onChange={(e) => setProfitSearch(e.target.value)}
+                        placeholder="Search by name, SKU, or barcode…"
+                        className="w-full h-8 pl-8 pr-3 rounded-lg border border-slate-200 bg-white text-xs outline-none focus:ring-2 focus:ring-emerald-400"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-200">
+                    <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500 uppercase">
+                      <Calendar className="h-3 w-3" /> Received between:
+                    </div>
+                    <input type="date" value={profitDateFrom} onChange={(e) => setProfitDateFrom(e.target.value)} className="h-8 px-2 rounded-lg border border-slate-200 bg-white text-xs outline-none cursor-pointer" />
+                    <span className="text-[10px] text-slate-400">to</span>
+                    <input type="date" value={profitDateTo} onChange={(e) => setProfitDateTo(e.target.value)} className="h-8 px-2 rounded-lg border border-slate-200 bg-white text-xs outline-none cursor-pointer" />
+                    {(profitSearch || profitDateFrom || profitDateTo) && (
+                      <button onClick={() => { setProfitSearch(""); setProfitDateFrom(""); setProfitDateTo(""); }} className="text-[10px] text-rose-500 hover:text-rose-700 font-semibold ml-auto">Clear</button>
+                    )}
+                  </div>
+                </div>
+
                 <div className="mobile-scroll-x">
                   <table className="w-full text-xs">
                     <thead>
@@ -1379,7 +1545,7 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
                       </tr>
                     </thead>
                     <tbody>
-                      {profitData.map(p => (
+                      {filteredProfitData.map(p => (
                         <tr key={p.id} className="border-b border-slate-100 hover:bg-slate-50">
                           <td className="py-2 px-2">
                             <div className="flex items-center gap-2">

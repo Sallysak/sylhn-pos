@@ -29,7 +29,7 @@ export interface ScannedProduct {
 }
 
 type ScanMode = "camera" | "manual" | "upload";
-type EngineState = "idle" | "starting" | "scanning" | "looking" | "error";
+type EngineState = "idle" | "starting" | "scanning" | "looking" | "error" | "notfound" | "found";
 
 /**
  * Premium multi-engine barcode scanner for ADDING NEW PRODUCTS.
@@ -72,6 +72,9 @@ export function ProductScanner({ onResult, onClose }: ProductScannerProps) {
   const [manualBarcode, setManualBarcode] = useState("");
   const [activeEngine, setActiveEngine] = useState<string>("");
   const [supportedEngines, setSupportedEngines] = useState<string[]>([]);
+  // Store the last lookup result + searched barcode for the "found"/"notfound" screens
+  const [lastResult, setLastResult] = useState<BarcodeLookupResult | null>(null);
+  const [searchedBarcode, setSearchedBarcode] = useState("");
   const { toast } = useToast();
 
   // ===== Detect which engines are available on mount =====
@@ -306,54 +309,56 @@ export function ProductScanner({ onResult, onClose }: ProductScannerProps) {
       return;
     }
 
-    // ===== Check digit validation (EAN-13/UPC-A/EAN-8) =====
-    // Detects mis-scans where one digit is wrong. Still proceeds with lookup
-    // (in case the barcode uses a non-standard scheme), but warns the user.
-    const checkResult = validateCheckDigit(barcode);
-    if (!checkResult.valid && checkResult.expected !== undefined) {
-      toast({
-        title: "⚠️ Barcode may be mis-scanned",
-        description: `Check digit mismatch — expected ${checkResult.expected}, got ${checkResult.actual}. Trying lookup anyway…`,
-        duration: 4000,
-      });
-    }
+    setSearchedBarcode(barcode);
+    setLastResult(null);
 
     try {
       const result = await lookupBarcodeEverywhere(barcode);
-      if (result) {
-        toast({
-          title: "Product found!",
-          description: `${result.name} (via ${result.source})`,
-        });
-        onResult({
-          barcode: result.barcode,
-          name: result.name,
-          emoji: result.emoji,
-          category: result.category,
-          description: result.description,
-          brand: result.brand,
-          imageUrl: result.imageUrl,
-          source: result.source,
-        });
+      if (result && result.name) {
+        // ===== FOUND — show product preview screen =====
+        setLastResult(result);
+        setEngineState("found");
+        if (navigator.vibrate) navigator.vibrate(100);
       } else {
-        // Not in any DB — return barcode for manual entry
-        const dbList = "OpenFoodFacts, UPCitemdb, Open Beauty Facts, Open Pet Food Facts";
-        toast({
-          title: "Barcode captured (not in product DBs)",
-          description: `Searched ${dbList}. This may be a local/imported product — please fill the details manually.`,
-          duration: 5000,
-        });
-        onResult({ barcode, source: "unknown" });
+        // ===== NOT FOUND — show "not found" screen =====
+        setLastResult(null);
+        setEngineState("notfound");
+        if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
       }
     } catch (e: any) {
       console.error("[scanner] lookup failed:", e);
-      toast({
-        title: "Lookup failed",
-        description: "Could not reach product databases. Please fill manually.",
-        variant: "destructive",
-      });
-      onResult({ barcode, source: "unknown" });
+      setLastResult(null);
+      setEngineState("notfound");
     }
+  };
+
+  // ===== Confirm: use the found product (from "found" screen) =====
+  const confirmFoundProduct = () => {
+    if (!lastResult) return;
+    onResult({
+      barcode: lastResult.barcode,
+      name: lastResult.name,
+      emoji: lastResult.emoji,
+      category: lastResult.category,
+      description: lastResult.description,
+      brand: lastResult.brand,
+      imageUrl: lastResult.imageUrl,
+      source: lastResult.source,
+    });
+  };
+
+  // ===== Confirm: use barcode only (from "notfound" screen) =====
+  const useBarcodeOnly = () => {
+    onResult({ barcode: searchedBarcode, source: "unknown" });
+  };
+
+  // ===== Retry: go back to manual entry =====
+  const retryScan = () => {
+    setEngineState("idle");
+    setLastResult(null);
+    setSearchedBarcode("");
+    setManualBarcode("");
+    setMode("manual");
   };
 
   // ===== Manual entry =====
@@ -471,7 +476,86 @@ export function ProductScanner({ onResult, onClose }: ProductScannerProps) {
             <div className="py-12 text-center">
               <Loader2 className="h-10 w-10 animate-spin mx-auto mb-3 text-violet-600" />
               <div className="font-semibold text-slate-900 dark:text-white">Looking up product…</div>
-              <div className="text-xs text-slate-500 mt-1">Querying OpenFoodFacts + UPCitemdb</div>
+              <div className="text-xs text-slate-500 mt-1">Searching 4 databases: OpenFoodFacts, UPCitemdb, Open Beauty Facts, Open Pet Food Facts</div>
+              <div className="text-[10px] text-slate-400 mt-2 font-mono">Barcode: {searchedBarcode}</div>
+            </div>
+          ) : engineState === "found" && lastResult ? (
+            /* ===== FOUND screen — show product preview before filling form ===== */
+            <div className="space-y-4">
+              <div className="text-center py-2">
+                <div className="h-14 w-14 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mx-auto mb-3">
+                  <Check className="h-7 w-7 text-emerald-600" />
+                </div>
+                <div className="font-bold text-slate-900 dark:text-white text-sm">Product Found!</div>
+                <div className="text-[10px] text-slate-500 mt-0.5">via {lastResult.source}</div>
+              </div>
+
+              {/* Product preview card */}
+              <div className="rounded-xl ring-1 ring-slate-200 dark:ring-slate-700 p-4 bg-slate-50 dark:bg-slate-800/50">
+                <div className="flex items-start gap-3">
+                  {lastResult.imageUrl ? (
+                    <img src={lastResult.imageUrl} alt="" className="h-16 w-16 rounded-lg object-cover flex-shrink-0" />
+                  ) : (
+                    <div className="h-16 w-16 rounded-lg bg-white dark:bg-slate-700 flex items-center justify-center text-3xl flex-shrink-0">
+                      {lastResult.emoji || "📦"}
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="font-bold text-sm text-slate-900 dark:text-white">{lastResult.name}</div>
+                    {lastResult.brand && <div className="text-xs text-slate-500 mt-0.5">{lastResult.brand}</div>}
+                    {lastResult.category && <div className="text-[10px] text-slate-400 mt-0.5 capitalize">Category: {lastResult.category}</div>}
+                    <div className="text-[10px] text-slate-400 mt-1 font-mono">Barcode: {lastResult.barcode}</div>
+                  </div>
+                </div>
+                {lastResult.description && (
+                  <div className="text-[10px] text-slate-500 mt-2 pt-2 border-t border-slate-200 dark:border-slate-700">
+                    {lastResult.description}
+                  </div>
+                )}
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex gap-2">
+                <Button variant="outline" className="flex-1" onClick={retryScan}>
+                  <Keyboard className="h-4 w-4 mr-2" /> Try another
+                </Button>
+                <Button className="flex-1 bg-emerald-600 hover:bg-emerald-700" onClick={confirmFoundProduct}>
+                  <Check className="h-4 w-4 mr-2" /> Use this product
+                </Button>
+              </div>
+            </div>
+          ) : engineState === "notfound" ? (
+            /* ===== NOT FOUND screen — barcode captured, product not in any DB ===== */
+            <div className="space-y-4">
+              <div className="text-center py-2">
+                <div className="h-14 w-14 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center mx-auto mb-3">
+                  <AlertCircle className="h-7 w-7 text-amber-600" />
+                </div>
+                <div className="font-bold text-slate-900 dark:text-white text-sm">Not in any database</div>
+                <div className="text-xs text-slate-500 mt-1">
+                  Searched: OpenFoodFacts, UPCitemdb, Open Beauty Facts, Open Pet Food Facts
+                </div>
+              </div>
+
+              {/* Barcode captured card */}
+              <div className="rounded-xl ring-1 ring-amber-200 dark:ring-amber-800 p-4 bg-amber-50 dark:bg-amber-900/10">
+                <div className="text-[10px] font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider mb-1">Barcode Captured</div>
+                <div className="text-lg font-mono font-bold text-slate-900 dark:text-white">{searchedBarcode}</div>
+                <div className="text-[10px] text-slate-500 mt-1">
+                  This may be a local, imported, or store-brand product not registered in international databases.
+                  You can still add it — just fill in the product details manually.
+                </div>
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex gap-2">
+                <Button variant="outline" className="flex-1" onClick={retryScan}>
+                  <Keyboard className="h-4 w-4 mr-2" /> Try another
+                </Button>
+                <Button className="flex-1 bg-violet-600 hover:bg-violet-700" onClick={useBarcodeOnly}>
+                  <Check className="h-4 w-4 mr-2" /> Use barcode & fill manually
+                </Button>
+              </div>
             </div>
           ) : mode === "camera" ? (
             <div className="space-y-3">
@@ -566,7 +650,18 @@ export function ProductScanner({ onResult, onClose }: ProductScannerProps) {
                 </p>
               </div>
               <Button onClick={handleManualSubmit} className="w-full bg-violet-600 hover:bg-violet-700">
-                <Search className="h-4 w-4 mr-2" /> Look up barcode
+                <Search className="h-4 w-4 mr-2" /> Look up barcode online
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full text-xs"
+                onClick={() => {
+                  const code = manualBarcode.trim();
+                  if (!code) { toast({ title: "Enter a barcode first", variant: "destructive" }); return; }
+                  onResult({ barcode: code, source: "manual" });
+                }}
+              >
+                <Check className="h-3.5 w-3.5 mr-2" /> Use barcode directly (skip lookup)
               </Button>
               <div className="grid grid-cols-2 gap-2">
                 <Button variant="outline" className="w-full" onClick={() => switchMode("camera")}>

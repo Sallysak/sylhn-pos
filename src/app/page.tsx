@@ -2233,6 +2233,16 @@ export default function POSPage() {
               </span>
               <span className="text-slate-300">·</span>
               <span>Prices in {CURRENCY_CODE}</span>
+              <span className="text-slate-300">·</span>
+              <span className="hidden sm:inline font-mono font-semibold text-slate-700">Today: {formatGHS(dailyTotal)}</span>
+              <span className="text-slate-300 hidden sm:inline">·</span>
+              <span className="hidden sm:inline">{transactionCount} txns</span>
+              {products.filter(p => p.stock <= p.reorderLevel && p.active !== false).length > 0 && (
+                <>
+                  <span className="text-slate-300 hidden md:inline">·</span>
+                  <span className="hidden md:inline text-amber-600 font-semibold">{products.filter(p => p.stock <= p.reorderLevel && p.active !== false).length} low stock</span>
+                </>
+              )}
             </div>
           </div>
 
@@ -2259,7 +2269,12 @@ export default function POSPage() {
 
           {/* Product Grid — scrolls, fills remaining space */}
           <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 scroll-premium" style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 p-3 sm:p-4">
+            <div className={cn(
+              "grid gap-2.5 sm:gap-3 p-3 sm:p-4",
+              showSidebar
+                ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
+                : "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7"
+            )}>
               {filteredProducts.map((product, idx) => {
                 const inCart = cart.find(item => item.productId === product.id);
                 const lowStock = product.stock <= product.reorderLevel;
