@@ -9,7 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { lookupBarcodeEverywhere, normalizeBarcode, isValidBarcode, type BarcodeLookupResult } from "@/lib/barcode-lookup";
+import { lookupBarcodeEverywhere, normalizeBarcode, isValidBarcode, validateCheckDigit, type BarcodeLookupResult } from "@/lib/barcode-lookup";
 
 interface ProductScannerProps {
   onResult: (result: ScannedProduct) => void;
@@ -25,7 +25,7 @@ export interface ScannedProduct {
   brand?: string;
   price?: number;
   imageUrl?: string;
-  source: "openfoodfacts" | "upcitemdb" | "manual" | "unknown";
+  source: "openfoodfacts" | "upcitemdb" | "openbeautyfacts" | "openpetfoodfacts" | "manual" | "unknown";
 }
 
 type ScanMode = "camera" | "manual" | "upload";
@@ -306,6 +306,18 @@ export function ProductScanner({ onResult, onClose }: ProductScannerProps) {
       return;
     }
 
+    // ===== Check digit validation (EAN-13/UPC-A/EAN-8) =====
+    // Detects mis-scans where one digit is wrong. Still proceeds with lookup
+    // (in case the barcode uses a non-standard scheme), but warns the user.
+    const checkResult = validateCheckDigit(barcode);
+    if (!checkResult.valid && checkResult.expected !== undefined) {
+      toast({
+        title: "⚠️ Barcode may be mis-scanned",
+        description: `Check digit mismatch — expected ${checkResult.expected}, got ${checkResult.actual}. Trying lookup anyway…`,
+        duration: 4000,
+      });
+    }
+
     try {
       const result = await lookupBarcodeEverywhere(barcode);
       if (result) {
@@ -325,9 +337,11 @@ export function ProductScanner({ onResult, onClose }: ProductScannerProps) {
         });
       } else {
         // Not in any DB — return barcode for manual entry
+        const dbList = "OpenFoodFacts, UPCitemdb, Open Beauty Facts, Open Pet Food Facts";
         toast({
-          title: "Barcode scanned successfully",
-          description: "Not found in product databases — please fill product details manually.",
+          title: "Barcode captured (not in product DBs)",
+          description: `Searched ${dbList}. This may be a local/imported product — please fill the details manually.`,
+          duration: 5000,
         });
         onResult({ barcode, source: "unknown" });
       }

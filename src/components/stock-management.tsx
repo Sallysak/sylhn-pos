@@ -777,6 +777,8 @@ function ProductForm({ product, groups, onSave, onClose }: {
     setShowScanner(false);
     const sourceLabel = result.source === "openfoodfacts" ? "OpenFoodFacts"
                       : result.source === "upcitemdb" ? "UPCitemdb"
+                      : result.source === "openbeautyfacts" ? "Open Beauty Facts"
+                      : result.source === "openpetfoodfacts" ? "Open Pet Food Facts"
                       : result.source === "manual" ? "manual entry"
                       : "barcode only (no DB match)";
     toast({
