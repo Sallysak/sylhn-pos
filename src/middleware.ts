@@ -36,7 +36,7 @@ const DEV_HEADERS: Record<string, string> = {
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' data: https://fonts.gstatic.com",
     "img-src 'self' data: blob: https:",
-    "connect-src 'self' https://internal-api.z.ai https://world.openfoodfacts.org https://vercel.live",
+    "connect-src 'self' https://internal-api.z.ai https://world.openfoodfacts.org https://api.upcitemdb.com https://vercel.live",
     "media-src 'self' data: blob:",
     "frame-ancestors *",
     "form-action 'self'",
@@ -64,7 +64,7 @@ const PROD_HEADERS: Record<string, string> = {
     "font-src 'self' data: https://fonts.gstatic.com",
     "img-src 'self' data: blob: https:",
     // Only allow API calls to self + the Z.AI API + OpenFoodFacts barcode lookup
-    "connect-src 'self' https://internal-api.z.ai https://world.openfoodfacts.org",
+    "connect-src 'self' https://internal-api.z.ai https://world.openfoodfacts.org https://api.upcitemdb.com",
     "media-src 'self' data: blob:",
     "frame-ancestors 'self' https://*.space-z.ai https://*.z.ai",
     "form-action 'self'",

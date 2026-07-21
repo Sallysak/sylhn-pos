@@ -769,14 +769,22 @@ function ProductForm({ product, groups, onSave, onClose }: {
       ...(result.name && { name: result.name }),
       ...(result.category && { category: result.category, groupId: result.category }),
       ...(result.emoji && { emoji: result.emoji }),
+      // Auto-fill supplier field with brand if available
+      ...(result.brand && !prev.supplier && { supplier: result.brand }),
+      // Auto-fill image if returned by lookup
+      ...(result.imageUrl && { image: result.imageUrl }),
     }));
     setShowScanner(false);
-    if (result.source === "openfoodfacts") {
-      toast({
-        title: "Product auto-filled",
-        description: `Looked up: ${result.name || result.barcode}`,
-      });
-    }
+    const sourceLabel = result.source === "openfoodfacts" ? "OpenFoodFacts"
+                      : result.source === "upcitemdb" ? "UPCitemdb"
+                      : result.source === "manual" ? "manual entry"
+                      : "barcode only (no DB match)";
+    toast({
+      title: result.name ? "Product auto-filled" : "Barcode captured",
+      description: result.name
+        ? `${result.name} (via ${sourceLabel})`
+        : `Barcode ${result.barcode} — fill product details manually`,
+    });
   };
 
   // Compute profit margin live (premium UX — instant feedback)
