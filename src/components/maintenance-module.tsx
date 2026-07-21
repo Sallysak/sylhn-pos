@@ -6,7 +6,7 @@ import {
   ArrowLeft, Settings2, Users, Database, Clock, Lock, Zap, Store,
   Power, Save, Plus, X, Edit2, Trash2, Shield, Download, Upload,
   CheckCircle2, AlertTriangle, KeyRound, Bell, Globe, Palette,
-  UserCog, HardDrive, RefreshCw, Info, Loader2,
+  UserCog, HardDrive, RefreshCw, Info, Loader2, AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +14,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { COMPANY, CURRENCY, TAX_RATE, formatGHS } from "@/lib/pos-data";
+import { PremiumUserManagement } from "@/components/premium-user-management";
 
 type MaintenanceTab = "settings" | "users" | "backup" | "shift" | "security" | "about";
 
@@ -126,7 +127,7 @@ export function MaintenanceModule({ onBack, cashier, dailyTotal, transactionCoun
             className="h-full"
           >
             {tab === "settings" && <SystemSettings />}
-            {tab === "users" && <UserManagement users={users} setUsers={setUsers} />}
+            {tab === "users" && <PremiumUserManagement />}
             {tab === "backup" && <BackupRestore />}
             {tab === "shift" && <CashierShift cashier={cashier} dailyTotal={dailyTotal} transactionCount={transactionCount} />}
             {tab === "security" && <SecuritySettings />}
@@ -187,10 +188,20 @@ function SystemSettings() {
           </SettingsSection>
 
           {/* Financial Settings */}
-          <SettingsSection title="Financial Settings" icon={Globe}>
-            <SettingField label="VAT/Tax Rate (%)" value={taxRate} onChange={setTaxRate} type="number" />
+          <SettingsSection title="Financial Settings — VAT & GRA Compliance" icon={Globe}>
+            <SettingField label="VAT/Tax Rate (%) — Ghana standard rate is 15%" value={taxRate} onChange={setTaxRate} type="number" />
             <SettingField label="Currency Code" value={currency} onChange={setCurrency} />
             <SettingField label="Low Stock Threshold" value={lowStockThreshold} onChange={setLowStockThreshold} type="number" />
+            {/* VAT/GRA Guide */}
+            <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 ring-1 ring-blue-200 dark:ring-blue-800 text-[11px] text-blue-800 dark:text-blue-200 space-y-1.5">
+              <div className="font-bold flex items-center gap-1.5"><AlertCircle className="h-3.5 w-3.5" /> GRA VAT Guide for Ghana</div>
+              <p>• <strong>Standard VAT rate:</strong> 15% (set above) — applies to most goods and services.</p>
+              <p>• <strong>VAT is calculated</strong> automatically on every taxable sale. Set products as "Taxable" in Stock → Add Product.</p>
+              <p>• <strong>VAT Filing:</strong> Go to Accounts → Profit & Tax → GRA e-VAT Filing to export JSON/XML for GRA portal submission.</p>
+              <p>• <strong>To change the VAT rate:</strong> Edit the field above and click Save. All future sales will use the new rate.</p>
+              <p>• <strong>To exempt a product from VAT:</strong> Uncheck "Taxable" in Stock → Edit Product.</p>
+              <p>• <strong>GRA Portal:</strong> https://gra.gov.gh — file returns monthly by the 15th of the following month.</p>
+            </div>
           </SettingsSection>
 
           {/* Receipt Settings */}
@@ -210,7 +221,28 @@ function SystemSettings() {
           {/* Save Button */}
           <div className="flex justify-end gap-2 pt-4 border-t border-slate-200">
             <Button variant="outline" onClick={() => { setStoreName(COMPANY.name); setContact(COMPANY.contact); setAddress(COMPANY.address); setTaxRate((TAX_RATE * 100).toString()); setCurrency("GHS"); setLowStockThreshold("20"); setReceiptFooter("Thank you for shopping!"); toast({ title: "Settings reset to defaults" }); }}>Reset to Defaults</Button>
-            <Button onClick={() => { try { localStorage.setItem("sylhn_settings", JSON.stringify({ storeName, contact, address, taxRate, currency, lowStockThreshold, receiptFooter, enableNotifications, enableLowStockAlerts })); toast({ title: "Settings saved", description: "System settings saved successfully" }); } catch { toast({ title: "Save failed", variant: "destructive" }); } }} className="bg-gradient-to-r from-slate-700 to-slate-800 hover:from-slate-800 hover:to-slate-900">
+            <Button onClick={async () => {
+              try {
+                // Save to localStorage for instant UI
+                localStorage.setItem("sylhn_settings", JSON.stringify({ storeName, contact, address, taxRate, currency, lowStockThreshold, receiptFooter, enableNotifications, enableLowStockAlerts }));
+                // Also persist to server via /api/system-settings
+                try {
+                  const { authedFetch } = await import("@/lib/client-auth");
+                  await authedFetch("/api/system-settings", {
+                    method: "POST",
+                    body: JSON.stringify([
+                      { key: "companyName", value: storeName },
+                      { key: "taxRate", value: (parseFloat(taxRate) / 100).toString() },
+                      { key: "taxName", value: "VAT" },
+                      { key: "currency", value: currency },
+                      { key: "lowStockThreshold", value: lowStockThreshold },
+                      { key: "receiptFooter", value: receiptFooter },
+                    ]),
+                  });
+                } catch { /* server save failed — localStorage is enough for now */ }
+                toast({ title: "Settings saved", description: "System settings saved successfully" });
+              } catch { toast({ title: "Save failed", variant: "destructive" }); }
+            }} className="bg-gradient-to-r from-slate-700 to-slate-800 hover:from-slate-800 hover:to-slate-900">
               <Save className="h-4 w-4" /> Save Settings
             </Button>
           </div>
