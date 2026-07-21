@@ -98,6 +98,30 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
   const [reorderSearch, setReorderSearch] = useState("");
   const [reorderCategory, setReorderCategory] = useState("all");
   const [reorderSupplier, setReorderSupplier] = useState("all");
+  // NEW: Date range filter — filter by product's received date or last stock movement
+  const [reorderDateFrom, setReorderDateFrom] = useState("");
+  const [reorderDateTo, setReorderDateTo] = useState("");
+  // NEW: Toggle to show ALL products (not just below-reorder) so user can
+  // manually pin items to the reorder list. This solves the "items delete
+  // automatically" complaint — pinned items stay until explicitly removed.
+  const [showAllProducts, setShowAllProducts] = useState(false);
+  // NEW: Pinned product IDs — these stay in the reorder list even if their
+  // stock goes above reorder level. Persists to localStorage.
+  const [pinnedReorderIds, setPinnedReorderIds] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set();
+    try {
+      const stored = localStorage.getItem("sylhn-pinned-reorder");
+      if (stored) return new Set(JSON.parse(stored));
+    } catch {}
+    return new Set();
+  });
+  // Persist pinned IDs to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem("sylhn-pinned-reorder", JSON.stringify(Array.from(pinnedReorderIds)));
+    } catch {}
+  }, [pinnedReorderIds]);
+
   // User-edited suggested quantities: { [productId]: number }
   // Falls back to the auto-computed suggestedQty if not edited.
   const [editedQtys, setEditedQtys] = useState<Record<string, number>>({});
@@ -229,9 +253,19 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
   // the server. Creating a PO now uses status='ordered' (not 'received'),
   // so stock is NOT auto-incremented and items stay in the reorder list
   // until you explicitly receive the PO in the Purchase module.
+  // ===== Reorder list: includes products below reorder level PLUS any pinned items =====
+  // Pinned items stay in the list even if stock goes above reorder level —
+  // this solves the "items delete automatically without consent" complaint.
+  // The user explicitly pins items they want to keep ordering.
   const reorderProducts = useMemo(() => {
     return products
-      .filter(p => p.quantity <= p.reorderLevel && p.active !== false)
+      .filter(p => {
+        // Include if below reorder level OR if pinned by user
+        const isBelowReorder = p.quantity <= p.reorderLevel && p.active !== false;
+        const isPinned = pinnedReorderIds.has(p.id);
+        if (showAllProducts) return p.active !== false; // show everything when toggle is on
+        return isBelowReorder || isPinned;
+      })
       .map(p => {
         const autoSuggested = Math.max(0, (p.reorderLevel * 2) - p.quantity);
         // Use user-edited qty if set, otherwise the auto-computed suggestion
@@ -241,13 +275,21 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
           suggestedQty,
           autoSuggestedQty: autoSuggested,
           reorderCost: suggestedQty * p.costPrice,
+          isPinned: pinnedReorderIds.has(p.id),
+          isBelowReorder: p.quantity <= p.reorderLevel,
         };
       })
-      .sort((a, b) => a.quantity - b.quantity);
-  }, [products, editedQtys]);
+      .sort((a, b) => {
+        // Pinned items first, then by stock quantity (lowest first)
+        if (a.isPinned && !b.isPinned) return -1;
+        if (!a.isPinned && b.isPinned) return 1;
+        return a.quantity - b.quantity;
+      });
+  }, [products, editedQtys, pinnedReorderIds, showAllProducts]);
 
   // ===== Apply multi-filters to reorder list =====
-  // Filters: product search (name/SKU/barcode), category, supplier.
+  // Filters: product search (name/SKU/barcode), category, supplier, date range.
+  // Date range filters by product's receivedDate (last stock receipt).
   // These are applied AFTER the base reorder computation so the user
   // can narrow down without losing the full list.
   const filteredReorderProducts = useMemo(() => {
@@ -272,9 +314,17 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
           return false;
         }
       }
+      // Date range filter — based on receivedDate (when stock was last received)
+      const receivedDate = (p as any).receivedDate;
+      if (reorderDateFrom || reorderDateTo) {
+        if (!receivedDate) return false; // no date = exclude when filtering by date
+        const pDate = typeof receivedDate === "string" ? receivedDate.split("T")[0] : new Date(receivedDate).toISOString().split("T")[0];
+        if (reorderDateFrom && pDate < reorderDateFrom) return false;
+        if (reorderDateTo && pDate > reorderDateTo) return false;
+      }
       return true;
     });
-  }, [reorderProducts, reorderSearch, reorderCategory, reorderSupplier]);
+  }, [reorderProducts, reorderSearch, reorderCategory, reorderSupplier, reorderDateFrom, reorderDateTo]);
 
   // Unique categories and suppliers for the filter dropdowns
   const reorderCategories = useMemo(() => {
@@ -940,20 +990,35 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
               </div>
 
               <div className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 p-4 sm:p-6">
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
                   <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2">
                     <AlertTriangle className="h-4 w-4 text-amber-500" /> Reorder Suggestions
+                    {pinnedReorderIds.size > 0 && (
+                      <Badge variant="outline" className="ml-2 text-[9px] bg-violet-50 text-violet-700 border-violet-200">
+                        📌 {pinnedReorderIds.size} pinned
+                      </Badge>
+                    )}
                   </h2>
                   <div className="flex items-center gap-2">
-                    {reorderProducts.length > 0 && (
+                    {/* Show All Products toggle — lets user pin items even if above reorder level */}
+                    <label className="flex items-center gap-1.5 text-[10px] font-semibold text-slate-600 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={showAllProducts}
+                        onChange={(e) => setShowAllProducts(e.target.checked)}
+                        className="rounded"
+                      />
+                      Show all products
+                    </label>
+                    {(reorderSearch || reorderCategory !== "all" || reorderSupplier !== "all" || reorderDateFrom || reorderDateTo) && (
                       <Button
-                        onClick={() => { setReorderSearch(""); setReorderCategory("all"); setReorderSupplier("all"); }}
+                        onClick={() => { setReorderSearch(""); setReorderCategory("all"); setReorderSupplier("all"); setReorderDateFrom(""); setReorderDateTo(""); }}
                         variant="outline"
                         size="sm"
                         className="h-7 px-2 text-[10px]"
                         title="Clear all filters"
                       >
-                        <Filter className="h-3 w-3 mr-1" /> Clear Filters
+                        <Filter className="h-3 w-3 mr-1" /> Clear
                       </Button>
                     )}
                     {filteredReorderProducts.length > 0 && (
@@ -968,8 +1033,9 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
                 </div>
 
                 {/* ===== Multi-Filter Bar ===== */}
-                {reorderProducts.length > 0 && (
-                  <div className="mb-4 p-3 rounded-xl bg-slate-50 ring-1 ring-slate-200 flex flex-wrap items-center gap-2">
+                <div className="mb-4 p-3 rounded-xl bg-slate-50 ring-1 ring-slate-200 space-y-2">
+                  {/* Row 1: Search + Category + Supplier */}
+                  <div className="flex flex-wrap items-center gap-2">
                     <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500 uppercase">
                       <Filter className="h-3 w-3" /> Filters:
                     </div>
@@ -1004,7 +1070,44 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
                       {reorderSuppliers.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
                   </div>
-                )}
+                  {/* Row 2: Date range filter */}
+                  <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-200">
+                    <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500 uppercase">
+                      <Calendar className="h-3 w-3" /> Received between:
+                    </div>
+                    <input
+                      type="date"
+                      value={reorderDateFrom}
+                      onChange={(e) => setReorderDateFrom(e.target.value)}
+                      className="h-8 px-2 rounded-lg border border-slate-200 bg-white text-xs outline-none cursor-pointer"
+                      title="Filter products received on or after this date"
+                    />
+                    <span className="text-[10px] text-slate-400">to</span>
+                    <input
+                      type="date"
+                      value={reorderDateTo}
+                      onChange={(e) => setReorderDateTo(e.target.value)}
+                      className="h-8 px-2 rounded-lg border border-slate-200 bg-white text-xs outline-none cursor-pointer"
+                      title="Filter products received on or before this date"
+                    />
+                    {(reorderDateFrom || reorderDateTo) && (
+                      <button
+                        onClick={() => { setReorderDateFrom(""); setReorderDateTo(""); }}
+                        className="text-[10px] text-rose-500 hover:text-rose-700 font-semibold"
+                      >
+                        Clear dates
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Info banner explaining pin behavior */}
+                <div className="mb-3 p-2.5 rounded-lg bg-violet-50 text-[10px] text-violet-700 flex items-start gap-2">
+                  <Star className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
+                  <span>
+                    <strong>📌 Pin items to keep them in the list.</strong> Click the ☆ button next to any product to pin it — pinned items stay in the reorder list even when stock is above reorder level, so they don't disappear automatically. Toggle "Show all products" to see and pin items that are well-stocked.
+                  </span>
+                </div>
 
                 {reorderProducts.length === 0 ? (
                   <div className="text-center py-12 text-slate-400 text-sm">
@@ -1019,6 +1122,7 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
                     <table className="w-full text-xs">
                       <thead>
                         <tr className="border-b border-slate-200">
+                          <th className="text-center py-2 px-2 font-semibold text-slate-600 w-10">📌</th>
                           <th className="text-left py-2 px-2 font-semibold text-slate-600">Product</th>
                           <th className="text-right py-2 px-2 font-semibold text-slate-600">Current Stock</th>
                           <th className="text-right py-2 px-2 font-semibold text-slate-600">Reorder Level</th>
@@ -1032,18 +1136,47 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
                       <tbody>
                         {filteredReorderProducts.map(p => {
                           const isEdited = editedQtys[p.id] !== undefined;
+                          const isPinned = (p as any).isPinned;
+                          const isBelowReorder = (p as any).isBelowReorder;
                           return (
-                            <tr key={p.id} className="border-b border-slate-100 hover:bg-slate-50">
+                            <tr key={p.id} className={cn("border-b border-slate-100 hover:bg-slate-50", isPinned && "bg-violet-50/40")}>
+                              {/* Pin button */}
+                              <td className="py-2 px-2 text-center">
+                                <button
+                                  onClick={() => {
+                                    setPinnedReorderIds(prev => {
+                                      const next = new Set(prev);
+                                      if (next.has(p.id)) next.delete(p.id);
+                                      else next.add(p.id);
+                                      return next;
+                                    });
+                                  }}
+                                  className={cn(
+                                    "h-7 w-7 rounded-md flex items-center justify-center transition",
+                                    isPinned
+                                      ? "text-violet-600 hover:bg-violet-100"
+                                      : "text-slate-300 hover:text-violet-500 hover:bg-violet-50"
+                                  )}
+                                  title={isPinned ? "Unpin — will disappear if stock is above reorder level" : "Pin to keep in reorder list (won't auto-delete)"}
+                                >
+                                  <Star className={cn("h-4 w-4", isPinned && "fill-violet-500")} />
+                                </button>
+                              </td>
                               <td className="py-2 px-2">
                                 <div className="flex items-center gap-2">
                                   <span>{p.emoji}</span>
                                   <div>
-                                    <div className="font-semibold text-slate-800">{p.name}</div>
+                                    <div className="font-semibold text-slate-800 flex items-center gap-1.5">
+                                      {p.name}
+                                      {isPinned && !isBelowReorder && (
+                                        <Badge variant="outline" className="text-[8px] bg-violet-100 text-violet-700 border-violet-200">pinned</Badge>
+                                      )}
+                                    </div>
                                     <div className="text-[9px] text-slate-400 font-mono">{p.sku}</div>
                                   </div>
                                 </div>
                               </td>
-                              <td className="py-2 px-2 text-right font-mono font-bold text-rose-600">{p.quantity}</td>
+                              <td className={cn("py-2 px-2 text-right font-mono font-bold", isBelowReorder ? "text-rose-600" : "text-emerald-600")}>{p.quantity}</td>
                               <td className="py-2 px-2 text-right font-mono text-slate-500">{p.reorderLevel}</td>
                               <td className="py-2 px-2 text-right">
                                 {/* ===== Editable Suggested Qty ===== */}
@@ -1100,7 +1233,7 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
                       </tbody>
                       <tfoot>
                         <tr className="border-t-2 border-slate-300 bg-slate-50">
-                          <td colSpan={5} className="py-3 px-2 text-right font-bold text-slate-700">Total Estimated Cost ({filteredReorderProducts.length} items):</td>
+                          <td colSpan={6} className="py-3 px-2 text-right font-bold text-slate-700">Total Estimated Cost ({filteredReorderProducts.length} items):</td>
                           <td className="py-3 px-2 text-right font-mono font-bold text-rose-600">{formatGHS(totalReorderCost)}</td>
                           <td colSpan={2}></td>
                         </tr>
@@ -1113,7 +1246,7 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
                 {reorderProducts.length > 0 && (
                   <div className="mt-3 p-2.5 rounded-lg bg-blue-50 text-[10px] text-blue-700 flex items-start gap-2">
                     <AlertCircle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
-                    <span>POs are created with status <strong>"Ordered"</strong> — stock does NOT change until you receive them in the Purchase module. Items stay in this list until received. Edit the <strong>Suggested Qty</strong> column to adjust order quantities before creating POs.</span>
+                    <span>POs are created with status <strong>"Ordered"</strong> — stock does NOT change until you receive them in the Purchase module. <strong>Edit the Suggested Qty column</strong> to set your preferred order quantity before creating POs. <strong>📌 Pin items</strong> with the ☆ button to keep them in the list even when stock is above reorder level — pinned items won't disappear automatically.</span>
                   </div>
                 )}
               </div>
