@@ -175,24 +175,64 @@ export async function POST(req: NextRequest) {
     if (!result.success) return validationError(result.error);
     const p = result.data;
 
-    const product = await db.product.create({
-      data: {
-        sku: p.sku,
-        barcode: p.barcode || "",
-        name: p.name,
-        emoji: p.emoji || "📦",
-        category: p.category || "other",
-        description: p.description || "",
-        price: Number(p.price) || 0,
-        costPrice: Number(p.costPrice) || 0,
-        quantity: Number(p.quantity) || 0,
-        unit: p.unit || "each",
-        reorderLevel: Number(p.reorderLevel) || 5,
-        taxable: p.taxable !== false,
-        groupId: p.groupId || null,
-      },
-      include: { group: true, suppliers: { include: { supplier: true } } },
-    });
+    // ===== Validate groupId exists before creating (foreign key constraint) =====
+    // The form sometimes sends a stale groupId (e.g. "g1" from localStorage
+    // cache) that no longer exists after a wipe. Prisma would throw a
+    // foreign key error — we catch it here and return a helpful message.
+    let validGroupId: string | null = null;
+    if (p.groupId && typeof p.groupId === "string" && p.groupId !== "null") {
+      try {
+        const group = await db.stockGroup.findUnique({ where: { id: p.groupId }, select: { id: true } });
+        if (group) {
+          validGroupId = group.id;
+        } else {
+          // Group doesn't exist — silently fall back to null rather than
+          // failing the whole product create. The product can be assigned
+          // to a group later via the UI.
+          console.warn(`[POST /api/products] groupId "${p.groupId}" not found — creating product without group`);
+        }
+      } catch (e) {
+        console.warn(`[POST /api/products] could not look up groupId "${p.groupId}":`, e);
+      }
+    }
+
+    let product;
+    try {
+      product = await db.product.create({
+        data: {
+          sku: p.sku,
+          barcode: p.barcode || "",
+          name: p.name,
+          emoji: p.emoji || "📦",
+          category: p.category || "other",
+          description: p.description || "",
+          price: Number(p.price) || 0,
+          costPrice: Number(p.costPrice) || 0,
+          quantity: Number(p.quantity) || 0,
+          unit: p.unit || "each",
+          reorderLevel: Number(p.reorderLevel) || 5,
+          taxable: p.taxable !== false,
+          batchNumber: p.batchNumber || "",
+          expiryDate: p.expiryDate ? new Date(p.expiryDate as string) : null,
+          receivedDate: p.receivedDate ? new Date(p.receivedDate as string) : null,
+          groupId: validGroupId,
+          active: p.active !== false,
+        },
+        include: { group: true, suppliers: { include: { supplier: true } } },
+      });
+    } catch (createErr: any) {
+      // Handle common Prisma errors with helpful messages
+      if (createErr?.code === "P2002") {
+        return NextResponse.json({
+          error: "A product with this SKU already exists. Use a different SKU.",
+        }, { status: 409 });
+      }
+      console.error("POST /api/products create error:", createErr);
+      return NextResponse.json({
+        error: "Failed to create product",
+        detail: createErr?.message || String(createErr),
+      }, { status: 500 });
+    }
 
     // Log audit
     await db.auditLog.create({

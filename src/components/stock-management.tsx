@@ -735,14 +735,18 @@ function ProductForm({ product, groups, onSave, onClose }: {
   onClose: () => void;
 }) {
   const { toast } = useToast();
+  // Use the first real group from the DB if available, else null.
+  // The old default 'g1' was a stale hardcoded ID that caused foreign key
+  // constraint errors after a data wipe (group 'g1' no longer exists).
+  const defaultGroupId = groups.length > 0 ? groups[0].id : "";
   const [form, setForm] = useState<Product>(product || {
     id: `p-${Date.now()}`,
     sku: `NEW-${Math.floor(1000 + Math.random() * 9000)}`,
     name: "",
     price: 0,
     costPrice: 0,
-    category: "fruits",
-    groupId: "g1",
+    category: defaultGroupId || "other",
+    groupId: defaultGroupId,
     unit: "each",
     stock: 0,
     reorderLevel: 10,

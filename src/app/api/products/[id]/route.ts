@@ -65,29 +65,66 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     const previous = await db.product.findUnique({ where: { id }, select: { quantity: true, name: true, sku: true } });
     if (!previous) return NextResponse.json({ error: "Product not found" }, { status: 404 });
 
-    const product = await db.product.update({
-      where: { id },
-      data: {
-        ...(updates.sku !== undefined && { sku: updates.sku }),
-        ...(updates.barcode !== undefined && { barcode: updates.barcode }),
-        ...(updates.name !== undefined && { name: updates.name }),
-        ...(updates.emoji !== undefined && { emoji: updates.emoji }),
-        ...(updates.category !== undefined && { category: updates.category }),
-        ...(updates.description !== undefined && { description: updates.description }),
-        ...(updates.price !== undefined && { price: Number(updates.price) }),
-        ...(updates.costPrice !== undefined && { costPrice: Number(updates.costPrice) }),
-        ...(updates.quantity !== undefined && { quantity: Number(updates.quantity) }),
-        ...(updates.unit !== undefined && { unit: updates.unit }),
-        ...(updates.reorderLevel !== undefined && { reorderLevel: Number(updates.reorderLevel) }),
-        ...(updates.taxable !== undefined && { taxable: updates.taxable }),
-        ...(updates.batchNumber !== undefined && { batchNumber: updates.batchNumber }),
-        ...(updates.expiryDate !== undefined && { expiryDate: updates.expiryDate ? new Date(updates.expiryDate as string) : null }),
-        ...(updates.receivedDate !== undefined && { receivedDate: updates.receivedDate ? new Date(updates.receivedDate as string) : null }),
-        ...(updates.groupId !== undefined && { groupId: updates.groupId || null }),
-        ...(updates.active !== undefined && { active: updates.active }),
-      },
-      include: { group: true, suppliers: { include: { supplier: true } } },
-    });
+    // ===== Validate groupId if it's being updated =====
+    // Same fix as POST: stale groupId from localStorage cache would cause
+    // a foreign key constraint error.
+    let validGroupId: string | null | undefined = undefined; // undefined = don't update
+    if (updates.groupId !== undefined) {
+      if (updates.groupId && typeof updates.groupId === "string" && updates.groupId !== "null") {
+        try {
+          const group = await db.stockGroup.findUnique({ where: { id: updates.groupId }, select: { id: true } });
+          if (group) {
+            validGroupId = group.id;
+          } else {
+            console.warn(`[PUT /api/products/${id}] groupId "${updates.groupId}" not found — setting to null`);
+            validGroupId = null;
+          }
+        } catch (e) {
+          console.warn(`[PUT /api/products/${id}] could not look up groupId:`, e);
+          validGroupId = null;
+        }
+      } else {
+        validGroupId = null;
+      }
+    }
+
+    let product;
+    try {
+      product = await db.product.update({
+        where: { id },
+        data: {
+          ...(updates.sku !== undefined && { sku: updates.sku }),
+          ...(updates.barcode !== undefined && { barcode: updates.barcode }),
+          ...(updates.name !== undefined && { name: updates.name }),
+          ...(updates.emoji !== undefined && { emoji: updates.emoji }),
+          ...(updates.category !== undefined && { category: updates.category }),
+          ...(updates.description !== undefined && { description: updates.description }),
+          ...(updates.price !== undefined && { price: Number(updates.price) }),
+          ...(updates.costPrice !== undefined && { costPrice: Number(updates.costPrice) }),
+          ...(updates.quantity !== undefined && { quantity: Number(updates.quantity) }),
+          ...(updates.unit !== undefined && { unit: updates.unit }),
+          ...(updates.reorderLevel !== undefined && { reorderLevel: Number(updates.reorderLevel) }),
+          ...(updates.taxable !== undefined && { taxable: updates.taxable }),
+          ...(updates.batchNumber !== undefined && { batchNumber: updates.batchNumber }),
+          ...(updates.expiryDate !== undefined && { expiryDate: updates.expiryDate ? new Date(updates.expiryDate as string) : null }),
+          ...(updates.receivedDate !== undefined && { receivedDate: updates.receivedDate ? new Date(updates.receivedDate as string) : null }),
+          ...(validGroupId !== undefined && { groupId: validGroupId }),
+          ...(updates.active !== undefined && { active: updates.active }),
+        },
+        include: { group: true, suppliers: { include: { supplier: true } } },
+      });
+    } catch (updateErr: any) {
+      if (updateErr?.code === "P2002") {
+        return NextResponse.json({
+          error: "A product with this SKU already exists. Use a different SKU.",
+        }, { status: 409 });
+      }
+      console.error("PUT /api/products/[id] update error:", updateErr);
+      return NextResponse.json({
+        error: "Failed to update product",
+        detail: updateErr?.message || String(updateErr),
+      }, { status: 500 });
+    }
 
     // If quantity changed, log to stock history
     if (updates.quantity !== undefined && previous.quantity !== Number(updates.quantity)) {
