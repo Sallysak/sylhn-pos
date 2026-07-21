@@ -84,6 +84,64 @@ const KeyboardShortcutsOverlay = dynamic(() => import("@/components/keyboard-sho
 // The /api/products endpoint returns Prisma-shaped products (with `quantity`
 // instead of `stock`, nested `group` object, ISO date strings, etc.).
 // This function converts them to the legacy `Product` shape used by the UI.
+
+/**
+ * Fuzzy product lookup by barcode or SKU.
+ * Used by: POS scanner, keypad barcode mode, Part No input.
+ *
+ * Matching strategy (tries each in order, returns first match):
+ *   1. Exact barcode match (trimmed)
+ *   2. Exact SKU match (case-insensitive, trimmed)
+ *   3. Normalized barcode match (strip spaces/dashes/leading zeros)
+ *   4. Barcode "contains" match (scanned code contains stored barcode or vice versa)
+ *   5. SKU "contains" match (partial SKU)
+ *
+ * This handles common scan issues:
+ *   - Extra whitespace from scanner
+ *   - Case differences (COKE-500 vs coke-500)
+ *   - Leading zero differences (EAN-13 vs UPC-A)
+ *   - QR codes that embed the barcode with extra text
+ */
+function findProductByCode(products: Product[], code: string): Product | undefined {
+  if (!code) return undefined;
+  const trimmed = code.trim();
+  if (!trimmed) return undefined;
+  const lower = trimmed.toLowerCase();
+  const normalized = trimmed.replace(/[\s-]/g, "").replace(/^0+/, "");
+
+  // 1. Exact barcode match (trimmed)
+  let product = products.find(p => p.barcode === trimmed);
+  if (product) return product;
+
+  // 2. Exact SKU match (case-insensitive)
+  product = products.find(p => p.sku.toLowerCase() === lower);
+  if (product) return product;
+
+  // 3. Normalized barcode match (strip spaces/dashes/leading zeros)
+  if (normalized) {
+    product = products.find(p => {
+      const pNorm = (p.barcode || "").replace(/[\s-]/g, "").replace(/^0+/, "");
+      return pNorm && pNorm === normalized;
+    });
+    if (product) return product;
+  }
+
+  // 4. Barcode "contains" match — handles QR codes with extra text
+  //    e.g. QR contains "Product: 6034000181036" — we match on "6034000181036"
+  product = products.find(p => {
+    if (!p.barcode) return false;
+    return trimmed.includes(p.barcode) || p.barcode.includes(trimmed);
+  });
+  if (product) return product;
+
+  // 5. SKU "contains" match (partial)
+  product = products.find(p => {
+    if (!p.sku) return false;
+    return lower.includes(p.sku.toLowerCase()) || p.sku.toLowerCase().includes(lower);
+  });
+  return product;
+}
+
 function serverProductToClientProduct(sp: any): Product {
   return {
     id: sp.id,
@@ -1044,7 +1102,7 @@ export default function POSPage() {
       ));
       toast({ title: `Price updated to ${formatGHS(value)}` });
     } else if (activeKeypadMode === "barcode") {
-      const product = products.find(p => p.barcode === keypadInput || p.sku === keypadInput);
+      const product = findProductByCode(products, keypadInput);
       if (product) {
         addToCart(product);
       } else {
@@ -2348,7 +2406,7 @@ export default function POSPage() {
                     }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
-                        const product = products.find(p => p.barcode === partNoInput || p.sku.toLowerCase() === partNoInput.toLowerCase());
+                        const product = findProductByCode(products, partNoInput);
                         if (product) {
                           addToCart(product);
                           setPartNoInput("");
@@ -2745,13 +2803,15 @@ export default function POSPage() {
         {showBarcodeScanner && (
           <BarcodeScanner
             onScan={(code) => {
-              // Look up product by barcode or SKU
-              const product = products.find(p => p.barcode === code || p.sku === code);
+              // Fuzzy lookup: handles whitespace, case, leading zeros, QR text
+              const product = findProductByCode(products, code);
               if (product) {
                 addToCart(product);
                 toast({ title: `Added: ${product.name}`, description: `Scanned: ${code}` });
+                // Close scanner after successful add (user can reopen for next item)
+                setShowBarcodeScanner(false);
               } else {
-                toast({ title: "No product found", description: `Barcode ${code} not in catalog`, variant: "destructive" });
+                toast({ title: "No product found", description: `Barcode ${code} not in catalog. Add the product in Stock → Add Product first.`, variant: "destructive", duration: 4000 });
               }
             }}
             onClose={() => setShowBarcodeScanner(false)}
