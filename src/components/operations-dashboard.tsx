@@ -7,7 +7,7 @@ import {
   Package, AlertTriangle, Clock, BarChart3, Activity, RefreshCw,
   Search, Printer, RotateCcw, X, Calendar, AlertCircle, CheckCircle2,
   Star, Boxes, Percent, FileText, ChevronRight, ArrowUpRight, ArrowDownRight,
-  Plus,
+  Plus, Download, FileBarChart, Filter,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +15,8 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { COMPANY, formatGHS } from "@/lib/pos-data";
+import { exportReportToPDF, exportReportToExcel, exportReportToCSV, printReport } from "@/lib/report-utils";
+import type { ReportData } from "@/lib/pos-types";
 
 // Premium fix: the original component used `p.quantity` and `p.active` from
 // the Prisma Product shape, but received `Product` typed against pos-data.ts
@@ -30,6 +32,7 @@ interface DashboardProduct {
   costPrice: number;
   unit: string;
   reorderLevel: number;
+  barcode?: string;
   // Accept either `stock` (pos-data) or `quantity` (Prisma)
   stock?: number;
   quantity?: number;
@@ -90,6 +93,35 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
   const [loadingSales, setLoadingSales] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSale, setSelectedSale] = useState<SaleRecord | null>(null);
+
+  // ===== Reorder tab: multi-filter + editable suggested qty + PO report =====
+  const [reorderSearch, setReorderSearch] = useState("");
+  const [reorderCategory, setReorderCategory] = useState("all");
+  const [reorderSupplier, setReorderSupplier] = useState("all");
+  // User-edited suggested quantities: { [productId]: number }
+  // Falls back to the auto-computed suggestedQty if not edited.
+  const [editedQtys, setEditedQtys] = useState<Record<string, number>>({});
+  // PO report dialog: shows created POs with print/export options
+  const [poReport, setPoReport] = useState<null | {
+    pos: Array<{
+      refNo: string;
+      supplierName: string;
+      supplierId: string | null;
+      items: Array<{
+        partNo: string;
+        details: string;
+        emoji: string;
+        quantity: number;
+        cost: number;
+        total: number;
+      }>;
+      total: number;
+      status: string;
+      createdAt: string;
+    }>;
+    totalCount: number;
+    totalCost: number;
+  }>(null);
 
   // Premium fix: normalize all products so `p.quantity` and `p.active` always exist
   const products = useMemo(() => (rawProducts || []).map(normalizeProduct), [rawProducts]);
@@ -192,18 +224,85 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
   }, [sales, searchQuery]);
 
   // ===== Reorder alerts =====
+  // Compute the base reorder list (products at or below reorder level).
+  // The list is STABLE — it only changes when product quantities change on
+  // the server. Creating a PO now uses status='ordered' (not 'received'),
+  // so stock is NOT auto-incremented and items stay in the reorder list
+  // until you explicitly receive the PO in the Purchase module.
   const reorderProducts = useMemo(() => {
     return products
       .filter(p => p.quantity <= p.reorderLevel && p.active !== false)
-      .map(p => ({
-        ...p,
-        suggestedQty: Math.max(0, (p.reorderLevel * 2) - p.quantity),
-        reorderCost: Math.max(0, (p.reorderLevel * 2) - p.quantity) * p.costPrice,
-      }))
+      .map(p => {
+        const autoSuggested = Math.max(0, (p.reorderLevel * 2) - p.quantity);
+        // Use user-edited qty if set, otherwise the auto-computed suggestion
+        const suggestedQty = editedQtys[p.id] !== undefined ? editedQtys[p.id] : autoSuggested;
+        return {
+          ...p,
+          suggestedQty,
+          autoSuggestedQty: autoSuggested,
+          reorderCost: suggestedQty * p.costPrice,
+        };
+      })
       .sort((a, b) => a.quantity - b.quantity);
-  }, [products]);
+  }, [products, editedQtys]);
 
-  const totalReorderCost = reorderProducts.reduce((sum, p) => sum + (p as any).reorderCost, 0);
+  // ===== Apply multi-filters to reorder list =====
+  // Filters: product search (name/SKU/barcode), category, supplier.
+  // These are applied AFTER the base reorder computation so the user
+  // can narrow down without losing the full list.
+  const filteredReorderProducts = useMemo(() => {
+    return reorderProducts.filter(p => {
+      // Search filter
+      if (reorderSearch) {
+        const q = reorderSearch.toLowerCase();
+        const nameMatch = (p.name || "").toLowerCase().includes(q);
+        const skuMatch = (p.sku || "").toLowerCase().includes(q);
+        const barcodeMatch = (p.barcode || "").toLowerCase().includes(q);
+        if (!nameMatch && !skuMatch && !barcodeMatch) return false;
+      }
+      // Category filter
+      if (reorderCategory !== "all") {
+        if ((p.category || "other") !== reorderCategory) return false;
+      }
+      // Supplier filter
+      if (reorderSupplier !== "all") {
+        if (reorderSupplier === "unassigned") {
+          if ((p as any).preferredSupplierName) return false;
+        } else if ((p as any).preferredSupplierName !== reorderSupplier) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [reorderProducts, reorderSearch, reorderCategory, reorderSupplier]);
+
+  // Unique categories and suppliers for the filter dropdowns
+  const reorderCategories = useMemo(() => {
+    const set = new Set<string>();
+    reorderProducts.forEach(p => set.add(p.category || "other"));
+    return Array.from(set).sort();
+  }, [reorderProducts]);
+
+  const reorderSuppliers = useMemo(() => {
+    const set = new Set<string>();
+    reorderProducts.forEach(p => {
+      const name = (p as any).preferredSupplierName;
+      if (name) set.add(name);
+    });
+    return Array.from(set).sort();
+  }, [reorderProducts]);
+
+  // Helper: get the effective suggested qty for a product (edited or auto)
+  const getEffectiveQty = (productId: string, autoQty: number): number => {
+    return editedQtys[productId] !== undefined ? editedQtys[productId] : autoQty;
+  };
+
+  // Helper: update the edited qty for a product
+  const updateEditedQty = (productId: string, qty: number) => {
+    setEditedQtys(prev => ({ ...prev, [productId]: Math.max(0, Math.floor(qty) || 0) }));
+  };
+
+  const totalReorderCost = filteredReorderProducts.reduce((sum, p) => sum + (p as any).reorderCost, 0);
 
   // ===== Expiry tracking =====
   const expiryProducts = useMemo(() => {
@@ -277,7 +376,15 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
   };
 
   // ===== Premium: Create Purchase Order for a single low-stock product =====
+  // IMPORTANT: Uses status='ordered' (NOT 'received') so stock is NOT
+  // auto-incremented. The product stays in the reorder list until you
+  // explicitly receive the PO in the Purchase module. This prevents the
+  // "data disappears without consent" issue.
   const handleCreatePO = async (product: any, suggestedQty: number, supplierId: string | null, supplierName: string | null, supplierCost: number | null) => {
+    if (suggestedQty <= 0) {
+      toast({ title: "Invalid quantity", description: "Suggested qty must be greater than 0", variant: "destructive" });
+      return;
+    }
     if (!confirm(`Create purchase order for ${suggestedQty} × ${product.name} @ GHS ${(supplierCost || product.costPrice).toFixed(2)}?`)) return;
     try {
       const cost = supplierCost || product.costPrice;
@@ -290,14 +397,13 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
           type: 'purchase',
           supplierId: supplierId || null,
           supplierName: supplierName || 'Unassigned',
-          status: 'received',  // auto-receive so stock increments immediately
+          status: 'ordered',  // NOT 'received' — stock stays unchanged until PO is received
           subtotal: total,
           taxAmount: 0,
           total,
-          amountPaid: 0,  // unpaid — supplier balance will be incremented
-          notes: `Auto-generated PO from low-stock reorder (suggested ${suggestedQty} units)`,
+          amountPaid: 0,
+          notes: `Reorder PO from Operations Dashboard — ${product.name} at ${product.quantity} units (reorder level: ${product.reorderLevel})`,
           createdBy: 'Operations Dashboard',
-          receivedAt: new Date().toISOString(),
           items: [{
             productId: product.id,
             partNo: product.sku,
@@ -316,7 +422,28 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
           title: 'Purchase Order Created',
           description: `${data.purchase.refNo} — ${suggestedQty} × ${product.name} @ GHS ${cost.toFixed(2)} = GHS ${total.toFixed(2)}${supplierId ? ` (${supplierName})` : ''}`,
         });
-        fetchDashboard();  // refresh low-stock list
+        // Show the PO report dialog with print/export options
+        setPoReport({
+          pos: [{
+            refNo: data.purchase.refNo,
+            supplierName: supplierName || 'Unassigned',
+            supplierId,
+            items: [{
+              partNo: product.sku,
+              details: product.name,
+              emoji: product.emoji,
+              quantity: suggestedQty,
+              cost,
+              total,
+            }],
+            total,
+            status: 'ordered',
+            createdAt: new Date().toISOString(),
+          }],
+          totalCount: 1,
+          totalCost: total,
+        });
+        fetchDashboard();
       } else {
         toast({ title: 'Failed to create PO', description: data.error || '', variant: 'destructive' });
       }
@@ -326,11 +453,20 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
   };
 
   // ===== Premium: Create PO for ALL low-stock items (one PO per supplier) =====
+  // Uses the FILTERED reorder list (so filters are respected) and the
+  // user-edited suggested quantities. Creates POs with status='ordered'
+  // so stock is NOT auto-incremented — items stay in the reorder list.
   const handleCreateAllPOs = async () => {
-    if (!confirm(`Create purchase orders for ALL ${reorderProducts.length} low-stock items? This will group items by their preferred supplier.`)) return;
+    const itemsToOrder = filteredReorderProducts;
+    if (itemsToOrder.length === 0) {
+      toast({ title: "No items to order", description: "Adjust your filters to include items.", variant: "destructive" });
+      return;
+    }
+    if (!confirm(`Create purchase orders for ${itemsToOrder.length} low-stock item(s)? Items will be grouped by their preferred supplier. Stock will NOT change until you receive the POs.`)) return;
+
     // Group by supplier
     const bySupplier: Record<string, { items: any[]; supplierId: string | null; supplierName: string }> = {};
-    for (const p of reorderProducts) {
+    for (const p of itemsToOrder) {
       const supplierId = (p as any).preferredSupplierId || 'unassigned';
       if (!bySupplier[supplierId]) {
         bySupplier[supplierId] = {
@@ -342,15 +478,17 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
       bySupplier[supplierId].items.push(p);
     }
 
+    const createdPOs: any[] = [];
     let successCount = 0;
     let totalCost = 0;
+
     for (const group of Object.values(bySupplier)) {
       const items = group.items.map((p: any) => ({
         productId: p.id,
         partNo: p.sku,
         details: p.name,
         emoji: p.emoji,
-        quantity: p.suggestedQty,
+        quantity: p.suggestedQty,  // uses edited qty if set, else auto-suggested
         cost: p.preferredSupplierCost || p.costPrice,
         tax: false,
         total: +((p.preferredSupplierCost || p.costPrice) * p.suggestedQty).toFixed(2),
@@ -366,28 +504,49 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
             type: 'purchase',
             supplierId: group.supplierId,
             supplierName: group.supplierName,
-            status: 'received',
+            status: 'ordered',  // NOT 'received' — stock stays unchanged
             subtotal: groupTotal,
             taxAmount: 0,
             total: groupTotal,
             amountPaid: 0,
-            notes: `Bulk reorder from low-stock dashboard — ${items.length} items`,
+            notes: `Bulk reorder from Operations Dashboard — ${items.length} items`,
             createdBy: 'Operations Dashboard',
-            receivedAt: new Date().toISOString(),
             items,
           }),
         });
         const data = await res.json();
-        if (res.ok && data.success) successCount++;
+        if (res.ok && data.success) {
+          successCount++;
+          createdPOs.push({
+            refNo: data.purchase.refNo,
+            supplierName: group.supplierName,
+            supplierId: group.supplierId,
+            items,
+            total: groupTotal,
+            status: 'ordered',
+            createdAt: new Date().toISOString(),
+          });
+        }
       } catch (e) {
         console.error('PO creation failed:', e);
       }
     }
+
     toast({
       title: `${successCount} PO(s) created`,
-      description: successCount > 0 ? `Total restock cost: GHS ${totalCost.toFixed(2)} — ${Object.keys(bySupplier).length} suppliers` : 'No POs created (check console)',
+      description: successCount > 0 ? `Total restock cost: GHS ${totalCost.toFixed(2)} — ${Object.keys(bySupplier).length} suppliers. Stock unchanged — receive POs in Purchase module.` : 'No POs created (check console)',
       variant: successCount > 0 ? 'default' : 'destructive',
     });
+
+    // Show the PO report dialog with print/export options
+    if (createdPOs.length > 0) {
+      setPoReport({
+        pos: createdPOs,
+        totalCount: createdPOs.length,
+        totalCost,
+      });
+    }
+
     fetchDashboard();
   };
 
@@ -768,34 +927,92 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                 <div className="bg-white rounded-xl shadow-sm ring-1 ring-slate-200 p-4">
                   <div className="text-[10px] font-semibold text-slate-500 uppercase">Products to Reorder</div>
-                  <div className="text-2xl font-bold text-amber-600 mt-1">{reorderProducts.length}</div>
+                  <div className="text-2xl font-bold text-amber-600 mt-1">{filteredReorderProducts.length}{filteredReorderProducts.length !== reorderProducts.length && <span className="text-xs text-slate-400"> / {reorderProducts.length}</span>}</div>
                 </div>
                 <div className="bg-white rounded-xl shadow-sm ring-1 ring-slate-200 p-4">
                   <div className="text-[10px] font-semibold text-slate-500 uppercase">Total Reorder Qty</div>
-                  <div className="text-2xl font-bold text-slate-800 mt-1">{reorderProducts.reduce((s, p) => s + (p as any).suggestedQty, 0)}</div>
+                  <div className="text-2xl font-bold text-slate-800 mt-1">{filteredReorderProducts.reduce((s, p) => s + (p as any).suggestedQty, 0)}</div>
                 </div>
                 <div className="bg-white rounded-xl shadow-sm ring-1 ring-slate-200 p-4">
                   <div className="text-[10px] font-semibold text-slate-500 uppercase">Est. Reorder Cost</div>
                   <div className="text-2xl font-bold text-rose-600 mt-1">{formatGHS(totalReorderCost)}</div>
                 </div>
               </div>
+
               <div className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 p-4 sm:p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2">
                     <AlertTriangle className="h-4 w-4 text-amber-500" /> Reorder Suggestions
                   </h2>
-                  {reorderProducts.length > 0 && (
-                    <Button
-                      onClick={handleCreateAllPOs}
-                      className="h-8 px-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-[11px] font-semibold"
-                    >
-                      <Plus className="h-3 w-3 mr-1" /> Create All POs (by supplier)
-                    </Button>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {reorderProducts.length > 0 && (
+                      <Button
+                        onClick={() => { setReorderSearch(""); setReorderCategory("all"); setReorderSupplier("all"); }}
+                        variant="outline"
+                        size="sm"
+                        className="h-7 px-2 text-[10px]"
+                        title="Clear all filters"
+                      >
+                        <Filter className="h-3 w-3 mr-1" /> Clear Filters
+                      </Button>
+                    )}
+                    {filteredReorderProducts.length > 0 && (
+                      <Button
+                        onClick={handleCreateAllPOs}
+                        className="h-8 px-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-[11px] font-semibold"
+                      >
+                        <Plus className="h-3 w-3 mr-1" /> Create POs ({filteredReorderProducts.length} items)
+                      </Button>
+                    )}
+                  </div>
                 </div>
+
+                {/* ===== Multi-Filter Bar ===== */}
+                {reorderProducts.length > 0 && (
+                  <div className="mb-4 p-3 rounded-xl bg-slate-50 ring-1 ring-slate-200 flex flex-wrap items-center gap-2">
+                    <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500 uppercase">
+                      <Filter className="h-3 w-3" /> Filters:
+                    </div>
+                    {/* Product search */}
+                    <div className="relative flex-1 min-w-[180px]">
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                      <input
+                        type="text"
+                        value={reorderSearch}
+                        onChange={(e) => setReorderSearch(e.target.value)}
+                        placeholder="Search by name, SKU, or barcode…"
+                        className="w-full h-8 pl-8 pr-3 rounded-lg border border-slate-200 bg-white text-xs outline-none focus:ring-2 focus:ring-emerald-400"
+                      />
+                    </div>
+                    {/* Category filter */}
+                    <select
+                      value={reorderCategory}
+                      onChange={(e) => setReorderCategory(e.target.value)}
+                      className="h-8 px-2 rounded-lg border border-slate-200 bg-white text-xs outline-none cursor-pointer"
+                    >
+                      <option value="all">All Categories</option>
+                      {reorderCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                    {/* Supplier filter */}
+                    <select
+                      value={reorderSupplier}
+                      onChange={(e) => setReorderSupplier(e.target.value)}
+                      className="h-8 px-2 rounded-lg border border-slate-200 bg-white text-xs outline-none cursor-pointer"
+                    >
+                      <option value="all">All Suppliers</option>
+                      <option value="unassigned">Unassigned</option>
+                      {reorderSuppliers.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                )}
+
                 {reorderProducts.length === 0 ? (
                   <div className="text-center py-12 text-slate-400 text-sm">
                     <CheckCircle2 className="h-8 w-8 mx-auto mb-2 text-emerald-400" /> All products well stocked
+                  </div>
+                ) : filteredReorderProducts.length === 0 ? (
+                  <div className="text-center py-12 text-slate-400 text-sm">
+                    <Filter className="h-8 w-8 mx-auto mb-2 opacity-30" /> No products match your filters
                   </div>
                 ) : (
                   <div className="mobile-scroll-x">
@@ -805,7 +1022,7 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
                           <th className="text-left py-2 px-2 font-semibold text-slate-600">Product</th>
                           <th className="text-right py-2 px-2 font-semibold text-slate-600">Current Stock</th>
                           <th className="text-right py-2 px-2 font-semibold text-slate-600">Reorder Level</th>
-                          <th className="text-right py-2 px-2 font-semibold text-slate-600">Suggested Qty</th>
+                          <th className="text-right py-2 px-2 font-semibold text-slate-600">Suggested Qty <span className="text-[8px] text-emerald-600 normal-case">(editable)</span></th>
                           <th className="text-right py-2 px-2 font-semibold text-slate-600">Unit Cost</th>
                           <th className="text-right py-2 px-2 font-semibold text-slate-600">Reorder Cost</th>
                           <th className="text-right py-2 px-2 font-semibold text-slate-600">Supplier</th>
@@ -813,49 +1030,77 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
                         </tr>
                       </thead>
                       <tbody>
-                        {reorderProducts.map(p => (
-                          <tr key={p.id} className="border-b border-slate-100 hover:bg-slate-50">
-                            <td className="py-2 px-2">
-                              <div className="flex items-center gap-2">
-                                <span>{p.emoji}</span>
-                                <div>
-                                  <div className="font-semibold text-slate-800">{p.name}</div>
-                                  <div className="text-[9px] text-slate-400 font-mono">{p.sku}</div>
+                        {filteredReorderProducts.map(p => {
+                          const isEdited = editedQtys[p.id] !== undefined;
+                          return (
+                            <tr key={p.id} className="border-b border-slate-100 hover:bg-slate-50">
+                              <td className="py-2 px-2">
+                                <div className="flex items-center gap-2">
+                                  <span>{p.emoji}</span>
+                                  <div>
+                                    <div className="font-semibold text-slate-800">{p.name}</div>
+                                    <div className="text-[9px] text-slate-400 font-mono">{p.sku}</div>
+                                  </div>
                                 </div>
-                              </div>
-                            </td>
-                            <td className="py-2 px-2 text-right font-mono font-bold text-rose-600">{p.quantity}</td>
-                            <td className="py-2 px-2 text-right font-mono text-slate-500">{p.reorderLevel}</td>
-                            <td className="py-2 px-2 text-right font-mono font-bold text-amber-600">{(p as any).suggestedQty}</td>
-                            <td className="py-2 px-2 text-right font-mono text-slate-600">{formatGHS(p.costPrice)}</td>
-                            <td className="py-2 px-2 text-right font-mono font-bold text-slate-800">{formatGHS((p as any).reorderCost)}</td>
-                            <td className="py-2 px-2 text-[10px] text-slate-600">
-                              {(p as any).preferredSupplierName ? (
-                                <div>
-                                  <div className="font-semibold">{(p as any).preferredSupplierName}</div>
-                                  {(p as any).preferredSupplierCost && (
-                                    <div className="text-slate-400 font-mono">GHS {(p as any).preferredSupplierCost.toFixed(2)} · {(p as any).leadTimeDays || 0}d lead</div>
+                              </td>
+                              <td className="py-2 px-2 text-right font-mono font-bold text-rose-600">{p.quantity}</td>
+                              <td className="py-2 px-2 text-right font-mono text-slate-500">{p.reorderLevel}</td>
+                              <td className="py-2 px-2 text-right">
+                                {/* ===== Editable Suggested Qty ===== */}
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={(p as any).suggestedQty}
+                                  onChange={(e) => updateEditedQty(p.id, parseInt(e.target.value) || 0)}
+                                  className={cn(
+                                    "w-20 h-7 px-2 rounded-md border text-right font-mono text-xs outline-none transition",
+                                    isEdited
+                                      ? "border-emerald-400 bg-emerald-50 text-emerald-700 font-bold ring-1 ring-emerald-300"
+                                      : "border-slate-200 bg-white text-amber-600 hover:border-slate-300"
                                   )}
-                                </div>
-                              ) : (
-                                <span className="text-slate-400 italic">Unassigned</span>
-                              )}
-                            </td>
-                            <td className="py-2 px-2 text-center">
-                              <button
-                                onClick={() => handleCreatePO(p, (p as any).suggestedQty, (p as any).preferredSupplierId || null, (p as any).preferredSupplierName || null, (p as any).preferredSupplierCost || null)}
-                                className="h-7 px-2 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-700 text-[10px] font-semibold flex items-center gap-1 mx-auto transition"
-                                title={`Create PO: ${(p as any).suggestedQty} × ${p.name}`}
-                              >
-                                <Plus className="h-3 w-3" /> Create PO
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
+                                  title={isEdited ? `Edited (auto-suggested: ${(p as any).autoSuggestedQty})` : `Auto-suggested — click to edit`}
+                                />
+                                {isEdited && (
+                                  <button
+                                    onClick={() => setEditedQtys(prev => { const next = { ...prev }; delete next[p.id]; return next; })}
+                                    className="ml-1 text-[9px] text-slate-400 hover:text-rose-500"
+                                    title="Reset to auto-suggested"
+                                  >
+                                    ↺
+                                  </button>
+                                )}
+                              </td>
+                              <td className="py-2 px-2 text-right font-mono text-slate-600">{formatGHS(p.costPrice)}</td>
+                              <td className="py-2 px-2 text-right font-mono font-bold text-slate-800">{formatGHS((p as any).reorderCost)}</td>
+                              <td className="py-2 px-2 text-[10px] text-slate-600">
+                                {(p as any).preferredSupplierName ? (
+                                  <div>
+                                    <div className="font-semibold">{(p as any).preferredSupplierName}</div>
+                                    {(p as any).preferredSupplierCost && (
+                                      <div className="text-slate-400 font-mono">GHS {(p as any).preferredSupplierCost.toFixed(2)} · {(p as any).leadTimeDays || 0}d lead</div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="text-slate-400 italic">Unassigned</span>
+                                )}
+                              </td>
+                              <td className="py-2 px-2 text-center">
+                                <button
+                                  onClick={() => handleCreatePO(p, (p as any).suggestedQty, (p as any).preferredSupplierId || null, (p as any).preferredSupplierName || null, (p as any).preferredSupplierCost || null)}
+                                  disabled={(p as any).suggestedQty <= 0}
+                                  className="h-7 px-2 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-700 text-[10px] font-semibold flex items-center gap-1 mx-auto transition disabled:opacity-40 disabled:cursor-not-allowed"
+                                  title={`Create PO: ${(p as any).suggestedQty} × ${p.name}`}
+                                >
+                                  <Plus className="h-3 w-3" /> Create PO
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                       <tfoot>
                         <tr className="border-t-2 border-slate-300 bg-slate-50">
-                          <td colSpan={5} className="py-3 px-2 text-right font-bold text-slate-700">Total Estimated Cost:</td>
+                          <td colSpan={5} className="py-3 px-2 text-right font-bold text-slate-700">Total Estimated Cost ({filteredReorderProducts.length} items):</td>
                           <td className="py-3 px-2 text-right font-mono font-bold text-rose-600">{formatGHS(totalReorderCost)}</td>
                           <td colSpan={2}></td>
                         </tr>
@@ -863,7 +1108,25 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
                     </table>
                   </div>
                 )}
+
+                {/* Info note about PO status */}
+                {reorderProducts.length > 0 && (
+                  <div className="mt-3 p-2.5 rounded-lg bg-blue-50 text-[10px] text-blue-700 flex items-start gap-2">
+                    <AlertCircle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
+                    <span>POs are created with status <strong>"Ordered"</strong> — stock does NOT change until you receive them in the Purchase module. Items stay in this list until received. Edit the <strong>Suggested Qty</strong> column to adjust order quantities before creating POs.</span>
+                  </div>
+                )}
               </div>
+
+              {/* ===== PO Report Dialog ===== */}
+              <AnimatePresence>
+                {poReport && (
+                  <POReportDialog
+                    report={poReport}
+                    onClose={() => setPoReport(null)}
+                  />
+                )}
+              </AnimatePresence>
             </motion.div>
           )}
 
@@ -1181,5 +1444,191 @@ function ExpiryStat({ label, count, color }: { label: string; count: number; col
       <div className="text-2xl font-bold text-slate-800">{count}</div>
       <div className="text-[10px] text-slate-500">products</div>
     </div>
+  );
+}
+
+// ===== PO Report Dialog — shown after creating POs from the reorder tab =====
+// Displays all created POs with their items, supplier, and total cost.
+// Includes Print, CSV, PDF, and Excel export buttons.
+function POReportDialog({ report, onClose }: {
+  report: {
+    pos: Array<{
+      refNo: string;
+      supplierName: string;
+      supplierId: string | null;
+      items: Array<{ partNo: string; details: string; emoji: string; quantity: number; cost: number; total: number; }>;
+      total: number;
+      status: string;
+      createdAt: string;
+    }>;
+    totalCount: number;
+    totalCost: number;
+  };
+  onClose: () => void;
+}) {
+  const { toast } = useToast();
+
+  // Build a flat row list for export (one row per PO item)
+  const buildReportData = (): ReportData => {
+    const rows: Record<string, any>[] = [];
+    for (const po of report.pos) {
+      for (const item of po.items) {
+        rows.push({
+          poRef: po.refNo,
+          supplier: po.supplierName,
+          status: po.status,
+          createdAt: new Date(po.createdAt).toLocaleString(),
+          partNo: item.partNo,
+          details: item.details,
+          quantity: item.quantity,
+          unitCost: item.cost,
+          total: item.total,
+        });
+      }
+    }
+    return {
+      type: "po-report",
+      title: "Purchase Order Report",
+      subtitle: `${report.totalCount} PO(s) · Total GHS ${report.totalCost.toFixed(2)} · ${new Date().toLocaleString()}`,
+      columns: [
+        { key: "poRef", label: "PO Ref No" },
+        { key: "supplier", label: "Supplier" },
+        { key: "details", label: "Product" },
+        { key: "quantity", label: "Qty", align: "right" },
+        { key: "unitCost", label: "Unit Cost", align: "right", format: (v: any) => `GHS ${Number(v).toFixed(2)}` },
+        { key: "total", label: "Total", align: "right", format: (v: any) => `GHS ${Number(v).toFixed(2)}` },
+        { key: "status", label: "Status" },
+      ],
+      rows,
+      summary: [
+        { label: "Total POs", value: String(report.totalCount) },
+        { label: "Total Items", value: String(rows.length) },
+        { label: "Total Cost", value: `GHS ${report.totalCost.toFixed(2)}` },
+        { label: "Generated", value: new Date().toLocaleString() },
+      ],
+    };
+  };
+
+  const handlePrint = () => {
+    const rpt = buildReportData();
+    printReport(rpt);
+  };
+  const handlePDF = () => {
+    const rpt = buildReportData();
+    exportReportToPDF(rpt);
+    toast({ title: "PDF exported", description: `${rpt.rows.length} items across ${report.totalCount} PO(s)` });
+  };
+  const handleExcel = () => {
+    const rpt = buildReportData();
+    exportReportToExcel(rpt);
+    toast({ title: "Excel exported", description: `${rpt.rows.length} items across ${report.totalCount} PO(s)` });
+  };
+  const handleCSV = () => {
+    const rpt = buildReportData();
+    exportReportToCSV(rpt);
+    toast({ title: "CSV exported", description: `${rpt.rows.length} items across ${report.totalCount} PO(s)` });
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.95, y: 20 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.95, y: 20 }}
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col overflow-hidden"
+      >
+        {/* Header */}
+        <div className="flex-shrink-0 px-5 py-4 bg-gradient-to-r from-emerald-700 to-teal-600 text-white flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-white/20 flex items-center justify-center">
+              <FileBarChart className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold">Purchase Order Report</h3>
+              <p className="text-[10px] opacity-90">{report.totalCount} PO(s) created · Total GHS {report.totalCost.toFixed(2)}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="h-8 w-8 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center transition">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Export buttons */}
+        <div className="flex-shrink-0 px-5 py-3 bg-slate-50 border-b border-slate-200 flex items-center gap-2 flex-wrap">
+          <span className="text-[10px] font-bold text-slate-500 uppercase mr-1">Export:</span>
+          <button onClick={handlePrint} className="h-8 px-3 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition">
+            <Printer className="h-3.5 w-3.5" /> Print
+          </button>
+          <button onClick={handlePDF} className="h-8 px-3 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-700 text-xs font-semibold flex items-center gap-1.5 transition">
+            <FileText className="h-3.5 w-3.5" /> PDF
+          </button>
+          <button onClick={handleExcel} className="h-8 px-3 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-700 text-xs font-semibold flex items-center gap-1.5 transition">
+            <Download className="h-3.5 w-3.5" /> Excel
+          </button>
+          <button onClick={handleCSV} className="h-8 px-3 rounded-lg bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs font-semibold flex items-center gap-1.5 transition">
+            <Download className="h-3.5 w-3.5" /> CSV
+          </button>
+        </div>
+
+        {/* PO details */}
+        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+          {report.pos.map((po, i) => (
+            <div key={i} className="rounded-xl ring-1 ring-slate-200 overflow-hidden">
+              {/* PO header */}
+              <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                <div>
+                  <div className="font-bold text-slate-900 text-sm font-mono">{po.refNo}</div>
+                  <div className="text-[10px] text-slate-500">{po.supplierName} · {new Date(po.createdAt).toLocaleString()}</div>
+                </div>
+                <div className="text-right">
+                  <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-[10px] uppercase">{po.status}</Badge>
+                  <div className="text-sm font-bold text-slate-900 mt-1 font-mono">GHS {po.total.toFixed(2)}</div>
+                </div>
+              </div>
+              {/* PO items */}
+              <table className="w-full text-xs">
+                <thead className="bg-white">
+                  <tr className="border-b border-slate-100">
+                    <th className="text-left py-1.5 px-3 font-semibold text-slate-500 text-[10px] uppercase">Part No</th>
+                    <th className="text-left py-1.5 px-3 font-semibold text-slate-500 text-[10px] uppercase">Product</th>
+                    <th className="text-right py-1.5 px-3 font-semibold text-slate-500 text-[10px] uppercase">Qty</th>
+                    <th className="text-right py-1.5 px-3 font-semibold text-slate-500 text-[10px] uppercase">Unit Cost</th>
+                    <th className="text-right py-1.5 px-3 font-semibold text-slate-500 text-[10px] uppercase">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {po.items.map((item, j) => (
+                    <tr key={j} className="border-b border-slate-50">
+                      <td className="py-2 px-3 font-mono text-slate-500 text-[10px]">{item.partNo}</td>
+                      <td className="py-2 px-3 text-slate-800">{item.emoji} {item.details}</td>
+                      <td className="py-2 px-3 text-right font-mono text-slate-700">{item.quantity}</td>
+                      <td className="py-2 px-3 text-right font-mono text-slate-600">GHS {item.cost.toFixed(2)}</td>
+                      <td className="py-2 px-3 text-right font-mono font-bold text-slate-800">GHS {item.total.toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ))}
+        </div>
+
+        {/* Footer */}
+        <div className="flex-shrink-0 px-5 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
+          <div className="text-xs text-slate-500">
+            <strong className="text-slate-700">{report.totalCount}</strong> PO(s) · <strong className="text-slate-700">{report.pos.reduce((s, p) => s + p.items.length, 0)}</strong> items · Total: <strong className="text-rose-600 font-mono">GHS {report.totalCost.toFixed(2)}</strong>
+          </div>
+          <Button onClick={onClose} size="sm" className="bg-slate-700 hover:bg-slate-800 text-white">
+            Close
+          </Button>
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }
