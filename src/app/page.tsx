@@ -2802,16 +2802,137 @@ export default function POSPage() {
       <AnimatePresence>
         {showBarcodeScanner && (
           <BarcodeScanner
-            onScan={(code) => {
-              // Fuzzy lookup: handles whitespace, case, leading zeros, QR text
+            onScan={async (code) => {
+              // ===== Step 1: Search local catalog (fast) =====
               const product = findProductByCode(products, code);
               if (product) {
                 addToCart(product);
                 toast({ title: `Added: ${product.name}`, description: `Scanned: ${code}` });
-                // Close scanner after successful add (user can reopen for next item)
                 setShowBarcodeScanner(false);
-              } else {
-                toast({ title: "No product found", description: `Barcode ${code} not in catalog. Add the product in Stock → Add Product first.`, variant: "destructive", duration: 4000 });
+                return;
+              }
+
+              // ===== Step 2: Not in catalog — search online databases =====
+              // This makes the scanner "universal" — it works for ANY barcode
+              // that exists in OpenFoodFacts, UPCitemdb, Open Beauty Facts,
+              // or Open Pet Food Facts. If found, auto-creates the product.
+              toast({
+                title: "Searching online…",
+                description: `Barcode ${code} not in your catalog. Checking 4 databases…`,
+              });
+
+              try {
+                const { lookupBarcodeEverywhere } = await import("@/lib/barcode-lookup");
+                const result = await lookupBarcodeEverywhere(code);
+
+                if (result && result.name) {
+                  // ===== Step 3: Found online — auto-create the product =====
+                  toast({
+                    title: "Found online! Creating product…",
+                    description: `${result.name} (via ${result.source})`,
+                  });
+
+                  // Create the product via API
+                  const { authedFetch } = await import("@/lib/client-auth");
+                  const createRes = await authedFetch("/api/products", {
+                    method: "POST",
+                    body: JSON.stringify({
+                      sku: `SCAN-${code.slice(-8)}`,
+                      barcode: code,
+                      name: result.name,
+                      emoji: result.emoji || "📦",
+                      category: result.category || "other",
+                      description: result.description || "",
+                      price: 0, // User sets price later
+                      costPrice: 0,
+                      quantity: 0, // No stock — user receives later
+                      unit: "each",
+                      reorderLevel: 5,
+                      taxable: true,
+                      groupId: null,
+                      active: true,
+                    }),
+                  });
+                  const createData = await createRes.json();
+
+                  if (createRes.ok && createData.success && createData.product) {
+                    // Convert server product to client format + add to local state
+                    const newProduct = serverProductToClientProduct(createData.product);
+                    setProducts(prev => [...prev, newProduct]);
+                    addToCart(newProduct);
+                    toast({
+                      title: `✅ Created & added: ${result.name}`,
+                      description: `Auto-created from ${result.source}. Set price & stock in Stock → Edit Product.`,
+                      duration: 5000,
+                    });
+                    setShowBarcodeScanner(false);
+                  } else {
+                    // Product creation failed (maybe SKU conflict) — try with different SKU
+                    const retryRes = await authedFetch("/api/products", {
+                      method: "POST",
+                      body: JSON.stringify({
+                        sku: `SCAN-${Date.now().toString().slice(-6)}`,
+                        barcode: code,
+                        name: result.name,
+                        emoji: result.emoji || "📦",
+                        category: result.category || "other",
+                        price: 0,
+                        costPrice: 0,
+                        quantity: 0,
+                        unit: "each",
+                        reorderLevel: 5,
+                        taxable: true,
+                        groupId: null,
+                        active: true,
+                      }),
+                    });
+                    const retryData = await retryRes.json();
+                    if (retryRes.ok && retryData.success && retryData.product) {
+                      const newProduct = serverProductToClientProduct(retryData.product);
+                      setProducts(prev => [...prev, newProduct]);
+                      addToCart(newProduct);
+                      toast({
+                        title: `✅ Created & added: ${result.name}`,
+                        description: `Auto-created from ${result.source}. Set price & stock in Stock → Edit Product.`,
+                        duration: 5000,
+                      });
+                      setShowBarcodeScanner(false);
+                    } else {
+                      toast({
+                        title: "Could not create product",
+                        description: retryData.error || "Server error. Add manually in Stock → Add Product.",
+                        variant: "destructive",
+                        duration: 5000,
+                      });
+                    }
+                  }
+                } else {
+                  // ===== Step 4: Not found anywhere — capture barcode for manual entry =====
+                  toast({
+                    title: "Barcode not in any database",
+                    description: `Scanned: ${code}. This may be a local/imported product. Add it in Stock → Add Product (barcode pre-filled).`,
+                    variant: "default",
+                    duration: 6000,
+                  });
+                  // Close scanner and navigate to stock add form with barcode pre-filled
+                  setShowBarcodeScanner(false);
+                  // Store the scanned barcode so the Add Product form can use it
+                  try { localStorage.setItem("sylhn-pending-barcode", code); } catch {}
+                  setInitialStockView("add-modify");
+                  setView("stock");
+                }
+              } catch (e: any) {
+                console.error("[pos-scan] online lookup failed:", e);
+                toast({
+                  title: "Lookup failed",
+                  description: `Barcode: ${code}. Network error — add manually in Stock → Add Product.`,
+                  variant: "destructive",
+                  duration: 5000,
+                });
+                setShowBarcodeScanner(false);
+                try { localStorage.setItem("sylhn-pending-barcode", code); } catch {}
+                setInitialStockView("add-modify");
+                setView("stock");
               }
             }}
             onClose={() => setShowBarcodeScanner(false)}

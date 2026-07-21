@@ -736,9 +736,15 @@ function ProductForm({ product, groups, onSave, onClose }: {
 }) {
   const { toast } = useToast();
   // Use the first real group from the DB if available, else null.
-  // The old default 'g1' was a stale hardcoded ID that caused foreign key
-  // constraint errors after a data wipe (group 'g1' no longer exists).
   const defaultGroupId = groups.length > 0 ? groups[0].id : "";
+
+  // Check for a pending barcode from the POS scanner (when a barcode was
+  // scanned at POS but not found in catalog or online — user is redirected
+  // here to fill in the product details manually).
+  const pendingBarcode = typeof window !== "undefined"
+    ? (localStorage.getItem("sylhn-pending-barcode") || "")
+    : "";
+
   const [form, setForm] = useState<Product>(product || {
     id: `p-${Date.now()}`,
     sku: `NEW-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -750,7 +756,7 @@ function ProductForm({ product, groups, onSave, onClose }: {
     unit: "each",
     stock: 0,
     reorderLevel: 10,
-    barcode: "",
+    barcode: pendingBarcode, // Pre-fill with scanned barcode if available
     emoji: "📦",
     taxable: false,
     batchNumber: `B-NEW-${Date.now().toString().slice(-4)}`,
@@ -758,6 +764,19 @@ function ProductForm({ product, groups, onSave, onClose }: {
     expiryDate: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
     supplier: "",
   });
+
+  // Clear the pending barcode once the form loads (so it doesn't persist)
+  useEffect(() => {
+    if (pendingBarcode) {
+      try { localStorage.removeItem("sylhn-pending-barcode"); } catch {}
+      if (!product) {
+        toast({
+          title: "Barcode pre-filled",
+          description: `Scanned barcode: ${pendingBarcode}. Fill in the product details and save.`,
+        });
+      }
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [showScanner, setShowScanner] = useState(false);
 
