@@ -163,92 +163,116 @@ export function printReport(report: ReportData) {
   if (!printWindow) return;
 
   const tableHead = report.columns.map(c => `<th class="${c.align || 'left'}">${c.label}</th>`).join("");
-  const tableBody = report.rows.map(row =>
-    `<tr>${report.columns.map(col => {
+  const tableBody = report.rows.map((row, i) =>
+    `<tr class="${i % 2 ? 'alt' : ''}">${report.columns.map(col => {
       const val = row[col.key];
       const display = col.format ? col.format(val, row) : (val ?? "");
       return `<td class="${col.align || 'left'}">${display}</td>`;
     }).join("")}</tr>`
   ).join("");
 
-  const summaryHtml = report.summary.map(s =>
-    `<div class="summary-row"><span class="summary-label">${s.label}:</span><span class="summary-value">${s.value}</span></div>`
-  ).join("");
+  const dateStr = new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
   printWindow.document.write(`
     <!DOCTYPE html>
-    <html>
+    <html lang="en">
     <head>
-      <title>${report.title} - ${COMPANY.name}</title>
+      <meta charset="UTF-8">
+      <title>${report.title} — ${COMPANY.name}</title>
       <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Segoe UI', Arial, sans-serif; padding: 30px; color: #1a1a1a; }
-        .company-header { text-align: center; border-bottom: 3px solid #107a57; padding-bottom: 15px; margin-bottom: 20px; }
-        .company-name { font-size: 28px; font-weight: bold; color: #107a57; letter-spacing: 1px; }
-        .company-info { font-size: 13px; color: #555; margin-top: 5px; }
-        .report-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 15px; }
-        .report-title { font-size: 20px; font-weight: bold; }
-        .report-subtitle { font-size: 12px; color: #666; margin-top: 3px; }
-        .report-meta { text-align: right; font-size: 11px; color: #666; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th { background: #107a57; color: white; padding: 10px 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
-        td { padding: 8px; border-bottom: 1px solid #e5e7eb; font-size: 12px; }
-        tr:nth-child(even) { background: #f0fdf4; }
-        tr:hover { background: #dcfce7; }
+        body { font-family: 'Segoe UI', Roboto, -apple-system, sans-serif; background: #f0f4f8; padding: 24px; color: #1e293b; line-height: 1.5; }
+        .container { max-width: 900px; margin: 0 auto; background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
+        .header { background: linear-gradient(135deg, #0f766e, #059669); color: #fff; padding: 28px 32px; display: flex; justify-content: space-between; align-items: center; }
+        .header-left h1 { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; }
+        .header-left .company { font-size: 13px; opacity: 0.85; margin-top: 4px; }
+        .header-right { text-align: right; font-size: 11px; opacity: 0.85; }
+        .header-right .date { font-weight: 600; }
+        .body { padding: 28px 32px; }
+        .report-info { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 2px solid #e2e8f0; }
+        .report-title { font-size: 18px; font-weight: 700; color: #1e293b; }
+        .report-subtitle { font-size: 12px; color: #64748b; margin-top: 4px; }
+        .report-meta { font-size: 11px; color: #64748b; text-align: right; }
+        .report-meta .badge { display: inline-block; background: #ecfdf5; color: #065f46; padding: 3px 10px; border-radius: 12px; font-weight: 600; font-size: 10px; margin-top: 4px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 12px; }
+        thead th { background: #1e293b; color: #fff; padding: 10px 8px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
+        tbody td { padding: 8px; border-bottom: 1px solid #e2e8f0; }
+        tbody tr.alt { background: #f8fafc; }
+        tfoot td { padding: 8px; border-top: 2px solid #1e293b; font-weight: 700; font-size: 12px; }
         .left { text-align: left; }
         .right { text-align: right; }
         .center { text-align: center; }
-        .summary-box { margin-top: 25px; padding: 15px; background: #f0fdf4; border-left: 4px solid #107a57; border-radius: 4px; }
-        .summary-title { font-size: 14px; font-weight: bold; color: #107a57; margin-bottom: 10px; text-transform: uppercase; }
-        .summary-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 13px; }
-        .summary-label { color: #555; }
-        .summary-value { font-weight: bold; }
-        .footer { margin-top: 40px; padding-top: 15px; border-top: 1px solid #e5e7eb; text-align: center; font-size: 11px; color: #999; }
+        .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-top: 16px; }
+        .summary-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 14px; }
+        .summary-card .label { font-size: 10px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+        .summary-card .value { font-size: 16px; font-weight: 700; color: #1e293b; font-family: 'SF Mono', Consolas, monospace; }
+        .footer { padding: 16px 32px; background: #f8fafc; border-top: 1px solid #e2e8f0; text-align: center; font-size: 10px; color: #94a3b8; }
+        .footer a { color: #059669; text-decoration: none; }
+        .actions { display: flex; gap: 8px; justify-content: center; margin-bottom: 16px; }
+        .btn { padding: 8px 18px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; border: none; }
+        .btn-print { background: #1e293b; color: #fff; }
         @media print {
-          body { padding: 15px; }
-          th { background: #107a57 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          tr:nth-child(even) { background: #f0fdf4 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          body { background: #fff; padding: 0; }
+          .container { box-shadow: none; border-radius: 0; }
+          .actions { display: none; }
           thead { display: table-header-group; }
           tr { page-break-inside: avoid; }
-          table { page-break-after: auto; }
+          thead th { background: #1e293b !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          tbody tr.alt { background: #f8fafc !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .header { background: linear-gradient(135deg, #0f766e, #059669) !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .summary-card { background: #f8fafc !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         }
       </style>
     </head>
     <body>
-      <div class="company-header">
-        <div class="company-name">${COMPANY.name}</div>
-        <div class="company-info">Contact: ${COMPANY.contact} &nbsp;|&nbsp; Address: ${COMPANY.address}</div>
-      </div>
-      <div class="report-header">
-        <div>
-          <div class="report-title">${report.title}</div>
-          <div class="report-subtitle">${report.subtitle}</div>
+      <div class="container">
+        <div class="header">
+          <div class="header-left">
+            <h1>${COMPANY.name}</h1>
+            <div class="company">${COMPANY.address} · Tel: ${COMPANY.contact}</div>
+          </div>
+          <div class="header-right">
+            <div class="date">${dateStr}</div>
+            <div>Generated by SYLHN POS</div>
+          </div>
         </div>
-        <div class="report-meta">
-          Generated: ${new Date().toLocaleString('en-GB')}<br>
-          Records: ${report.rows.length}
+        <div class="body">
+          <div class="actions">
+            <button class="btn btn-print" onclick="window.print()">🖨 Print / Save as PDF</button>
+          </div>
+          <div class="report-info">
+            <div>
+              <div class="report-title">${report.title}</div>
+              <div class="report-subtitle">${report.subtitle}</div>
+            </div>
+            <div class="report-meta">
+              Records: ${report.rows.length}<br>
+              <span class="badge">${report.type}</span>
+            </div>
+          </div>
+          <table>
+            <thead><tr>${tableHead}</tr></thead>
+            <tbody>${tableBody}</tbody>
+          </table>
+          <div class="summary-grid">
+            ${report.summary.map(s => `
+              <div class="summary-card">
+                <div class="label">${s.label}</div>
+                <div class="value">${s.value}</div>
+              </div>
+            `).join("")}
+          </div>
+        </div>
+        <div class="footer">
+          ${COMPANY.name} · ${COMPANY.address} · ${COMPANY.contact}<br>
+          Generated on ${dateStr} · This is a computer-generated report from SYLHN POS
         </div>
       </div>
-      <table>
-        <thead><tr>${tableHead}</tr></thead>
-        <tbody>${tableBody}</tbody>
-      </table>
-      <div class="summary-box">
-        <div class="summary-title">Summary</div>
-        ${summaryHtml}
-      </div>
-      <div class="footer">
-        ${COMPANY.name} &nbsp;|&nbsp; ${COMPANY.address} &nbsp;|&nbsp; Tel: ${COMPANY.contact}<br>
-        This is a computer-generated report. All prices in Ghana Cedis (GHS).
-      </div>
+      <script>setTimeout(function(){window.print();},300);</script>
     </body>
     </html>
   `);
   printWindow.document.close();
-  setTimeout(() => {
-    printWindow.focus();
-    printWindow.print();
-  }, 300);
 }
 
 // Generate report data based on type

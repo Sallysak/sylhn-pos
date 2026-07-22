@@ -81,8 +81,9 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
       setError("");
 
       try {
+        // Lower resolution for faster startup (640x480 is enough for barcodes)
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
+          video: { facingMode: "environment", width: { ideal: 640 }, height: { ideal: 480 } },
           audio: false,
         });
         if (cancelled) {
@@ -92,32 +93,32 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
         streamRef.current = stream;
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
-          await videoRef.current.play();
+          videoRef.current.play().catch(() => {}); // don't await — start ASAP
         }
 
-        // Start ZXing engine (works on ALL browsers)
-        await startZxingEngine();
-        // Also start native engine in parallel (for speed on Chrome/Edge)
+        // Show camera feed immediately while engine loads
+        if (!cancelled) setEngineState("scanning");
+
+        // Prefer native (faster) when available, ZXing as fallback
         if (supportedEngines.includes("native") && !cancelled) {
           startNativeEngine();
-        }
-        if (!cancelled) {
-          setEngineState("scanning");
+        } else {
+          startZxingEngine();
         }
       } catch (e: any) {
         console.warn("Camera start error:", e);
         if (cancelled) return;
         let msg: string;
         if (e?.name === "NotAllowedError") {
-          msg = "Camera access denied. Allow camera permission in your browser settings, or use manual entry / image upload.";
+          msg = "Camera access denied. Allow camera permission, or use manual entry / image upload.";
         } else if (e?.name === "NotFoundError") {
-          msg = "No camera found on this device. Use manual entry or upload a photo of the barcode.";
+          msg = "No camera found. Use manual entry or upload a photo.";
         } else if (e?.name === "NotReadableError") {
-          msg = "Camera is in use by another app. Close it and try again, or use manual entry.";
+          msg = "Camera is in use by another app. Close it and try again.";
         } else if (e?.name === "OverconstrainedError") {
-          msg = "No back camera available. Use manual entry or image upload.";
+          msg = "No back camera available. Use manual entry or upload.";
         } else {
-          msg = e?.message || "Could not start camera. Use manual entry or image upload.";
+          msg = e?.message || "Could not start camera. Use manual entry or upload.";
         }
         setError(msg);
         setEngineState("error");
@@ -153,7 +154,7 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
         BarcodeFormat.QR_CODE, BarcodeFormat.DATA_MATRIX, BarcodeFormat.PDF_417,
         BarcodeFormat.RSS_14, BarcodeFormat.RSS_EXPANDED,
       ]);
-      hints.set(DecodeHintType.TRY_HARDER, true);
+      // TRY_HARDER omitted for speed — 640x480 + common formats is sufficient
       reader.hints = hints;
       zxingReaderRef.current = reader;
 
@@ -288,7 +289,7 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
         BarcodeFormat.CODABAR, BarcodeFormat.ITF, BarcodeFormat.QR_CODE,
         BarcodeFormat.DATA_MATRIX, BarcodeFormat.PDF_417,
       ]);
-      hints.set(DecodeHintType.TRY_HARDER, true);
+      // TRY_HARDER omitted for speed — 640x480 + common formats is sufficient
       reader.hints = hints;
 
       const imageUrl = URL.createObjectURL(file);
