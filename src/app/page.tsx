@@ -1475,8 +1475,11 @@ export default function POSPage() {
         { header: "Profit & Tax" },
         { label: "Profit & Loss", icon: BarChart3, action: () => { setAccountsReport("profit-loss"); setView("accounts-reports"); } },
         { label: "VAT Tax Report", icon: Percent, action: () => { setAccountsReport("vat-tax"); setView("accounts-reports"); } },
-        { label: "GRA e-VAT Filing (JSON)", icon: FileText, action: () => { window.open("/api/reports/vat-filing/e-file?format=json&year=" + new Date().getFullYear() + "&month=" + (new Date().getMonth() + 1), "_blank"); } },
-        { label: "GRA e-VAT Filing (XML)", icon: FileText, action: () => { window.open("/api/reports/vat-filing/e-file?format=xml&year=" + new Date().getFullYear() + "&month=" + (new Date().getMonth() + 1), "_blank"); } },
+        { label: "📊 GRA VAT Filing Report (View)", icon: FileText, action: () => { window.open("/api/reports/vat-filing/e-file?format=html&year=" + new Date().getFullYear() + "&month=" + (new Date().getMonth() + 1), "_blank"); } },
+        { label: "🖨 GRA VAT Filing (Print)", icon: FileText, action: () => { window.open("/api/reports/vat-filing/e-file?format=print&year=" + new Date().getFullYear() + "&month=" + (new Date().getMonth() + 1), "_blank"); } },
+        { separator: true },
+        { label: "GRA e-VAT Export (JSON)", icon: FileText, action: () => { window.open("/api/reports/vat-filing/e-file?format=json&year=" + new Date().getFullYear() + "&month=" + (new Date().getMonth() + 1), "_blank"); } },
+        { label: "GRA e-VAT Export (XML)", icon: FileText, action: () => { window.open("/api/reports/vat-filing/e-file?format=xml&year=" + new Date().getFullYear() + "&month=" + (new Date().getMonth() + 1), "_blank"); } },
         ...(hasPermission('financeOps') ? [
           { header: "Finance Operations" },
           { label: "Expense Management", icon: Wallet, action: () => { setFinanceTab("expenses"); setView("finance-ops"); } },
