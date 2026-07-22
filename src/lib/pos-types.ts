@@ -32,7 +32,7 @@ export interface PaymentResult {
   saleId?: string;
 }
 
-export type ViewMode = "login" | "pos" | "stock" | "reports" | "purchase" | "purchase-form" | "telephone" | "telephone-directory" | "maintenance" | "sold-items" | "sales-menu" | "daily-sales" | "sales-history" | "supplier-form" | "accounts-reports" | "finance-ops" | "admin-login" | "admin-panel" | "admin-hub" | "dashboard" | "receipt-archive" | "sync-settings" | "stock-history-pro" | "features-map" | "email-system" | "credit-management" | "auto-replenish";
+export type ViewMode = "login" | "pos" | "stock" | "reports" | "purchase" | "purchase-form" | "telephone" | "telephone-directory" | "maintenance" | "sold-items" | "sales-menu" | "daily-sales" | "sales-history" | "supplier-form" | "accounts-reports" | "finance-ops" | "admin-login" | "admin-panel" | "admin-hub" | "dashboard" | "receipt-archive" | "sync-settings" | "stock-history-pro" | "features-map" | "email-system" | "credit-management" | "auto-replenish" | "reports-center";
 
 export type StockView = "add-modify" | "group-maintenance" | "quantity-adjustment" | "history" | "stock-file" | "stock-search";
 

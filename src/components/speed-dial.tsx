@@ -60,21 +60,31 @@ export function SpeedDial({ actions }: SpeedDialProps) {
 
   return (
     <>
-      {/* Backdrop overlay when expanded */}
+      {/* Liquid glass backdrop when expanded — premium blurry effect */}
       <AnimatePresence>
         {open && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-slate-900/40 backdrop-blur-[2px] z-40 lg:hidden"
+            initial={{ opacity: 0, backdropFilter: "blur(0px)" }}
+            animate={{ opacity: 1, backdropFilter: "blur(16px)" }}
+            exit={{ opacity: 0, backdropFilter: "blur(0px)" }}
+            transition={{ duration: 0.3 }}
+            className="fixed inset-0 z-40"
+            style={{
+              background: "rgba(15, 23, 42, 0.25)",
+              backdropFilter: "blur(16px) saturate(180%)",
+              WebkitBackdropFilter: "blur(16px) saturate(180%)",
+            }}
             onClick={() => setOpen(false)}
-          />
+          >
+            {/* Liquid glass decorative blobs */}
+            <div className="absolute -top-20 -left-20 h-72 w-72 rounded-full bg-emerald-400/20 blur-3xl" />
+            <div className="absolute top-1/3 -right-20 h-80 w-80 rounded-full bg-violet-400/15 blur-3xl" />
+            <div className="absolute -bottom-20 left-1/4 h-72 w-72 rounded-full bg-blue-400/15 blur-3xl" />
+          </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Speed Dial container — positioned on the LEFT side on mobile so it
-          doesn't cover the "More" tab (rightmost) of the bottom nav. */}
+      {/* Speed Dial container */}
       <div
         ref={containerRef}
         className="fixed flex flex-col items-start gap-2.5"
@@ -112,8 +122,8 @@ export function SpeedDial({ actions }: SpeedDialProps) {
                     >
                       <Icon className="h-5 w-5" />
                     </button>
-                    {/* Label — premium pill (on right since FAB is on left) */}
-                    <div className="bg-slate-900/95 backdrop-blur text-white text-xs font-semibold px-3 py-1.5 rounded-lg shadow-premium whitespace-nowrap ring-1 ring-white/10">
+                    {/* Label — liquid glass pill */}
+                    <div className="bg-white/20 backdrop-blur-xl text-white text-xs font-semibold px-3 py-1.5 rounded-lg whitespace-nowrap ring-1 ring-white/30 shadow-lg">
                       {action.label}
                     </div>
                   </motion.div>

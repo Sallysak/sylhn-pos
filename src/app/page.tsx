@@ -78,6 +78,7 @@ const FeaturesMap = dynamic(() => import("@/components/features-map").then(m => 
 const AdminHub = dynamic(() => import("@/components/admin-hub").then(m => ({ default: m.AdminHub })), { ssr: false, loading: loadingFallback });
 const CreditManagement = dynamic(() => import("@/components/credit-management").then(m => ({ default: m.CreditManagement })), { ssr: false, loading: loadingFallback });
 const AutoReplenishRules = dynamic(() => import("@/components/auto-replenish-rules").then(m => ({ default: m.AutoReplenishRules })), { ssr: false, loading: loadingFallback });
+const ReportsCenter = dynamic(() => import("@/components/reports-center").then(m => ({ default: m.ReportsCenter })), { ssr: false, loading: loadingFallback });
 const KeyboardShortcutsOverlay = dynamic(() => import("@/components/keyboard-shortcuts").then(m => ({ default: m.KeyboardShortcutsOverlay })), { ssr: false });
 
 // ===== Server → Client product transformer =====
@@ -1396,6 +1397,7 @@ export default function POSPage() {
         { label: "New Sale", icon: Plus, action: () => { clearCart(); setView("pos"); }, shortcut: "Ctrl+N" },
         { separator: true },
         { label: "📊 Operations Dashboard", icon: TrendingUp, action: () => setView("dashboard") },
+        { label: "📋 Reports Center", icon: FileBarChart, action: () => setView("reports-center" as ViewMode) },
         { label: "🧾 Receipt Archive", icon: FileText, action: () => setView("receipt-archive") },
         { separator: true },
         { label: "Open Cash Drawer", icon: DollarSign, action: handleOpenCash },
@@ -1827,6 +1829,24 @@ export default function POSPage() {
         <MobileNav
           active={view}
           onNavigate={(v) => { if (v === "cart") setMobileCartOpen(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
+          cartCount={cart.reduce((s, i) => s + i.quantity, 0)}
+          user={loggedInUser ? { fullName: loggedInUser.fullName, role: loggedInUser.role } : null}
+          onLogout={() => handleLogout()}
+        />
+      </>
+    );
+  }
+  if (view === "reports-center") {
+    return (
+      <>
+        <ReportsCenter
+          onBack={() => setView("pos")}
+          onNavigate={(v) => setView(v as ViewMode)}
+          onSetAccountsReport={(r) => setAccountsReport(r as any)}
+        />
+        <MobileNav
+          active={view}
+          onNavigate={(v) => { if (v === "cart") setMobileCartOpen(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("reports-center"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
           cartCount={cart.reduce((s, i) => s + i.quantity, 0)}
           user={loggedInUser ? { fullName: loggedInUser.fullName, role: loggedInUser.role } : null}
           onLogout={() => handleLogout()}
