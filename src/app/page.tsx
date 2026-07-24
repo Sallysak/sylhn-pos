@@ -899,8 +899,10 @@ export default function POSPage() {
   useEffect(() => {
     if (!customerSearch || customerSearch.length < 1) {
       setCustomerResults([]);
+      setShowCustomerDropdown(false);
       return;
     }
+    setShowCustomerDropdown(true);
     const timer = setTimeout(async () => {
       try {
         const res = await authedFetch(`/api/customers?search=${encodeURIComponent(customerSearch)}&limit=10`);
@@ -909,7 +911,7 @@ export default function POSPage() {
           setCustomerResults(data.customers || []);
         }
       } catch { /* ignore */ }
-    }, 300); // 300ms debounce
+    }, 200); // 200ms debounce (faster response)
     return () => clearTimeout(timer);
   }, [customerSearch]);
 
@@ -2464,7 +2466,7 @@ export default function POSPage() {
 
                 {/* Invoice Info Bar — horizontal layout, wraps on mobile */}
                 <div className="flex-shrink-0 px-3 py-1.5 bg-slate-100 border-b border-slate-300 flex items-center gap-3 text-[10px] flex-wrap">
-                  <div className="flex items-center gap-1 relative">
+                  <div className="flex items-center gap-1 relative" style={{ zIndex: 60 }}>
                     <span className="font-semibold text-slate-600">Client:</span>
                     <input
                       value={customerName}
@@ -2475,8 +2477,8 @@ export default function POSPage() {
                         setCustomerId(null); // clear ID when typing manually
                       }}
                       onFocus={() => { if (customerName) { setCustomerSearch(customerName); setShowCustomerDropdown(true); } }}
-                      onBlur={() => setTimeout(() => setShowCustomerDropdown(false), 200)}
-                      placeholder="Walk-in or search customer…"
+                      onBlur={() => setTimeout(() => setShowCustomerDropdown(false), 300)}
+                      placeholder="Type to search…"
                       className="w-32 lg:w-48 h-6 px-1.5 border border-slate-300 rounded text-[10px] bg-white outline-none focus:ring-1 focus:ring-blue-400"
                     />
                     {customerId && (
@@ -2484,30 +2486,35 @@ export default function POSPage() {
                         <X className="h-2.5 w-2.5" />
                       </button>
                     )}
-                    {/* Customer search dropdown */}
+                    {/* Customer search dropdown — uses onMouseDown to fire before onBlur */}
                     {showCustomerDropdown && customerResults.length > 0 && (
-                      <div className="absolute top-full left-0 mt-1 w-72 bg-white rounded-lg shadow-xl ring-1 ring-slate-200 z-50 max-h-60 overflow-y-auto">
+                      <div className="absolute top-full left-0 mt-1 w-80 bg-white rounded-lg shadow-2xl ring-2 ring-slate-200 max-h-60 overflow-y-auto" style={{ zIndex: 100 }}>
                         {customerResults.map((c: any) => (
-                          <button
+                          <div
                             key={c.id}
-                            onClick={() => selectCustomer(c)}
-                            className="w-full flex items-center justify-between px-3 py-2 hover:bg-emerald-50 text-left transition border-b border-slate-50 last:border-0"
+                            onMouseDown={(e) => { e.preventDefault(); selectCustomer(c); }}
+                            className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-emerald-50 text-left transition cursor-pointer border-b border-slate-50 last:border-0"
                           >
-                            <div>
-                              <div className="font-semibold text-xs text-slate-800">{c.name}</div>
-                              <div className="text-[9px] text-slate-400">{c.phone || c.email || 'No contact'}</div>
+                            <div className="min-w-0">
+                              <div className="font-semibold text-xs text-slate-800 truncate">{c.name}</div>
+                              <div className="text-[9px] text-slate-400">{c.phone || c.mobile || c.email || 'No contact'}</div>
                             </div>
-                            <div className="text-right flex-shrink-0">
+                            <div className="text-right flex-shrink-0 ml-2">
                               {c.creditLimit > 0 && (
                                 <div className="text-[9px] font-semibold text-violet-600">Credit: {formatGHS(c.creditLimit)}</div>
                               )}
                               {c.balance > 0 && (
                                 <div className="text-[9px] font-semibold text-rose-500">Owes: {formatGHS(c.balance)}</div>
                               )}
-                              <Badge variant="outline" className="text-[8px] capitalize">{c.tier}</Badge>
+                              <span className="text-[8px] text-slate-400 capitalize">{c.tier}</span>
                             </div>
-                          </button>
+                          </div>
                         ))}
+                      </div>
+                    )}
+                    {showCustomerDropdown && customerSearch && customerResults.length === 0 && (
+                      <div className="absolute top-full left-0 mt-1 w-80 bg-white rounded-lg shadow-2xl ring-2 ring-slate-200 p-3 text-center" style={{ zIndex: 100 }}>
+                        <div className="text-[10px] text-slate-400">No customers found. Type a name to search.</div>
                       </div>
                     )}
                   </div>

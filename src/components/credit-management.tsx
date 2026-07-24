@@ -7,13 +7,14 @@ import {
   ArrowUpRight, ArrowDownRight, Phone, Mail, MapPin, X,
   CheckCircle2, Clock, FileText, Download, Filter, Loader2,
   User, DollarSign, Calendar, ChevronRight, Printer, RefreshCw,
-  Sparkles, ShieldCheck, Ban, Award,
+  Sparkles, ShieldCheck, Ban, Award, Edit2, Trash2, Shield, Lock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { authedFetch } from "@/lib/client-auth";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
@@ -91,6 +92,13 @@ export function CreditManagement() {
   const [groupFilter, setGroupFilter] = useState<string>("all");
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(null);
+  const [managerCreds, setManagerCreds] = useState({ username: "", password: "" });
+  const [managerError, setManagerError] = useState("");
+  const [managerAction, setManagerAction] = useState<"edit" | "delete" | null>(null);
+  const [verifyingManager, setVerifyingManager] = useState(false);
   const [creditAccount, setCreditAccount] = useState<CreditAccount | null>(null);
   const [accountLoading, setAccountLoading] = useState(false);
   const [showSettleDialog, setShowSettleDialog] = useState(false);
@@ -159,6 +167,97 @@ export function CreditManagement() {
       if (res.ok) setCreditAccount(data);
     } catch {}
     setAccountLoading(false);
+  };
+
+  // ===== Edit customer (requires manager approval) =====
+  const openEditDialog = (c: Customer) => {
+    setManagerAction("edit");
+    setManagerCreds({ username: "", password: "" });
+    setManagerError("");
+    setSelectedCustomer(c);
+  };
+
+  const openDeleteDialog = (c: Customer) => {
+    setManagerAction("delete");
+    setManagerCreds({ username: "", password: "" });
+    setManagerError("");
+    setCustomerToDelete(c);
+  };
+
+  const verifyManager = async (): Promise<boolean> => {
+    setVerifyingManager(true);
+    setManagerError("");
+    try {
+      const res = await fetch("/api/auth/approve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          action: "delete",
+          reason: managerAction === "edit" ? "Edit customer" : "Delete customer",
+          managerUsername: managerCreds.username,
+          managerPassword: managerCreds.password,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.approved) {
+        return true;
+      } else {
+        setManagerError(data.error || "Approval denied");
+        return false;
+      }
+    } catch {
+      setManagerError("Network error");
+      return false;
+    } finally {
+      setVerifyingManager(false);
+    }
+  };
+
+  const handleManagerApprove = async () => {
+    const approved = await verifyManager();
+    if (!approved) return;
+
+    if (managerAction === "edit") {
+      setShowEditDialog(true);
+      setManagerAction(null);
+    } else if (managerAction === "delete" && customerToDelete) {
+      // Delete the customer
+      try {
+        const res = await authedFetch(`/api/customers/${customerToDelete.id}`, { method: "DELETE" });
+        if (res.ok) {
+          toast({ title: "Customer deleted", description: customerToDelete.name });
+          fetchCustomers();
+        } else {
+          const data = await res.json();
+          toast({ title: "Delete failed", description: data.error, variant: "destructive" });
+        }
+      } catch {
+        toast({ title: "Network error", variant: "destructive" });
+      }
+      setCustomerToDelete(null);
+      setManagerAction(null);
+    }
+  };
+
+  const handleEditSave = async (updated: Partial<Customer>) => {
+    if (!selectedCustomer) return;
+    try {
+      const res = await authedFetch(`/api/customers/${selectedCustomer.id}`, {
+        method: "PUT",
+        body: JSON.stringify(updated),
+      });
+      if (res.ok) {
+        toast({ title: "Customer updated", description: selectedCustomer.name });
+        setShowEditDialog(false);
+        fetchCustomers();
+      } else {
+        const data = await res.json();
+        toast({ title: "Update failed", description: data.error, variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Network error", variant: "destructive" });
+    }
   };
 
   // ============= Render: List View =============
@@ -326,7 +425,23 @@ export function CreditManagement() {
                             )}
                           </td>
                           <td className="px-4 py-3 text-right">
-                            <ChevronRight className="h-4 w-4 text-slate-400" />
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); openEditDialog(c); }}
+                                className="h-7 w-7 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/30 flex items-center justify-center text-blue-600 transition"
+                                title="Edit customer (requires manager approval)"
+                              >
+                                <Edit2 className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); openDeleteDialog(c); }}
+                                className="h-7 w-7 rounded-md hover:bg-rose-50 dark:hover:bg-rose-900/30 flex items-center justify-center text-rose-600 transition"
+                                title="Delete customer (requires manager approval)"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                              <ChevronRight className="h-4 w-4 text-slate-400 ml-1" />
+                            </div>
                           </td>
                         </tr>
                       );
@@ -345,6 +460,67 @@ export function CreditManagement() {
             fetchCustomers();
             openCustomer(c);
           }}
+        />
+
+        {/* Manager Approval Dialog (for edit/delete) */}
+        <Dialog open={managerAction !== null} onOpenChange={(v) => { if (!v) { setManagerAction(null); setCustomerToDelete(null); setManagerError(""); } }}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Shield className="h-4 w-4 text-amber-600" />
+                Manager Approval Required
+              </DialogTitle>
+              <DialogDescription>
+                {managerAction === "edit" ? `Edit customer "${selectedCustomer?.name}"` : `Delete customer "${customerToDelete?.name}"`}
+                <br />A manager or admin must authorize this action.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3 py-2">
+              <div>
+                <Label>Manager Username</Label>
+                <Input
+                  autoFocus
+                  value={managerCreds.username}
+                  onChange={(e) => setManagerCreds({ ...managerCreds, username: e.target.value })}
+                  placeholder="e.g. manager"
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label>Password</Label>
+                <div className="relative mt-1">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Input
+                    type="password"
+                    value={managerCreds.password}
+                    onChange={(e) => setManagerCreds({ ...managerCreds, password: e.target.value })}
+                    placeholder="••••••••"
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+              {managerError && (
+                <div className="bg-rose-50 border border-rose-200 rounded-lg px-3 py-2 text-xs text-rose-700 font-medium">
+                  {managerError}
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => { setManagerAction(null); setCustomerToDelete(null); setManagerError(""); }} disabled={verifyingManager}>Cancel</Button>
+              <Button onClick={handleManagerApprove} disabled={verifyingManager || !managerCreds.username || !managerCreds.password} className="bg-amber-600 hover:bg-amber-700">
+                {verifyingManager ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Shield className="h-4 w-4 mr-2" />}
+                Authorize
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Customer Dialog */}
+        <EditCustomerDialog
+          open={showEditDialog}
+          onOpenChange={setShowEditDialog}
+          customer={selectedCustomer}
+          onSave={handleEditSave}
         />
       </div>
     );
@@ -908,4 +1084,120 @@ function debounce<T extends (...args: any[]) => void>(fn: T, delay: number): (..
     clearTimeout(t);
     t = setTimeout(() => fn(...args), delay);
   };
+}
+
+// ============= Edit Customer Dialog =============
+function EditCustomerDialog({ open, onOpenChange, customer, onSave }: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  customer: Customer | null;
+  onSave: (updated: Partial<Customer>) => void;
+}) {
+  const [form, setForm] = useState({
+    name: "", phone: "", mobile: "", email: "", address: "", city: "",
+    group: "regular", creditLimit: "", notes: "",
+  });
+
+  useEffect(() => {
+    if (customer && open) {
+      setForm({
+        name: customer.name || "",
+        phone: customer.phone || "",
+        mobile: customer.mobile || "",
+        email: customer.email || "",
+        address: customer.address || "",
+        city: customer.city || "",
+        group: customer.group || "regular",
+        creditLimit: customer.creditLimit?.toString() || "",
+        notes: customer.notes || "",
+      });
+    }
+  }, [customer, open]);
+
+  const handleSave = () => {
+    if (!form.name.trim()) return;
+    onSave({
+      name: form.name,
+      phone: form.phone,
+      mobile: form.mobile,
+      email: form.email,
+      address: form.address,
+      city: form.city,
+      group: form.group as "regular" | "vip" | "wholesale",
+      creditLimit: parseFloat(form.creditLimit) || 0,
+      notes: form.notes,
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Edit Customer</DialogTitle>
+          <DialogDescription>Update customer details. Changes are saved to the database.</DialogDescription>
+        </DialogHeader>
+        <div className="grid grid-cols-2 gap-3 py-2">
+          <div className="col-span-2">
+            <Label>Name *</Label>
+            <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+          </div>
+          <div>
+            <Label>Phone</Label>
+            <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+          </div>
+          <div>
+            <Label>Mobile</Label>
+            <Input value={form.mobile} onChange={(e) => setForm({ ...form, mobile: e.target.value })} />
+          </div>
+          <div className="col-span-2">
+            <Label>Email</Label>
+            <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+          </div>
+          <div className="col-span-2">
+            <Label>Address</Label>
+            <Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+          </div>
+          <div>
+            <Label>City</Label>
+            <Input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
+          </div>
+          <div>
+            <Label>Group</Label>
+            <Select value={form.group} onValueChange={(v) => setForm({ ...form, group: v })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="regular">Regular</SelectItem>
+                <SelectItem value="vip">VIP</SelectItem>
+                <SelectItem value="wholesale">Wholesale</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="col-span-2">
+            <Label>Credit Limit (GHS)</Label>
+            <Input
+              type="number"
+              step="0.01"
+              value={form.creditLimit}
+              onChange={(e) => setForm({ ...form, creditLimit: e.target.value })}
+              placeholder="0.00"
+            />
+          </div>
+          <div className="col-span-2">
+            <Label>Notes</Label>
+            <Textarea
+              value={form.notes}
+              onChange={(e) => setForm({ ...form, notes: e.target.value })}
+              rows={2}
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={handleSave} disabled={!form.name.trim()}>
+            <CheckCircle2 className="h-4 w-4 mr-2" /> Save Changes
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
