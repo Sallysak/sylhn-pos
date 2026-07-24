@@ -267,7 +267,7 @@ export function AdminLogin({ onSuccess, onCancel, adminOnly = false }: { onSucce
       // Do NOT fall back to local — the server explicitly said "invalid".
       // Just record the failed attempt.
       if (data.setupNeeded) {
-        setError('No users in database. Run setup first — visit /api/setup in your browser, then try again with admin/admin123');
+        setError('No users in database. Visit /api/setup in your browser to create default users, then try again.');
         return;
       }
       failAttempt(data.error || 'Invalid credentials');

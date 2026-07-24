@@ -158,6 +158,179 @@ export function CreditManagement() {
     }
   };
 
+  // ===== Print credit sales history as a premium styled report =====
+  const printCreditReport = () => {
+    if (!selectedCustomer || !creditAccount) {
+      toast({ title: "No data to print", description: "Customer credit account not loaded yet.", variant: "destructive" });
+      return;
+    }
+
+    const c = selectedCustomer;
+    const acct = creditAccount;
+    const dateStr = new Date().toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+
+    const salesRows = acct.sales.map((s, i) => `
+      <tr class="${i % 2 ? "alt" : ""}">
+        <td style="font-family:monospace;font-weight:600">${s.invoiceNumber}</td>
+        <td>${new Date(s.createdAt).toLocaleDateString("en-GB")}</td>
+        <td>${s.cashierName || "—"}</td>
+        <td style="text-align:right">${(s.total || 0).toLocaleString("en-GH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        <td style="text-align:right;font-weight:600;color:#dc2626">${(s.creditAmountDue || 0).toLocaleString("en-GH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        <td>${s.creditDueDate ? new Date(s.creditDueDate).toLocaleDateString("en-GB") : "—"}</td>
+        <td style="text-align:center">${s.creditSettledAt
+          ? '<span style="color:#059669;font-weight:600">Settled</span>'
+          : s.isOverdue
+          ? '<span style="color:#dc2626;font-weight:600">Overdue</span>'
+          : '<span style="color:#d97706;font-weight:600">Pending</span>'
+        }</td>
+      </tr>`).join("");
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Credit Account Statement — ${c.name}</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Segoe UI',Roboto,-apple-system,sans-serif; background:#f0f4f8; padding:24px; color:#1e293b; line-height:1.5; }
+  .container { max-width:900px; margin:0 auto; background:#fff; border-radius:16px; overflow:hidden; box-shadow:0 4px 24px rgba(0,0,0,0.08); }
+  .header { background:linear-gradient(135deg,#7c3aed,#5b21b6); color:#fff; padding:28px 32px; display:flex; justify-content:space-between; align-items:center; }
+  .header h1 { font-size:22px; font-weight:800; letter-spacing:-0.02em; }
+  .header .subtitle { font-size:13px; opacity:0.85; margin-top:4px; }
+  .header-right { text-align:right; font-size:11px; opacity:0.85; }
+  .body { padding:28px 32px; }
+  .actions { display:flex; gap:8px; justify-content:center; margin-bottom:16px; }
+  .btn { padding:8px 18px; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer; border:none; }
+  .btn-print { background:#1e293b; color:#fff; }
+  .section { margin-bottom:24px; }
+  .section-title { font-size:12px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:12px; padding-bottom:6px; border-bottom:2px solid #e2e8f0; }
+  .info-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px 24px; }
+  .info-item { display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid #f1f5f9; }
+  .info-item .label { color:#64748b; font-size:13px; }
+  .info-item .value { font-weight:600; font-size:13px; }
+  .summary-cards { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:16px; }
+  .card { padding:14px; border-radius:10px; text-align:center; }
+  .card .label { font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px; opacity:0.8; }
+  .card .value { font-size:18px; font-weight:800; font-family:'SF Mono',Consolas,monospace; }
+  .card.violet { background:#f5f3ff; color:#5b21b6; }
+  .card.red { background:#fef2f2; color:#991b1b; }
+  .card.green { background:#ecfdf5; color:#065f46; }
+  table { width:100%; border-collapse:collapse; font-size:12px; }
+  thead th { background:#1e293b; color:#fff; padding:10px 8px; font-size:10px; text-transform:uppercase; letter-spacing:0.06em; font-weight:600; text-align:left; }
+  tbody td { padding:8px; border-bottom:1px solid #e2e8f0; }
+  tbody tr.alt { background:#f8fafc; }
+  .utilization { background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:16px; margin-bottom:16px; }
+  .utilization .bar { height:8px; background:#e2e8f0; border-radius:4px; overflow:hidden; margin-top:8px; }
+  .utilization .fill { height:100%; border-radius:4px; }
+  .footer { padding:16px 32px; background:#f8fafc; border-top:1px solid #e2e8f0; text-align:center; font-size:10px; color:#94a3b8; }
+  @media print { body { background:#fff; padding:0; } .container { box-shadow:none; border-radius:0; } .actions { display:none; } thead { display:table-header-group; } tr { page-break-inside:avoid; } thead th { background:#1e293b !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; } tbody tr.alt { background:#f8fafc !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; } .header { background:linear-gradient(135deg,#7c3aed,#5b21b6) !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; } .card { -webkit-print-color-adjust:exact; print-color-adjust:exact; } }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <div>
+      <h1>SYLHN COMPANY LTD</h1>
+      <div class="subtitle">Credit Account Statement</div>
+    </div>
+    <div class="header-right">
+      <div style="font-weight:600">${dateStr}</div>
+      <div>Generated by SYLHN POS</div>
+    </div>
+  </div>
+  <div class="body">
+    <div class="actions">
+      <button class="btn btn-print" onclick="window.print()">Print / Save as PDF</button>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Company Details</div>
+      <div class="info-grid">
+        <div class="info-item"><span class="label">Company</span><span class="value">SYLHN COMPANY LTD</span></div>
+        <div class="info-item"><span class="label">Address</span><span class="value">East Legon, Accra, Ghana</span></div>
+        <div class="info-item"><span class="label">Phone</span><span class="value">+233 59 276 6044</span></div>
+        <div class="info-item"><span class="label">Currency</span><span class="value">GHS (Ghana Cedi)</span></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Customer Information</div>
+      <div class="info-grid">
+        <div class="info-item"><span class="label">Customer Name</span><span class="value">${c.name}</span></div>
+        <div class="info-item"><span class="label">Tier</span><span class="value" style="text-transform:capitalize">${c.tier}</span></div>
+        <div class="info-item"><span class="label">Phone</span><span class="value">${c.phone || c.mobile || "—"}</span></div>
+        <div class="info-item"><span class="label">Email</span><span class="value">${c.email || "—"}</span></div>
+        <div class="info-item"><span class="label">Group</span><span class="value" style="text-transform:capitalize">${c.group}</span></div>
+        <div class="info-item"><span class="label">Address</span><span class="value">${c.address || "—"}${c.city ? ", " + c.city : ""}</span></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Credit Summary</div>
+      <div class="summary-cards">
+        <div class="card violet"><div class="label">Credit Limit</div><div class="value">₵${(c.creditLimit || 0).toLocaleString("en-GH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div></div>
+        <div class="card red"><div class="label">Outstanding</div><div class="value">₵${(acct.customer.totalOutstanding || 0).toLocaleString("en-GH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div></div>
+        <div class="card green"><div class="label">Available</div><div class="value">₵${(acct.customer.availableCredit || 0).toLocaleString("en-GH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div></div>
+      </div>
+      <div class="utilization">
+        <div style="display:flex;justify-content:space-between;font-size:12px">
+          <span style="font-weight:600;color:#475569">Credit Utilization</span>
+          <span style="font-weight:700;color:${acct.customer.overLimit ? "#dc2626" : "#059669"}">${c.creditLimit > 0 ? Math.min(100, (acct.customer.totalOutstanding / c.creditLimit) * 100).toFixed(1) : 0}%</span>
+        </div>
+        <div class="bar"><div class="fill" style="width:${c.creditLimit > 0 ? Math.min(100, (acct.customer.totalOutstanding / c.creditLimit) * 100) : 0}%;background:${acct.customer.overLimit ? "#dc2626" : acct.customer.totalOutstanding / (c.creditLimit || 1) > 0.7 ? "#d97706" : "#059669"}"></div></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Credit Sales History (${acct.sales.length} transactions)</div>
+      ${acct.sales.length === 0 ? '<div style="text-align:center;padding:24px;color:#94a3b8;font-size:13px">No credit sales recorded for this customer.</div>' : `
+      <table>
+        <thead>
+          <tr>
+            <th>Invoice</th>
+            <th>Date</th>
+            <th>Cashier</th>
+            <th style="text-align:right">Total</th>
+            <th style="text-align:right">Amount Due</th>
+            <th>Due Date</th>
+            <th style="text-align:center">Status</th>
+          </tr>
+        </thead>
+        <tbody>${salesRows}</tbody>
+      </table>`}
+    </div>
+
+    <div class="section">
+      <div class="section-title">Payment Summary</div>
+      <div class="info-grid">
+        <div class="info-item"><span class="label">Total Credit Sales</span><span class="value">${acct.summary.totalCreditSales}</span></div>
+        <div class="info-item"><span class="label">Total Credit Issued</span><span class="value">₵${(acct.summary.totalCreditIssued || 0).toLocaleString("en-GH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+        <div class="info-item"><span class="label">Total Settled</span><span class="value" style="color:#059669">₵${(acct.summary.totalSettled || 0).toLocaleString("en-GH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+        <div class="info-item"><span class="label">Total Outstanding</span><span class="value" style="color:#dc2626">₵${(acct.summary.totalOutstanding || 0).toLocaleString("en-GH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+        <div class="info-item"><span class="label">Overdue Count</span><span class="value" style="color:${acct.summary.overdueCount > 0 ? "#dc2626" : "#475569"}">${acct.summary.overdueCount}</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    SYLHN COMPANY LTD · East Legon, Accra, Ghana · +233 59 276 6044<br>
+    Generated on ${dateStr} · This is a computer-generated statement from SYLHN POS Credit Management System
+  </div>
+</div>
+<script>setTimeout(function(){window.print();},300);</script>
+</body>
+</html>`;
+
+    const printWin = window.open("", "_blank", "width=900,height=700");
+    if (!printWin) {
+      toast({ title: "Popup blocked", description: "Allow popups to print the report", variant: "destructive" });
+      return;
+    }
+    printWin.document.write(html);
+    printWin.document.close();
+  };
+
   const refreshAccount = async () => {
     if (!selectedCustomer) return;
     setAccountLoading(true);
@@ -539,6 +712,7 @@ export function CreditManagement() {
       showSettleDialog={showSettleDialog}
       onSettleDialogChange={setShowSettleDialog}
       onSettled={refreshAccount}
+      onPrint={printCreditReport}
     />
   );
 }
@@ -546,7 +720,7 @@ export function CreditManagement() {
 // ============= Customer Detail View =============
 function CustomerCreditDetail({
   customer, account, loading, onBack, onRefresh, onSettle,
-  showSettleDialog, onSettleDialogChange, onSettled,
+  showSettleDialog, onSettleDialogChange, onSettled, onPrint,
 }: {
   customer: Customer;
   account: CreditAccount | null;
@@ -557,6 +731,7 @@ function CustomerCreditDetail({
   showSettleDialog: boolean;
   onSettleDialogChange: (v: boolean) => void;
   onSettled: () => void;
+  onPrint: () => void;
 }) {
   const utilizationPct = account && customer.creditLimit > 0
     ? Math.min(100, (account.customer.totalOutstanding / customer.creditLimit) * 100)
@@ -688,9 +863,11 @@ function CustomerCreditDetail({
                   <h3 className="font-bold text-slate-900 dark:text-white">Credit Sales History</h3>
                   <p className="text-xs text-slate-500">All credit sales for this customer, newest first</p>
                 </div>
-                <Button variant="ghost" size="sm" onClick={() => window.print()}>
-                  <Printer className="h-4 w-4 mr-2" /> Print
-                </Button>
+                <div className="flex gap-2">
+                  <Button variant="ghost" size="sm" onClick={onPrint}>
+                    <Printer className="h-4 w-4 mr-2" /> Print Report
+                  </Button>
+                </div>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
