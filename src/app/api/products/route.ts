@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { db, waitForDb } from "@/lib/db";
 import { requireAuth, requirePermission } from "@/lib/auth";
 import { ProductSchema, ProductBulkSchema, validate, validationError } from "@/lib/validation";
 import { rateLimitApiRead, rateLimitApiWrite, rateLimitResponse, getClientIp } from "@/lib/rate-limit";
@@ -25,6 +25,7 @@ import crypto from "crypto";
 //   This is most useful for non-incremental calls (no `since` param).
 export async function GET(req: NextRequest) {
   try { await requireAuth(); } catch (e) { return e as Response; }
+  await waitForDb();
 
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);

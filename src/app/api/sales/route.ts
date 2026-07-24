@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { db, waitForDb } from "@/lib/db";
 import { requireAuth, requirePermission } from "@/lib/auth";
 import { SaleSchema, validate, validationError } from "@/lib/validation";
 import { rateLimitApiRead, rateLimitApiWrite, rateLimitResponse, getClientIp } from "@/lib/rate-limit";
@@ -11,6 +11,7 @@ import { publishRealtimeEvent } from "@/lib/realtime";
 // GET /api/sales — list sales (with optional date filter)
 export async function GET(req: NextRequest) {
   try { await requireAuth(); } catch (e) { return e as Response; }
+  await waitForDb();
 
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);

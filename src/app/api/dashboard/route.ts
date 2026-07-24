@@ -11,13 +11,14 @@ import {
   getInventorySnapshot,
   getSupplierAging,
 } from "@/lib/reports";
-import { db } from "@/lib/db";
+import { db, waitForDb } from "@/lib/db";
 
 // GET /api/dashboard — single endpoint returning all KPIs for the dashboard
 // Premium feature: one round-trip gets the operations dashboard everything
 // it needs (sales, top products, low stock, expiry, hourly, trend, inventory).
 export async function GET(req: NextRequest) {
   try { await requireAuth(); } catch (e) { return e as Response; }
+  await waitForDb();
 
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);

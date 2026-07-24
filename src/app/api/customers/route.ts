@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { db, waitForDb } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
 import { rateLimitApiRead, rateLimitApiWrite, rateLimitResponse, getClientIp } from "@/lib/rate-limit";
 import { auditLog } from "@/lib/audit";
@@ -7,6 +7,7 @@ import { auditLog } from "@/lib/audit";
 // GET /api/customers — list customers
 export async function GET(req: NextRequest) {
   try { await requireAuth(); } catch (e) { return e as Response; }
+  await waitForDb();
 
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
@@ -51,6 +52,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   let user;
   try { user = await requireAuth(); } catch (e) { return e as Response; }
+  await waitForDb();
 
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);

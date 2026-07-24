@@ -50,17 +50,22 @@ export const viewport: Viewport = {
 const SW_REGISTER = `
 if ('serviceWorker' in navigator) {
   if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
-    // DEV: unregister any existing service worker so it doesn't serve stale chunks
     navigator.serviceWorker.getRegistrations().then((regs) => {
       regs.forEach((r) => r.unregister());
     });
   } else {
-    // PROD: register the service worker for offline support
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('/sw.js').catch(() => {});
     });
   }
 }
+// Global error handler — catches unhandled promise rejections (network
+// errors, API failures, etc.) so they don't crash the app silently.
+window.addEventListener('unhandledrejection', (event) => {
+  console.error('[unhandled-rejection]', event.reason);
+  // Prevent the rejection from showing in the browser console as an error
+  event.preventDefault();
+});
 `;
 
 export default function RootLayout({

@@ -77,21 +77,19 @@ function tuneDatabaseUrl(url: string | undefined): string | undefined {
 }
 
 // ===== Schema bootstrap =====
-// On a fresh Postgres instance, tables don't exist yet. We try a simple
-// query; if it fails, we run `prisma db push` to create the schema, then
-// seed default users. This is idempotent and safe to run on every cold
-// start — if the tables already exist, the count() succeeds and we skip.
+// DB initialization — runs ONCE per serverless instance lifetime.
+// Uses a flag so we don't do a count() round-trip on every cold start
+// after the first successful init. The globalForPrisma cache persists
+// across warm invocations within the same serverless instance.
 if (!globalForPrisma.__prismaDbPush) {
   globalForPrisma.__prismaDbPush = (async () => {
     try {
-      const userCount = await db.systemUser.count();
-      if (userCount === 0) {
-        console.log('[db] No users found. Seeding default users...');
-        await seedDefaultUsers();
-      }
+      // Quick health check — if this succeeds, tables exist and DB is ready
+      await db.systemUser.count();
+      // Don't seed here — seeding is handled by /api/setup and /api/auth/login
+      // self-healing. This keeps cold start fast (single count query).
     } catch (e: any) {
-      // Table doesn't exist — create the schema via `prisma db push`.
-      // This is the supported, schema-driven way to provision a fresh DB.
+      // Table doesn't exist — only run db push on FIRST EVER deploy
       console.log('[db] Tables not found. Running prisma db push...');
       try {
         const { execSync } = await import('child_process');
@@ -104,11 +102,6 @@ if (!globalForPrisma.__prismaDbPush) {
         await seedDefaultUsers();
       } catch (pushErr: any) {
         console.error('[db] prisma db push failed:', pushErr?.message || pushErr);
-        // Don't try to create tables with raw SQL — Prisma's schema is large
-        // and hand-maintaining a parallel raw-SQL schema is brittle. If
-        // db push fails, the operator should run it manually:
-        //   npx prisma db push
-        // and check that DATABASE_URL points to a writable Postgres instance.
       }
     }
   })().catch((e) => {
@@ -116,7 +109,11 @@ if (!globalForPrisma.__prismaDbPush) {
   });
 }
 
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = db
+// CRITICAL: Always cache PrismaClient globally — in BOTH dev and production.
+// Without this, every Vercel cold start creates a new PrismaClient, opening
+// new DB connections. With many concurrent requests, this exhausts Neon's
+// connection pool (max ~20 connections on free tier).
+globalForPrisma.prisma = db
 
 // ===== Helpers: seed default users + wait for DB readiness =====
 // Used by /api/auth/login to self-heal when the DB has no users (e.g. a

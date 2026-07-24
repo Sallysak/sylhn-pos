@@ -38,20 +38,29 @@ export async function authedFetch(url: string, options: RequestInit = {}): Promi
     ...(options.headers as Record<string, string> || {}),
   };
 
-  // Attach Bearer token if available (fallback for iframe)
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  // Attach CSRF token for write methods
   const method = (options.method || "GET").toUpperCase();
   if (["POST", "PUT", "PATCH", "DELETE"].includes(method) && csrfToken) {
     headers["X-CSRF-Token"] = csrfToken;
   }
 
-  return fetch(url, {
-    ...options,
-    headers,
-    credentials: "include",
-  });
+  // Timeout: 15 seconds for all requests. Prevents infinite hangs
+  // when the server is slow or unresponsive (especially on Vercel
+  // cold starts). The AbortController cancels the fetch after 15s.
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15_000);
+
+  try {
+    return await fetch(url, {
+      ...options,
+      headers,
+      credentials: "include",
+      signal: options.signal || controller.signal,
+    });
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
