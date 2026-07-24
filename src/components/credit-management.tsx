@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { authedFetch } from "@/lib/client-auth";
+import { cn } from "@/lib/utils";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
@@ -190,41 +191,53 @@ export function CreditManagement() {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Credit Account Statement — ${c.name}</title>
+<title>Credit Statement — ${c.name}</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family:'Segoe UI',Roboto,-apple-system,sans-serif; background:#f0f4f8; padding:24px; color:#1e293b; line-height:1.5; }
-  .container { max-width:900px; margin:0 auto; background:#fff; border-radius:16px; overflow:hidden; box-shadow:0 4px 24px rgba(0,0,0,0.08); }
-  .header { background:linear-gradient(135deg,#7c3aed,#5b21b6); color:#fff; padding:28px 32px; display:flex; justify-content:space-between; align-items:center; }
-  .header h1 { font-size:22px; font-weight:800; letter-spacing:-0.02em; }
-  .header .subtitle { font-size:13px; opacity:0.85; margin-top:4px; }
-  .header-right { text-align:right; font-size:11px; opacity:0.85; }
-  .body { padding:28px 32px; }
-  .actions { display:flex; gap:8px; justify-content:center; margin-bottom:16px; }
-  .btn { padding:8px 18px; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer; border:none; }
-  .btn-print { background:#1e293b; color:#fff; }
-  .section { margin-bottom:24px; }
-  .section-title { font-size:12px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:12px; padding-bottom:6px; border-bottom:2px solid #e2e8f0; }
-  .info-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px 24px; }
-  .info-item { display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid #f1f5f9; }
-  .info-item .label { color:#64748b; font-size:13px; }
-  .info-item .value { font-weight:600; font-size:13px; }
-  .summary-cards { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:16px; }
-  .card { padding:14px; border-radius:10px; text-align:center; }
-  .card .label { font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px; opacity:0.8; }
-  .card .value { font-size:18px; font-weight:800; font-family:'SF Mono',Consolas,monospace; }
+  body { font-family:'Segoe UI',Roboto,-apple-system,sans-serif; background:#f0f4f8; padding:20px; color:#1e293b; line-height:1.4; }
+  .container { max-width:800px; margin:0 auto; background:#fff; border-radius:12px; overflow:hidden; box-shadow:0 4px 24px rgba(0,0,0,0.08); }
+  .header { background:linear-gradient(135deg,#7c3aed,#5b21b6); color:#fff; padding:20px 28px; display:flex; justify-content:space-between; align-items:center; }
+  .header h1 { font-size:20px; font-weight:800; }
+  .header .subtitle { font-size:12px; opacity:0.85; margin-top:2px; }
+  .header-right { text-align:right; font-size:10px; opacity:0.85; }
+  .body { padding:20px 28px; }
+  .actions { text-align:center; margin-bottom:12px; }
+  .btn { padding:7px 16px; border-radius:8px; font-size:11px; font-weight:600; cursor:pointer; border:none; background:#1e293b; color:#fff; }
+  .two-col { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:14px; }
+  .section-title { font-size:10px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:6px; padding-bottom:4px; border-bottom:1.5px solid #e2e8f0; }
+  .info-item { display:flex; justify-content:space-between; padding:3px 0; font-size:11px; }
+  .info-item .label { color:#64748b; }
+  .info-item .value { font-weight:600; }
+  .summary-cards { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:12px; }
+  .card { padding:10px 8px; border-radius:8px; text-align:center; }
+  .card .label { font-size:8px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; margin-bottom:2px; opacity:0.8; }
+  .card .value { font-size:15px; font-weight:800; font-family:'SF Mono',Consolas,monospace; }
   .card.violet { background:#f5f3ff; color:#5b21b6; }
   .card.red { background:#fef2f2; color:#991b1b; }
   .card.green { background:#ecfdf5; color:#065f46; }
-  table { width:100%; border-collapse:collapse; font-size:12px; }
-  thead th { background:#1e293b; color:#fff; padding:10px 8px; font-size:10px; text-transform:uppercase; letter-spacing:0.06em; font-weight:600; text-align:left; }
-  tbody td { padding:8px; border-bottom:1px solid #e2e8f0; }
+  .card.blue { background:#eff6ff; color:#1e40af; }
+  .utilization { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:10px 12px; margin-bottom:12px; }
+  .utilization .bar { height:6px; background:#e2e8f0; border-radius:3px; overflow:hidden; margin-top:6px; }
+  .utilization .fill { height:100%; border-radius:3px; }
+  table { width:100%; border-collapse:collapse; font-size:10px; }
+  thead th { background:#1e293b; color:#fff; padding:6px 6px; font-size:9px; text-transform:uppercase; letter-spacing:0.04em; font-weight:600; text-align:left; }
+  tbody td { padding:5px 6px; border-bottom:1px solid #e2e8f0; }
   tbody tr.alt { background:#f8fafc; }
-  .utilization { background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:16px; margin-bottom:16px; }
-  .utilization .bar { height:8px; background:#e2e8f0; border-radius:4px; overflow:hidden; margin-top:8px; }
-  .utilization .fill { height:100%; border-radius:4px; }
-  .footer { padding:16px 32px; background:#f8fafc; border-top:1px solid #e2e8f0; text-align:center; font-size:10px; color:#94a3b8; }
-  @media print { body { background:#fff; padding:0; } .container { box-shadow:none; border-radius:0; } .actions { display:none; } thead { display:table-header-group; } tr { page-break-inside:avoid; } thead th { background:#1e293b !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; } tbody tr.alt { background:#f8fafc !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; } .header { background:linear-gradient(135deg,#7c3aed,#5b21b6) !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; } .card { -webkit-print-color-adjust:exact; print-color-adjust:exact; } }
+  .footer { padding:10px 28px; background:#f8fafc; border-top:1px solid #e2e8f0; text-align:center; font-size:9px; color:#94a3b8; }
+  @media print {
+    body { background:#fff; padding:0; font-size:10px; }
+    .container { box-shadow:none; border-radius:0; max-width:100%; }
+    .actions { display:none; }
+    .body { padding:12px 20px; }
+    .header { padding:14px 20px; }
+    thead { display:table-header-group; }
+    tr { page-break-inside:avoid; }
+    thead th { background:#1e293b !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    tbody tr.alt { background:#f8fafc !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    .header { background:linear-gradient(135deg,#7c3aed,#5b21b6) !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    .card { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    @page { margin:10mm; }
+  }
 </style>
 </head>
 <body>
@@ -236,86 +249,67 @@ export function CreditManagement() {
     </div>
     <div class="header-right">
       <div style="font-weight:600">${dateStr}</div>
-      <div>Generated by SYLHN POS</div>
+      <div>SYLHN POS</div>
     </div>
   </div>
   <div class="body">
     <div class="actions">
-      <button class="btn btn-print" onclick="window.print()">Print / Save as PDF</button>
+      <button class="btn" onclick="window.print()">Print / Save as PDF</button>
     </div>
 
-    <div class="section">
-      <div class="section-title">Company Details</div>
-      <div class="info-grid">
+    <div class="two-col">
+      <div>
+        <div class="section-title">Company Details</div>
         <div class="info-item"><span class="label">Company</span><span class="value">SYLHN COMPANY LTD</span></div>
         <div class="info-item"><span class="label">Address</span><span class="value">East Legon, Accra, Ghana</span></div>
         <div class="info-item"><span class="label">Phone</span><span class="value">+233 59 276 6044</span></div>
-        <div class="info-item"><span class="label">Currency</span><span class="value">GHS (Ghana Cedi)</span></div>
       </div>
-    </div>
-
-    <div class="section">
-      <div class="section-title">Customer Information</div>
-      <div class="info-grid">
-        <div class="info-item"><span class="label">Customer Name</span><span class="value">${c.name}</span></div>
-        <div class="info-item"><span class="label">Tier</span><span class="value" style="text-transform:capitalize">${c.tier}</span></div>
+      <div>
+        <div class="section-title">Customer Information</div>
+        <div class="info-item"><span class="label">Name</span><span class="value">${c.name}</span></div>
+        <div class="info-item"><span class="label">Tier / Group</span><span class="value" style="text-transform:capitalize">${c.tier} / ${c.group}</span></div>
         <div class="info-item"><span class="label">Phone</span><span class="value">${c.phone || c.mobile || "—"}</span></div>
         <div class="info-item"><span class="label">Email</span><span class="value">${c.email || "—"}</span></div>
-        <div class="info-item"><span class="label">Group</span><span class="value" style="text-transform:capitalize">${c.group}</span></div>
-        <div class="info-item"><span class="label">Address</span><span class="value">${c.address || "—"}${c.city ? ", " + c.city : ""}</span></div>
       </div>
     </div>
 
-    <div class="section">
-      <div class="section-title">Credit Summary</div>
-      <div class="summary-cards">
-        <div class="card violet"><div class="label">Credit Limit</div><div class="value">₵${(c.creditLimit || 0).toLocaleString("en-GH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div></div>
-        <div class="card red"><div class="label">Outstanding</div><div class="value">₵${(acct.customer.totalOutstanding || 0).toLocaleString("en-GH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div></div>
-        <div class="card green"><div class="label">Available</div><div class="value">₵${(acct.customer.availableCredit || 0).toLocaleString("en-GH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div></div>
+    <div class="section-title">Credit Summary</div>
+    <div class="summary-cards">
+      <div class="card violet"><div class="label">Credit Limit</div><div class="value">₵${(c.creditLimit || 0).toFixed(2)}</div></div>
+      <div class="card red"><div class="label">Outstanding</div><div class="value">₵${(acct.customer.totalOutstanding || 0).toFixed(2)}</div></div>
+      <div class="card green"><div class="label">Available</div><div class="value">₵${(acct.customer.availableCredit || 0).toFixed(2)}</div></div>
+      <div class="card blue"><div class="label">Total Settled</div><div class="value">₵${(acct.summary.totalSettled || 0).toFixed(2)}</div></div>
+    </div>
+    <div class="utilization">
+      <div style="display:flex;justify-content:space-between;font-size:11px">
+        <span style="font-weight:600;color:#475569">Utilization</span>
+        <span style="font-weight:700;color:${acct.customer.overLimit ? "#dc2626" : "#059669"}">${c.creditLimit > 0 ? Math.min(100, (acct.customer.totalOutstanding / c.creditLimit) * 100).toFixed(1) : 0}%${acct.customer.overLimit ? " (OVER LIMIT)" : ""}</span>
       </div>
-      <div class="utilization">
-        <div style="display:flex;justify-content:space-between;font-size:12px">
-          <span style="font-weight:600;color:#475569">Credit Utilization</span>
-          <span style="font-weight:700;color:${acct.customer.overLimit ? "#dc2626" : "#059669"}">${c.creditLimit > 0 ? Math.min(100, (acct.customer.totalOutstanding / c.creditLimit) * 100).toFixed(1) : 0}%</span>
-        </div>
-        <div class="bar"><div class="fill" style="width:${c.creditLimit > 0 ? Math.min(100, (acct.customer.totalOutstanding / c.creditLimit) * 100) : 0}%;background:${acct.customer.overLimit ? "#dc2626" : acct.customer.totalOutstanding / (c.creditLimit || 1) > 0.7 ? "#d97706" : "#059669"}"></div></div>
-      </div>
+      <div class="bar"><div class="fill" style="width:${c.creditLimit > 0 ? Math.min(100, (acct.customer.totalOutstanding / c.creditLimit) * 100) : 0}%;background:${acct.customer.overLimit ? "#dc2626" : acct.customer.totalOutstanding / (c.creditLimit || 1) > 0.7 ? "#d97706" : "#059669"}"></div></div>
     </div>
 
-    <div class="section">
-      <div class="section-title">Credit Sales History (${acct.sales.length} transactions)</div>
-      ${acct.sales.length === 0 ? '<div style="text-align:center;padding:24px;color:#94a3b8;font-size:13px">No credit sales recorded for this customer.</div>' : `
-      <table>
-        <thead>
-          <tr>
-            <th>Invoice</th>
-            <th>Date</th>
-            <th>Cashier</th>
-            <th style="text-align:right">Total</th>
-            <th style="text-align:right">Amount Due</th>
-            <th>Due Date</th>
-            <th style="text-align:center">Status</th>
-          </tr>
-        </thead>
-        <tbody>${salesRows}</tbody>
-      </table>`}
-    </div>
+    <div class="section-title">Credit Sales History (${acct.sales.length})</div>
+    ${acct.sales.length === 0 ? '<div style="text-align:center;padding:16px;color:#94a3b8;font-size:12px">No credit sales recorded for this customer.</div>' : `
+    <table>
+      <thead><tr>
+        <th>Invoice</th><th>Date</th><th>Cashier</th>
+        <th style="text-align:right">Total</th><th style="text-align:right">Due</th>
+        <th>Due Date</th><th style="text-align:center">Status</th>
+      </tr></thead>
+      <tbody>${salesRows}</tbody>
+    </table>`}
 
-    <div class="section">
-      <div class="section-title">Payment Summary</div>
-      <div class="info-grid">
-        <div class="info-item"><span class="label">Total Credit Sales</span><span class="value">${acct.summary.totalCreditSales}</span></div>
-        <div class="info-item"><span class="label">Total Credit Issued</span><span class="value">₵${(acct.summary.totalCreditIssued || 0).toLocaleString("en-GH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
-        <div class="info-item"><span class="label">Total Settled</span><span class="value" style="color:#059669">₵${(acct.summary.totalSettled || 0).toLocaleString("en-GH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
-        <div class="info-item"><span class="label">Total Outstanding</span><span class="value" style="color:#dc2626">₵${(acct.summary.totalOutstanding || 0).toLocaleString("en-GH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
-        <div class="info-item"><span class="label">Overdue Count</span><span class="value" style="color:${acct.summary.overdueCount > 0 ? "#dc2626" : "#475569"}">${acct.summary.overdueCount}</span></div>
-      </div>
+    <div style="margin-top:10px;display:flex;gap:16px;flex-wrap:wrap;font-size:11px">
+      <span><strong>Total Sales:</strong> ${acct.summary.totalCreditSales}</span>
+      <span><strong>Issued:</strong> ₵${(acct.summary.totalCreditIssued || 0).toFixed(2)}</span>
+      <span><strong>Outstanding:</strong> <span style="color:#dc2626;font-weight:600">₵${(acct.summary.totalOutstanding || 0).toFixed(2)}</span></span>
+      <span><strong>Overdue:</strong> <span style="color:${acct.summary.overdueCount > 0 ? "#dc2626" : "#475569"};font-weight:600">${acct.summary.overdueCount}</span></span>
     </div>
   </div>
 
   <div class="footer">
     SYLHN COMPANY LTD · East Legon, Accra, Ghana · +233 59 276 6044<br>
-    Generated on ${dateStr} · This is a computer-generated statement from SYLHN POS Credit Management System
+    Generated ${dateStr} · SYLHN POS Credit Management System
   </div>
 </div>
 <script>setTimeout(function(){window.print();},300);</script>
@@ -1124,78 +1118,143 @@ function AddCustomerDialog({
     }
   };
 
+  const groupOptions = [
+    { value: "regular", label: "Regular", icon: "👤", color: "from-slate-500 to-slate-600" },
+    { value: "vip", label: "VIP", icon: "⭐", color: "from-amber-500 to-orange-600" },
+    { value: "wholesale", label: "Wholesale", icon: "📦", color: "from-violet-500 to-purple-600" },
+  ];
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>New Customer</DialogTitle>
-          <DialogDescription>
-            Add a customer for credit tracking, loyalty, and sales history.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="grid grid-cols-2 gap-3 py-2">
-          <div className="col-span-2">
-            <Label>Name *</Label>
-            <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+      <DialogContent className="sm:max-w-lg p-0 overflow-hidden">
+        {/* Premium gradient header */}
+        <div className="bg-gradient-to-br from-violet-600 via-purple-600 to-fuchsia-600 text-white px-6 py-5 relative overflow-hidden">
+          <div className="pointer-events-none absolute -top-12 -right-12 h-40 w-40 rounded-full bg-white/10 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-12 -left-12 h-40 w-40 rounded-full bg-fuchsia-400/20 blur-3xl" />
+          <div className="relative z-10 flex items-center gap-3">
+            <div className="h-11 w-11 rounded-xl bg-white/20 ring-1 ring-white/30 flex items-center justify-center backdrop-blur-sm">
+              <User className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold tracking-tight">New Customer</h2>
+              <p className="text-[11px] opacity-85">Add a customer for credit tracking & loyalty</p>
+            </div>
           </div>
+        </div>
+
+        <div className="px-6 py-5 space-y-4 max-h-[60vh] overflow-y-auto">
+          {/* Name — full width, prominent */}
           <div>
-            <Label>Phone</Label>
-            <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+            <Label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Customer Name *</Label>
+            <Input
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              placeholder="e.g. Ama Osei"
+              className="h-11 text-sm font-semibold"
+              autoFocus
+            />
           </div>
+
+          {/* Contact — two columns */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Phone</Label>
+              <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+233 24 000 0000" className="h-10 text-sm" />
+            </div>
+            <div>
+              <Label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Mobile</Label>
+              <Input value={form.mobile} onChange={(e) => setForm({ ...form, mobile: e.target.value })} placeholder="+233 20 000 0000" className="h-10 text-sm" />
+            </div>
+          </div>
+
+          {/* Email */}
           <div>
-            <Label>Mobile</Label>
-            <Input value={form.mobile} onChange={(e) => setForm({ ...form, mobile: e.target.value })} />
+            <Label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Email</Label>
+            <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="customer@email.com" className="h-10 text-sm" />
           </div>
-          <div className="col-span-2">
-            <Label>Email</Label>
-            <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+
+          {/* Address + City */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="col-span-2">
+              <Label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Address</Label>
+              <Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Street address" className="h-10 text-sm" />
+            </div>
+            <div>
+              <Label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">City</Label>
+              <Input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} placeholder="Accra" className="h-10 text-sm" />
+            </div>
           </div>
-          <div className="col-span-2">
-            <Label>Address</Label>
-            <Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
-          </div>
+
+          {/* Group — visual selector */}
           <div>
-            <Label>City</Label>
-            <Input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
+            <Label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Customer Group</Label>
+            <div className="grid grid-cols-3 gap-2">
+              {groupOptions.map(opt => (
+                <button
+                  key={opt.value}
+                  onClick={() => setForm({ ...form, group: opt.value })}
+                  className={cn(
+                    "flex flex-col items-center gap-1 py-2.5 rounded-xl ring-2 transition active:scale-95",
+                    form.group === opt.value
+                      ? "ring-violet-500 bg-violet-50"
+                      : "ring-slate-200 hover:ring-slate-300 bg-white"
+                  )}
+                >
+                  <span className="text-lg">{opt.icon}</span>
+                  <span className="text-[10px] font-semibold text-slate-700">{opt.label}</span>
+                </button>
+              ))}
+            </div>
           </div>
+
+          {/* Credit Limit — with live preview */}
           <div>
-            <Label>Group</Label>
-            <Select value={form.group} onValueChange={(v) => setForm({ ...form, group: v })}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="regular">Regular</SelectItem>
-                <SelectItem value="vip">VIP</SelectItem>
-                <SelectItem value="wholesale">Wholesale</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="col-span-2">
-            <Label>Credit Limit (GHS)</Label>
+            <Label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Credit Limit (GHS)</Label>
             <Input
               type="number"
               step="0.01"
               value={form.creditLimit}
               onChange={(e) => setForm({ ...form, creditLimit: e.target.value })}
-              placeholder="0.00 — leave blank for no credit"
+              placeholder="0.00"
+              className="h-10 text-sm font-mono"
             />
+            {form.creditLimit && parseFloat(form.creditLimit) > 0 ? (
+              <div className="mt-1.5 flex items-center gap-2 text-[10px] text-violet-600 font-semibold">
+                <CreditCard className="h-3 w-3" />
+                Credit account will be created with ₵{parseFloat(form.creditLimit).toFixed(2)} limit
+              </div>
+            ) : (
+              <p className="text-[10px] text-slate-400 mt-1">Leave at 0 for cash-only customers (no credit)</p>
+            )}
           </div>
-          <div className="col-span-2">
-            <Label>Notes</Label>
+
+          {/* Notes */}
+          <div>
+            <Label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Notes (optional)</Label>
             <Textarea
               value={form.notes}
               onChange={(e) => setForm({ ...form, notes: e.target.value })}
-              placeholder="Optional notes about this customer"
+              placeholder="Any notes about this customer…"
               rows={2}
+              className="text-sm"
             />
           </div>
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>Cancel</Button>
-          <Button onClick={handleSubmit} disabled={submitting}>
+
+        {/* Footer — sticky */}
+        <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex gap-2">
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting} className="flex-1 h-10">
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={submitting || !form.name.trim()}
+            className="flex-1 h-10 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white font-bold"
+          >
             {submitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
             Create Customer
           </Button>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );
