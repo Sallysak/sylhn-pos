@@ -157,12 +157,6 @@ export function ManagerApproval({
                 </div>
               )}
 
-              <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-[11px] text-amber-800">
-                <div className="font-semibold mb-0.5">Default manager credentials:</div>
-                <div className="font-mono">manager / manager123</div>
-                <div className="font-mono">admin / admin123</div>
-              </div>
-
               <div className="flex gap-2 pt-2">
                 <button
                   type="button"
