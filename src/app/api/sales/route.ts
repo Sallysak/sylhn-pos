@@ -194,6 +194,9 @@ export async function POST(req: NextRequest) {
           paymentRef: s.paymentRef || "",
           status: s.status || "completed",
           notes: s.notes || "",
+          isCreditSale: s.isCreditSale || false,
+          creditAmountDue: s.isCreditSale ? total : 0,
+          creditDueDate: s.creditDueDate ? new Date(s.creditDueDate as string) : null,
           shiftId,
           pointsRedeemed: pointsRedeemedRequested,
           costOfGoods: computedCostOfGoods,
@@ -286,6 +289,19 @@ export async function POST(req: NextRequest) {
           });
           newSale.pointsEarned = awardedPoints;
           newSale.pointsRedeemed = pointsRedeemedRequested;
+        }
+
+        // ===== Credit sale: increment customer's outstanding balance =====
+        if (s.isCreditSale && total > 0) {
+          await tx.customer.update({
+            where: { id: customerId },
+            data: {
+              balance: { increment: total },
+              totalSpent: { increment: total },
+              visits: { increment: 1 },
+              lastVisitAt: new Date(),
+            },
+          });
         }
       }
 

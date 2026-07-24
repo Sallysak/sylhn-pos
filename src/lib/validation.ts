@@ -83,6 +83,10 @@ export const SaleSchema = z.object({
   paymentRef: z.string().max(128).optional().default(""),
   status: z.enum(["completed", "voided", "held"]).optional().default("completed"),
   notes: z.string().max(2000).optional().default(""),
+  // Credit sale fields
+  isCreditSale: z.boolean().optional().default(false),
+  creditAmountDue: z.number().min(0).max(10_000_000).optional().default(0),
+  creditDueDate: z.union([z.string(), z.date(), z.null()]).optional(),
   items: z.array(SaleItemSchema).min(1).max(500),
   // Premium: multi-payment split (optional)
   payments: z.array(SalePaymentSchema).max(10).optional(),
