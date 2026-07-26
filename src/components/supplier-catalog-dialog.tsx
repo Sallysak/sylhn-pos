@@ -117,7 +117,7 @@ export function SupplierCatalogDialog({
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        toast({ title: "Added to catalog ✓", description: `${product.name} (${product.sku})` });
+        toast({ title: "Added to catalog ✓", description: `${product.name} (${product.sku}) — now visible in Find Part No on the supplier form` });
         loadCatalog();
         onChanged?.();
       } else {
@@ -196,6 +196,11 @@ export function SupplierCatalogDialog({
         </div>
 
         <div className="px-6 py-5 space-y-4 max-h-[65vh] overflow-y-auto">
+          {/* Help banner — explains the workflow */}
+          <div className="rounded-xl bg-violet-50 dark:bg-violet-950/30 border border-violet-200 dark:border-violet-900/50 px-3 py-2.5 text-[11px] text-violet-800 dark:text-violet-300 leading-relaxed">
+            <strong>How this works:</strong> Add stock items to this supplier's catalog. Then close this dialog and use <strong>Find Part No</strong> on the supplier form — your catalog items will appear at the top of the search results with this supplier's cost price auto-filled.
+          </div>
+
           {loading ? (
             <div className="text-center py-8 text-slate-500">
               <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
@@ -208,7 +213,8 @@ export function SupplierCatalogDialog({
                 <div className="text-center py-6 text-slate-400">
                   <Package className="h-8 w-8 mx-auto mb-2 opacity-30" />
                   <p className="font-semibold text-sm">Catalog is empty</p>
-                  <p className="text-xs mt-1">Click "Add Product" below to link a stock item to this supplier.</p>
+                  <p className="text-xs mt-1">Click <strong>"Add Product to Catalog"</strong> below, search for a stock item, and click it to link it to this supplier.</p>
+                  <p className="text-[10px] mt-2 text-violet-600">Once added, the item will appear in the Find Part No search on the supplier form.</p>
                 </div>
               ) : (
                 <div className="space-y-1.5">
@@ -353,8 +359,19 @@ export function SupplierCatalogDialog({
         </div>
 
         <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
-          <Button variant="outline" className="w-full h-11" onClick={() => onOpenChange(false)}>
-            Close
+          <Button
+            className="w-full h-11 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white font-bold"
+            onClick={() => {
+              onOpenChange(false);
+              if (catalog.length > 0) {
+                toast({
+                  title: "Catalog saved ✓",
+                  description: `${catalog.length} product(s) in ${supplierName}'s catalog. Use Find Part No on the supplier form to add them to a PO.`,
+                });
+              }
+            }}
+          >
+            Done — Back to Supplier Form
           </Button>
         </div>
       </DialogContent>

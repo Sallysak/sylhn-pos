@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
+import { useSession } from "@/hooks/use-session";
 import { cn } from "@/lib/utils";
 import { COMPANY, CURRENCY, formatGHS, type Product } from "@/lib/pos-data";
 import { PopupWindow } from "@/components/popup-window";
@@ -79,6 +80,9 @@ const BLUE = "#0078D7";
 
 export function SupplierForm({ onBack, products }: SupplierFormProps) {
   const { toast } = useToast();
+  const { user: sessionUser } = useSession();
+  // Only admins + managers can edit or delete supplier records
+  const canEditSupplier = sessionUser?.role === "admin" || sessionUser?.role === "manager";
   // Premium fix: start with bundled initialSuppliers for instant render,
   // then fetch from /api/suppliers on mount and replace the list.
   const [suppliers, setSuppliers] = useState<Supplier[]>(initialSuppliers);
@@ -342,13 +346,29 @@ export function SupplierForm({ onBack, products }: SupplierFormProps) {
       if (data.purchase?.id) setSavedPurchaseId(data.purchase.id);
       if (data.purchase?.refNo) {
         setSavedRefNo(data.purchase.refNo);
-        setInvoiceNo(data.purchase.refNo);
       }
       toast({
         title: "Saved ✓ (F2)",
         description: `${data.purchase.refNo} · ${selectedSupplier.name} · ${lines.length} items · ${formatGHS(totals.grandTotal)}`,
       });
-      setTimeout(() => setSaved(false), 2000);
+      // Reset the form to default for the next entry — but KEEP savedPurchaseId
+      // + savedRefNo so Email/Payment/Print buttons still work on the just-saved PO.
+      setTimeout(() => {
+        setLines([]);
+        setSelectedLine(null);
+        setPaidAmount(0);
+        setFindPartNo("");
+        setOnHand(0);
+        setInvoiceNo(`PUR-${Date.now().toString().slice(-6)}`);
+        setRefNo("");
+        setSaved(false);
+        // Note: do NOT clear savedPurchaseId / savedRefNo / selectedSupplier —
+        // the user may want to Email/Payment/Print the just-saved PO.
+        toast({
+          title: "Form reset",
+          description: `Ready for next entry. Use Email/Payment/Print with ${data.purchase.refNo}.`,
+        });
+      }, 1500);
     } catch (e: any) {
       toast({ title: "Failed to save", description: e?.message, variant: "destructive" });
     }
@@ -620,16 +640,16 @@ export function SupplierForm({ onBack, products }: SupplierFormProps) {
             <button onClick={() => setShowNewSupplier(true)} title="Add a new supplier to the system" className="h-7 px-3 rounded text-white text-[9px] font-semibold flex items-center gap-1 transition shadow-sm" style={{ backgroundColor: '#16A34A' }}><Plus className="h-3 w-3" /> New Supplier</button>
             <button
               onClick={() => { if (selectedSupplier) { setEditSupplier(selectedSupplier); setShowNewSupplier(true); } else { toast({ title: "Select a supplier first", variant: "destructive" }); } }}
-              disabled={!selectedSupplier}
-              title={!selectedSupplier ? "Select a supplier first to edit their details" : "Edit the selected supplier's details (name, contact, address, etc.)"}
-              className={cn("h-7 px-3 rounded text-white text-[9px] font-semibold flex items-center gap-1 transition shadow-sm", !selectedSupplier && "opacity-40 cursor-not-allowed")}
+              disabled={!selectedSupplier || !canEditSupplier}
+              title={!canEditSupplier ? "Admin/Manager only — you don't have permission to edit suppliers" : !selectedSupplier ? "Select a supplier first to edit their details" : "Edit the selected supplier's details (name, contact, address, etc.)"}
+              className={cn("h-7 px-3 rounded text-white text-[9px] font-semibold flex items-center gap-1 transition shadow-sm", (!selectedSupplier || !canEditSupplier) && "opacity-40 cursor-not-allowed")}
               style={{ backgroundColor: '#EA580C' }}
             ><Edit2 className="h-3 w-3" /> Edit Supplier</button>
             <button
               onClick={handleDeleteSupplier}
-              disabled={!selectedSupplier}
-              title={!selectedSupplier ? "Select a supplier first to deactivate" : "Deactivate the selected supplier (soft delete — preserves history)"}
-              className={cn("h-7 px-3 rounded text-white text-[9px] font-semibold flex items-center gap-1 transition shadow-sm", !selectedSupplier && "opacity-40 cursor-not-allowed")}
+              disabled={!selectedSupplier || !canEditSupplier}
+              title={!canEditSupplier ? "Admin/Manager only — you don't have permission to delete suppliers" : !selectedSupplier ? "Select a supplier first to deactivate" : "Deactivate the selected supplier (soft delete — preserves history)"}
+              className={cn("h-7 px-3 rounded text-white text-[9px] font-semibold flex items-center gap-1 transition shadow-sm", (!selectedSupplier || !canEditSupplier) && "opacity-40 cursor-not-allowed")}
               style={{ backgroundColor: '#DC2626' }}
             ><Trash2 className="h-3 w-3" /> Delete Supplier</button>
             <button
@@ -664,6 +684,7 @@ export function SupplierForm({ onBack, products }: SupplierFormProps) {
             <SupplierListPopup
               suppliers={suppliers}
               searchText={supplierDetails}
+              canEditSupplier={canEditSupplier}
               onSelect={handleSelectSupplier}
               onNew={() => { setShowSupplierList(false); setEditSupplier(null); setShowNewSupplier(true); }}
               onNotes={(s) => { setShowSupplierList(false); setSelectedSupplier(s); setSupplierDetails(s.name); setShowNotesDialog(true); }}
@@ -1015,9 +1036,10 @@ function StockListMiniPopup({ products, searchText, onSelect, onClose }: {
 }
 
 // ===== Supplier List Popup =====
-function SupplierListPopup({ suppliers, searchText, onSelect, onNew, onNotes, onHistory, onEmail, onEdit, onDelete, onClose }: {
+function SupplierListPopup({ suppliers, searchText, canEditSupplier, onSelect, onNew, onNotes, onHistory, onEmail, onEdit, onDelete, onClose }: {
   suppliers: Supplier[];
   searchText: string;
+  canEditSupplier?: boolean;
   onSelect: (s: Supplier) => void;
   onNew: () => void;
   onNotes?: (s: Supplier) => void;
@@ -1232,8 +1254,8 @@ function SupplierListPopup({ suppliers, searchText, onSelect, onNew, onNotes, on
           <IconButton label="New" color="#2196F3" onClick={onNew} icon={<Plus className="h-4 w-4 text-white" />} />
           <IconButton label="Notes" color="#9C27B0" onClick={() => selectedSupplier ? (onNotes ? onNotes(selectedSupplier) : toast({ title: "Notes", description: selectedSupplier.notes || 'No notes for this supplier' })) : toast({ title: "Select a supplier first", variant: "destructive" })} disabled={!selectedSupplier} icon={<StickyNote className="h-4 w-4 text-white" />} />
           <IconButton label="History" color="#2196F3" onClick={() => selectedSupplier ? (onHistory ? onHistory(selectedSupplier) : toast({ title: "History", description: `Transaction history for ${selectedSupplier.name}` })) : toast({ title: "Select a supplier first", variant: "destructive" })} disabled={!selectedSupplier} icon={<Hash className="h-4 w-4 text-white" />} />
-          <IconButton label="Edit" color="#EA580C" onClick={() => selectedSupplier ? (onEdit ? onEdit(selectedSupplier) : toast({ title: "Edit", description: `Edit ${selectedSupplier.name}` })) : toast({ title: "Select a supplier first", variant: "destructive" })} disabled={!selectedSupplier} icon={<Edit2 className="h-4 w-4 text-white" />} />
-          <IconButton label="Delete" color="#DC2626" onClick={() => selectedSupplier ? (onDelete ? onDelete(selectedSupplier) : toast({ title: "Delete", description: `Deactivate ${selectedSupplier.name}` })) : toast({ title: "Select a supplier first", variant: "destructive" })} disabled={!selectedSupplier} icon={<Trash2 className="h-4 w-4 text-white" />} />
+          <IconButton label="Edit" color="#EA580C" onClick={() => selectedSupplier ? (onEdit ? onEdit(selectedSupplier) : toast({ title: "Edit", description: `Edit ${selectedSupplier.name}` })) : toast({ title: "Select a supplier first", variant: "destructive" })} disabled={!selectedSupplier || !canEditSupplier} icon={<Edit2 className="h-4 w-4 text-white" />} />
+          <IconButton label="Delete" color="#DC2626" onClick={() => selectedSupplier ? (onDelete ? onDelete(selectedSupplier) : toast({ title: "Delete", description: `Deactivate ${selectedSupplier.name}` })) : toast({ title: "Select a supplier first", variant: "destructive" })} disabled={!selectedSupplier || !canEditSupplier} icon={<Trash2 className="h-4 w-4 text-white" />} />
           <IconButton label="Mail" color="#2196F3" onClick={() => selectedSupplier ? (onEmail ? onEmail(selectedSupplier) : toast({ title: "Mail", description: `Compose email to ${selectedSupplier.name}` })) : toast({ title: "Select a supplier first", variant: "destructive" })} disabled={!selectedSupplier} icon={<Mail className="h-4 w-4 text-white" />} />
           <IconButton label="Email" color="#4CAF50" onClick={() => selectedSupplier ? (onEmail ? onEmail(selectedSupplier) : toast({ title: "Email", description: `Send email to ${selectedSupplier.email || '(no email on file)'}` })) : toast({ title: "Select a supplier first", variant: "destructive" })} disabled={!selectedSupplier} icon={<Mail className="h-4 w-4 text-white" />} />
           <IconButton label="Labels" color="#2196F3" onClick={() => selectedSupplier ? toast({ title: "Labels", description: `Print address labels for ${selectedSupplier.name}` }) : toast({ title: "Select a supplier first", variant: "destructive" })} disabled={!selectedSupplier} icon={<FileText className="h-4 w-4 text-white" />} />
