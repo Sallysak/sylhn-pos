@@ -42,6 +42,7 @@ import { WhatsAppBroadcast } from "@/components/whatsapp-broadcast";
 import { AIForecastDashboard } from "@/components/ai-forecast-dashboard";
 import { ExpiryManager } from "@/components/expiry-manager";
 import { AdvancedReportsDashboard } from "@/components/advanced-reports-dashboard";
+import { VoiceSearch } from "@/components/voice-search";
 import { detectNetwork } from "@/lib/mobile-money";
 import { initializePaystackTransaction, isPaystackConfigured } from "@/lib/paystack";
 import { useToast } from "@/hooks/use-toast";
@@ -2272,17 +2273,20 @@ export default function POSPage() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search products, scan barcode, or enter SKU..."
-                className="w-full h-10 pl-11 pr-24 rounded-xl bg-white text-slate-800 text-sm shadow-premium outline-none ring-2 ring-transparent focus:ring-emerald-400/70 transition"
+                className="w-full h-10 pl-11 pr-32 rounded-xl bg-white text-slate-800 text-sm shadow-premium outline-none ring-2 ring-transparent focus:ring-emerald-400/70 transition"
               />
-              <button
+              <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                <VoiceSearch onResult={(text) => { setSearchQuery(text); toast({ title: "Voice search", description: text }); }} />
+                <button
                 onClick={() => setShowBarcodeScanner(true)}
-                className={cn("absolute right-1.5 top-1/2 -translate-y-1/2 h-7 px-2.5 rounded-lg flex items-center gap-1 text-[11px] font-semibold transition",
+                className={cn("h-7 px-2.5 rounded-lg flex items-center gap-1 text-[11px] font-semibold transition",
                   "bg-emerald-100 text-emerald-700 hover:bg-emerald-200 active:scale-95")}
                 title="Open barcode scanner (camera)"
               >
                 <ScanLine className="h-3.5 w-3.5" />
                 Scan
               </button>
+              </div>
             </div>
           </div>
 
