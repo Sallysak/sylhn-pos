@@ -2382,8 +2382,9 @@ export default function POSPage() {
             </button>
             <button
               onClick={() => setShowStocktakeWizard(true)}
-              className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition-all active:scale-95 flex-shrink-0 bg-indigo-500/15 hover:bg-indigo-500/25 ring-1 ring-indigo-400/20 hover:ring-indigo-400/40 backdrop-blur-sm"
-              title="Run a stocktake (physical count → variance → update stock)"
+              disabled={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager"}
+              title={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" ? "Admin/Manager only" : "Run a stocktake (physical count → variance → update stock)"}
+              className={cn("group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition-all active:scale-95 flex-shrink-0 bg-indigo-500/15 hover:bg-indigo-500/25 ring-1 ring-indigo-400/20 hover:ring-indigo-400/40 backdrop-blur-sm", loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" && "opacity-30 cursor-not-allowed hover:bg-indigo-500/15")}
             >
               <ClipboardCheck className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Stocktake
             </button>
@@ -2391,15 +2392,17 @@ export default function POSPage() {
             <div className="w-px h-5 bg-white/10 flex-shrink-0 mx-0.5" />
             <button
               onClick={() => setShowWhatsAppBroadcast(true)}
-              className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition-all active:scale-95 flex-shrink-0 bg-green-500/15 hover:bg-green-500/30 ring-1 ring-green-400/20 hover:ring-green-400/40 backdrop-blur-sm"
-              title="Send WhatsApp broadcast to customers"
+              disabled={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager"}
+              title={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" ? "Admin/Manager only" : "Send WhatsApp broadcast to customers"}
+              className={cn("group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition-all active:scale-95 flex-shrink-0 bg-green-500/15 hover:bg-green-500/30 ring-1 ring-green-400/20 hover:ring-green-400/40 backdrop-blur-sm", loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" && "opacity-30 cursor-not-allowed hover:bg-green-500/15")}
             >
               <MessageCircle className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Broadcast
             </button>
             <button
               onClick={() => setShowAIForecast(true)}
-              className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition-all active:scale-95 flex-shrink-0 bg-violet-500/15 hover:bg-violet-500/30 ring-1 ring-violet-400/20 hover:ring-violet-400/40 backdrop-blur-sm"
-              title="AI demand forecasting + reorder suggestions"
+              disabled={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager"}
+              title={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" ? "Admin/Manager only" : "AI demand forecasting + reorder suggestions"}
+              className={cn("group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition-all active:scale-95 flex-shrink-0 bg-violet-500/15 hover:bg-violet-500/30 ring-1 ring-violet-400/20 hover:ring-violet-400/40 backdrop-blur-sm", loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" && "opacity-30 cursor-not-allowed hover:bg-violet-500/15")}
             >
               <Brain className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> AI Forecast
             </button>
@@ -2410,11 +2413,12 @@ export default function POSPage() {
             >
               <AlertTriangle className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Expiry
             </button>
-            {/* Phase 4: Advanced Reports */}
+            {/* Phase 4: Advanced Reports — Admin/Manager only */}
             <button
               onClick={() => setShowAdvancedReports(true)}
-              className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition-all active:scale-95 flex-shrink-0 bg-cyan-500/15 hover:bg-cyan-500/30 ring-1 ring-cyan-400/20 hover:ring-cyan-400/40 backdrop-blur-sm"
-              title="Advanced reports: ABC analysis, profit margins, hourly traffic, staff performance"
+              disabled={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager"}
+              title={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" ? "Admin/Manager only" : "Advanced reports: ABC analysis, profit margins, hourly traffic, staff performance"}
+              className={cn("group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition-all active:scale-95 flex-shrink-0 bg-cyan-500/15 hover:bg-cyan-500/30 ring-1 ring-cyan-400/20 hover:ring-cyan-400/40 backdrop-blur-sm", loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" && "opacity-30 cursor-not-allowed hover:bg-cyan-500/15")}
             >
               <BarChart3 className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Reports
             </button>
