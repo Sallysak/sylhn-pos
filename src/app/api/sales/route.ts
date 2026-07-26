@@ -5,6 +5,7 @@ import { SaleSchema, validate, validationError } from "@/lib/validation";
 import { rateLimitApiRead, rateLimitApiWrite, rateLimitResponse, getClientIp } from "@/lib/rate-limit";
 import { auditLogTx } from "@/lib/audit";
 import { generateInvoiceNumber } from "@/lib/identifiers";
+import { generateSequentialInvoiceNumber } from "@/lib/gra-compliance";
 import { awardLoyaltyPoints, redeemLoyaltyPoints, reverseLoyaltyForSale } from "@/lib/loyalty";
 import { publishRealtimeEvent } from "@/lib/realtime";
 
@@ -146,8 +147,19 @@ export async function POST(req: NextRequest) {
     // We can't publish events inside the transaction (it might still roll back).
     const stockUpdates: Array<{ productId: string; newQuantity: number }> = [];
 
+    // Generate GRA-compliant sequential invoice number BEFORE the transaction
+    // (the generator queries the DB, so we do it outside the tx to avoid
+    // nested query issues). Falls back to the legacy generator if the
+    // sequential one fails for any reason.
+    let sequentialInvoiceNumber: string;
+    try {
+      sequentialInvoiceNumber = s.invoiceNumber || await generateSequentialInvoiceNumber();
+    } catch {
+      sequentialInvoiceNumber = s.invoiceNumber || generateInvoiceNumber();
+    }
+
     const sale = await db.$transaction(async (tx) => {
-      const invoiceNumber = s.invoiceNumber || generateInvoiceNumber();
+      const invoiceNumber = sequentialInvoiceNumber;
 
       // Compute tax server-side using the tax rate from the request.
       // The frontend sends taxRate as a decimal (e.g. 0.15 for 15% VAT),

@@ -10,6 +10,7 @@ import {
   ChevronRight, ScanLine, Pause, Play, RotateCcw, DollarSign, Receipt,
   ShoppingCart as Cart, Settings, Bell, LogOut, Menu as MenuIcon,
   TrendingUp, BarChart3, Tag, AlertCircle, CheckCircle2, ArrowLeft,
+  ClipboardCheck,
   Zap, Store, Hash, Boxes, FileBarChart, ChevronDown, FileText, Eye,
   Layers, ArrowUpDown, History, FileSpreadsheet, Home, Power,
   Phone, Truck, Users, Database, Wrench, Shield,
@@ -35,6 +36,10 @@ import {
 } from "@/components/ui/dialog";
 import { OfflineSyncIndicator } from "@/components/offline-sync-indicator";
 import { LabelPrinter } from "@/components/label-printer";
+import { ExpenseManager } from "@/components/expense-manager";
+import { StocktakeWizard } from "@/components/stocktake-wizard";
+import { detectNetwork } from "@/lib/mobile-money";
+import { initializePaystackTransaction, isPaystackConfigured } from "@/lib/paystack";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { initialSuppliers } from "@/components/supplier-form";
@@ -265,6 +270,8 @@ export default function POSPage() {
   // Premium: Price tags printer
   const [showPriceTags, setShowPriceTags] = useState(false);
   const [showLabelPrinter, setShowLabelPrinter] = useState(false);
+  const [showExpenseManager, setShowExpenseManager] = useState(false);
+  const [showStocktakeWizard, setShowStocktakeWizard] = useState(false);
   const [dailyTotal, setDailyTotal] = useState(() => {
     if (typeof window !== 'undefined') { try { return parseFloat(localStorage.getItem('sylhn-daily-total') || '0') || 0; } catch {} }
     return 0;
@@ -2293,6 +2300,22 @@ export default function POSPage() {
             >
               <Tag className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Labels</span>
             </button>
+            {/* Premium: Expense Manager */}
+            <button
+              onClick={() => setShowExpenseManager(true)}
+              className="btn-premium h-9 px-2.5 rounded-lg gradient-premium-glass hover:bg-white/20 ring-1 ring-white/25 text-white text-xs font-bold flex items-center gap-1 transition flex-shrink-0"
+              title="Record expenses (rent, utilities, salaries, etc.)"
+            >
+              <Wallet className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Expenses</span>
+            </button>
+            {/* Premium: Stocktake Wizard */}
+            <button
+              onClick={() => setShowStocktakeWizard(true)}
+              className="btn-premium h-9 px-2.5 rounded-lg gradient-premium-glass hover:bg-white/20 ring-1 ring-white/25 text-white text-xs font-bold flex items-center gap-1 transition flex-shrink-0"
+              title="Run a stocktake (physical count → variance → update stock)"
+            >
+              <ClipboardCheck className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Stocktake</span>
+            </button>
             {/* Premium: AI Assistant button — always visible (mobile + desktop) */}
             <button
               onClick={() => setShowAiAssistant(true)}
@@ -3319,6 +3342,12 @@ export default function POSPage() {
         </DialogContent>
       </Dialog>
 
+      {/* ===== Expense Manager Dialog ===== */}
+      <ExpenseManager open={showExpenseManager} onOpenChange={setShowExpenseManager} />
+
+      {/* ===== Stocktake Wizard Dialog ===== */}
+      <StocktakeWizard open={showStocktakeWizard} onOpenChange={setShowStocktakeWizard} products={products} />
+
       {/* ===== Cash Drawer Animation ===== */}
       <AnimatePresence>
         {showCashDrawer && (
@@ -3664,12 +3693,21 @@ function PaymentModal({ total, subtotal, tax, discount, itemCount, invoiceNumber
                         placeholder="233XXXXXXXXX"
                         autoFocus
                         inputMode="tel"
-                        className="input-premium w-full h-12 pl-11 pr-4 text-base sm:text-sm font-mono font-bold"
+                        className="input-premium w-full h-12 pl-11 pr-28 text-base sm:text-sm font-mono font-bold"
                       />
+                      {momoPhone.length >= 10 && (
+                        <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                          {(() => {
+                            const network = detectNetwork(momoPhone);
+                            const colors: Record<string, string> = { mtn: "bg-yellow-400 text-black", telecel: "bg-red-500 text-white", airteltigo: "bg-blue-500 text-white" };
+                            const labels: Record<string, string> = { mtn: "MTN", telecel: "Telecel", airteltigo: "AT" };
+                            return <span className={cn("px-2 py-0.5 rounded text-[10px] font-bold", colors[network])}>{labels[network]}</span>;
+                          })()}
+                        </div>
+                      )}
                     </div>
                     <div className="text-[10px] text-slate-400 mt-1.5">
-                      Enter the customer's phone number in international format (e.g. 233241234567).
-                      They'll receive a prompt to approve the payment.
+                      Enter the customer's phone number (e.g. 233241234567). Network is auto-detected. They'll receive a prompt to approve the payment.
                     </div>
                   </div>
                   <button
@@ -3743,12 +3781,54 @@ function PaymentModal({ total, subtotal, tax, discount, itemCount, invoiceNumber
           )}
 
           {method === "card" && (
-            <div className="px-5 pb-4">
-              <div className="p-4 rounded-xl bg-blue-50 text-center">
-                <div className="text-3xl mb-2">💳</div>
-                <div className="text-sm font-semibold text-slate-700">Insert/tap card on terminal</div>
-                <div className="text-xs text-slate-500 mt-1">Confirm on payment terminal</div>
-              </div>
+            <div className="px-5 pb-4 space-y-3">
+              {isPaystackConfigured() ? (
+                <>
+                  <div className="p-4 rounded-xl bg-blue-50 text-center ring-1 ring-blue-200">
+                    <div className="text-3xl mb-2">💳</div>
+                    <div className="text-sm font-semibold text-slate-700">Pay with Card via Paystack</div>
+                    <div className="text-xs text-slate-500 mt-1">Visa, Mastercard, Verve — secure payment via Paystack</div>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      try {
+                        const result = await initializePaystackTransaction({
+                          email: "pos@sylhn.com",
+                          amount: total,
+                          reference: invoiceNumber || `INV-${Date.now()}`,
+                          callbackUrl: window.location.href,
+                          metadata: { invoiceNumber },
+                        });
+                        window.location.href = result.authorizationUrl;
+                      } catch (e: any) {
+                        toast({ title: "Paystack error", description: e?.message, variant: "destructive" });
+                      }
+                    }}
+                    className="btn-premium w-full h-12 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-sm font-bold flex items-center justify-center gap-2 transition active:scale-95"
+                  >
+                    <CreditCard className="h-4 w-4" />
+                    Pay {formatGHS(total)} via Paystack
+                  </button>
+                  <div className="text-[10px] text-slate-400 text-center">
+                    You'll be redirected to Paystack's secure page to enter card details.
+                  </div>
+                </>
+              ) : (
+                <div className="p-4 rounded-xl bg-amber-50 text-center ring-1 ring-amber-200">
+                  <div className="text-3xl mb-2">💳</div>
+                  <div className="text-sm font-semibold text-slate-700">Card payment not configured</div>
+                  <div className="text-xs text-slate-500 mt-1">
+                    Set <code className="bg-slate-100 px-1 rounded">PAYSTACK_SECRET_KEY</code> in your environment variables to enable card payments.
+                    For now, use an external card terminal and confirm manually.
+                  </div>
+                  <button
+                    onClick={() => { onComplete("card", total); }}
+                    className="mt-3 w-full h-10 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm font-bold transition"
+                  >
+                    Confirm Card Payment (Manual)
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
