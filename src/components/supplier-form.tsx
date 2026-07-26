@@ -16,6 +16,8 @@ import { COMPANY, CURRENCY, formatGHS, type Product } from "@/lib/pos-data";
 import { PopupWindow } from "@/components/popup-window";
 import { SupplierEmailDialog } from "@/components/supplier-email-dialog";
 import { SupplierCatalogDialog } from "@/components/supplier-catalog-dialog";
+import { SupplierNotesDialog } from "@/components/supplier-notes-dialog";
+import { SupplierHistoryDialog } from "@/components/supplier-history-dialog";
 import { PurchasePaymentDialog } from "@/components/purchase-payment-dialog";
 
 // Supplier interface — exported so other components (e.g. PurchaseForm) can use real supplier data
@@ -146,6 +148,10 @@ export function SupplierForm({ onBack, products }: SupplierFormProps) {
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [showCatalogDialog, setShowCatalogDialog] = useState(false);
+  const [showNotesDialog, setShowNotesDialog] = useState(false);
+  const [showHistoryDialog, setShowHistoryDialog] = useState(false);
+  // Edit-supplier mode: when set, NewSupplierPopup opens pre-filled with this supplier's data
+  const [editSupplier, setEditSupplier] = useState<Supplier | null>(null);
   // Supplier's catalog (loaded when a supplier is selected) — drives the "Find Part no" search
   const [supplierCatalog, setSupplierCatalog] = useState<any[]>([]);
 
@@ -423,6 +429,79 @@ export function SupplierForm({ onBack, products }: SupplierFormProps) {
     }
   };
 
+  // ===== Issue 1: Delete supplier (deactivates the supplier record — soft delete) =====
+  const handleDeleteSupplier = async () => {
+    if (!selectedSupplier) return;
+    const reason = window.prompt(`Deactivate supplier "${selectedSupplier.name}"?\n\nReason (optional):`) ?? "";
+    if (!window.confirm(`Are you sure? This will deactivate "${selectedSupplier.name}". Existing purchase + payment history is preserved. The supplier will no longer appear in dropdowns.`)) return;
+    try {
+      const res = await fetch(`/api/suppliers/${selectedSupplier.id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast({ title: "Supplier deactivated", description: `${selectedSupplier.name} (${selectedSupplier.code})${reason ? ` — ${reason}` : ""}` });
+        // Remove from local list + clear selection
+        setSuppliers(prev => prev.filter(s => s.id !== selectedSupplier.id));
+        setSelectedSupplier(null);
+        setSupplierDetails("");
+        setSupplierCatalog([]);
+      } else {
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
+    } catch (e: any) {
+      toast({ title: "Failed to delete supplier", description: e?.message, variant: "destructive" });
+    }
+  };
+
+  // ===== Issue 1: Edit supplier — called from NewSupplierPopup when editSupplier is set =====
+  const handleEditSupplierSave = async (updated: Supplier) => {
+    if (!editSupplier) {
+      // Not in edit mode — fall through to create-new flow
+      handleSaveNewSupplier(updated);
+      return;
+    }
+    setShowNewSupplier(false);
+    setEditSupplier(null);
+    try {
+      const res = await fetch(`/api/suppliers/${editSupplier.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          name: updated.name,
+          contactName: updated.contactName || '',
+          phone: updated.phone || '',
+          mobile: updated.mobile || '',
+          email: updated.email || '',
+          fax: updated.fax || '',
+          address: updated.address || '',
+          city: updated.city || '',
+          state: updated.state || '',
+          country: updated.country || 'Ghana',
+          businessNo: updated.businessNo || '',
+          tradingTerms: updated.tradingTerms || 'Net 30',
+          creditLimit: updated.creditLimit || 0,
+          taxInclusive: updated.taxInclusive || false,
+          notes: updated.notes || '',
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && (data.success || data.supplier)) {
+        const updatedSupplier = { ...editSupplier, ...updated };
+        setSuppliers(prev => prev.map(s => s.id === editSupplier.id ? updatedSupplier : s));
+        setSelectedSupplier(updatedSupplier);
+        setSupplierDetails(updatedSupplier.name);
+        toast({ title: "Supplier updated ✓", description: `${updated.name} (${updated.code})` });
+      } else {
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
+    } catch (e: any) {
+      toast({ title: "Failed to update supplier", description: e?.message, variant: "destructive" });
+    }
+  };
+
   const handlePrint_old_removed = () => {};
 
   const supplierBalance = selectedSupplier?.balance || 0;
@@ -539,6 +618,27 @@ export function SupplierForm({ onBack, products }: SupplierFormProps) {
             <button onClick={handlePayment} disabled={!selectedSupplier || totals.due <= 0} title={!selectedSupplier ? "Select a supplier first" : totals.due <= 0 ? "Already fully paid" : "Record supplier payment"} className={cn("h-7 px-3 rounded text-white text-[9px] font-semibold flex items-center gap-1 transition shadow-sm", (!selectedSupplier || totals.due <= 0) && "opacity-40 cursor-not-allowed")} style={{ backgroundColor: BLUE }}><CreditCard className="h-3 w-3" /> Payment <kbd className="text-[7px] bg-white/20 px-0.5 rounded">F5</kbd></button>
             {/* Phase 4: New Supplier + Catalog buttons */}
             <button onClick={() => setShowNewSupplier(true)} title="Add a new supplier to the system" className="h-7 px-3 rounded text-white text-[9px] font-semibold flex items-center gap-1 transition shadow-sm" style={{ backgroundColor: '#16A34A' }}><Plus className="h-3 w-3" /> New Supplier</button>
+            <button
+              onClick={() => { if (selectedSupplier) { setEditSupplier(selectedSupplier); setShowNewSupplier(true); } else { toast({ title: "Select a supplier first", variant: "destructive" }); } }}
+              disabled={!selectedSupplier}
+              title={!selectedSupplier ? "Select a supplier first to edit their details" : "Edit the selected supplier's details (name, contact, address, etc.)"}
+              className={cn("h-7 px-3 rounded text-white text-[9px] font-semibold flex items-center gap-1 transition shadow-sm", !selectedSupplier && "opacity-40 cursor-not-allowed")}
+              style={{ backgroundColor: '#EA580C' }}
+            ><Edit2 className="h-3 w-3" /> Edit Supplier</button>
+            <button
+              onClick={handleDeleteSupplier}
+              disabled={!selectedSupplier}
+              title={!selectedSupplier ? "Select a supplier first to deactivate" : "Deactivate the selected supplier (soft delete — preserves history)"}
+              className={cn("h-7 px-3 rounded text-white text-[9px] font-semibold flex items-center gap-1 transition shadow-sm", !selectedSupplier && "opacity-40 cursor-not-allowed")}
+              style={{ backgroundColor: '#DC2626' }}
+            ><Trash2 className="h-3 w-3" /> Delete Supplier</button>
+            <button
+              onClick={() => setShowHistoryDialog(true)}
+              disabled={!selectedSupplier}
+              title={!selectedSupplier ? "Select a supplier first" : "View purchase + payment history for this supplier"}
+              className={cn("h-7 px-3 rounded text-white text-[9px] font-semibold flex items-center gap-1 transition shadow-sm", !selectedSupplier && "opacity-40 cursor-not-allowed")}
+              style={{ backgroundColor: '#0891B2' }}
+            ><Hash className="h-3 w-3" /> History</button>
             <button onClick={() => setShowCatalogDialog(true)} disabled={!selectedSupplier} title={!selectedSupplier ? "Select a supplier first to manage their catalog" : "Manage this supplier's product catalog — products added here appear in the Find Part No search"} className={cn("h-7 px-3 rounded text-white text-[9px] font-semibold flex items-center gap-1 transition shadow-sm", !selectedSupplier && "opacity-40 cursor-not-allowed")} style={{ backgroundColor: '#9333EA' }}>
               <Package className="h-3 w-3" /> Catalog
               {supplierCatalog.length > 0 && <Badge className="ml-0.5 h-3 px-1 text-[8px] bg-white/30 text-white border-0">{supplierCatalog.length}</Badge>}
@@ -565,18 +665,38 @@ export function SupplierForm({ onBack, products }: SupplierFormProps) {
               suppliers={suppliers}
               searchText={supplierDetails}
               onSelect={handleSelectSupplier}
-              onNew={() => { setShowSupplierList(false); setShowNewSupplier(true); }}
+              onNew={() => { setShowSupplierList(false); setEditSupplier(null); setShowNewSupplier(true); }}
+              onNotes={(s) => { setShowSupplierList(false); setSelectedSupplier(s); setSupplierDetails(s.name); setShowNotesDialog(true); }}
+              onHistory={(s) => { setShowSupplierList(false); setSelectedSupplier(s); setSupplierDetails(s.name); setShowHistoryDialog(true); }}
+              onEmail={(s) => { setShowSupplierList(false); setSelectedSupplier(s); setSupplierDetails(s.name); setShowEmailDialog(true); }}
+              onEdit={(s) => { setShowSupplierList(false); setSelectedSupplier(s); setSupplierDetails(s.name); setEditSupplier(s); setShowNewSupplier(true); }}
+              onDelete={async (s) => {
+                if (!window.confirm(`Deactivate supplier "${s.name}"?\n\nExisting purchase + payment history is preserved. The supplier will no longer appear in dropdowns.`)) return;
+                try {
+                  const res = await fetch(`/api/suppliers/${s.id}`, { method: "DELETE", credentials: "include" });
+                  const data = await res.json();
+                  if (res.ok && data.success) {
+                    toast({ title: "Supplier deactivated", description: `${s.name} (${s.code})` });
+                    setSuppliers(prev => prev.filter(x => x.id !== s.id));
+                  } else {
+                    throw new Error(data.error || `HTTP ${res.status}`);
+                  }
+                } catch (e: any) {
+                  toast({ title: "Failed to delete", description: e?.message, variant: "destructive" });
+                }
+              }}
               onClose={() => setShowSupplierList(false)}
             />
           )}
         </AnimatePresence>
 
-        {/* New Supplier Popup */}
+        {/* New / Edit Supplier Popup */}
         <AnimatePresence>
           {showNewSupplier && (
             <NewSupplierPopup
-              onSave={handleSaveNewSupplier}
-              onClose={() => setShowNewSupplier(false)}
+              editSupplier={editSupplier}
+              onSave={editSupplier ? handleEditSupplierSave : handleSaveNewSupplier}
+              onClose={() => { setShowNewSupplier(false); setEditSupplier(null); }}
             />
           )}
         </AnimatePresence>
@@ -616,6 +736,27 @@ export function SupplierForm({ onBack, products }: SupplierFormProps) {
           supplierName={selectedSupplier?.name || ""}
           supplierEmail={selectedSupplier?.email}
           supplierContactName={selectedSupplier?.contactName}
+        />
+
+        <SupplierNotesDialog
+          open={showNotesDialog}
+          onOpenChange={setShowNotesDialog}
+          supplierId={selectedSupplier?.id || null}
+          supplierName={selectedSupplier?.name || ""}
+          initialNotes={selectedSupplier?.notes || ""}
+          onSaved={() => {
+            // Refresh the supplier's notes in local state
+            if (selectedSupplier) {
+              setSelectedSupplier({ ...selectedSupplier, notes: selectedSupplier.notes });
+            }
+          }}
+        />
+
+        <SupplierHistoryDialog
+          open={showHistoryDialog}
+          onOpenChange={setShowHistoryDialog}
+          supplierId={selectedSupplier?.id || null}
+          supplierName={selectedSupplier?.name || ""}
         />
 
         <PurchasePaymentDialog
@@ -874,11 +1015,16 @@ function StockListMiniPopup({ products, searchText, onSelect, onClose }: {
 }
 
 // ===== Supplier List Popup =====
-function SupplierListPopup({ suppliers, searchText, onSelect, onNew, onClose }: {
+function SupplierListPopup({ suppliers, searchText, onSelect, onNew, onNotes, onHistory, onEmail, onEdit, onDelete, onClose }: {
   suppliers: Supplier[];
   searchText: string;
   onSelect: (s: Supplier) => void;
   onNew: () => void;
+  onNotes?: (s: Supplier) => void;
+  onHistory?: (s: Supplier) => void;
+  onEmail?: (s: Supplier) => void;
+  onEdit?: (s: Supplier) => void;
+  onDelete?: (s: Supplier) => void;
   onClose: () => void;
 }) {
   const { toast } = useToast();
@@ -969,7 +1115,7 @@ function SupplierListPopup({ suppliers, searchText, onSelect, onNew, onClose }: 
         <div className="flex-shrink-0 flex items-center justify-between px-3 h-8 text-white" style={{ background: 'linear-gradient(to bottom, #004488, #003366)' }}>
           <div className="flex items-center gap-1.5">
             <FileText className="h-3.5 w-3.5" />
-            <span className="text-xs font-bold">Supplier List ({totalCount})</span>
+            <span className="text-xs font-bold">Supplier List ({filteredCount === totalCount ? `${totalCount}` : `${filteredCount} of ${totalCount}`})</span>
           </div>
           <button onClick={onClose} className="h-5 w-5 rounded bg-red-600 hover:bg-red-700 flex items-center justify-center transition">
             <X className="h-3 w-3 text-white" />
@@ -1084,13 +1230,14 @@ function SupplierListPopup({ suppliers, searchText, onSelect, onNew, onClose }: 
         <div className="flex-shrink-0 px-2 py-2 flex items-center gap-1 border-t border-slate-300 bg-white overflow-x-auto">
           <IconButton label="Select" shortcut="Enter" color="#4CAF50" onClick={handleSelect} disabled={!selectedSupplier} icon={<Check className="h-4 w-4 text-white" />} />
           <IconButton label="New" color="#2196F3" onClick={onNew} icon={<Plus className="h-4 w-4 text-white" />} />
-          <IconButton label="Notes" color="#9C27B0" onClick={() => selectedSupplier ? toast({ title: "Notes", description: selectedSupplier.notes || 'No notes for this supplier' }) : toast({ title: "Select a supplier first", variant: "destructive" })} disabled={!selectedSupplier} icon={<StickyNote className="h-4 w-4 text-white" />} />
-          <IconButton label="History" color="#2196F3" onClick={() => selectedSupplier ? toast({ title: "History", description: `Transaction history for ${selectedSupplier.name}` }) : toast({ title: "Select a supplier first", variant: "destructive" })} disabled={!selectedSupplier} icon={<Hash className="h-4 w-4 text-white" />} />
-          <IconButton label="Delete" color="#9E9E9E" onClick={() => selectedSupplier ? toast({ title: "Delete", description: `Use the supplier form's Delete button to deactivate ${selectedSupplier.name}` }) : toast({ title: "Select a supplier first", variant: "destructive" })} disabled={!selectedSupplier} icon={<Trash2 className="h-4 w-4 text-white" />} />
-          <IconButton label="Mail" color="#2196F3" onClick={() => selectedSupplier ? toast({ title: "Mail", description: `Compose email to ${selectedSupplier.name}` }) : toast({ title: "Select a supplier first", variant: "destructive" })} disabled={!selectedSupplier} icon={<Mail className="h-4 w-4 text-white" />} />
-          <IconButton label="Email" color="#4CAF50" onClick={() => selectedSupplier ? toast({ title: "Email", description: `Send email to ${selectedSupplier.email || '(no email on file)'}` }) : toast({ title: "Select a supplier first", variant: "destructive" })} disabled={!selectedSupplier} icon={<Mail className="h-4 w-4 text-white" />} />
-          <IconButton label="Labels" color="#2196F3" onClick={() => toast({ title: "Labels", description: "Print address labels for selected supplier" })} disabled={!selectedSupplier} icon={<FileText className="h-4 w-4 text-white" />} />
-          <IconButton label="Envelope" shortcut="F3" color="#2196F3" onClick={() => toast({ title: "Envelope (F3)", description: "Print envelope for selected supplier" })} disabled={!selectedSupplier} icon={<Printer className="h-4 w-4 text-white" />} />
+          <IconButton label="Notes" color="#9C27B0" onClick={() => selectedSupplier ? (onNotes ? onNotes(selectedSupplier) : toast({ title: "Notes", description: selectedSupplier.notes || 'No notes for this supplier' })) : toast({ title: "Select a supplier first", variant: "destructive" })} disabled={!selectedSupplier} icon={<StickyNote className="h-4 w-4 text-white" />} />
+          <IconButton label="History" color="#2196F3" onClick={() => selectedSupplier ? (onHistory ? onHistory(selectedSupplier) : toast({ title: "History", description: `Transaction history for ${selectedSupplier.name}` })) : toast({ title: "Select a supplier first", variant: "destructive" })} disabled={!selectedSupplier} icon={<Hash className="h-4 w-4 text-white" />} />
+          <IconButton label="Edit" color="#EA580C" onClick={() => selectedSupplier ? (onEdit ? onEdit(selectedSupplier) : toast({ title: "Edit", description: `Edit ${selectedSupplier.name}` })) : toast({ title: "Select a supplier first", variant: "destructive" })} disabled={!selectedSupplier} icon={<Edit2 className="h-4 w-4 text-white" />} />
+          <IconButton label="Delete" color="#DC2626" onClick={() => selectedSupplier ? (onDelete ? onDelete(selectedSupplier) : toast({ title: "Delete", description: `Deactivate ${selectedSupplier.name}` })) : toast({ title: "Select a supplier first", variant: "destructive" })} disabled={!selectedSupplier} icon={<Trash2 className="h-4 w-4 text-white" />} />
+          <IconButton label="Mail" color="#2196F3" onClick={() => selectedSupplier ? (onEmail ? onEmail(selectedSupplier) : toast({ title: "Mail", description: `Compose email to ${selectedSupplier.name}` })) : toast({ title: "Select a supplier first", variant: "destructive" })} disabled={!selectedSupplier} icon={<Mail className="h-4 w-4 text-white" />} />
+          <IconButton label="Email" color="#4CAF50" onClick={() => selectedSupplier ? (onEmail ? onEmail(selectedSupplier) : toast({ title: "Email", description: `Send email to ${selectedSupplier.email || '(no email on file)'}` })) : toast({ title: "Select a supplier first", variant: "destructive" })} disabled={!selectedSupplier} icon={<Mail className="h-4 w-4 text-white" />} />
+          <IconButton label="Labels" color="#2196F3" onClick={() => selectedSupplier ? toast({ title: "Labels", description: `Print address labels for ${selectedSupplier.name}` }) : toast({ title: "Select a supplier first", variant: "destructive" })} disabled={!selectedSupplier} icon={<FileText className="h-4 w-4 text-white" />} />
+          <IconButton label="Envelope" shortcut="F3" color="#2196F3" onClick={() => selectedSupplier ? toast({ title: "Envelope (F3)", description: `Print envelope for ${selectedSupplier.name}` }) : toast({ title: "Select a supplier first", variant: "destructive" })} disabled={!selectedSupplier} icon={<Printer className="h-4 w-4 text-white" />} />
           <div className="flex-1" />
           <IconButton label="Close" shortcut="Esc" color="#F44336" onClick={onClose} icon={<X className="h-4 w-4 text-white" />} />
         </div>
@@ -1098,11 +1245,12 @@ function SupplierListPopup({ suppliers, searchText, onSelect, onNew, onClose }: 
     </motion.div>
   );
 }
-// ===== New Supplier Popup =====
-function NewSupplierPopup({ onSave, onClose }: { onSave: (s: Supplier) => void; onClose: () => void; }) {
+// ===== New / Edit Supplier Popup =====
+function NewSupplierPopup({ onSave, onClose, editSupplier }: { onSave: (s: Supplier) => void; onClose: () => void; editSupplier?: Supplier | null; }) {
   const { toast } = useToast();
   const [tab, setTab] = useState<"trading" | "history" | "notes">("trading");
-  const [form, setForm] = useState<Supplier>({
+  const isEditMode = !!editSupplier;
+  const [form, setForm] = useState<Supplier>(editSupplier || {
     id: `s-${Date.now()}`, code: String(Date.now()).slice(-5), name: "", address: "", city: "", state: "", country: "Ghana", phone: "", mobile: "", fax: "", email: "", contactName: "", businessNo: "", title: "Mr", tradingTerms: "Net 30", creditLimit: 0, balance: 0, taxInclusive: false, notes: "",
   });
 
@@ -1127,7 +1275,7 @@ function NewSupplierPopup({ onSave, onClose }: { onSave: (s: Supplier) => void; 
       <motion.div initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }} onClick={(e) => e.stopPropagation()} className="bg-white rounded-lg shadow-2xl overflow-hidden flex flex-col w-full" style={{ width: '100%', maxWidth: '680px', maxHeight: '85vh', fontFamily: 'Arial, Helvetica, sans-serif' }}>
         {/* Title Bar */}
         <div className="flex-shrink-0 flex items-center justify-between px-3 h-7 text-white" style={{ backgroundColor: BLUE }}>
-          <span className="text-xs font-bold">New Supplier</span>
+          <span className="text-xs font-bold">{isEditMode ? `Edit Supplier — ${editSupplier?.name}` : "New Supplier"}</span>
           <button onClick={onClose} className="h-5 w-5 rounded bg-red-600 hover:bg-red-700 flex items-center justify-center transition"><X className="h-3 w-3 text-white" /></button>
         </div>
         {/* Top Header Row */}
@@ -1172,7 +1320,7 @@ function NewSupplierPopup({ onSave, onClose }: { onSave: (s: Supplier) => void; 
         {/* Action Buttons */}
         <div className="flex-shrink-0 px-3 py-1.5 flex items-center justify-end gap-2 border-t border-slate-300" style={{ backgroundColor: '#F0F0F0' }}>
           <button onClick={onClose} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1 transition" style={{ backgroundColor: '#F44336' }}><X className="h-3 w-3" /> Close (Esc)</button>
-          <button type="button" onClick={handleSave} disabled={!form.name} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1 transition disabled:opacity-50" style={{ backgroundColor: BLUE }}><Save className="h-3 w-3" /> Save (F2)</button>
+          <button type="button" onClick={handleSave} disabled={!form.name} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1 transition disabled:opacity-50" style={{ backgroundColor: BLUE }}><Save className="h-3 w-3" /> {isEditMode ? "Update (F2)" : "Save (F2)"}</button>
         </div>
       </motion.div>
     </motion.div>
