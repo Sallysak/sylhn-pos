@@ -293,6 +293,7 @@ export function SupplierForm({ onBack, products }: SupplierFormProps) {
       total: totals.grandTotal,
       amountPaid: paidAmount,
       notes: "",
+      createdBy: salesperson || "system",  // FIX: zod PurchaseSchema requires createdBy (string)
       items: lines.map(l => ({
         productId: (l as any).productId || null,
         partNo: l.partNo,
