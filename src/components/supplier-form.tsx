@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { useSession } from "@/hooks/use-session";
+import { getCachedUser } from "@/lib/session-data";
 import { cn } from "@/lib/utils";
 import { COMPANY, CURRENCY, formatGHS, type Product } from "@/lib/pos-data";
 import { PopupWindow } from "@/components/popup-window";
@@ -81,8 +82,11 @@ const BLUE = "#0078D7";
 export function SupplierForm({ onBack, products }: SupplierFormProps) {
   const { toast } = useToast();
   const { user: sessionUser } = useSession();
-  // Only admins + managers can edit or delete supplier records
-  const canEditSupplier = sessionUser?.role === "admin" || sessionUser?.role === "manager";
+  // Only admins + managers can edit or delete supplier records.
+  // Fallback to getCachedUser() (reads localStorage directly) in case
+  // useSession hasn't loaded yet (timing issue with lazy-loaded components).
+  const effectiveUser = sessionUser || getCachedUser();
+  const canEditSupplier = effectiveUser?.role === "admin" || effectiveUser?.role === "manager";
   // Premium fix: start with bundled initialSuppliers for instant render,
   // then fetch from /api/suppliers on mount and replace the list.
   const [suppliers, setSuppliers] = useState<Supplier[]>(initialSuppliers);

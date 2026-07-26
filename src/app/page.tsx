@@ -212,6 +212,44 @@ export default function POSPage() {
     }
     return initialStockHistory;
   });
+  // Suppliers — fetch from API on mount, fallback to initialSuppliers
+  const [suppliers, setSuppliers] = useState<any[]>(initialSuppliers);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/suppliers', { credentials: 'include' });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+        if (data.suppliers && data.suppliers.length > 0) {
+          const mapped = data.suppliers.map((s: any) => ({
+            id: s.id,
+            code: s.code,
+            name: s.name,
+            address: s.address || '',
+            city: s.city || '',
+            state: s.state || '',
+            country: s.country || 'Ghana',
+            phone: s.phone || '',
+            mobile: s.mobile || '',
+            fax: s.fax || '',
+            email: s.email || '',
+            contactName: s.contactName || '',
+            businessNo: s.businessNo || '',
+            title: '',
+            tradingTerms: s.tradingTerms || 'Net 30',
+            creditLimit: s.creditLimit || 0,
+            balance: s.balance || 0,
+            taxInclusive: s.taxInclusive || false,
+            notes: s.notes || '',
+          }));
+          setSuppliers(mapped);
+        }
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // ===== POS State =====
   const [activeCategory, setActiveCategory] = useState<string>("all");
@@ -1857,7 +1895,7 @@ export default function POSPage() {
   if (view === "purchase-form") {
     return (
       <>
-        <PurchaseForm onBack={() => setView("pos")} products={products} groups={groups} suppliers={initialSuppliers} />
+        <PurchaseForm onBack={() => setView("pos")} products={products} groups={groups} suppliers={suppliers} />
         <MobileNav
           active={view}
           onNavigate={(v) => { if (v === "cart") setMobileCartOpen(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}

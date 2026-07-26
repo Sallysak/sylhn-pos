@@ -132,6 +132,8 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
   const [selectedLine, setSelectedLine] = useState<number | null>(null);
   const [findPartNo, setFindPartNo] = useState("");
   const [onHand, setOnHand] = useState(0);
+  // Supplier's catalog (loaded when a supplier is selected) — drives the Find Part No search
+  const [supplierCatalog, setSupplierCatalog] = useState<any[]>([]);
   const [bin, setBin] = useState("");
   const [showStockList, setShowStockList] = useState(false);
   const [listPopupMode, setListPopupMode] = useState<ListPopupMode>('none');
@@ -555,7 +557,7 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
       setLines(prev => prev.map((l, i) => i === existingIdx ? { ...l, quantity: l.quantity + 1, total: (l.quantity + 1) * l.cost } : l));
       toast({ title: "Quantity updated", description: `${product.emoji} ${product.name} qty +1` });
     } else {
-      setLines(prev => [...prev, { id: `line-${Date.now()}`, partNo: product.sku, details: `${product.emoji} ${product.name}`, emoji: product.emoji, quantity: 1, cost: product.costPrice, expiry: product.expiryDate, tax: product.taxable, total: product.costPrice }]);
+      setLines(prev => [...prev, { id: `line-${Date.now()}`, partNo: product.sku, details: `${product.emoji} ${product.name}`, emoji: product.emoji, quantity: 1, cost: product.costPrice, expiry: product.expiryDate, tax: product.taxable, total: product.costPrice, productId: product.id }]);
       toast({ title: "Product added", description: `${product.emoji} ${product.name}` });
     }
     setFindPartNo(""); setShowStockList(false); setOnHand(0); setBin(""); setSaved(false);
@@ -967,6 +969,20 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
                     if (typeof matched.balance === 'number') setBalance(matched.balance);
                     if (typeof matched.creditLimit === 'number') setLimit(matched.creditLimit);
                     if (typeof matched.taxInclusive === 'boolean') setTaxInclusive(matched.taxInclusive);
+                    // Load this supplier's catalog so Find Part No shows catalog items first
+                    fetch(`/api/suppliers/${matched.id}/products`, { credentials: "include" })
+                      .then(r => r.json())
+                      .then(data => {
+                        if (data.catalog) {
+                          setSupplierCatalog(data.catalog);
+                          if (data.catalog.length > 0) {
+                            toast({ title: "Catalog loaded", description: `${data.catalog.length} product(s) in ${matched.name}'s catalog` });
+                          }
+                        }
+                      })
+                      .catch(() => setSupplierCatalog([]));
+                  } else {
+                    setSupplierCatalog([]);
                   }
                 }}
                 className="h-6 px-1.5 text-[10px] border border-slate-400 rounded bg-white outline-none focus:ring-1 focus:ring-green-400 min-w-[140px]"
@@ -1361,7 +1377,25 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
         {/* Stock List Popup (legacy, kept for fallback) */}
         <AnimatePresence>
           {showStockList && (
-            <StockListMiniPopup products={products} searchText={findPartNo} onSelect={addProductToLine} onClose={() => setShowStockList(false)} />
+            <StockListMiniPopup
+              products={(() => {
+                // If supplier has a catalog, show catalog items first with supplier's cost
+                if (supplierCatalog.length > 0) {
+                  const catalogProductIds = new Set(supplierCatalog.map((c: any) => c.productId));
+                  const catalogProducts = supplierCatalog.map((c: any) => ({
+                    ...c.product,
+                    costPrice: c.supplierCost,
+                    sku: c.supplierSku || c.product.sku,
+                  } as Product));
+                  const otherProducts = products.filter(p => !catalogProductIds.has(p.id));
+                  return [...catalogProducts, ...otherProducts];
+                }
+                return products;
+              })()}
+              searchText={findPartNo}
+              onSelect={addProductToLine}
+              onClose={() => setShowStockList(false)}
+            />
           )}
         </AnimatePresence>
 
