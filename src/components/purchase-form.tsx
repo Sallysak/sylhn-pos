@@ -13,6 +13,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { COMPANY, CURRENCY, formatGHS, type Product, type StockGroup } from "@/lib/pos-data";
+import { computeGhanaTax, GHANA_TAX_RATES } from "@/lib/ghana-tax";
 import { PopupWindow } from "@/components/popup-window";
 import { PurchaseListPopup, type PurchaseListRow } from "@/components/purchase-list-popup";
 import { PurchaseOrderListPopup, type PurchaseOrderListRow } from "@/components/purchase-order-list-popup";
@@ -148,6 +149,11 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
   const [showShortcutsOverlay, setShowShortcutsOverlay] = useState(false);
   // Track the current PO status for the status badge
   const [purchaseStatus, setPurchaseStatus] = useState<string>("draft");
+  // Phase 3: Form-level status (what status to save with). Defaults to "received"
+  // for backwards compat — user can change to "draft" or "ordered" to use GRN workflow
+  const [formStatus, setFormStatus] = useState<"draft" | "ordered" | "received">("received");
+  // Phase 3: Approval threshold (POs over this amount need manager approval before receiving)
+  const APPROVAL_THRESHOLD = 5000;
   // Phase 2: currency + landed costs
   const [currency, setCurrency] = useState<string>("GHS");
   const [exchangeRate, setExchangeRate] = useState<number>(1);
@@ -399,6 +405,15 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
     return { totalQty, totalGross, totalDiscount, totalTax, totalCost: totalNet, landedCosts, grandTotal, due };
   }, [lines, taxInclusive, paidAmount, currency, freightCost, insuranceCost, customsDuty, otherLandedCosts]);
 
+  // Phase 3: Approval threshold check
+  const requiresApproval = totals.grandTotal > APPROVAL_THRESHOLD && formStatus === "received" && !savedPurchaseId;
+
+  // Phase 3: Ghana tax breakdown for the totals panel
+  const taxBreakdown = useMemo(() => {
+    const taxableAmount = totals.totalCost - totals.totalDiscount;
+    return computeGhanaTax(taxableAmount);
+  }, [totals.totalCost, totals.totalDiscount]);
+
   const handleFindPartNo = (value: string) => {
     setFindPartNo(value);
     // When user types in Find Part No, open the appropriate list popup based on docType:
@@ -576,7 +591,7 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
       type: 'purchase' as const,
       supplierId: supplierObj?.id || null,
       supplierName: supplier || '',
-      status: 'received' as const,
+      status: formStatus,
       subtotal: totals.totalCost,
       discount: totals.totalDiscount,
       taxAmount: totals.totalTax,
@@ -659,6 +674,13 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
 
   const handlePrint = () => {
     if (lines.length === 0) { toast({ title: "Nothing to print", variant: "destructive" }); return; }
+    // Phase 3: if the purchase is saved, open the branded PDF view
+    if (savedPurchaseId) {
+      window.open(`/api/purchases/${savedPurchaseId}/pdf`, "_blank");
+      toast({ title: "Opening branded PDF (F3)", description: savedRefNo || invoiceNo });
+      return;
+    }
+    // Fallback: inline print template for unsaved purchases
     // Open a print window with only the report content
     const printWin = window.open('', '_blank', 'width=800,height=600');
     if (!printWin) { toast({ title: "Popup blocked", description: "Allow popups to print", variant: "destructive" }); return; }
@@ -845,8 +867,25 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
                 <option value="Quote">Quote</option>
                 <option value="Order">Order</option>
               </select>
+              {/* Phase 3: Status dropdown (GRN workflow) */}
+              <select
+                value={formStatus}
+                onChange={(e) => setFormStatus(e.target.value as any)}
+                disabled={!!savedPurchaseId}
+                title={savedPurchaseId ? "Status is managed by the workflow (use Receive/Approve buttons)" : "Save status: Draft (no stock change), Ordered (PO sent, no stock yet), Received (stock increments now)"}
+                className="bg-white/15 border border-white/20 rounded px-1.5 py-0.5 text-[10px] text-white font-bold outline-none disabled:opacity-60"
+              >
+                <option value="draft">Draft</option>
+                <option value="ordered">Ordered</option>
+                <option value="received">Received</option>
+              </select>
               <Badge variant="secondary" className="bg-white/25 text-white text-[9px]">{invoiceNo}</Badge>
               {saved && <Badge variant="secondary" className="bg-green-200 text-green-800 text-[9px]">✓ Saved</Badge>}
+              {requiresApproval && (
+                <Badge className="bg-amber-400 text-amber-950 text-[9px] animate-pulse">
+                  <Shield className="h-2.5 w-2.5 mr-0.5" /> Needs approval (₵{APPROVAL_THRESHOLD}+)
+                </Badge>
+              )}
             </div>
             <div className="flex items-center gap-2 text-[10px]">
               <div className="flex items-center gap-1">
@@ -951,6 +990,15 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
               ) : null;
             })()}
           </div>
+
+          {/* Phase 3: Approval warning banner */}
+          {requiresApproval && (
+            <div className="flex-shrink-0 px-3 py-1.5 bg-amber-50 border-b border-amber-200 flex items-center gap-2 text-[10px] text-amber-800">
+              <Shield className="h-3.5 w-3.5 shrink-0" />
+              <span className="font-semibold">Approval required:</span>
+              <span>This PO is over ₵{APPROVAL_THRESHOLD.toFixed(2)}. Save as <strong>Ordered</strong> instead of Received, then ask a manager to click <strong>Approve</strong> before receiving goods.</span>
+            </div>
+          )}
 
           {/* Order + Delivery Panels */}
           <div className="flex-shrink-0 px-3 py-1.5 flex items-start gap-3 border-b border-slate-200">
@@ -1197,7 +1245,10 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
             <div className="flex-1 flex items-center justify-end gap-1.5 flex-wrap">
               <div className="text-right"><label className="text-[8px] font-bold text-slate-600 block">Total Qty</label><input value={totals.totalQty} readOnly className="w-12 h-5 px-1 text-[9px] font-mono border border-slate-300 rounded bg-white outline-none text-center" /></div>
               <div className="text-right"><label className="text-[8px] font-bold text-slate-600 block">Disc ₵</label><input value={totals.totalDiscount.toFixed(2)} readOnly className="w-14 h-5 px-1 text-[9px] font-mono border border-slate-300 rounded bg-emerald-50 outline-none text-right text-emerald-700" /></div>
-              <div className="text-right"><label className="text-[8px] font-bold text-slate-600 block">Tax ₵</label><input value={totals.totalTax.toFixed(2)} readOnly className="w-14 h-5 px-1 text-[9px] font-mono border border-slate-300 rounded bg-white outline-none text-right" /></div>
+              <div className="text-right" title={`VAT 15%: ₵${taxBreakdown.components.find(c=>c.name==='VAT')?.amount.toFixed(2) || '0.00'}\nNHIL 2.5%: ₵${taxBreakdown.components.find(c=>c.name==='NHIL')?.amount.toFixed(2) || '0.00'}\nGETFL 2.5%: ₵${taxBreakdown.components.find(c=>c.name==='GETFL')?.amount.toFixed(2) || '0.00'}`}>
+                <label className="text-[8px] font-bold text-slate-600 block">Tax ₵</label>
+                <input value={totals.totalTax.toFixed(2)} readOnly className="w-14 h-5 px-1 text-[9px] font-mono border border-slate-300 rounded bg-white outline-none text-right" />
+              </div>
               <div className="text-right"><label className="text-[8px] font-bold text-slate-600 block">Landed ₵</label><input value={totals.landedCosts.toFixed(2)} readOnly className="w-14 h-5 px-1 text-[9px] font-mono border border-slate-300 rounded bg-white outline-none text-right" /></div>
               <div className="text-right"><label className="text-[8px] font-bold text-slate-600 block">Total</label><input value={totals.grandTotal.toFixed(2)} readOnly className="w-16 h-5 px-1 text-[9px] font-mono font-bold border border-slate-400 rounded outline-none text-right" style={{ backgroundColor: '#E6F0FF' }} /></div>
               <div className="text-right"><label className="text-[8px] font-bold text-slate-600 block">Paid ₵</label><input type="number" value={paidAmount || ''} onChange={(e) => setPaidAmount(parseFloat(e.target.value) || 0)} className="w-16 h-5 px-1 text-[9px] font-mono border border-slate-400 rounded bg-white outline-none text-right" placeholder="0.00" /></div>
