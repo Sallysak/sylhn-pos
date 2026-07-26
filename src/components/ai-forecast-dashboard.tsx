@@ -13,14 +13,19 @@ import { cn } from "@/lib/utils";
 
 interface ForecastItem {
   productId: string;
-  productName: string;
+  name: string;
   emoji: string;
+  sku: string;
   currentStock: number;
-  predictedDemand: number;
-  recommendedOrder: number;
-  confidence: number;
-  trend: "up" | "down" | "stable";
-  daysUntilStockout: number | null;
+  projectedDemand: number;
+  recommendedReorderQty: number;
+  confidenceScore: number;
+  trend: string;
+  projectedStockoutDays: number | null;
+  urgency: string;
+  avgDailyVelocity: number;
+  costPrice: number;
+  sellingPrice: number;
 }
 
 interface AIForecastDashboardProps {
@@ -54,8 +59,8 @@ export function AIForecastDashboard({ open, onOpenChange }: AIForecastDashboardP
   };
 
   const topPicks = forecasts.slice(0, 20);
-  const urgentRestock = forecasts.filter(f => f.daysUntilStockout !== null && f.daysUntilStockout <= 7);
-  const surplus = forecasts.filter(f => f.currentStock > f.predictedDemand * 2 && f.predictedDemand > 0);
+  const urgentRestock = forecasts.filter(f => f.projectedStockoutDays !== null && f.projectedStockoutDays <= 7);
+  const surplus = forecasts.filter(f => f.currentStock > f.projectedDemand * 2 && f.projectedDemand > 0);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -118,30 +123,32 @@ export function AIForecastDashboard({ open, onOpenChange }: AIForecastDashboardP
                 {topPicks.map(f => (
                   <div key={f.productId} className={cn(
                     "flex items-center gap-3 p-2.5 rounded-lg border transition",
-                    f.daysUntilStockout !== null && f.daysUntilStockout <= 7
+                    f.projectedStockoutDays !== null && f.projectedStockoutDays <= 7
                       ? "bg-rose-50 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900/40"
-                      : f.currentStock > f.predictedDemand * 2
+                      : f.currentStock > f.projectedDemand * 2
                       ? "bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/40"
                       : "bg-slate-50 dark:bg-slate-800/50 border-slate-100 dark:border-slate-700"
                   )}>
                     <span className="text-lg shrink-0">{f.emoji || "📦"}</span>
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-semibold truncate">{f.productName}</div>
+                      <div className="text-sm font-semibold truncate">{f.name}</div>
                       <div className="text-[10px] text-slate-500 flex items-center gap-2">
-                        <span>Stock: {f.currentStock}</span>
-                        <span>· Predicted: {f.predictedDemand}</span>
-                        {f.daysUntilStockout !== null && <span className={cn("font-bold", f.daysUntilStockout <= 7 && "text-rose-600")}>· Stockout in {f.daysUntilStockout}d</span>}
+                        <span>SKU: {f.sku}</span>
+                        <span>· Stock: {f.currentStock}</span>
+                        <span>· Demand: {f.projectedDemand}</span>
+                        <span>· {f.avgDailyVelocity.toFixed(1)}/day</span>
+                        {f.projectedStockoutDays !== null && <span className={cn("font-bold", f.projectedStockoutDays <= 7 && "text-rose-600")}>· Stockout in {f.projectedStockoutDays}d</span>}
                       </div>
                     </div>
                     {f.trend === "up" ? <TrendingUp className="h-4 w-4 text-emerald-500 shrink-0" />
                      : f.trend === "down" ? <TrendingDown className="h-4 w-4 text-rose-500 shrink-0" />
                      : null}
-                    {f.recommendedOrder > 0 && (
+                    {f.recommendedReorderQty > 0 && (
                       <Badge className="bg-violet-100 text-violet-700 text-[10px] shrink-0">
-                        <ShoppingCart className="h-2.5 w-2.5 mr-0.5" /> Order {f.recommendedOrder}
+                        <ShoppingCart className="h-2.5 w-2.5 mr-0.5" /> Order {f.recommendedReorderQty}
                       </Badge>
                     )}
-                    <div className="text-[9px] text-slate-400 shrink-0">{Math.round(f.confidence * 100)}% conf</div>
+                    <div className="text-[9px] text-slate-400 shrink-0">{isNaN(f.confidenceScore) ? "—" : `${Math.round(f.confidenceScore * 100)}%`} conf</div>
                   </div>
                 ))}
               </div>

@@ -165,6 +165,19 @@ export function StocktakeWizard({ open, onOpenChange, products }: StocktakeWizar
     ));
   };
 
+  // Quick increment (+1)
+  const handleQuickIncrement = (productId: string, delta: number) => {
+    setItems(prev => prev.map(item => {
+      if (item.productId !== productId) return item;
+      const newCount = (item.countedQty ?? 0) + delta;
+      return { ...item, countedQty: newCount, variance: newCount - item.expectedQty };
+    }));
+  };
+
+  // Filter: show only uncounted, or all
+  const [showUncountedOnly, setShowUncountedOnly] = useState(false);
+  const displayItems = showUncountedOnly ? items.filter(i => i.countedQty === null) : items;
+
   // Step 3: Review variances
   const handleReview = () => {
     const counted = items.filter(i => i.countedQty !== null);
@@ -292,17 +305,20 @@ export function StocktakeWizard({ open, onOpenChange, products }: StocktakeWizar
                   </Button>
                 </div>
 
-                {/* Progress */}
+                {/* Progress + filter */}
                 <div className="flex items-center gap-2 text-xs">
                   <Badge className="bg-emerald-100 text-emerald-700">{countedCount} counted</Badge>
                   <Badge className="bg-amber-100 text-amber-700">{uncountedCount} remaining</Badge>
+                  <Button size="sm" variant="outline" onClick={() => setShowUncountedOnly(!showUncountedOnly)} className="h-6 text-[10px]">
+                    {showUncountedOnly ? "Show All" : "Show Uncounted Only"}
+                  </Button>
                 </div>
 
                 {/* Items list */}
                 <div className="max-h-72 overflow-y-auto space-y-1 border border-slate-200 dark:border-slate-700 rounded-lg p-1.5">
-                  {items.map(item => (
+                  {displayItems.map(item => (
                     <div key={item.productId} className={cn(
-                      "flex items-center gap-2 p-1.5 rounded-md transition",
+                      "flex items-center gap-2 p-2 rounded-md transition",
                       item.countedQty !== null ? "bg-emerald-50 dark:bg-emerald-950/20" : "bg-white dark:bg-slate-800/50"
                     )}>
                       <span className="text-base shrink-0">{item.emoji}</span>
@@ -310,22 +326,29 @@ export function StocktakeWizard({ open, onOpenChange, products }: StocktakeWizar
                         <div className="text-xs font-semibold truncate">{item.productName}</div>
                         <div className="text-[9px] text-slate-500 font-mono">{item.sku} · expected: {item.expectedQty}</div>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <Input
-                          type="number"
-                          value={item.countedQty ?? ""}
-                          onChange={(e) => handleManualCount(item.productId, parseInt(e.target.value) || 0)}
-                          placeholder="—"
-                          className="h-7 w-14 text-xs text-center font-mono"
-                        />
-                      </div>
+                      {/* Quick increment buttons */}
+                      <button onClick={() => handleQuickIncrement(item.productId, -1)} className="h-6 w-6 rounded bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 text-xs font-bold transition shrink-0">−</button>
+                      <Input
+                        type="number"
+                        value={item.countedQty ?? ""}
+                        onChange={(e) => handleManualCount(item.productId, parseInt(e.target.value) || 0)}
+                        placeholder="—"
+                        className="h-6 w-14 text-xs text-center font-mono"
+                      />
+                      <button onClick={() => handleQuickIncrement(item.productId, 1)} className="h-6 w-6 rounded bg-emerald-200 dark:bg-emerald-800 hover:bg-emerald-300 dark:hover:bg-emerald-700 text-emerald-700 dark:text-emerald-200 text-xs font-bold transition shrink-0">+</button>
                       {item.variance !== null && item.variance !== 0 && (
-                        <Badge className={cn("text-[9px]", item.variance > 0 ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700")}>
+                        <Badge className={cn("text-[9px] shrink-0", item.variance > 0 ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700")}>
                           {item.variance > 0 ? "+" : ""}{item.variance}
                         </Badge>
                       )}
                     </div>
                   ))}
+                  {displayItems.length === 0 && (
+                    <div className="text-center py-4 text-slate-400 text-xs">
+                      <CheckCircle2 className="h-6 w-6 mx-auto mb-1 text-emerald-500" />
+                      All items counted!
+                    </div>
+                  )}
                 </div>
               </motion.div>
             )}

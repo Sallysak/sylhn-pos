@@ -2697,7 +2697,7 @@ export default function POSPage() {
 
                 {/* Invoice Info Bar — horizontal layout, wraps on mobile */}
                 <div className="flex-shrink-0 px-3 py-1.5 bg-slate-100 border-b border-slate-300 flex items-center gap-3 text-[10px] flex-wrap">
-                  <div className="flex items-center gap-1 relative" style={{ zIndex: 60 }}>
+                  <div className="flex items-center gap-1 relative" style={{ zIndex: 30 }}>
                     <span className="font-semibold text-slate-600">Client:</span>
                     <input
                       value={customerName}
