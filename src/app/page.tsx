@@ -30,6 +30,11 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+} from "@/components/ui/dialog";
+import { OfflineSyncIndicator } from "@/components/offline-sync-indicator";
+import { LabelPrinter } from "@/components/label-printer";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { initialSuppliers } from "@/components/supplier-form";
@@ -255,6 +260,7 @@ export default function POSPage() {
   const [showStdCalc, setShowStdCalc] = useState(false);
   // Premium: Price tags printer
   const [showPriceTags, setShowPriceTags] = useState(false);
+  const [showLabelPrinter, setShowLabelPrinter] = useState(false);
   const [dailyTotal, setDailyTotal] = useState(() => {
     if (typeof window !== 'undefined') { try { return parseFloat(localStorage.getItem('sylhn-daily-total') || '0') || 0; } catch {} }
     return 0;
@@ -2107,6 +2113,8 @@ export default function POSPage() {
 
           {/* Right: Stats + Logout (compact on mobile, full on desktop) */}
           <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
+            {/* Offline sync indicator — always visible, shows online/offline status + queued sales count */}
+            <OfflineSyncIndicator />
             <div className="hidden lg:flex items-center gap-2 text-right">
               <div className="px-2.5 py-1 rounded-lg gradient-premium-glass ring-1 ring-white/25 backdrop-blur-md">
                 <div className="text-[9px] text-emerald-50/80 font-medium tracking-wide">{now ? now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : '--'}</div>
@@ -2147,13 +2155,21 @@ export default function POSPage() {
             >
               <DollarSign className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Cash Calc</span>
             </button>
-            {/* Premium: Price Tags */}
+            {/* Premium: Price Tags (legacy simple version) */}
             <button
               onClick={() => setShowPriceTags(true)}
               className="btn-premium h-9 px-2.5 rounded-lg gradient-premium-glass hover:bg-white/20 ring-1 ring-white/25 text-white text-xs font-bold flex items-center gap-1 transition flex-shrink-0"
-              title="Print Price Tags"
+              title="Print Price Tags (simple)"
             >
               <Printer className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Tags</span>
+            </button>
+            {/* Premium: Label Printer (multi-size + barcode + multi-select) */}
+            <button
+              onClick={() => setShowLabelPrinter(true)}
+              className="btn-premium h-9 px-2.5 rounded-lg gradient-premium-glass hover:bg-white/20 ring-1 ring-white/25 text-white text-xs font-bold flex items-center gap-1 transition flex-shrink-0"
+              title="Print Labels (multi-size + barcode)"
+            >
+              <Tag className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Labels</span>
             </button>
             {/* Premium: AI Assistant button — always visible (mobile + desktop) */}
             <button
@@ -3164,6 +3180,22 @@ export default function POSPage() {
       <AnimatePresence>
         {showPriceTags && <PriceTagsPrinter onClose={() => setShowPriceTags(false)} />}
       </AnimatePresence>
+
+      {/* ===== Label Printer Dialog (multi-size + barcode + multi-select) ===== */}
+      <Dialog open={showLabelPrinter} onOpenChange={setShowLabelPrinter}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Tag className="h-5 w-5 text-violet-600" />
+              Label Printer
+            </DialogTitle>
+            <DialogDescription>
+              Print price tags + barcode labels for shelf display. Supports 30×20mm, 40×30mm, 50×30mm, and 70×40mm label sizes for Zebra, Brother, and Xprinter label printers.
+            </DialogDescription>
+          </DialogHeader>
+          <LabelPrinter products={products} onClose={() => setShowLabelPrinter(false)} />
+        </DialogContent>
+      </Dialog>
 
       {/* ===== Cash Drawer Animation ===== */}
       <AnimatePresence>
