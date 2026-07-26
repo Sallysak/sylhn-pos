@@ -41,6 +41,7 @@ import { StocktakeWizard } from "@/components/stocktake-wizard";
 import { WhatsAppBroadcast } from "@/components/whatsapp-broadcast";
 import { AIForecastDashboard } from "@/components/ai-forecast-dashboard";
 import { ExpiryManager } from "@/components/expiry-manager";
+import { AdvancedReportsDashboard } from "@/components/advanced-reports-dashboard";
 import { detectNetwork } from "@/lib/mobile-money";
 import { initializePaystackTransaction, isPaystackConfigured } from "@/lib/paystack";
 import { useToast } from "@/hooks/use-toast";
@@ -316,6 +317,7 @@ export default function POSPage() {
   const [showWhatsAppBroadcast, setShowWhatsAppBroadcast] = useState(false);
   const [showAIForecast, setShowAIForecast] = useState(false);
   const [showExpiryManager, setShowExpiryManager] = useState(false);
+  const [showAdvancedReports, setShowAdvancedReports] = useState(false);
   const [dailyTotal, setDailyTotal] = useState(() => {
     if (typeof window !== 'undefined') { try { return parseFloat(localStorage.getItem('sylhn-daily-total') || '0') || 0; } catch {} }
     return 0;
@@ -2404,6 +2406,14 @@ export default function POSPage() {
             >
               <AlertTriangle className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Expiry
             </button>
+            {/* Phase 4: Advanced Reports */}
+            <button
+              onClick={() => setShowAdvancedReports(true)}
+              className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition-all active:scale-95 flex-shrink-0 bg-cyan-500/15 hover:bg-cyan-500/30 ring-1 ring-cyan-400/20 hover:ring-cyan-400/40 backdrop-blur-sm"
+              title="Advanced reports: ABC analysis, profit margins, hourly traffic, staff performance"
+            >
+              <BarChart3 className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Reports
+            </button>
           </div>
         </div>
 
@@ -3426,6 +3436,9 @@ export default function POSPage() {
 
       {/* ===== Phase 3: Expiry Manager (FEFO) ===== */}
       <ExpiryManager open={showExpiryManager} onOpenChange={setShowExpiryManager} />
+
+      {/* ===== Phase 4: Advanced Reports Dashboard ===== */}
+      <AdvancedReportsDashboard open={showAdvancedReports} onOpenChange={setShowAdvancedReports} />
 
       {/* ===== Cash Drawer Animation ===== */}
       <AnimatePresence>
