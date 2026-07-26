@@ -70,20 +70,14 @@ export async function POST(req: NextRequest) {
   // of the supplier UUID, which Prisma rejects with P2003. We verify the
   // supplier exists BEFORE entering the transaction and return a friendly 400
   // instead of letting the error bubble up as a 500.
+  //
+  // Note: we no longer reject non-UUID-shaped strings here. The previous UUID
+  // regex check was too strict — it rejected temporary client-side IDs (like
+  // "s1" or "s-1234567890") that the supplier form uses optimistically before
+  // the server returns the real UUID. Instead, we just look up the supplier
+  // by ID and return SUPPLIER_NOT_FOUND if it doesn't exist. The DB lookup is
+  // cheap and unambiguous.
   if (p.supplierId) {
-    // Reject obvious non-UUID values (names, codes, etc.) — UUIDs are 36 chars
-    // with dashes. This catches the most common client-side mistake.
-    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!UUID_RE.test(String(p.supplierId))) {
-      return NextResponse.json(
-        {
-          error: "Invalid supplier reference",
-          detail: "The supplier value looks like a name, not an ID. Please re-select the supplier from the dropdown.",
-          code: "SUPPLIER_NOT_UUID",
-        },
-        { status: 400 }
-      );
-    }
     const supplier = await db.supplier.findUnique({
       where: { id: String(p.supplierId) },
       select: { id: true, name: true, active: true },

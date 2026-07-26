@@ -237,12 +237,23 @@ export function SupplierForm({ onBack, products }: SupplierFormProps) {
         // Replace the optimistic temp-id entry with the real server entry
         setSuppliers(prev => prev.map(s => s.id === newSupplier.id ? { ...newSupplier, id: data.supplier.id, code: data.supplier.code } : s));
         setSelectedSupplier({ ...newSupplier, id: data.supplier.id, code: data.supplier.code });
-        toast({ title: "Supplier synced to server", description: `${data.supplier.code} — ${data.supplier.name}` });
+        toast({ title: "Supplier synced to server ✓", description: `${data.supplier.code} — ${data.supplier.name}` });
       } else {
-        toast({ title: "Supplier saved locally (server sync failed)", description: data.error || `HTTP ${res.status}`, variant: "destructive" });
+        // Server sync failed — clear the selected supplier so the user can't
+        // try to save a PO against a temp ID that the API will reject.
+        setSelectedSupplier(null);
+        setSupplierDetails("");
+        toast({
+          title: "Supplier sync failed — please try again",
+          description: data.error || `HTTP ${res.status}`,
+          variant: "destructive",
+        });
       }
     } catch (e: any) {
-      toast({ title: "Supplier saved locally (network error)", description: e?.message || '', variant: "destructive" });
+      // Network error — same: clear the selected supplier
+      setSelectedSupplier(null);
+      setSupplierDetails("");
+      toast({ title: "Supplier sync failed (network error)", description: e?.message || '', variant: "destructive" });
     }
   };
 
