@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, Save, Printer, Mail, Trash2, CreditCard, X, Search,
   Plus, Check, Package, Calendar, User, Hash,
+  ChevronUp, ChevronDown, Paperclip, PackageCheck, Shield, Keyboard,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +18,10 @@ import { PurchaseListPopup, type PurchaseListRow } from "@/components/purchase-l
 import { PurchaseOrderListPopup, type PurchaseOrderListRow } from "@/components/purchase-order-list-popup";
 import { PurchaseEmailDialog } from "@/components/purchase-email-dialog";
 import { PurchasePaymentDialog } from "@/components/purchase-payment-dialog";
+import { PurchaseReceiveDialog } from "@/components/purchase-receive-dialog";
+import { PurchaseAttachmentsDialog } from "@/components/purchase-attachments-dialog";
+import { ManagerApproval } from "@/components/manager-approval";
+import { KeyboardShortcutsOverlay } from "@/components/keyboard-shortcuts-overlay";
 
 // ===== Sample existing purchase transactions (linked to Purchase List) =====
 const existingPurchases: (PurchaseListRow & { items?: { sku: string; name: string; emoji: string; qty: number; cost: number; taxable: boolean }[]; supplier?: string; date?: string })[] = [
@@ -125,6 +130,14 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
   // Premium dialog open states
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
+  const [showReceiveDialog, setShowReceiveDialog] = useState(false);
+  const [showAttachmentsDialog, setShowAttachmentsDialog] = useState(false);
+  const [showApproveDialog, setShowApproveDialog] = useState(false);
+  const [showShortcutsOverlay, setShowShortcutsOverlay] = useState(false);
+  // Track the current PO status for the status badge
+  const [purchaseStatus, setPurchaseStatus] = useState<string>("draft");
+  // Auto-save draft key (per-tab, per-form-instance)
+  const draftKey = useMemo(() => `sylhn-po-draft-${typeof window !== 'undefined' ? window.location.pathname : 'default'}`, []);
 
   const findPartNoRef = useRef<HTMLInputElement>(null);
 
@@ -143,7 +156,106 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
         }
       }
     } catch { /* ignore */ }
+    // ===== Phase 1: Restore auto-saved draft (if any) =====
+    // We only restore if there are no lines yet (so we don't clobber a reorder
+    // draft that was just loaded) and if the draft is less than 24 hours old.
+    try {
+      const autoDraftRaw = window.localStorage.getItem(draftKey);
+      if (autoDraftRaw && lines.length === 0) {
+        const draft = JSON.parse(autoDraftRaw);
+        if (draft && Array.isArray(draft.lines) && draft.lines.length > 0) {
+          const ageMs = Date.now() - (draft.savedAt || 0);
+          if (ageMs < 24 * 60 * 60 * 1000) {
+            // Restore the draft
+            setLines(draft.lines.map((l: any) => ({
+              id: l.id || `line-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+              partNo: l.partNo || '',
+              details: l.details || '',
+              emoji: l.emoji || '',
+              productId: l.productId,
+              quantity: l.quantity || 1,
+              cost: l.cost || 0,
+              expiry: l.expiry || '',
+              tax: l.tax ?? true,
+              total: l.total || 0,
+            })));
+            if (draft.supplier) setSupplier(draft.supplier);
+            if (draft.invoiceNo) setInvoiceNo(draft.invoiceNo);
+            if (draft.refNo) setRefNo(draft.refNo);
+            if (draft.terms) setTerms(draft.terms);
+            if (typeof draft.paidAmount === 'number') setPaidAmount(draft.paidAmount);
+            toast({
+              title: 'Draft restored',
+              description: `${draft.lines.length} items from your last session · auto-saved ${new Date(draft.savedAt).toLocaleTimeString()}`,
+            });
+          } else {
+            // Draft is stale — clear it
+            window.localStorage.removeItem(draftKey);
+          }
+        }
+      }
+    } catch { /* ignore */ }
   }, []);
+
+  // ===== Phase 1: Auto-save draft to localStorage every 30 seconds =====
+  // Skipped if there are no lines (nothing worth saving) or if the purchase
+  // has already been saved to the server (savedPurchaseId is set).
+  useEffect(() => {
+    if (lines.length === 0 || savedPurchaseId) return;
+    const interval = setInterval(() => {
+      try {
+        const draft = {
+          lines,
+          supplier,
+          invoiceNo,
+          refNo,
+          terms,
+          paidAmount,
+          savedAt: Date.now(),
+        };
+        window.localStorage.setItem(draftKey, JSON.stringify(draft));
+      } catch { /* ignore quota errors */ }
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [lines, supplier, invoiceNo, refNo, terms, paidAmount, savedPurchaseId, draftKey]);
+
+  // ===== Phase 1: Move line up/down (reorder) =====
+  const moveLine = (index: number, direction: 'up' | 'down') => {
+    if (direction === 'up' && index === 0) return;
+    if (direction === 'down' && index === lines.length - 1) return;
+    const newLines = [...lines];
+    const swapWith = direction === 'up' ? index - 1 : index + 1;
+    [newLines[index], newLines[swapWith]] = [newLines[swapWith], newLines[index]];
+    setLines(newLines);
+  };
+
+  // ===== Phase 1: Handle successful GRN (receive) =====
+  const handleReceived = () => {
+    setPurchaseStatus('received');
+    // Refresh the purchase from server
+    if (savedPurchaseId) {
+      fetch(`/api/purchases/${savedPurchaseId}`, { credentials: 'include' })
+        .then(r => r.json())
+        .then(data => {
+          if (data.purchase) {
+            setPurchaseStatus(data.purchase.status || 'received');
+          }
+        })
+        .catch(() => {});
+    }
+  };
+
+  // ===== Phase 1: Handle successful approval =====
+  const handleApproved = (approver: any) => {
+    setShowApproveDialog(false);
+    toast({
+      title: 'Purchase approved ✓',
+      description: `Approved by ${approver.fullName} (${approver.role})`,
+    });
+  };
+
+  // ===== Phase 1: Toggle shortcuts overlay via keyboard (handled in component) =====
+  // The KeyboardShortcutsOverlay component listens for "?" itself.
 
   // ===== Load the reorder draft into the form =====
   const loadReorderDraft = () => {
@@ -438,6 +550,9 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
         setSavedRefNo(data.purchase.refNo);
         setInvoiceNo(data.purchase.refNo);
       }
+      if (data.purchase?.status) setPurchaseStatus(data.purchase.status);
+      // Clear draft since the purchase is now saved
+      try { window.localStorage.removeItem(draftKey); } catch {}
       toast({
         title: "Purchase saved to server",
         description: `${data.purchase.refNo} · ${lines.length} items · ${formatGHS(totals.grandTotal)} · stock updated`,
@@ -781,9 +896,27 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
                     const isSelected = selectedLine === idx;
                     return (
                       <div key={line.id} onClick={() => setSelectedLine(idx)}
-                        className="grid grid-cols-[25px_100px_1fr_55px_70px_80px_30px_80px] gap-1 px-2 py-0.5 text-[9px] cursor-pointer border-b border-slate-100"
+                        className="grid grid-cols-[40px_100px_1fr_55px_70px_80px_30px_80px] gap-1 px-2 py-0.5 text-[9px] cursor-pointer border-b border-slate-100"
                         style={{ backgroundColor: isSelected ? '#E6F0FF' : (idx % 2 === 1 ? '#F8F8F8' : '#FFFFFF') }}>
-                        <div className="text-center text-slate-500">{idx + 1}</div>
+                        <div className="flex items-center justify-center gap-0.5 text-slate-500" onClick={(e) => e.stopPropagation()}>
+                          <span className="text-[8px]">{idx + 1}</span>
+                          <button
+                            onClick={() => moveLine(idx, 'up')}
+                            disabled={idx === 0}
+                            title="Move up"
+                            className={cn("h-3 w-3 rounded hover:bg-slate-200 flex items-center justify-center", idx === 0 && "opacity-30 cursor-not-allowed")}
+                          >
+                            <ChevronUp className="h-2 w-2" />
+                          </button>
+                          <button
+                            onClick={() => moveLine(idx, 'down')}
+                            disabled={idx === lines.length - 1}
+                            title="Move down"
+                            className={cn("h-3 w-3 rounded hover:bg-slate-200 flex items-center justify-center", idx === lines.length - 1 && "opacity-30 cursor-not-allowed")}
+                          >
+                            <ChevronDown className="h-2 w-2" />
+                          </button>
+                        </div>
                         <div className="font-mono truncate">{line.partNo}</div>
                         <div className="truncate">{line.details}</div>
                         <div className="text-right"><input type="number" value={line.quantity} onClick={(e) => e.stopPropagation()} onChange={(e) => updateLine(idx, 'quantity', parseFloat(e.target.value) || 0)} className="w-full text-right font-mono bg-transparent border-b border-transparent hover:border-slate-300 focus:border-green-400 outline-none" /></div>
@@ -852,12 +985,55 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
           </div>
 
           {/* Action Buttons */}
-          <div className="flex-shrink-0 px-3 py-1.5 flex items-center gap-1.5 border-t border-slate-300" style={{ backgroundColor: '#F0F0F0' }}>
+          <div className="flex-shrink-0 px-3 py-1.5 flex items-center gap-1.5 border-t border-slate-300 flex-wrap" style={{ backgroundColor: '#F0F0F0' }}>
             <button onClick={handleSave} className="h-7 px-3 rounded text-white text-[9px] font-semibold flex items-center gap-1 transition shadow-sm" style={{ backgroundColor: GREEN }}> <Save className="h-3 w-3" /> Save <kbd className="text-[7px] bg-white/20 px-0.5 rounded">F2</kbd></button>
             <button onClick={handlePrint} className="h-7 px-3 rounded text-white text-[9px] font-semibold flex items-center gap-1 transition shadow-sm" style={{ backgroundColor: GREEN }}> <Printer className="h-3 w-3" /> Print <kbd className="text-[7px] bg-white/20 px-0.5 rounded">F3</kbd></button>
             <button onClick={handleEmail} disabled={!savedPurchaseId} title={!savedPurchaseId ? "Save the purchase first to enable email" : "Email this purchase order to the supplier"} className={cn("h-7 px-3 rounded text-white text-[9px] font-semibold flex items-center gap-1 transition shadow-sm", !savedPurchaseId && "opacity-40 cursor-not-allowed")} style={{ backgroundColor: GREEN }}> <Mail className="h-3 w-3" /> Email</button>
             <button onClick={handleDelete} className="h-7 px-3 rounded text-white text-[9px] font-semibold flex items-center gap-1 transition shadow-sm" style={{ backgroundColor: GREEN }}> <Trash2 className="h-3 w-3" /> Delete <kbd className="text-[7px] bg-white/20 px-0.5 rounded">F4</kbd></button>
             <button onClick={handlePayment} disabled={!savedPurchaseId} title={!savedPurchaseId ? "Save the purchase first to enable payment" : "Record a supplier payment"} className={cn("h-7 px-3 rounded text-white text-[9px] font-semibold flex items-center gap-1 transition shadow-sm", !savedPurchaseId && "opacity-40 cursor-not-allowed")} style={{ backgroundColor: GREEN }}> <CreditCard className="h-3 w-3" /> Payment <kbd className="text-[7px] bg-white/20 px-0.5 rounded">F5</kbd></button>
+            {/* Phase 1: Receive (GRN) button */}
+            <button
+              onClick={() => setShowReceiveDialog(true)}
+              disabled={!savedPurchaseId}
+              title={!savedPurchaseId ? "Save the purchase first to receive goods" : "Mark goods as received (GRN)"}
+              className={cn("h-7 px-3 rounded text-white text-[9px] font-semibold flex items-center gap-1 transition shadow-sm", !savedPurchaseId && "opacity-40 cursor-not-allowed")}
+              style={{ backgroundColor: '#3B82F6' }}
+            > <PackageCheck className="h-3 w-3" /> Receive</button>
+            {/* Phase 1: Attachments button */}
+            <button
+              onClick={() => setShowAttachmentsDialog(true)}
+              disabled={!savedPurchaseId}
+              title={!savedPurchaseId ? "Save the purchase first to attach files" : "Upload invoices, delivery notes, customs forms"}
+              className={cn("h-7 px-3 rounded text-white text-[9px] font-semibold flex items-center gap-1 transition shadow-sm", !savedPurchaseId && "opacity-40 cursor-not-allowed")}
+              style={{ backgroundColor: '#64748B' }}
+            > <Paperclip className="h-3 w-3" /> Attach</button>
+            {/* Phase 1: Approve button */}
+            <button
+              onClick={() => setShowApproveDialog(true)}
+              disabled={!savedPurchaseId}
+              title={!savedPurchaseId ? "Save the purchase first to approve" : "Manager approval"}
+              className={cn("h-7 px-3 rounded text-white text-[9px] font-semibold flex items-center gap-1 transition shadow-sm", !savedPurchaseId && "opacity-40 cursor-not-allowed")}
+              style={{ backgroundColor: '#F59E0B' }}
+            > <Shield className="h-3 w-3" /> Approve</button>
+            {/* Phase 1: Keyboard shortcuts overlay button */}
+            <button
+              onClick={() => setShowShortcutsOverlay(true)}
+              title="Show keyboard shortcuts (or press ?)"
+              className="h-7 px-2 rounded text-white text-[9px] font-semibold flex items-center gap-1 transition shadow-sm"
+              style={{ backgroundColor: '#1E293B' }}
+            > <Keyboard className="h-3 w-3" /> <kbd className="text-[7px] bg-white/20 px-0.5 rounded">?</kbd></button>
+            {/* Phase 1: Status badge */}
+            {savedPurchaseId && (
+              <Badge className={cn(
+                "ml-1 text-[9px] uppercase border-transparent",
+                purchaseStatus === 'received' && "bg-emerald-500 text-white",
+                purchaseStatus === 'cancelled' && "bg-rose-500 text-white",
+                purchaseStatus === 'ordered' && "bg-indigo-500 text-white",
+                purchaseStatus === 'draft' && "bg-slate-400 text-white",
+              )}>
+                {purchaseStatus}
+              </Badge>
+            )}
             <div className="flex-1" />
             {selectedLine !== null && <button onClick={() => removeLine(selectedLine)} className="h-7 px-2 rounded bg-rose-100 hover:bg-rose-200 text-rose-700 text-[9px] font-semibold flex items-center gap-1 transition"><Trash2 className="h-3 w-3" /> Remove Line</button>}
           </div>
@@ -928,6 +1104,47 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
         paidAmount={paidAmount}
         onPaid={handlePaymentSuccess}
       />
+
+      {/* Phase 1: Receive (GRN) Dialog */}
+      <PurchaseReceiveDialog
+        open={showReceiveDialog}
+        onOpenChange={setShowReceiveDialog}
+        purchaseId={savedPurchaseId}
+        refNo={savedRefNo || invoiceNo}
+        supplierName={supplier}
+        items={lines.map(l => ({
+          id: l.id,
+          partNo: l.partNo,
+          details: l.details,
+          emoji: l.emoji,
+          quantity: l.quantity,
+          cost: l.cost,
+          receivedQty: 0,
+        }))}
+        onReceived={handleReceived}
+      />
+
+      {/* Phase 1: Attachments Dialog */}
+      <PurchaseAttachmentsDialog
+        open={showAttachmentsDialog}
+        onOpenChange={setShowAttachmentsDialog}
+        purchaseId={savedPurchaseId}
+        refNo={savedRefNo || invoiceNo}
+      />
+
+      {/* Phase 1: Approve Dialog (manager approval) */}
+      <ManagerApproval
+        open={showApproveDialog}
+        title="Approve Purchase Order"
+        description={`Authorize ${savedRefNo || invoiceNo} for ${supplier} — total ${formatGHS(totals.grandTotal)}`}
+        action="discount"
+        amount={totals.grandTotal}
+        onApproved={handleApproved}
+        onClose={() => setShowApproveDialog(false)}
+      />
+
+      {/* Phase 1: Keyboard Shortcuts Overlay (toggle with ?) */}
+      {showShortcutsOverlay && <KeyboardShortcutsOverlay />}
     </div>
   );
 }
