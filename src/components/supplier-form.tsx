@@ -904,9 +904,9 @@ function StockListMiniPopup({ products, searchText, onSelect, onClose }: {
         className="rounded-lg shadow-2xl overflow-hidden flex flex-col w-full"
         style={{ width: '100%', maxWidth: '900px', maxHeight: '90vh', backgroundColor: '#669999', fontFamily: 'Tahoma, Arial, Helvetica, sans-serif' }}
       >
-        {/* ===== Header — "Stock Search" title ===== */}
+        {/* ===== Header — "Stock List" title (user requested to retain this name) ===== */}
         <div className="px-3 pt-2 pb-1.5">
-          <h2 className="text-base font-bold text-black">Stock Search</h2>
+          <h2 className="text-base font-bold text-black">Stock List</h2>
         </div>
 
         {/* ===== Search & Filter Panel — dark green headers + inputs ===== */}
