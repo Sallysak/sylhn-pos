@@ -993,7 +993,7 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
             </div>
             <div className="flex items-center gap-1.5">
               <span className="text-[10px] font-bold text-slate-700">Invoice:</span>
-              <input value={invoiceNo} onChange={(e) => setInvoiceNo(e.target.value)} className="h-6 w-24 px-1.5 text-[10px] font-mono border border-slate-400 rounded bg-white outline-none" />
+              <input value={invoiceNo} onChange={(e) => setInvoiceNo(e.target.value)} className="h-6 w-32 min-w-[100px] px-1.5 text-[10px] font-mono border border-slate-400 rounded bg-white outline-none" />
             </div>
             {/* Display supplier details when matched */}
             {supplier && (() => {
@@ -1242,7 +1242,7 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
                       }
                     }}
                     placeholder="Type / Enter..."
-                    className="w-24 h-5 px-1.5 text-[9px] font-mono border border-slate-400 rounded outline-none focus:ring-1 focus:ring-green-400"
+                    className="w-full min-w-[120px] flex-1 h-6 px-1.5 text-[9px] font-mono border border-slate-400 rounded outline-none focus:ring-1 focus:ring-green-400"
                     style={{ backgroundColor: '#FFFFCC' }}
                   />
                   <button

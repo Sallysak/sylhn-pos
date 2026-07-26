@@ -2341,64 +2341,68 @@ export default function POSPage() {
           </div>
         </div>
 
-        {/* ===== Phase 1-3 Feature Toolbar — always visible (desktop + mobile), horizontally scrollable ===== */}
-        <div className="border-t border-white/10 bg-black/15 backdrop-blur-md">
-          <div className="flex items-center gap-1.5 px-3 py-1.5 overflow-x-auto scrollbar-hide">
+        {/* ===== Phase 1-3 Feature Toolbar — premium pill bar, always visible ===== */}
+        <div className="border-t border-white/10 bg-gradient-to-r from-black/20 via-black/15 to-black/20 backdrop-blur-md">
+          <div className="flex items-center gap-1 px-3 py-1.5 overflow-x-auto scrollbar-hide max-w-full">
             <button
               onClick={() => setShowCashCalc(true)}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-full text-white text-[10px] font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 bg-white/10 hover:bg-white/20"
+              className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition-all active:scale-95 flex-shrink-0 bg-white/5 hover:bg-white/15 ring-1 ring-white/10 hover:ring-white/20 backdrop-blur-sm"
               title="Cash Denomination Calculator"
             >
-              <DollarSign className="h-3 w-3" /> Cash Calc
+              <DollarSign className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Cash Calc
             </button>
             <button
               onClick={() => setShowPriceTags(true)}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-full text-white text-[10px] font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 bg-white/10 hover:bg-white/20"
+              className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition-all active:scale-95 flex-shrink-0 bg-white/5 hover:bg-white/15 ring-1 ring-white/10 hover:ring-white/20 backdrop-blur-sm"
               title="Print Price Tags (simple)"
             >
-              <Printer className="h-3 w-3" /> Tags
+              <Printer className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Tags
             </button>
             <button
               onClick={() => setShowLabelPrinter(true)}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-full text-white text-[10px] font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 bg-white/10 hover:bg-white/20"
+              className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition-all active:scale-95 flex-shrink-0 bg-white/5 hover:bg-white/15 ring-1 ring-white/10 hover:ring-white/20 backdrop-blur-sm"
               title="Print Labels (multi-size + barcode)"
             >
-              <Tag className="h-3 w-3" /> Labels
+              <Tag className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Labels
             </button>
+            {/* Divider */}
+            <div className="w-px h-5 bg-white/10 flex-shrink-0 mx-0.5" />
             <button
               onClick={() => setShowExpenseManager(true)}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-full text-white text-[10px] font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 bg-white/10 hover:bg-white/20"
+              className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition-all active:scale-95 flex-shrink-0 bg-rose-500/15 hover:bg-rose-500/25 ring-1 ring-rose-400/20 hover:ring-rose-400/40 backdrop-blur-sm"
               title="Record expenses (rent, utilities, salaries, etc.)"
             >
-              <Wallet className="h-3 w-3" /> Expenses
+              <Wallet className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Expenses
             </button>
             <button
               onClick={() => setShowStocktakeWizard(true)}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-full text-white text-[10px] font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 bg-white/10 hover:bg-white/20"
+              className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition-all active:scale-95 flex-shrink-0 bg-indigo-500/15 hover:bg-indigo-500/25 ring-1 ring-indigo-400/20 hover:ring-indigo-400/40 backdrop-blur-sm"
               title="Run a stocktake (physical count → variance → update stock)"
             >
-              <ClipboardCheck className="h-3 w-3" /> Stocktake
+              <ClipboardCheck className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Stocktake
             </button>
+            {/* Divider */}
+            <div className="w-px h-5 bg-white/10 flex-shrink-0 mx-0.5" />
             <button
               onClick={() => setShowWhatsAppBroadcast(true)}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-full text-white text-[10px] font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 bg-green-500/30 hover:bg-green-500/50 ring-1 ring-green-400/30"
+              className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition-all active:scale-95 flex-shrink-0 bg-green-500/15 hover:bg-green-500/30 ring-1 ring-green-400/20 hover:ring-green-400/40 backdrop-blur-sm"
               title="Send WhatsApp broadcast to customers"
             >
-              <MessageCircle className="h-3 w-3" /> Broadcast
+              <MessageCircle className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Broadcast
             </button>
             <button
               onClick={() => setShowAIForecast(true)}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-full text-white text-[10px] font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 bg-violet-500/30 hover:bg-violet-500/50 ring-1 ring-violet-400/30"
+              className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition-all active:scale-95 flex-shrink-0 bg-violet-500/15 hover:bg-violet-500/30 ring-1 ring-violet-400/20 hover:ring-violet-400/40 backdrop-blur-sm"
               title="AI demand forecasting + reorder suggestions"
             >
-              <Brain className="h-3 w-3" /> AI Forecast
+              <Brain className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> AI Forecast
             </button>
             <button
               onClick={() => setShowExpiryManager(true)}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-full text-white text-[10px] font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 bg-orange-500/30 hover:bg-orange-500/50 ring-1 ring-orange-400/30"
+              className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition-all active:scale-95 flex-shrink-0 bg-orange-500/15 hover:bg-orange-500/30 ring-1 ring-orange-400/20 hover:ring-orange-400/40 backdrop-blur-sm"
               title="Expiry date management (FEFO) + alerts"
             >
-              <AlertTriangle className="h-3 w-3" /> Expiry
+              <AlertTriangle className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Expiry
             </button>
           </div>
         </div>
