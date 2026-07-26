@@ -10,7 +10,7 @@ import {
   ChevronRight, ScanLine, Pause, Play, RotateCcw, DollarSign, Receipt,
   ShoppingCart as Cart, Settings, Bell, LogOut, Menu as MenuIcon,
   TrendingUp, BarChart3, Tag, AlertCircle, CheckCircle2, ArrowLeft,
-  ClipboardCheck,
+  ClipboardCheck, MessageCircle, Brain,
   Zap, Store, Hash, Boxes, FileBarChart, ChevronDown, FileText, Eye,
   Layers, ArrowUpDown, History, FileSpreadsheet, Home, Power,
   Phone, Truck, Users, Database, Wrench, Shield,
@@ -38,6 +38,9 @@ import { OfflineSyncIndicator } from "@/components/offline-sync-indicator";
 import { LabelPrinter } from "@/components/label-printer";
 import { ExpenseManager } from "@/components/expense-manager";
 import { StocktakeWizard } from "@/components/stocktake-wizard";
+import { WhatsAppBroadcast } from "@/components/whatsapp-broadcast";
+import { AIForecastDashboard } from "@/components/ai-forecast-dashboard";
+import { ExpiryManager } from "@/components/expiry-manager";
 import { detectNetwork } from "@/lib/mobile-money";
 import { initializePaystackTransaction, isPaystackConfigured } from "@/lib/paystack";
 import { useToast } from "@/hooks/use-toast";
@@ -310,6 +313,9 @@ export default function POSPage() {
   const [showLabelPrinter, setShowLabelPrinter] = useState(false);
   const [showExpenseManager, setShowExpenseManager] = useState(false);
   const [showStocktakeWizard, setShowStocktakeWizard] = useState(false);
+  const [showWhatsAppBroadcast, setShowWhatsAppBroadcast] = useState(false);
+  const [showAIForecast, setShowAIForecast] = useState(false);
+  const [showExpiryManager, setShowExpiryManager] = useState(false);
   const [dailyTotal, setDailyTotal] = useState(() => {
     if (typeof window !== 'undefined') { try { return parseFloat(localStorage.getItem('sylhn-daily-total') || '0') || 0; } catch {} }
     return 0;
@@ -2354,6 +2360,30 @@ export default function POSPage() {
             >
               <ClipboardCheck className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Stocktake</span>
             </button>
+            {/* Phase 3: WhatsApp Broadcast */}
+            <button
+              onClick={() => setShowWhatsAppBroadcast(true)}
+              className="btn-premium h-9 px-2.5 rounded-lg gradient-premium-glass hover:bg-white/20 ring-1 ring-white/25 text-white text-xs font-bold flex items-center gap-1 transition flex-shrink-0"
+              title="Send WhatsApp broadcast to customers"
+            >
+              <MessageCircle className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Broadcast</span>
+            </button>
+            {/* Phase 3: AI Forecast */}
+            <button
+              onClick={() => setShowAIForecast(true)}
+              className="btn-premium h-9 px-2.5 rounded-lg bg-gradient-to-r from-violet-500/40 to-purple-500/40 hover:from-violet-500/60 hover:to-purple-500/60 text-white text-xs font-bold flex items-center gap-1 transition ring-1 ring-white/30 flex-shrink-0"
+              title="AI demand forecasting + reorder suggestions"
+            >
+              <Brain className="h-3.5 w-3.5" /> <span className="hidden sm:inline">AI Forecast</span>
+            </button>
+            {/* Phase 3: Expiry Manager (FEFO) */}
+            <button
+              onClick={() => setShowExpiryManager(true)}
+              className="btn-premium h-9 px-2.5 rounded-lg gradient-premium-glass hover:bg-white/20 ring-1 ring-white/25 text-white text-xs font-bold flex items-center gap-1 transition flex-shrink-0"
+              title="Expiry date management (FEFO) + alerts"
+            >
+              <AlertTriangle className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Expiry</span>
+            </button>
             {/* Premium: AI Assistant button — always visible (mobile + desktop) */}
             <button
               onClick={() => setShowAiAssistant(true)}
@@ -3385,6 +3415,15 @@ export default function POSPage() {
 
       {/* ===== Stocktake Wizard Dialog ===== */}
       <StocktakeWizard open={showStocktakeWizard} onOpenChange={setShowStocktakeWizard} products={products} />
+
+      {/* ===== Phase 3: WhatsApp Broadcast ===== */}
+      <WhatsAppBroadcast open={showWhatsAppBroadcast} onOpenChange={setShowWhatsAppBroadcast} />
+
+      {/* ===== Phase 3: AI Forecast Dashboard ===== */}
+      <AIForecastDashboard open={showAIForecast} onOpenChange={setShowAIForecast} />
+
+      {/* ===== Phase 3: Expiry Manager (FEFO) ===== */}
+      <ExpiryManager open={showExpiryManager} onOpenChange={setShowExpiryManager} />
 
       {/* ===== Cash Drawer Animation ===== */}
       <AnimatePresence>
