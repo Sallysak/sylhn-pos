@@ -2320,70 +2320,6 @@ export default function POSPage() {
             >
               {darkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </button>
-            {/* Premium: Cash Calculator */}
-            <button
-              onClick={() => setShowCashCalc(true)}
-              className="btn-premium h-9 px-2.5 rounded-lg gradient-premium-glass hover:bg-white/20 ring-1 ring-white/25 text-white text-xs font-bold flex items-center gap-1 transition flex-shrink-0"
-              title="Cash Denomination Calculator"
-            >
-              <DollarSign className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Cash Calc</span>
-            </button>
-            {/* Premium: Price Tags (legacy simple version) */}
-            <button
-              onClick={() => setShowPriceTags(true)}
-              className="btn-premium h-9 px-2.5 rounded-lg gradient-premium-glass hover:bg-white/20 ring-1 ring-white/25 text-white text-xs font-bold flex items-center gap-1 transition flex-shrink-0"
-              title="Print Price Tags (simple)"
-            >
-              <Printer className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Tags</span>
-            </button>
-            {/* Premium: Label Printer (multi-size + barcode + multi-select) */}
-            <button
-              onClick={() => setShowLabelPrinter(true)}
-              className="btn-premium h-9 px-2.5 rounded-lg gradient-premium-glass hover:bg-white/20 ring-1 ring-white/25 text-white text-xs font-bold flex items-center gap-1 transition flex-shrink-0"
-              title="Print Labels (multi-size + barcode)"
-            >
-              <Tag className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Labels</span>
-            </button>
-            {/* Premium: Expense Manager */}
-            <button
-              onClick={() => setShowExpenseManager(true)}
-              className="btn-premium h-9 px-2.5 rounded-lg gradient-premium-glass hover:bg-white/20 ring-1 ring-white/25 text-white text-xs font-bold flex items-center gap-1 transition flex-shrink-0"
-              title="Record expenses (rent, utilities, salaries, etc.)"
-            >
-              <Wallet className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Expenses</span>
-            </button>
-            {/* Premium: Stocktake Wizard */}
-            <button
-              onClick={() => setShowStocktakeWizard(true)}
-              className="btn-premium h-9 px-2.5 rounded-lg gradient-premium-glass hover:bg-white/20 ring-1 ring-white/25 text-white text-xs font-bold flex items-center gap-1 transition flex-shrink-0"
-              title="Run a stocktake (physical count → variance → update stock)"
-            >
-              <ClipboardCheck className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Stocktake</span>
-            </button>
-            {/* Phase 3: WhatsApp Broadcast */}
-            <button
-              onClick={() => setShowWhatsAppBroadcast(true)}
-              className="btn-premium h-9 px-2.5 rounded-lg gradient-premium-glass hover:bg-white/20 ring-1 ring-white/25 text-white text-xs font-bold flex items-center gap-1 transition flex-shrink-0"
-              title="Send WhatsApp broadcast to customers"
-            >
-              <MessageCircle className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Broadcast</span>
-            </button>
-            {/* Phase 3: AI Forecast */}
-            <button
-              onClick={() => setShowAIForecast(true)}
-              className="btn-premium h-9 px-2.5 rounded-lg bg-gradient-to-r from-violet-500/40 to-purple-500/40 hover:from-violet-500/60 hover:to-purple-500/60 text-white text-xs font-bold flex items-center gap-1 transition ring-1 ring-white/30 flex-shrink-0"
-              title="AI demand forecasting + reorder suggestions"
-            >
-              <Brain className="h-3.5 w-3.5" /> <span className="hidden sm:inline">AI Forecast</span>
-            </button>
-            {/* Phase 3: Expiry Manager (FEFO) */}
-            <button
-              onClick={() => setShowExpiryManager(true)}
-              className="btn-premium h-9 px-2.5 rounded-lg gradient-premium-glass hover:bg-white/20 ring-1 ring-white/25 text-white text-xs font-bold flex items-center gap-1 transition flex-shrink-0"
-              title="Expiry date management (FEFO) + alerts"
-            >
-              <AlertTriangle className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Expiry</span>
-            </button>
             {/* Premium: AI Assistant button — always visible (mobile + desktop) */}
             <button
               onClick={() => setShowAiAssistant(true)}
@@ -2401,6 +2337,68 @@ export default function POSPage() {
             </button>
             <button onClick={() => handleLogout()} className="btn-premium h-9 px-3 rounded-lg bg-rose-500/30 hover:bg-rose-500/50 ring-1 ring-rose-300/30 text-white text-xs font-bold flex items-center gap-1.5 transition flex-shrink-0" title="Sign out">
               <LogOut className="h-4 w-4" /> <span>Logout</span>
+            </button>
+          </div>
+        </div>
+
+        {/* ===== Phase 1-3 Feature Toolbar — always visible (desktop + mobile), horizontally scrollable ===== */}
+        <div className="border-t border-white/10 bg-black/15 backdrop-blur-md">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 overflow-x-auto scrollbar-hide">
+            <button
+              onClick={() => setShowCashCalc(true)}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-full text-white text-[10px] font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 bg-white/10 hover:bg-white/20"
+              title="Cash Denomination Calculator"
+            >
+              <DollarSign className="h-3 w-3" /> Cash Calc
+            </button>
+            <button
+              onClick={() => setShowPriceTags(true)}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-full text-white text-[10px] font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 bg-white/10 hover:bg-white/20"
+              title="Print Price Tags (simple)"
+            >
+              <Printer className="h-3 w-3" /> Tags
+            </button>
+            <button
+              onClick={() => setShowLabelPrinter(true)}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-full text-white text-[10px] font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 bg-white/10 hover:bg-white/20"
+              title="Print Labels (multi-size + barcode)"
+            >
+              <Tag className="h-3 w-3" /> Labels
+            </button>
+            <button
+              onClick={() => setShowExpenseManager(true)}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-full text-white text-[10px] font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 bg-white/10 hover:bg-white/20"
+              title="Record expenses (rent, utilities, salaries, etc.)"
+            >
+              <Wallet className="h-3 w-3" /> Expenses
+            </button>
+            <button
+              onClick={() => setShowStocktakeWizard(true)}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-full text-white text-[10px] font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 bg-white/10 hover:bg-white/20"
+              title="Run a stocktake (physical count → variance → update stock)"
+            >
+              <ClipboardCheck className="h-3 w-3" /> Stocktake
+            </button>
+            <button
+              onClick={() => setShowWhatsAppBroadcast(true)}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-full text-white text-[10px] font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 bg-green-500/30 hover:bg-green-500/50 ring-1 ring-green-400/30"
+              title="Send WhatsApp broadcast to customers"
+            >
+              <MessageCircle className="h-3 w-3" /> Broadcast
+            </button>
+            <button
+              onClick={() => setShowAIForecast(true)}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-full text-white text-[10px] font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 bg-violet-500/30 hover:bg-violet-500/50 ring-1 ring-violet-400/30"
+              title="AI demand forecasting + reorder suggestions"
+            >
+              <Brain className="h-3 w-3" /> AI Forecast
+            </button>
+            <button
+              onClick={() => setShowExpiryManager(true)}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-full text-white text-[10px] font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 bg-orange-500/30 hover:bg-orange-500/50 ring-1 ring-orange-400/30"
+              title="Expiry date management (FEFO) + alerts"
+            >
+              <AlertTriangle className="h-3 w-3" /> Expiry
             </button>
           </div>
         </div>
