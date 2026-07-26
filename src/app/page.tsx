@@ -47,7 +47,6 @@ import { detectNetwork } from "@/lib/mobile-money";
 import { initializePaystackTransaction, isPaystackConfigured } from "@/lib/paystack";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { initialSuppliers } from "@/components/supplier-form";
 import { InstallButton } from "@/components/install-button";
 import { MobileNav } from "@/components/mobile-nav";
 import { BarcodeScanner } from "@/components/barcode-scanner";
@@ -217,8 +216,8 @@ export default function POSPage() {
     }
     return initialStockHistory;
   });
-  // Suppliers — fetch from API on mount, fallback to initialSuppliers
-  const [suppliers, setSuppliers] = useState<any[]>(initialSuppliers);
+  // Suppliers — fetch from API on mount, start empty
+  const [suppliers, setSuppliers] = useState<any[]>([]);
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -227,27 +226,15 @@ export default function POSPage() {
         if (!res.ok) return;
         const data = await res.json();
         if (cancelled) return;
-        if (data.suppliers && data.suppliers.length > 0) {
+        if (data.suppliers) {
           const mapped = data.suppliers.map((s: any) => ({
-            id: s.id,
-            code: s.code,
-            name: s.name,
-            address: s.address || '',
-            city: s.city || '',
-            state: s.state || '',
-            country: s.country || 'Ghana',
-            phone: s.phone || '',
-            mobile: s.mobile || '',
-            fax: s.fax || '',
-            email: s.email || '',
-            contactName: s.contactName || '',
-            businessNo: s.businessNo || '',
-            title: '',
-            tradingTerms: s.tradingTerms || 'Net 30',
-            creditLimit: s.creditLimit || 0,
-            balance: s.balance || 0,
-            taxInclusive: s.taxInclusive || false,
-            notes: s.notes || '',
+            id: s.id, code: s.code, name: s.name,
+            address: s.address || '', city: s.city || '', state: s.state || '',
+            country: s.country || 'Ghana', phone: s.phone || '', mobile: s.mobile || '',
+            fax: s.fax || '', email: s.email || '', contactName: s.contactName || '',
+            businessNo: s.businessNo || '', title: '', tradingTerms: s.tradingTerms || 'Net 30',
+            creditLimit: s.creditLimit || 0, balance: s.balance || 0,
+            taxInclusive: s.taxInclusive || false, notes: s.notes || '',
           }));
           setSuppliers(mapped);
         }
@@ -255,6 +242,26 @@ export default function POSPage() {
     })();
     return () => { cancelled = true; };
   }, []);
+
+  // ===== Fetch stock groups from API on mount =====
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/stock-groups', { credentials: 'include' });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+        if (data.groups && data.groups.length > 0) {
+          setGroups(data.groups);
+          try { localStorage.setItem('sylhn-groups', JSON.stringify(data.groups)); } catch {}
+        }
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // ===== Fetch held orders + daily totals from API on login (moved after loggedInUser) =====
 
   // ===== POS State =====
   const [activeCategory, setActiveCategory] = useState<string>("all");
@@ -340,6 +347,56 @@ export default function POSPage() {
   const [financeTab, setFinanceTab] = useState<"expenses" | "cash-recon" | "mobile-money">("expenses");
   const [adminUser, setAdminUser] = useState<any>(null);
   const [loggedInUser, setLoggedInUser] = useState<any>(null);
+
+  // ===== Fetch held orders from API on login =====
+  useEffect(() => {
+    if (!loggedInUser) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/held-orders', { credentials: 'include' });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+        if (data.orders && data.orders.length > 0) {
+          setHeldOrders(data.orders.map((o: any) => ({
+            id: o.id, invoiceNumber: o.invoiceNumber,
+            customerName: o.customerName || 'Walk-in',
+            items: (o.items || []).map((i: any) => ({
+              id: i.id, productId: i.productId, sku: i.sku || '', name: i.name || '',
+              price: Number(i.price) || 0, quantity: Number(i.quantity) || 1,
+              unit: i.unit || 'each', emoji: i.emoji || '📦', discount: Number(i.discount) || 0,
+              taxable: i.taxable !== false, stock: 0,
+            })),
+            total: Number(o.total) || 0, createdAt: o.createdAt,
+          })));
+        }
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+  }, [loggedInUser]);
+
+  // ===== Fetch daily sales total + transaction count from API on login =====
+  useEffect(() => {
+    if (!loggedInUser) return;
+    (async () => {
+      try {
+        const today = new Date().toISOString().split('T')[0];
+        const res = await fetch(`/api/sales?dateFrom=${today}&dateTo=${today}&limit=1000`, { credentials: 'include' });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.sales) {
+          const total = data.sales.reduce((s: number, sale: any) => s + (Number(sale.total) || 0), 0);
+          setDailyTotal(total);
+          setTransactionCount(data.sales.length);
+          try {
+            localStorage.setItem('sylhn-daily-total', String(total));
+            localStorage.setItem('sylhn-txn-count', String(data.sales.length));
+          } catch {}
+        }
+      } catch {}
+    })();
+  }, [loggedInUser]);
 
   const { toast } = useToast();
   const searchInputRef = useRef<HTMLInputElement>(null);
