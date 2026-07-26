@@ -89,6 +89,18 @@ interface PurchaseLine {
   expiry: string;
   tax: boolean;
   total: number;
+  // Phase 2: per-line discount
+  discountType?: "amount" | "percent" | null;
+  discountValue?: number;
+  // Phase 2: per-line tax rate (replaces simple tax boolean; tax bool kept for backwards compat)
+  taxRate?: number; // 0.15 = 15%
+  // Phase 2: batch + free quantity
+  batchNumber?: string;
+  freeQuantity?: number;
+  // Phase 2: pricing markups
+  retailPrice?: number;
+  tradePrice?: number;
+  wholesalePrice?: number;
 }
 
 interface PurchaseFormProps {
@@ -136,6 +148,15 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
   const [showShortcutsOverlay, setShowShortcutsOverlay] = useState(false);
   // Track the current PO status for the status badge
   const [purchaseStatus, setPurchaseStatus] = useState<string>("draft");
+  // Phase 2: currency + landed costs
+  const [currency, setCurrency] = useState<string>("GHS");
+  const [exchangeRate, setExchangeRate] = useState<number>(1);
+  const [freightCost, setFreightCost] = useState<number>(0);
+  const [insuranceCost, setInsuranceCost] = useState<number>(0);
+  const [customsDuty, setCustomsDuty] = useState<number>(0);
+  const [otherLandedCosts, setOtherLandedCosts] = useState<number>(0);
+  // Phase 2: which line is "expanded" to show batch/free-qty/prices
+  const [expandedLine, setExpandedLine] = useState<string | null>(null);
   // Auto-save draft key (per-tab, per-form-instance)
   const draftKey = useMemo(() => `sylhn-po-draft-${typeof window !== 'undefined' ? window.location.pathname : 'default'}`, []);
 
@@ -178,12 +199,28 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
               expiry: l.expiry || '',
               tax: l.tax ?? true,
               total: l.total || 0,
+              // Phase 2: restore new per-line fields
+              discountType: l.discountType || null,
+              discountValue: l.discountValue || 0,
+              taxRate: typeof l.taxRate === 'number' ? l.taxRate : undefined,
+              batchNumber: l.batchNumber || '',
+              freeQuantity: l.freeQuantity || 0,
+              retailPrice: l.retailPrice || 0,
+              tradePrice: l.tradePrice || 0,
+              wholesalePrice: l.wholesalePrice || 0,
             })));
             if (draft.supplier) setSupplier(draft.supplier);
             if (draft.invoiceNo) setInvoiceNo(draft.invoiceNo);
             if (draft.refNo) setRefNo(draft.refNo);
             if (draft.terms) setTerms(draft.terms);
             if (typeof draft.paidAmount === 'number') setPaidAmount(draft.paidAmount);
+            // Phase 2: restore currency + landed costs
+            if (draft.currency) setCurrency(draft.currency);
+            if (typeof draft.exchangeRate === 'number') setExchangeRate(draft.exchangeRate);
+            if (typeof draft.freightCost === 'number') setFreightCost(draft.freightCost);
+            if (typeof draft.insuranceCost === 'number') setInsuranceCost(draft.insuranceCost);
+            if (typeof draft.customsDuty === 'number') setCustomsDuty(draft.customsDuty);
+            if (typeof draft.otherLandedCosts === 'number') setOtherLandedCosts(draft.otherLandedCosts);
             toast({
               title: 'Draft restored',
               description: `${draft.lines.length} items from your last session · auto-saved ${new Date(draft.savedAt).toLocaleTimeString()}`,
@@ -211,13 +248,20 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
           refNo,
           terms,
           paidAmount,
+          // Phase 2: save currency + landed costs too
+          currency,
+          exchangeRate,
+          freightCost,
+          insuranceCost,
+          customsDuty,
+          otherLandedCosts,
           savedAt: Date.now(),
         };
         window.localStorage.setItem(draftKey, JSON.stringify(draft));
       } catch { /* ignore quota errors */ }
     }, 30000);
     return () => clearInterval(interval);
-  }, [lines, supplier, invoiceNo, refNo, terms, paidAmount, savedPurchaseId, draftKey]);
+  }, [lines, supplier, invoiceNo, refNo, terms, paidAmount, savedPurchaseId, draftKey, currency, exchangeRate, freightCost, insuranceCost, customsDuty, otherLandedCosts]);
 
   // ===== Phase 1: Move line up/down (reorder) =====
   const moveLine = (index: number, direction: 'up' | 'down') => {
@@ -318,13 +362,42 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
   };
 
   const totals = useMemo(() => {
-    const totalQty = lines.reduce((s, l) => s + l.quantity, 0);
-    const totalCost = lines.reduce((s, l) => s + l.total, 0);
-    const taxAmount = lines.filter(l => l.tax).reduce((s, l) => s + l.total * 0.15, 0);
-    const grandTotal = taxInclusive ? totalCost : totalCost + taxAmount;
+    // Phase 2: per-line discount + tax rate calculation
+    // Each line: gross = qty * cost; discount = computed from type+value;
+    // net = gross - discount; tax = net * taxRate; lineTotal = net + tax
+    let totalQty = 0;
+    let totalGross = 0;
+    let totalDiscount = 0;
+    let totalTax = 0;
+    let totalNet = 0;
+
+    for (const l of lines) {
+      const gross = l.quantity * l.cost;
+      let discount = 0;
+      if (l.discountType === "amount") {
+        discount = Math.min(l.discountValue || 0, gross);
+      } else if (l.discountType === "percent") {
+        discount = (gross * Math.min(l.discountValue || 0, 100)) / 100;
+      }
+      const net = gross - discount;
+      // Phase 2: use per-line taxRate if set, otherwise fall back to old behavior (15% if tax=true)
+      const effectiveTaxRate = typeof l.taxRate === "number" ? l.taxRate : (l.tax ? 0.15 : 0);
+      const tax = net * effectiveTaxRate;
+      const lineTotal = taxInclusive ? net : net + tax;
+
+      totalQty += l.quantity + (l.freeQuantity || 0);
+      totalGross += gross;
+      totalDiscount += discount;
+      totalTax += tax;
+      totalNet += lineTotal;
+    }
+
+    // Phase 2: landed costs (freight + insurance + customs + other) added to grand total
+    const landedCosts = freightCost + insuranceCost + customsDuty + otherLandedCosts;
+    const grandTotal = totalNet + landedCosts;
     const due = grandTotal - paidAmount;
-    return { totalQty, totalCost, taxAmount, grandTotal, due };
-  }, [lines, taxInclusive, paidAmount]);
+    return { totalQty, totalGross, totalDiscount, totalTax, totalCost: totalNet, landedCosts, grandTotal, due };
+  }, [lines, taxInclusive, paidAmount, currency, freightCost, insuranceCost, customsDuty, otherLandedCosts]);
 
   const handleFindPartNo = (value: string) => {
     setFindPartNo(value);
@@ -504,22 +577,40 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
       supplierId: supplierObj?.id || null,
       supplierName: supplier || '',
       status: 'received' as const,
-      subtotal: totals.grandTotal - totals.taxAmount,
-      taxAmount: totals.taxAmount,
+      subtotal: totals.totalCost,
+      discount: totals.totalDiscount,
+      taxAmount: totals.totalTax,
       total: totals.grandTotal,
       amountPaid: paidAmount,
       notes: '',
       createdBy: salesperson,
       receivedAt: new Date().toISOString(),
+      // Phase 2: currency + landed costs
+      currency,
+      exchangeRate,
+      freightCost,
+      insuranceCost,
+      customsDuty,
+      otherLandedCosts,
       items: lines.map(l => ({
         productId: l.productId || null,
         partNo: l.partNo,
         details: l.details,
+        emoji: l.emoji,
         quantity: l.quantity,
         cost: l.cost,
         tax: l.tax,
         total: l.total,
         expiryDate: l.expiry || null,
+        // Phase 2: per-line discount + tax rate + batch + free qty + prices
+        discountType: l.discountType || null,
+        discountValue: l.discountValue || 0,
+        taxRate: typeof l.taxRate === "number" ? l.taxRate : (l.tax ? 0.15 : 0),
+        batchNumber: l.batchNumber || null,
+        freeQuantity: l.freeQuantity || 0,
+        retailPrice: l.retailPrice || 0,
+        tradePrice: l.tradePrice || 0,
+        wholesalePrice: l.wholesalePrice || 0,
       })),
     };
 
@@ -622,10 +713,12 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
       </table>
       <table class="totals">
         <tr><td>Total Qty:</td><td style="text-align:right">${totals.totalQty}</td></tr>
-        <tr><td>TAX GHC:</td><td style="text-align:right">${totals.taxAmount.toFixed(2)}</td></tr>
-        <tr class="total-row"><td>Total GHC:</td><td style="text-align:right">${totals.grandTotal.toFixed(2)}</td></tr>
-        <tr><td>Paid GHC:</td><td style="text-align:right">${paidAmount.toFixed(2)}</td></tr>
-        <tr class="total-row"><td>Due GHC:</td><td style="text-align:right;color:${totals.due > 0 ? '#D32F2F' : '#388E3C'}">${totals.due.toFixed(2)}</td></tr>
+        <tr><td>Discount:</td><td style="text-align:right;color:#059669">−${totals.totalDiscount.toFixed(2)}</td></tr>
+        <tr><td>Tax:</td><td style="text-align:right">${totals.totalTax.toFixed(2)}</td></tr>
+        ${totals.landedCosts > 0 ? `<tr><td>Landed Costs:</td><td style="text-align:right">${totals.landedCosts.toFixed(2)}</td></tr>` : ''}
+        <tr class="total-row"><td>Total:</td><td style="text-align:right">${totals.grandTotal.toFixed(2)}</td></tr>
+        <tr><td>Paid:</td><td style="text-align:right">${paidAmount.toFixed(2)}</td></tr>
+        <tr class="total-row"><td>Due:</td><td style="text-align:right;color:${totals.due > 0 ? '#D32F2F' : '#388E3C'}">${totals.due.toFixed(2)}</td></tr>
       </table>
       </body></html>`);
     printWin.document.close();
@@ -880,8 +973,8 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
 
           {/* Data Grid */}
           <div className="flex-1 overflow-hidden flex flex-col min-h-0">
-            <div className="flex-shrink-0 grid grid-cols-[25px_100px_1fr_55px_70px_80px_30px_80px] gap-1 px-2 py-1 text-[9px] font-bold text-slate-700 border-b border-slate-400" style={{ backgroundColor: '#E0E0E0' }}>
-              <div className="text-center">#</div><div>Part Number</div><div>Details</div><div className="text-right">Qty</div><div className="text-right">Cost GHC</div><div className="text-center">Expiry</div><div className="text-center">TAX</div><div className="text-right">Total GHC</div>
+            <div className="flex-shrink-0 grid grid-cols-[40px_90px_1fr_45px_60px_55px_50px_45px_70px] gap-1 px-2 py-1 text-[9px] font-bold text-slate-700 border-b border-slate-400" style={{ backgroundColor: '#E0E0E0' }}>
+              <div className="text-center">#</div><div>Part Number</div><div>Details</div><div className="text-right">Qty</div><div className="text-right">Cost</div><div className="text-right">Disc</div><div className="text-right">Tax%</div><div className="text-center">Expiry</div><div className="text-right">Total</div>
             </div>
             <ScrollArea className="flex-1 min-h-0">
               <div>
@@ -894,36 +987,165 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
                 ) : (
                   lines.map((line, idx) => {
                     const isSelected = selectedLine === idx;
+                    const isExpanded = expandedLine === line.id;
+                    // Phase 2: compute per-line discount + tax for live display
+                    const lineGross = line.quantity * line.cost;
+                    let lineDiscount = 0;
+                    if (line.discountType === "amount") lineDiscount = Math.min(line.discountValue || 0, lineGross);
+                    else if (line.discountType === "percent") lineDiscount = (lineGross * Math.min(line.discountValue || 0, 100)) / 100;
+                    const lineNet = lineGross - lineDiscount;
+                    const effectiveTaxRate = typeof line.taxRate === "number" ? line.taxRate : (line.tax ? 0.15 : 0);
+                    const lineTax = lineNet * effectiveTaxRate;
+                    const lineTotal = taxInclusive ? lineNet : lineNet + lineTax;
                     return (
-                      <div key={line.id} onClick={() => setSelectedLine(idx)}
-                        className="grid grid-cols-[40px_100px_1fr_55px_70px_80px_30px_80px] gap-1 px-2 py-0.5 text-[9px] cursor-pointer border-b border-slate-100"
-                        style={{ backgroundColor: isSelected ? '#E6F0FF' : (idx % 2 === 1 ? '#F8F8F8' : '#FFFFFF') }}>
-                        <div className="flex items-center justify-center gap-0.5 text-slate-500" onClick={(e) => e.stopPropagation()}>
-                          <span className="text-[8px]">{idx + 1}</span>
-                          <button
-                            onClick={() => moveLine(idx, 'up')}
-                            disabled={idx === 0}
-                            title="Move up"
-                            className={cn("h-3 w-3 rounded hover:bg-slate-200 flex items-center justify-center", idx === 0 && "opacity-30 cursor-not-allowed")}
-                          >
-                            <ChevronUp className="h-2 w-2" />
-                          </button>
-                          <button
-                            onClick={() => moveLine(idx, 'down')}
-                            disabled={idx === lines.length - 1}
-                            title="Move down"
-                            className={cn("h-3 w-3 rounded hover:bg-slate-200 flex items-center justify-center", idx === lines.length - 1 && "opacity-30 cursor-not-allowed")}
-                          >
-                            <ChevronDown className="h-2 w-2" />
-                          </button>
+                      <div key={line.id}>
+                        <div
+                          onClick={() => setSelectedLine(idx)}
+                          className="grid grid-cols-[40px_90px_1fr_45px_60px_55px_50px_45px_70px] gap-1 px-2 py-0.5 text-[9px] cursor-pointer border-b border-slate-100"
+                          style={{ backgroundColor: isSelected ? '#E6F0FF' : (idx % 2 === 1 ? '#F8F8F8' : '#FFFFFF') }}
+                        >
+                          {/* # + reorder + expand */}
+                          <div className="flex items-center justify-center gap-0.5 text-slate-500" onClick={(e) => e.stopPropagation()}>
+                            <span className="text-[8px]">{idx + 1}</span>
+                            <button
+                              onClick={() => moveLine(idx, 'up')}
+                              disabled={idx === 0}
+                              title="Move up"
+                              className={cn("h-3 w-3 rounded hover:bg-slate-200 flex items-center justify-center", idx === 0 && "opacity-30 cursor-not-allowed")}
+                            >
+                              <ChevronUp className="h-2 w-2" />
+                            </button>
+                            <button
+                              onClick={() => moveLine(idx, 'down')}
+                              disabled={idx === lines.length - 1}
+                              title="Move down"
+                              className={cn("h-3 w-3 rounded hover:bg-slate-200 flex items-center justify-center", idx === lines.length - 1 && "opacity-30 cursor-not-allowed")}
+                            >
+                              <ChevronDown className="h-2 w-2" />
+                            </button>
+                            <button
+                              onClick={() => setExpandedLine(isExpanded ? null : line.id)}
+                              title={isExpanded ? "Hide details (batch, free qty, prices)" : "Show details (batch, free qty, prices)"}
+                              className="h-3 w-3 rounded hover:bg-slate-200 flex items-center justify-center"
+                            >
+                              <Hash className="h-2 w-2" />
+                            </button>
+                          </div>
+                          <div className="font-mono truncate">{line.partNo}</div>
+                          <div className="truncate">{line.details}</div>
+                          {/* Qty */}
+                          <div className="text-right">
+                            <input type="number" value={line.quantity}
+                              onClick={(e) => e.stopPropagation()}
+                              onChange={(e) => updateLine(idx, 'quantity', parseFloat(e.target.value) || 0)}
+                              className="w-full text-right font-mono bg-transparent border-b border-transparent hover:border-slate-300 focus:border-green-400 outline-none" />
+                          </div>
+                          {/* Cost */}
+                          <div className="text-right">
+                            <input type="number" step="0.01" value={line.cost}
+                              onClick={(e) => e.stopPropagation()}
+                              onChange={(e) => updateLine(idx, 'cost', parseFloat(e.target.value) || 0)}
+                              className="w-full text-right font-mono bg-transparent border-b border-transparent hover:border-slate-300 focus:border-green-400 outline-none" />
+                          </div>
+                          {/* Phase 2: Discount (type + value) */}
+                          <div className="text-right flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+                            <select
+                              value={line.discountType || ""}
+                              onChange={(e) => updateLine(idx, 'discountType', (e.target.value || null) as any)}
+                              className="text-[8px] px-0.5 h-4 rounded border border-slate-200 bg-white"
+                              title="Discount type"
+                            >
+                              <option value="">—</option>
+                              <option value="amount">₵</option>
+                              <option value="percent">%</option>
+                            </select>
+                            <input
+                              type="number" step="0.01" value={line.discountValue || 0}
+                              onChange={(e) => updateLine(idx, 'discountValue', parseFloat(e.target.value) || 0)}
+                              disabled={!line.discountType}
+                              className="w-10 text-right font-mono bg-transparent border-b border-transparent hover:border-slate-300 focus:border-green-400 outline-none disabled:opacity-40"
+                            />
+                          </div>
+                          {/* Phase 2: Tax rate (replaces simple checkbox) */}
+                          <div className="text-right" onClick={(e) => e.stopPropagation()} title="Tax rate (0.15 = 15%)">
+                            <input
+                              type="number" step="0.005" min="0" max="1" value={effectiveTaxRate}
+                              onChange={(e) => updateLine(idx, 'taxRate', parseFloat(e.target.value) || 0)}
+                              className="w-full text-right font-mono bg-transparent border-b border-transparent hover:border-slate-300 focus:border-green-400 outline-none"
+                            />
+                          </div>
+                          {/* Expiry */}
+                          <div className="text-center text-slate-600">
+                            <input
+                              type="date"
+                              value={line.expiry}
+                              onClick={(e) => e.stopPropagation()}
+                              onChange={(e) => updateLine(idx, 'expiry', e.target.value)}
+                              className="w-full text-[8px] bg-transparent border-b border-transparent hover:border-slate-300 focus:border-green-400 outline-none"
+                            />
+                          </div>
+                          {/* Total */}
+                          <div className="text-right font-mono font-semibold">
+                            {lineTotal.toFixed(2)}
+                            {lineDiscount > 0 && (
+                              <div className="text-[7px] text-emerald-600">−{lineDiscount.toFixed(2)}</div>
+                            )}
+                          </div>
                         </div>
-                        <div className="font-mono truncate">{line.partNo}</div>
-                        <div className="truncate">{line.details}</div>
-                        <div className="text-right"><input type="number" value={line.quantity} onClick={(e) => e.stopPropagation()} onChange={(e) => updateLine(idx, 'quantity', parseFloat(e.target.value) || 0)} className="w-full text-right font-mono bg-transparent border-b border-transparent hover:border-slate-300 focus:border-green-400 outline-none" /></div>
-                        <div className="text-right"><input type="number" step="0.01" value={line.cost} onClick={(e) => e.stopPropagation()} onChange={(e) => updateLine(idx, 'cost', parseFloat(e.target.value) || 0)} className="w-full text-right font-mono bg-transparent border-b border-transparent hover:border-slate-300 focus:border-green-400 outline-none" /></div>
-                        <div className="text-center text-slate-600">{line.expiry}</div>
-                        <div className="text-center"><input type="checkbox" checked={line.tax} onClick={(e) => e.stopPropagation()} onChange={(e) => updateLine(idx, 'tax', e.target.checked)} className="h-2.5 w-2.5 accent-green-600" /></div>
-                        <div className="text-right font-mono font-semibold">{line.total.toFixed(2)}</div>
+                        {/* Phase 2: Expandable details row (batch, free qty, prices) */}
+                        {isExpanded && (
+                          <div className="px-2 py-1.5 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 grid grid-cols-6 gap-2 text-[9px]">
+                            <div>
+                              <label className="text-[8px] font-bold text-slate-500 uppercase block">Batch No</label>
+                              <input
+                                value={line.batchNumber || ""}
+                                onChange={(e) => updateLine(idx, 'batchNumber', e.target.value)}
+                                className="w-full h-5 px-1 text-[9px] border border-slate-200 rounded bg-white"
+                                placeholder="B-001"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[8px] font-bold text-slate-500 uppercase block">Free Qty</label>
+                              <input
+                                type="number" min="0" value={line.freeQuantity || 0}
+                                onChange={(e) => updateLine(idx, 'freeQuantity', parseInt(e.target.value) || 0)}
+                                className="w-full h-5 px-1 text-[9px] font-mono border border-slate-200 rounded bg-white"
+                                title="Free goods (e.g. buy 10 get 1 free → enter 1)"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[8px] font-bold text-slate-500 uppercase block">Retail ₵</label>
+                              <input
+                                type="number" step="0.01" value={line.retailPrice || 0}
+                                onChange={(e) => updateLine(idx, 'retailPrice', parseFloat(e.target.value) || 0)}
+                                className="w-full h-5 px-1 text-[9px] font-mono border border-slate-200 rounded bg-white"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[8px] font-bold text-slate-500 uppercase block">Trade ₵</label>
+                              <input
+                                type="number" step="0.01" value={line.tradePrice || 0}
+                                onChange={(e) => updateLine(idx, 'tradePrice', parseFloat(e.target.value) || 0)}
+                                className="w-full h-5 px-1 text-[9px] font-mono border border-slate-200 rounded bg-white"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[8px] font-bold text-slate-500 uppercase block">Wholesale ₵</label>
+                              <input
+                                type="number" step="0.01" value={line.wholesalePrice || 0}
+                                onChange={(e) => updateLine(idx, 'wholesalePrice', parseFloat(e.target.value) || 0)}
+                                className="w-full h-5 px-1 text-[9px] font-mono border border-slate-200 rounded bg-white"
+                              />
+                            </div>
+                            <div className="flex items-end">
+                              <div className="text-[8px] text-slate-500">
+                                <div>Gross: <span className="font-mono font-bold">{lineGross.toFixed(2)}</span></div>
+                                <div>Net: <span className="font-mono font-bold text-emerald-600">{lineNet.toFixed(2)}</span></div>
+                                <div>Tax: <span className="font-mono font-bold">{lineTax.toFixed(2)}</span></div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })
@@ -974,13 +1196,48 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
             </div>
             <div className="flex-1 flex items-center justify-end gap-1.5 flex-wrap">
               <div className="text-right"><label className="text-[8px] font-bold text-slate-600 block">Total Qty</label><input value={totals.totalQty} readOnly className="w-12 h-5 px-1 text-[9px] font-mono border border-slate-300 rounded bg-white outline-none text-center" /></div>
-              <div className="text-right"><label className="text-[8px] font-bold text-slate-600 block">TAX GHC</label><input value={totals.taxAmount.toFixed(2)} readOnly className="w-14 h-5 px-1 text-[9px] font-mono border border-slate-300 rounded bg-white outline-none text-right" /></div>
-              <div className="text-right"><label className="text-[8px] font-bold text-slate-600 block">Retail %</label><input type="number" placeholder="0" className="w-10 h-5 px-1 text-[9px] font-mono border border-slate-300 rounded bg-white outline-none text-right" /></div>
-              <div className="text-right"><label className="text-[8px] font-bold text-slate-600 block">Total GHC</label><input value={totals.grandTotal.toFixed(2)} readOnly className="w-16 h-5 px-1 text-[9px] font-mono font-bold border border-slate-400 rounded outline-none text-right" style={{ backgroundColor: '#E6F0FF' }} /></div>
-              <div className="text-right"><label className="text-[8px] font-bold text-slate-600 block">Trade %</label><input type="number" placeholder="0" className="w-10 h-5 px-1 text-[9px] font-mono border border-slate-300 rounded bg-white outline-none text-right" /></div>
-              <div className="text-right"><label className="text-[8px] font-bold text-slate-600 block">Paid GHC</label><input type="number" value={paidAmount || ''} onChange={(e) => setPaidAmount(parseFloat(e.target.value) || 0)} className="w-16 h-5 px-1 text-[9px] font-mono border border-slate-400 rounded bg-white outline-none text-right" placeholder="0.00" /></div>
-              <div className="text-right"><label className="text-[8px] font-bold text-slate-600 block">WSale %</label><input type="number" placeholder="0" className="w-10 h-5 px-1 text-[9px] font-mono border border-slate-300 rounded bg-white outline-none text-right" /></div>
-              <div className="text-right"><label className="text-[8px] font-bold text-slate-600 block">Due GHC</label><input value={totals.due.toFixed(2)} readOnly className={cn("w-16 h-5 px-1 text-[9px] font-mono font-bold border border-slate-400 rounded outline-none text-right", totals.due > 0 ? "text-rose-600" : "text-emerald-600")} style={{ backgroundColor: '#FFF8E1' }} /></div>
+              <div className="text-right"><label className="text-[8px] font-bold text-slate-600 block">Disc ₵</label><input value={totals.totalDiscount.toFixed(2)} readOnly className="w-14 h-5 px-1 text-[9px] font-mono border border-slate-300 rounded bg-emerald-50 outline-none text-right text-emerald-700" /></div>
+              <div className="text-right"><label className="text-[8px] font-bold text-slate-600 block">Tax ₵</label><input value={totals.totalTax.toFixed(2)} readOnly className="w-14 h-5 px-1 text-[9px] font-mono border border-slate-300 rounded bg-white outline-none text-right" /></div>
+              <div className="text-right"><label className="text-[8px] font-bold text-slate-600 block">Landed ₵</label><input value={totals.landedCosts.toFixed(2)} readOnly className="w-14 h-5 px-1 text-[9px] font-mono border border-slate-300 rounded bg-white outline-none text-right" /></div>
+              <div className="text-right"><label className="text-[8px] font-bold text-slate-600 block">Total</label><input value={totals.grandTotal.toFixed(2)} readOnly className="w-16 h-5 px-1 text-[9px] font-mono font-bold border border-slate-400 rounded outline-none text-right" style={{ backgroundColor: '#E6F0FF' }} /></div>
+              <div className="text-right"><label className="text-[8px] font-bold text-slate-600 block">Paid ₵</label><input type="number" value={paidAmount || ''} onChange={(e) => setPaidAmount(parseFloat(e.target.value) || 0)} className="w-16 h-5 px-1 text-[9px] font-mono border border-slate-400 rounded bg-white outline-none text-right" placeholder="0.00" /></div>
+              <div className="text-right"><label className="text-[8px] font-bold text-slate-600 block">Due ₵</label><input value={totals.due.toFixed(2)} readOnly className={cn("w-16 h-5 px-1 text-[9px] font-mono font-bold border border-slate-400 rounded outline-none text-right", totals.due > 0 ? "text-rose-600" : "text-emerald-600")} style={{ backgroundColor: '#FFF8E1' }} /></div>
+            </div>
+          </div>
+
+          {/* Phase 2: Currency + landed costs row */}
+          <div className="flex-shrink-0 px-3 py-1 bg-slate-50 border-t border-slate-200 flex items-center gap-2 flex-wrap text-[9px]">
+            <div className="flex items-center gap-1">
+              <label className="text-[8px] font-bold text-slate-600">Currency:</label>
+              <select value={currency} onChange={(e) => setCurrency(e.target.value)} className="h-5 px-1 text-[9px] border border-slate-300 rounded bg-white">
+                <option value="GHS">GHS</option>
+                <option value="USD">USD</option>
+                <option value="EUR">EUR</option>
+                <option value="GBP">GBP</option>
+                <option value="CNY">CNY</option>
+              </select>
+            </div>
+            {currency !== "GHS" && (
+              <div className="flex items-center gap-1">
+                <label className="text-[8px] font-bold text-slate-600">FX Rate:</label>
+                <input type="number" step="0.0001" min="0" value={exchangeRate} onChange={(e) => setExchangeRate(parseFloat(e.target.value) || 1)} className="w-16 h-5 px-1 text-[9px] font-mono border border-slate-300 rounded bg-white" />
+              </div>
+            )}
+            <div className="flex items-center gap-1">
+              <label className="text-[8px] font-bold text-slate-600">Freight ₵:</label>
+              <input type="number" step="0.01" min="0" value={freightCost} onChange={(e) => setFreightCost(parseFloat(e.target.value) || 0)} className="w-14 h-5 px-1 text-[9px] font-mono border border-slate-300 rounded bg-white" />
+            </div>
+            <div className="flex items-center gap-1">
+              <label className="text-[8px] font-bold text-slate-600">Insurance ₵:</label>
+              <input type="number" step="0.01" min="0" value={insuranceCost} onChange={(e) => setInsuranceCost(parseFloat(e.target.value) || 0)} className="w-14 h-5 px-1 text-[9px] font-mono border border-slate-300 rounded bg-white" />
+            </div>
+            <div className="flex items-center gap-1">
+              <label className="text-[8px] font-bold text-slate-600">Customs ₵:</label>
+              <input type="number" step="0.01" min="0" value={customsDuty} onChange={(e) => setCustomsDuty(parseFloat(e.target.value) || 0)} className="w-14 h-5 px-1 text-[9px] font-mono border border-slate-300 rounded bg-white" />
+            </div>
+            <div className="flex items-center gap-1">
+              <label className="text-[8px] font-bold text-slate-600">Other ₵:</label>
+              <input type="number" step="0.01" min="0" value={otherLandedCosts} onChange={(e) => setOtherLandedCosts(parseFloat(e.target.value) || 0)} className="w-14 h-5 px-1 text-[9px] font-mono border border-slate-300 rounded bg-white" />
             </div>
           </div>
 

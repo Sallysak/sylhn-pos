@@ -57,6 +57,7 @@ model SystemUser {
   stockHistory      StockHistory[]
   purchases         Purchase[]           @relation("PurchaseCreatedBy")
   purchaseReceived  Purchase[]           @relation("PurchaseReceivedBy")
+  purchaseApproved  Purchase[]           @relation("PurchaseApprovedBy")
   expenses          Expense[]
   emailLogs         EmailLog[]
   heldOrders        HeldOrder[]
@@ -704,10 +705,31 @@ model Purchase {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
+  // Phase 2: Multi-currency + landed costs (all nullable/defaulted for backwards compat)
+  currency        String  @default("GHS")   // GHS | USD | EUR | GBP | CNY
+  exchangeRate    Float   @default(1)        // 1.0 if GHS, otherwise FX rate at PO date
+  freightCost     Float   @default(0)
+  insuranceCost   Float   @default(0)
+  customsDuty     Float   @default(0)
+  otherLandedCosts Float  @default(0)
+
+  // Phase 2: Approval workflow (nullable so existing purchases are unaffected)
+  approvedById    String?
+  approvedAt      DateTime?
+  approvalThreshold Float @default(0)        // amount that triggered approval (0 if none)
+
+  // Phase 2: Cancellation tracking
+  cancelledAt     DateTime?
+  cancelReason    String  @default("")
+
+  // Phase 2: Optimistic concurrency
+  version         Int     @default(1)
+
   // Relations
   supplier       Supplier?         @relation(fields: [supplierId], references: [id], onDelete: SetNull)
   createdBy      SystemUser?       @relation("PurchaseCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   receivedBy     SystemUser?       @relation("PurchaseReceivedBy", fields: [receivedById], references: [id], onDelete: SetNull)
+  approver       SystemUser?       @relation("PurchaseApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
   items          PurchaseItem[]
   payments       SupplierPayment[]
   stockHistory   StockHistory[]
@@ -731,6 +753,24 @@ model PurchaseItem {
   total       Float
   expiryDate  DateTime?
   receivedQty Int?      // partial receipt tracking for orders
+
+  // Phase 2: Per-line discount (nullable/defaulted for backwards compat)
+  discountType    String?   // "amount" | "percent" | null
+  discountValue   Float     @default(0)
+  discountAmount  Float     @default(0)   // computed
+
+  // Phase 2: Per-line tax rate (replaces single Tax Inclusive checkbox)
+  taxRate         Float     @default(0)   // 0.15 = 15%
+  taxAmount       Float     @default(0)   // computed
+
+  // Phase 2: Per-line batch + free quantity
+  batchNumber     String?
+  freeQuantity    Int       @default(0)
+
+  // Phase 2: Pricing markups (auto-filled from supplier cost)
+  retailPrice     Float     @default(0)
+  tradePrice      Float     @default(0)
+  wholesalePrice  Float     @default(0)
 
   purchase Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
   product  Product? @relation(fields: [productId], references: [id], onDelete: SetNull)

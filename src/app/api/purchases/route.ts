@@ -113,6 +113,16 @@ export async function POST(req: NextRequest) {
       const total = Number(p.total) || 0;
       const amountPaid = Number(p.amountPaid) || 0;
 
+      // Phase 2: pull new optional fields from the body (all defaulted so
+      // missing values don't break older clients)
+      const body = p as any;
+      const currency = String(body.currency || "GHS");
+      const exchangeRate = Number(body.exchangeRate) || 1;
+      const freightCost = Number(body.freightCost) || 0;
+      const insuranceCost = Number(body.insuranceCost) || 0;
+      const customsDuty = Number(body.customsDuty) || 0;
+      const otherLandedCosts = Number(body.otherLandedCosts) || 0;
+
       // Create purchase + items
       const newPurchase = await tx.purchase.create({
         data: {
@@ -131,43 +141,82 @@ export async function POST(req: NextRequest) {
           receivedById: status === "received" ? user.uid : null,
           receivedAt: p.receivedAt ? new Date(p.receivedAt as string) : (status === "received" ? new Date() : null),
           expectedAt,
+          // Phase 2 fields
+          currency,
+          exchangeRate,
+          freightCost,
+          insuranceCost,
+          customsDuty,
+          otherLandedCosts,
           items: {
-            create: p.items.map((item) => ({
-              productId: item.productId || null,
-              partNo: item.partNo,
-              details: item.details,
-              emoji: "📦",
-              quantity: Number(item.quantity) || 1,
-              cost: Number(item.cost) || 0,
-              tax: item.tax !== false,
-              total: Number(item.total) || 0,
-              expiryDate: item.expiryDate ? new Date(item.expiryDate as string) : null,
-            })),
+            create: p.items.map((item: any) => {
+              // Phase 2: per-line discount calculation
+              const lineGross = (Number(item.quantity) || 0) * (Number(item.cost) || 0);
+              let discountAmount = 0;
+              if (item.discountType === "amount") {
+                discountAmount = Math.min(Number(item.discountValue) || 0, lineGross);
+              } else if (item.discountType === "percent") {
+                discountAmount = (lineGross * Math.min(Number(item.discountValue) || 0, 100)) / 100;
+              }
+              const lineNet = lineGross - discountAmount;
+              const taxRate = Number(item.taxRate) || 0;
+              const taxAmount = lineNet * taxRate;
+              const lineTotalWithTax = lineNet + taxAmount;
+
+              return {
+                productId: item.productId || null,
+                partNo: item.partNo,
+                details: item.details,
+                emoji: item.emoji || "📦",
+                quantity: Number(item.quantity) || 1,
+                cost: Number(item.cost) || 0,
+                tax: item.tax !== false,
+                total: Number(item.total) || lineTotalWithTax,
+                expiryDate: item.expiryDate ? new Date(item.expiryDate as string) : null,
+                // Phase 2 fields
+                discountType: item.discountType || null,
+                discountValue: Number(item.discountValue) || 0,
+                discountAmount,
+                taxRate,
+                taxAmount,
+                batchNumber: item.batchNumber || null,
+                freeQuantity: Number(item.freeQuantity) || 0,
+                retailPrice: Number(item.retailPrice) || 0,
+                tradePrice: Number(item.tradePrice) || 0,
+                wholesalePrice: Number(item.wholesalePrice) || 0,
+              };
+            }),
           },
         },
         include: { items: true, supplier: true },
       });
 
       // If received, increment stock + create linked StockHistory entries atomically
+      // Phase 2: also increment by freeQuantity (buy 10 get 1 free → stock gets 11)
       if (newPurchase.status === "received") {
         for (const item of newPurchase.items) {
           if (item.productId) {
+            const totalReceived = item.quantity + (item.freeQuantity || 0);
             // Update product: increment qty, update costPrice + receivedDate + expiryDate
             await tx.product.update({
               where: { id: item.productId },
               data: {
-                quantity: { increment: item.quantity },
+                quantity: { increment: totalReceived },
                 ...(item.cost > 0 && { costPrice: item.cost }),
                 receivedDate: new Date(),
                 ...(item.expiryDate && { expiryDate: item.expiryDate }),
+                // Phase 2: update retail/trade/wholesale prices if provided
+                ...(item.retailPrice > 0 && { retailPrice: item.retailPrice }),
+                ...(item.tradePrice > 0 && { tradePrice: item.tradePrice }),
+                ...(item.wholesalePrice > 0 && { wholesalePrice: item.wholesalePrice }),
               },
             });
             await tx.stockHistory.create({
               data: {
                 productId: item.productId,
                 action: "received",
-                quantity: item.quantity,
-                reason: `Purchase ${refNo}`,
+                quantity: totalReceived,
+                reason: `Purchase ${refNo}${item.batchNumber ? ` · batch ${item.batchNumber}` : ""}`,
                 reference: refNo,
                 purchaseId: newPurchase.id,
                 userId: user.uid,
