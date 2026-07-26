@@ -48,6 +48,10 @@ import { SpeedDial } from "@/components/speed-dial";
 import { saveCart, loadCart, clearCart as clearPersistedCart } from "@/lib/cart-persistence";
 import { saveSessionToken, clearSessionToken, getSessionToken, authedFetch } from "@/lib/client-auth";
 import { clearAuthState, saveUserSession, getCachedUser, hasUnsavedBusinessData } from "@/lib/session-data";
+import {
+  buildReceiptBytes, printBytes, isPrinterConnected, connectPrinter,
+  type ReceiptData,
+} from "@/lib/thermal-printer";
 
 // ===== Lazy-loaded components (code-split for faster initial load) =====
 // Each form is loaded on-demand only when the user navigates to it.
@@ -1222,12 +1226,130 @@ export default function POSPage() {
     toast({ title: "Order saved (F2)", description: `${heldOrders.length + 1} order(s) on hold` });
   };
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
     if (cart.length === 0) {
       toast({ title: "Nothing to print", variant: "destructive" });
       return;
     }
-    toast({ title: "Printing receipt (F3)", description: `Invoice ${invoiceNumber}` });
+
+    // Build the receipt data
+    const receiptData: ReceiptData = {
+      companyName: COMPANY.name,
+      companyAddress: COMPANY.address,
+      companyPhone: COMPANY.contact,
+      invoiceNumber: invoiceNumber || `INV-${Date.now().toString().slice(-6)}`,
+      cashierName: loggedInUser?.fullName || cashier,
+      customerName: customerName || undefined,
+      timestamp: new Date(),
+      items: cart.map(item => ({
+        name: item.name,
+        emoji: item.emoji,
+        quantity: item.quantity,
+        price: item.price,
+        total: (item.total ?? (item.price * item.quantity * (1 - (item.discount || 0) / 100))),
+      })),
+      subtotal,
+      discount: discountAmount,
+      taxAmount: taxAmount,
+      total,
+      amountPaid: 0,
+      change: 0,
+      paymentMethod: "—",
+      currencySymbol: CURRENCY,
+    };
+
+    // Try thermal printer first (if connected via Bluetooth)
+    if (isPrinterConnected()) {
+      try {
+        const bytes = buildReceiptBytes(receiptData, 80); // 80mm paper
+        await printBytes(bytes);
+        toast({ title: "Receipt printed ✓", description: `Invoice ${invoiceNumber} (thermal printer)` });
+        return;
+      } catch (e: any) {
+        toast({ title: "Thermal printer failed — using browser print", description: e?.message, variant: "default" });
+        // Fall through to browser print
+      }
+    } else {
+      // Try to connect automatically (will prompt user to select a Bluetooth printer)
+      // Only attempt if Bluetooth is supported — otherwise skip straight to browser print
+      if (typeof navigator !== "undefined" && (navigator as any).bluetooth) {
+        try {
+          const device = await connectPrinter();
+          if (device) {
+            const bytes = buildReceiptBytes(receiptData, 80);
+            await printBytes(bytes);
+            toast({ title: "Receipt printed ✓", description: `Invoice ${invoiceNumber} (${device.name})` });
+            return;
+          }
+        } catch {
+          // User cancelled the Bluetooth picker — fall through to browser print
+        }
+      }
+    }
+
+    // Fallback: browser print (window.print with a receipt-optimized HTML template)
+    const itemsHtml = cart.map(item => `
+      <tr>
+        <td style="padding:2px 4px;text-align:left;font-size:11px">${item.emoji || ''} ${item.name}</td>
+        <td style="padding:2px 4px;text-align:right;font-size:11px">${item.quantity}</td>
+        <td style="padding:2px 4px;text-align:right;font-size:11px">${formatGHS(item.total ?? (item.price * item.quantity * (1 - (item.discount || 0) / 100)))}</td>
+      </tr>`).join("");
+
+    const receiptHtml = `<!DOCTYPE html>
+<html>
+<head>
+<title>Receipt — ${invoiceNumber}</title>
+<style>
+  @page { size: 80mm auto; margin: 0; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Courier New', monospace; width: 80mm; padding: 4mm; color: #000; }
+  .center { text-align: center; }
+  .bold { font-weight: bold; }
+  .dashed { border-top: 1px dashed #000; margin: 4px 0; }
+  table { width: 100%; border-collapse: collapse; }
+  th { font-size: 10px; text-align: left; padding: 2px 4px; border-bottom: 1px solid #000; }
+  .total-row { font-size: 14px; font-weight: bold; }
+  .small { font-size: 10px; }
+  @media print { body { width: 80mm; } }
+</style>
+</head>
+<body>
+  <div class="center bold" style="font-size:14px">${COMPANY.name}</div>
+  <div class="center small">${COMPANY.address}</div>
+  <div class="center small">${COMPANY.contact}</div>
+  <div class="dashed"></div>
+  <div class="small">Invoice: <strong>${invoiceNumber}</strong></div>
+  <div class="small">Date: ${new Date().toLocaleString('en-GB')}</div>
+  <div class="small">Cashier: ${loggedInUser?.fullName || cashier}</div>
+  ${customerName ? `<div class="small">Customer: ${customerName}</div>` : ''}
+  <div class="dashed"></div>
+  <table>
+    <thead><tr><th>Item</th><th style="text-align:right">Qty</th><th style="text-align:right">Total</th></tr></thead>
+    <tbody>${itemsHtml}</tbody>
+  </table>
+  <div class="dashed"></div>
+  <div class="small" style="display:flex;justify-content:space-between"><span>Subtotal:</span><span>${formatGHS(subtotal)}</span></div>
+  ${discountAmount > 0 ? `<div class="small" style="display:flex;justify-content:space-between"><span>Discount:</span><span>-${formatGHS(discountAmount)}</span></div>` : ''}
+  <div class="small" style="display:flex;justify-content:space-between"><span>Tax:</span><span>${formatGHS(taxAmount)}</span></div>
+  <div class="total-row" style="display:flex;justify-content:space-between;margin-top:4px"><span>TOTAL:</span><span>${formatGHS(total)}</span></div>
+  <div class="dashed"></div>
+  <div class="center small">Thank you for shopping!</div>
+  <div class="center small bold">Goods sold are not returnable.</div>
+</body>
+</html>`;
+
+    const printWin = window.open("", "_blank", "width=400,height=600");
+    if (!printWin) {
+      toast({ title: "Popup blocked", description: "Allow popups to print receipts", variant: "destructive" });
+      return;
+    }
+    printWin.document.write(receiptHtml);
+    printWin.document.close();
+    setTimeout(() => {
+      printWin.focus();
+      printWin.print();
+    }, 300);
+    toast({ title: "Printing receipt (F3)", description: `Invoice ${invoiceNumber} (browser print)` });
   };
 
   const handleVoid = () => {
