@@ -734,74 +734,220 @@ function SupplierListPopup({ suppliers, searchText, onSelect, onNew, onClose }: 
   const { toast } = useToast();
   const [query, setQuery] = useState(searchText);
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [showDeleted, setShowDeleted] = useState(false);
+  const [showOutstanding, setShowOutstanding] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { const t = setTimeout(() => inputRef.current?.focus(), 50); return () => clearTimeout(t); }, []);
 
+  // Filtered list — applies search query + toggle filters
   const filtered = useMemo(() => {
     const q = (query || searchText).toLowerCase().trim();
-    if (!q) return suppliers;
-    return suppliers.filter(s => s.name.toLowerCase().includes(q) || s.code.includes(q));
-  }, [suppliers, query, searchText]);
+    let result = suppliers;
+    if (q) {
+      result = result.filter(s =>
+        s.name.toLowerCase().includes(q) ||
+        s.code.toLowerCase().includes(q) ||
+        (s.phone || '').toLowerCase().includes(q) ||
+        (s.mobile || '').toLowerCase().includes(q) ||
+        (s.address || '').toLowerCase().includes(q)
+      );
+    }
+    if (showOutstanding) {
+      // Outstanding = has a non-zero balance
+      result = result.filter(s => Math.abs(s.balance || 0) > 0.01);
+    }
+    return result;
+  }, [suppliers, query, searchText, showOutstanding, showDeleted]);
+
+  // Sort by code ascending (matches screenshot)
+  const sorted = useMemo(() => [...filtered].sort((a, b) => a.code.localeCompare(b.code)), [filtered]);
+
+  // Stats for status bar
+  const totalCount = suppliers.length;
+  const filteredCount = sorted.length;
+  const totalBalance = sorted.reduce((sum, s) => sum + (s.balance || 0), 0);
+  const outstandingCount = sorted.filter(s => Math.abs(s.balance || 0) > 0.01).length;
 
   const handleSelect = () => {
-    const supplier = filtered[selectedIndex];
+    const supplier = sorted[selectedIndex];
     if (!supplier) {
-      toast({ title: 'No supplier selected', variant: 'destructive' });
+      toast({ title: 'No supplier selected', variant: "destructive" });
       return;
     }
     onSelect(supplier);
-    // ALWAYS close the popup after Select.
     onClose();
   };
 
+  // Keyboard navigation
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') { e.preventDefault(); handleSelect(); }
+    if (e.key === 'Escape') { e.preventDefault(); onClose(); }
+    if (e.key === 'ArrowDown') { e.preventDefault(); setSelectedIndex(i => Math.min(sorted.length - 1, i + 1)); }
+    if (e.key === 'ArrowUp') { e.preventDefault(); setSelectedIndex(i => Math.max(0, i - 1)); }
+  };
+
+  // Icon button helper — matches the ezi-solution toolbar style
+  const IconButton = ({ icon, label, color, onClick, disabled, shortcut }: any) => (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      title={shortcut ? `${label} (${shortcut})` : label}
+      className="flex flex-col items-center gap-0.5 p-1.5 rounded hover:bg-slate-100 transition disabled:opacity-40 disabled:cursor-not-allowed"
+    >
+      <div className="h-7 w-7 rounded flex items-center justify-center" style={{ backgroundColor: color }}>
+        {icon}
+      </div>
+      <span className="text-[8px] font-semibold text-slate-700 whitespace-nowrap">{label}</span>
+    </button>
+  );
+
+  const selectedSupplier = sorted[selectedIndex];
+
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/40 flex items-start justify-center pt-4 sm:pt-20 z-50 p-4" onClick={onClose}>
-      <motion.div initial={{ scale: 0.95, y: -20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: -20 }} transition={{ type: "spring", damping: 25, stiffness: 300 }} onClick={(e) => e.stopPropagation()} className="bg-white rounded-lg shadow-2xl overflow-hidden flex flex-col w-full" style={{ width: '100%', maxWidth: '550px', maxHeight: '85vh', fontFamily: 'Arial, Helvetica, sans-serif' }}>
-        {/* Title Bar */}
-        <div className="flex-shrink-0 flex items-center justify-between px-3 h-7 text-white" style={{ backgroundColor: '#5B9BD5' }}>
-          <span className="text-xs font-bold">Suppliers List</span>
-          <button onClick={onClose} className="h-5 w-5 rounded bg-red-600 hover:bg-red-700 flex items-center justify-center transition"><X className="h-3 w-3 text-white" /></button>
-        </div>
-        {/* Search */}
-        <div className="flex-shrink-0 px-3 py-1.5 bg-white border-b border-slate-300 flex items-center gap-2">
-          <label className="text-[10px] font-bold text-slate-700">Search:</label>
-          <input ref={inputRef} value={query} onChange={(e) => { setQuery(e.target.value); setSelectedIndex(0); }} onKeyDown={(e) => { if (e.key === 'Enter') handleSelect(); if (e.key === 'Escape') onClose(); if (e.key === 'ArrowDown') { e.preventDefault(); setSelectedIndex(i => Math.min(filtered.length - 1, i + 1)); } if (e.key === 'ArrowUp') { e.preventDefault(); setSelectedIndex(i => Math.max(0, i - 1)); } }} placeholder="Type supplier name or code..." className="flex-1 h-7 px-2 text-xs border border-slate-400 rounded outline-none focus:ring-2 focus:ring-blue-400" />
-        </div>
-        {/* Table */}
-        <div className="flex-1 overflow-hidden flex flex-col min-h-0">
-          <div className="flex-shrink-0 grid grid-cols-[80px_1fr_1fr] gap-1 px-2 py-1 text-[10px] font-bold text-white" style={{ backgroundColor: '#4A90E2' }}>
-            <div>Code</div><div>Suppliers Name</div><div>Address</div>
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/40 flex items-start justify-center pt-4 sm:pt-10 z-50 p-4" onClick={onClose}>
+      <motion.div
+        initial={{ scale: 0.95, y: -20 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.95, y: -20 }}
+        transition={{ type: "spring", damping: 25, stiffness: 300 }}
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-lg shadow-2xl overflow-hidden flex flex-col w-full border-2"
+        style={{ width: '100%', maxWidth: '1100px', maxHeight: '90vh', borderColor: '#003366', fontFamily: 'Arial, Helvetica, sans-serif' }}
+      >
+        {/* ===== Title Bar — dark blue gradient with count ===== */}
+        <div className="flex-shrink-0 flex items-center justify-between px-3 h-8 text-white" style={{ background: 'linear-gradient(to bottom, #004488, #003366)' }}>
+          <div className="flex items-center gap-1.5">
+            <FileText className="h-3.5 w-3.5" />
+            <span className="text-xs font-bold">Supplier List ({totalCount})</span>
           </div>
+          <button onClick={onClose} className="h-5 w-5 rounded bg-red-600 hover:bg-red-700 flex items-center justify-center transition">
+            <X className="h-3 w-3 text-white" />
+          </button>
+        </div>
+
+        {/* ===== Search & Filters Bar — classic Windows gray ===== */}
+        <div className="flex-shrink-0 px-2 py-1.5 flex items-center gap-2 border-b border-slate-300" style={{ backgroundColor: '#D4D0C8' }}>
+          <label className="text-[10px] font-bold text-slate-700">Search:</label>
+          <input
+            ref={inputRef}
+            value={query}
+            onChange={(e) => { setQuery(e.target.value); setSelectedIndex(0); }}
+            onKeyDown={handleKeyDown}
+            placeholder="Type supplier name, code, phone, or address..."
+            className="h-6 flex-1 max-w-xs px-2 text-[10px] border border-slate-500 rounded bg-white outline-none focus:ring-1 focus:ring-blue-500"
+            style={{ boxShadow: 'inset 1px 1px 2px rgba(0,0,0,0.1)' }}
+          />
+          <button
+            onClick={() => { setSelectedIndex(0); }}
+            className="h-6 px-3 text-[10px] font-bold text-black rounded border border-slate-500 hover:bg-slate-200 transition"
+            style={{ backgroundColor: '#E8E8E8' }}
+          >
+            search
+          </button>
+          <div className="flex-1" />
+          <button
+            onClick={() => { setShowDeleted(!showDeleted); setSelectedIndex(0); }}
+            className={cn("h-6 px-2 text-[10px] font-bold rounded border transition", showDeleted ? "bg-blue-500 text-white border-blue-700" : "bg-slate-200 text-black border-slate-500 hover:bg-slate-300")}
+          >
+            Show deleted Records
+          </button>
+          <button
+            onClick={() => { setShowOutstanding(!showOutstanding); setSelectedIndex(0); }}
+            className={cn("h-6 px-2 text-[10px] font-bold rounded border transition", showOutstanding ? "bg-blue-500 text-white border-blue-700" : "bg-slate-200 text-black border-slate-500 hover:bg-slate-300")}
+          >
+            Show Outstanding
+          </button>
+        </div>
+
+        {/* ===== Data Grid — 6 columns matching ezi-solution ===== */}
+        <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+          {/* Column Headers — blue-grey background */}
+          <div
+            className="flex-shrink-0 grid gap-0 px-1 py-1 text-[10px] font-bold text-white"
+            style={{ backgroundColor: '#7B8FA6', gridTemplateColumns: '70px 1fr 1.4fr 100px 100px 110px' }}
+          >
+            <div className="px-1">Code</div>
+            <div className="px-1">Clients Name</div>
+            <div className="px-1">Address</div>
+            <div className="px-1">Mobile</div>
+            <div className="px-1">Telephone</div>
+            <div className="px-1 text-right">Balance</div>
+          </div>
+
+          {/* Rows — scrollable */}
           <ScrollArea className="flex-1 min-h-0">
             <div>
-              {filtered.length === 0 ? <div className="text-center py-6 text-slate-400 text-xs">No suppliers found</div> : (
-                filtered.map((s, idx) => (
-                  <div key={s.id} onClick={() => setSelectedIndex(idx)} onDoubleClick={() => onSelect(s)} className="grid grid-cols-[80px_1fr_1fr] gap-1 px-2 py-1 text-[10px] cursor-pointer border-b border-slate-100" style={{ backgroundColor: idx === selectedIndex ? '#D6E8FF' : (idx % 2 === 1 ? '#F8F8F8' : '#FFFFFF') }}>
-                    <div className="font-mono">{s.code}</div><div className="truncate">{s.name}</div><div className="truncate text-slate-500">{s.address || '-'}</div>
-                  </div>
-                ))
+              {sorted.length === 0 ? (
+                <div className="text-center py-10 text-slate-400 text-xs">
+                  <FileText className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                  No suppliers found{query ? ` for "${query}"` : ''}
+                </div>
+              ) : (
+                sorted.map((s, idx) => {
+                  const isSelected = idx === selectedIndex;
+                  const isOutstanding = Math.abs(s.balance || 0) > 0.01;
+                  const isNegative = (s.balance || 0) < 0;
+                  const bg = isSelected
+                    ? '#D6E8FF'
+                    : isOutstanding
+                    ? '#FFE4E1'
+                    : idx % 2 === 1
+                    ? '#F0F0F0'
+                    : '#FFFFFF';
+                  return (
+                    <div
+                      key={s.id}
+                      onClick={() => setSelectedIndex(idx)}
+                      onDoubleClick={() => { onSelect(s); onClose(); }}
+                      className="grid gap-0 px-1 py-0.5 text-[10px] cursor-pointer border-b border-slate-100"
+                      style={{ backgroundColor: bg, gridTemplateColumns: '70px 1fr 1.4fr 100px 100px 110px' }}
+                    >
+                      <div className="px-1 font-mono text-slate-700">{s.code}</div>
+                      <div className="px-1 truncate font-medium text-slate-900">{s.name}</div>
+                      <div className="px-1 truncate text-slate-600">{[s.address, s.city].filter(Boolean).join(', ') || '—'}</div>
+                      <div className="px-1 font-mono text-slate-600">{s.mobile || s.phone || '—'}</div>
+                      <div className="px-1 font-mono text-slate-600">{s.phone || '—'}</div>
+                      <div className={cn("px-1 text-right font-mono font-semibold", isNegative ? "text-rose-700" : isOutstanding ? "text-rose-600" : "text-slate-700")}>
+                        {(s.balance || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </div>
+                    </div>
+                  );
+                })
               )}
             </div>
           </ScrollArea>
         </div>
-        {/* Action Buttons */}
-        <div className="flex-shrink-0 px-3 py-1.5 flex items-center gap-1.5 border-t border-slate-300" style={{ backgroundColor: '#E0F0E8' }}>
-          <button onClick={handleSelect} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1" style={{ backgroundColor: '#4CAF50' }}><Check className="h-3 w-3" /> Select (Enter)</button>
-          <button onClick={onNew} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1" style={{ backgroundColor: '#2196F3' }}><Plus className="h-3 w-3" /> New</button>
-          <button onClick={() => { if (!filtered[selectedIndex]) { toast({ title: "Select a supplier first", variant: "destructive" }); return; } toast({ title: "Notes", description: filtered[selectedIndex].name }); }} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1" style={{ backgroundColor: '#9C27B0' }}><StickyNote className="h-3 w-3" /> Notes</button>
-          <div className="flex-1" />
-          <button onClick={onClose} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1" style={{ backgroundColor: '#F44336' }}><X className="h-3 w-3" /> Close (Esc)</button>
+
+        {/* ===== Status Bar — dark blue, totals on left + balance sum on right ===== */}
+        <div className="flex-shrink-0 px-3 py-1 text-[10px] text-white flex items-center justify-between" style={{ background: 'linear-gradient(to bottom, #004488, #003366)' }}>
+          <div className="flex items-center gap-4 font-bold">
+            <span>Total= {filteredCount}</span>
+            <span>Outstanding= {outstandingCount}</span>
+          </div>
+          <div className="font-mono font-bold">
+            {totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </div>
         </div>
-        {/* Status Bar */}
-        <div className="flex-shrink-0 px-3 py-0.5 text-[9px] text-slate-600 flex items-center gap-3" style={{ backgroundColor: '#E0E0E0' }}>
-          <span className="font-mono">{filtered.length} of {suppliers.length} suppliers</span>
+
+        {/* ===== Action Toolbar — 10 icon buttons matching ezi-solution ===== */}
+        <div className="flex-shrink-0 px-2 py-2 flex items-center gap-1 border-t border-slate-300 bg-white overflow-x-auto">
+          <IconButton label="Select" shortcut="Enter" color="#4CAF50" onClick={handleSelect} disabled={!selectedSupplier} icon={<Check className="h-4 w-4 text-white" />} />
+          <IconButton label="New" color="#2196F3" onClick={onNew} icon={<Plus className="h-4 w-4 text-white" />} />
+          <IconButton label="Notes" color="#9C27B0" onClick={() => selectedSupplier ? toast({ title: "Notes", description: selectedSupplier.notes || 'No notes for this supplier' }) : toast({ title: "Select a supplier first", variant: "destructive" })} disabled={!selectedSupplier} icon={<StickyNote className="h-4 w-4 text-white" />} />
+          <IconButton label="History" color="#2196F3" onClick={() => selectedSupplier ? toast({ title: "History", description: `Transaction history for ${selectedSupplier.name}` }) : toast({ title: "Select a supplier first", variant: "destructive" })} disabled={!selectedSupplier} icon={<Hash className="h-4 w-4 text-white" />} />
+          <IconButton label="Delete" color="#9E9E9E" onClick={() => selectedSupplier ? toast({ title: "Delete", description: `Use the supplier form's Delete button to deactivate ${selectedSupplier.name}` }) : toast({ title: "Select a supplier first", variant: "destructive" })} disabled={!selectedSupplier} icon={<Trash2 className="h-4 w-4 text-white" />} />
+          <IconButton label="Mail" color="#2196F3" onClick={() => selectedSupplier ? toast({ title: "Mail", description: `Compose email to ${selectedSupplier.name}` }) : toast({ title: "Select a supplier first", variant: "destructive" })} disabled={!selectedSupplier} icon={<Mail className="h-4 w-4 text-white" />} />
+          <IconButton label="Email" color="#4CAF50" onClick={() => selectedSupplier ? toast({ title: "Email", description: `Send email to ${selectedSupplier.email || '(no email on file)'}` }) : toast({ title: "Select a supplier first", variant: "destructive" })} disabled={!selectedSupplier} icon={<Mail className="h-4 w-4 text-white" />} />
+          <IconButton label="Labels" color="#2196F3" onClick={() => toast({ title: "Labels", description: "Print address labels for selected supplier" })} disabled={!selectedSupplier} icon={<FileText className="h-4 w-4 text-white" />} />
+          <IconButton label="Envelope" shortcut="F3" color="#2196F3" onClick={() => toast({ title: "Envelope (F3)", description: "Print envelope for selected supplier" })} disabled={!selectedSupplier} icon={<Printer className="h-4 w-4 text-white" />} />
+          <div className="flex-1" />
+          <IconButton label="Close" shortcut="Esc" color="#F44336" onClick={onClose} icon={<X className="h-4 w-4 text-white" />} />
         </div>
       </motion.div>
     </motion.div>
   );
 }
-
 // ===== New Supplier Popup =====
 function NewSupplierPopup({ onSave, onClose }: { onSave: (s: Supplier) => void; onClose: () => void; }) {
   const { toast } = useToast();
