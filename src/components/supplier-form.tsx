@@ -13,6 +13,9 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { COMPANY, CURRENCY, formatGHS, type Product } from "@/lib/pos-data";
 import { PopupWindow } from "@/components/popup-window";
+import { SupplierEmailDialog } from "@/components/supplier-email-dialog";
+import { SupplierCatalogDialog } from "@/components/supplier-catalog-dialog";
+import { PurchasePaymentDialog } from "@/components/purchase-payment-dialog";
 
 // Supplier interface — exported so other components (e.g. PurchaseForm) can use real supplier data
 export interface Supplier {
@@ -135,6 +138,15 @@ export function SupplierForm({ onBack, products }: SupplierFormProps) {
   const [paidAmount, setPaidAmount] = useState(0);
   const [showStockList, setShowStockList] = useState(false);
   const [saved, setSaved] = useState(false);
+  // Track saved purchase ID + refNo so Email/Delete/Payment actually work
+  const [savedPurchaseId, setSavedPurchaseId] = useState<string | null>(null);
+  const [savedRefNo, setSavedRefNo] = useState<string>("");
+  // Premium dialog open states
+  const [showEmailDialog, setShowEmailDialog] = useState(false);
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false);
+  const [showCatalogDialog, setShowCatalogDialog] = useState(false);
+  // Supplier's catalog (loaded when a supplier is selected) — drives the "Find Part no" search
+  const [supplierCatalog, setSupplierCatalog] = useState<any[]>([]);
 
   const totals = useMemo(() => {
     const totalQty = lines.reduce((s, l) => s + l.quantity, 0);
@@ -166,6 +178,22 @@ export function SupplierForm({ onBack, products }: SupplierFormProps) {
     setTerms(supplier.tradingTerms);
     setTaxInclusive(supplier.taxInclusive);
     toast({ title: "Supplier selected", description: `${supplier.name} (${supplier.code})` });
+
+    // Load this supplier's catalog so "Find Part no" searches the right products
+    fetch(`/api/suppliers/${supplier.id}/products`, { credentials: "include" })
+      .then(r => r.json())
+      .then(data => {
+        if (data.catalog) {
+          setSupplierCatalog(data.catalog);
+          if (data.catalog.length > 0) {
+            toast({
+              title: "Catalog loaded",
+              description: `${data.catalog.length} product(s) in ${supplier.name}'s catalog — search by part no to add them`,
+            });
+          }
+        }
+      })
+      .catch(() => setSupplierCatalog([]));
   };
 
   // Add new supplier — Premium fix: persist to /api/suppliers
@@ -220,15 +248,19 @@ export function SupplierForm({ onBack, products }: SupplierFormProps) {
 
   // Add product to lines
   const addProductToLine = (product: Product) => {
+    // If this product is in the supplier's catalog, prefer the supplier's cost
+    const catalogEntry = supplierCatalog.find((c: any) => c.productId === product.id);
+    const costToUse = catalogEntry ? catalogEntry.supplierCost : product.costPrice;
+
     const existingIdx = lines.findIndex(l => l.partNo === product.sku);
     if (existingIdx >= 0) {
       setLines(prev => prev.map((l, i) => i === existingIdx ? { ...l, quantity: l.quantity + 1, total: (l.quantity + 1) * l.cost * (1 - l.discount / 100) } : l));
     } else {
-      setLines(prev => [...prev, { id: `line-${Date.now()}`, partNo: product.sku, details: `${product.emoji} ${product.name}`, emoji: product.emoji, quantity: 1, cost: product.costPrice, discount: 0, expiry: product.expiryDate, tax: product.taxable, total: product.costPrice }]);
+      setLines(prev => [...prev, { id: `line-${Date.now()}`, partNo: catalogEntry?.supplierSku || product.sku, details: `${product.emoji} ${product.name}`, emoji: product.emoji, quantity: 1, cost: costToUse, discount: 0, expiry: product.expiryDate, tax: product.taxable, total: costToUse, productId: product.id } as any]);
     }
     setFindPartNo("");
     setOnHand(0);
-    toast({ title: "Product added", description: `${product.emoji} ${product.name}` });
+    toast({ title: "Product added", description: `${product.emoji} ${product.name}${catalogEntry ? ` · supplier cost ₵${catalogEntry.supplierCost.toFixed(2)}` : ""}` });
   };
 
   const updateLine = (idx: number, field: keyof PurchaseLine, value: any) => {
@@ -245,18 +277,75 @@ export function SupplierForm({ onBack, products }: SupplierFormProps) {
   const removeLine = (idx: number) => { setLines(prev => prev.filter((_, i) => i !== idx)); setSelectedLine(null); toast({ title: "Line removed" }); };
 
   // ===== Working Action Handlers =====
-  const handleSave = () => {
+  // Save: persist the supplier PO to /api/purchases (so Email/Payment/Delete can operate on a real record)
+  const handleSave = async () => {
     if (lines.length === 0) { toast({ title: "No items to save", variant: "destructive" }); return; }
     if (!selectedSupplier) { toast({ title: "Select a supplier first", variant: "destructive" }); return; }
-    setSaved(true);
-    toast({ title: "✅ Saved (F2)", description: `${invoiceNo} · ${selectedSupplier.name} · ${lines.length} items · ${formatGHS(totals.grandTotal)}` });
-    setTimeout(() => setSaved(false), 2000);
+
+    const payload = {
+      refNo: invoiceNo,
+      type: "purchase" as const,
+      supplierId: selectedSupplier.id,
+      supplierName: selectedSupplier.name,
+      status: "received" as const,
+      subtotal: totals.totalCost,
+      taxAmount: totals.taxAmount,
+      total: totals.grandTotal,
+      amountPaid: paidAmount,
+      notes: "",
+      items: lines.map(l => ({
+        productId: (l as any).productId || null,
+        partNo: l.partNo,
+        details: l.details,
+        quantity: l.quantity,
+        cost: l.cost,
+        tax: l.tax,
+        total: l.total,
+        expiryDate: l.expiry || null,
+      })),
+    };
+
+    try {
+      const res = await fetch("/api/purchases", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        const errMsg = data.code === "SUPPLIER_NOT_FOUND" || data.code === "FK_SUPPLIER"
+          ? "Supplier not found. Please re-select the supplier."
+          : data.error || `HTTP ${res.status}`;
+        throw new Error(errMsg);
+      }
+      setSaved(true);
+      if (data.purchase?.id) setSavedPurchaseId(data.purchase.id);
+      if (data.purchase?.refNo) {
+        setSavedRefNo(data.purchase.refNo);
+        setInvoiceNo(data.purchase.refNo);
+      }
+      toast({
+        title: "Saved ✓ (F2)",
+        description: `${data.purchase.refNo} · ${selectedSupplier.name} · ${lines.length} items · ${formatGHS(totals.grandTotal)}`,
+      });
+      setTimeout(() => setSaved(false), 2000);
+    } catch (e: any) {
+      toast({ title: "Failed to save", description: e?.message, variant: "destructive" });
+    }
   };
 
   const handlePrint = () => {
     if (lines.length === 0) { toast({ title: "Nothing to print", variant: "destructive" }); return; }
+    // If saved, open the branded PDF view
+    if (savedPurchaseId) {
+      window.open(`/api/purchases/${savedPurchaseId}/pdf`, "_blank");
+      toast({ title: "Opening branded PDF (F3)", description: savedRefNo || invoiceNo });
+      return;
+    }
+    // Fallback: inline print for unsaved
     const printWin = window.open('', '_blank', 'width=800,height=600');
-    if (!printWin) { toast({ title: "Popup blocked", variant: "destructive" }); return; }
+    if (!printWin) { toast({ title: "Popup blocked", description: "Allow popups to print", variant: "destructive" }); return; }
     const rows = lines.map((l, i) => `<tr style="background:${i % 2 === 1 ? '#F8F8F8' : '#FFF'}"><td style="border:1px solid #999;padding:3px 6px;text-align:center">${i + 1}</td><td style="border:1px solid #999;padding:3px 6px;font-family:monospace">${l.partNo}</td><td style="border:1px solid #999;padding:3px 6px">${l.details}</td><td style="border:1px solid #999;padding:3px 6px;text-align:right">${l.quantity.toFixed(2)}</td><td style="border:1px solid #999;padding:3px 6px;text-align:right">${l.cost.toFixed(2)}</td><td style="border:1px solid #999;padding:3px 6px;text-align:right">${l.discount.toFixed(1)}%</td><td style="border:1px solid #999;padding:3px 6px;text-align:center">${l.expiry}</td><td style="border:1px solid #999;padding:3px 6px;text-align:center">${l.tax ? '✓' : ''}</td><td style="border:1px solid #999;padding:3px 6px;text-align:right;font-weight:bold">${l.total.toFixed(2)}</td></tr>`).join('');
     printWin.document.write(`<!DOCTYPE html><html><head><title>Supplier Order ${invoiceNo}</title><style>body{font-family:Arial;margin:20px}h1{text-align:center;font-size:18px;margin:0}h2{text-align:center;font-size:14px;margin:5px 0 15px}.info{display:flex;justify-content:space-between;margin-bottom:15px;font-size:11px}table{width:100%;border-collapse:collapse;font-size:11px}th{background:#E0E0E0;border:1px solid #999;padding:4px 6px}.totals{margin-top:10px;font-size:11px}@media print{thead{display:table-header-group}tr{page-break-inside:avoid}}</style></head><body><div style="text-align:center;border-bottom:2px solid #333;padding-bottom:10px;margin-bottom:15px"><h1>${COMPANY.name}</h1><div style="font-size:12px;color:#666">${COMPANY.address} · ${COMPANY.contact}</div></div><h2>Supplier Purchase Order</h2><div class="info"><div><strong>Invoice:</strong> ${invoiceNo}</div><div><strong>Supplier:</strong> ${selectedSupplier?.name || 'N/A'}</div><div><strong>Date:</strong> ${date}</div><div><strong>Terms:</strong> ${terms || 'N/A'}</div></div><table><thead><tr><th>#</th><th>Part Number</th><th>Details</th><th style="text-align:right">Qty</th><th style="text-align:right">Cost GHC</th><th style="text-align:right">Disc%</th><th style="text-align:center">Expiry</th><th style="text-align:center">TAX</th><th style="text-align:right">Total GHC</th></tr></thead><tbody>${rows}</tbody></table><table class="totals"><tr style="font-weight:bold;border-top:2px solid #333"><td>Total Qty: ${totals.totalQty.toFixed(2)}</td><td>TAX: ${totals.taxAmount.toFixed(2)}</td><td>Total: ${totals.grandTotal.toFixed(2)}</td><td>Paid: ${paidAmount.toFixed(2)}</td><td>Due: ${totals.due.toFixed(2)}</td></tr></table></body></html>`);
     printWin.document.close();
@@ -264,24 +353,64 @@ export function SupplierForm({ onBack, products }: SupplierFormProps) {
     toast({ title: "Printing (F3)", description: `${lines.length} items` });
   };
 
+  // Email: open premium dialog
   const handleEmail = () => {
     if (!selectedSupplier) { toast({ title: "Select a supplier first", variant: "destructive" }); return; }
-    if (lines.length === 0) { toast({ title: "No items to email", variant: "destructive" }); return; }
-    toast({ title: "✅ Email sent", description: `Purchase order ${invoiceNo} emailed to ${selectedSupplier.name} (${selectedSupplier.email || 'no email'})` });
+    setShowEmailDialog(true);
   };
 
-  const handleDelete = () => {
-    if (lines.length === 0) { toast({ title: "Nothing to delete" }); return; }
+  // Delete: cancel the saved purchase (if any) + clear the form
+  const handleDelete = async () => {
+    if (savedPurchaseId) {
+      const reason = window.prompt("Reason for cancelling this purchase? (required)") || "";
+      if (!reason.trim()) return;
+      try {
+        const res = await fetch(`/api/purchases/${savedPurchaseId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ action: "cancel" }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) throw new Error(data.error || `HTTP ${res.status}`);
+        toast({ title: "Purchase cancelled (F4)", description: `${savedRefNo || invoiceNo} — ${reason}` });
+      } catch (e: any) {
+        toast({ title: "Failed to cancel", description: e?.message, variant: "destructive" });
+        return;
+      }
+    } else if (lines.length === 0) {
+      toast({ title: "Nothing to delete" });
+      return;
+    }
     setLines([]); setSelectedLine(null); setPaidAmount(0); setSaved(false);
-    toast({ title: "✅ Deleted (F4)", description: "All lines cleared" });
+    setSavedPurchaseId(null); setSavedRefNo("");
+    setInvoiceNo(`PUR-${Date.now().toString().slice(-6)}`);
+    toast({ title: "Form cleared (F4)" });
   };
 
+  // Payment: open premium payment dialog
   const handlePayment = () => {
     if (lines.length === 0) { toast({ title: "No items", variant: "destructive" }); return; }
     if (totals.due <= 0) { toast({ title: "Already fully paid" }); return; }
-    setPaidAmount(totals.grandTotal);
-    toast({ title: "✅ Payment recorded (F5)", description: `Paid ${formatGHS(totals.grandTotal)} · Due ${formatGHS(0)}` });
+    if (!selectedSupplier) { toast({ title: "Select a supplier first", variant: "destructive" }); return; }
+    setShowPaymentDialog(true);
   };
+
+  // After payment recorded — refresh paid/due from server
+  const handlePaymentSuccess = () => {
+    if (savedPurchaseId) {
+      fetch(`/api/purchases/${savedPurchaseId}`, { credentials: "include" })
+        .then(r => r.json())
+        .then(data => {
+          if (data.purchase) setPaidAmount(Number(data.purchase.amountPaid) || 0);
+        })
+        .catch(() => {});
+    } else {
+      setPaidAmount(totals.grandTotal);
+    }
+  };
+
+  const handlePrint_old_removed = () => {};
 
   const supplierBalance = selectedSupplier?.balance || 0;
   const supplierLimit = selectedSupplier?.creditLimit || 0;
@@ -389,12 +518,19 @@ export function SupplierForm({ onBack, products }: SupplierFormProps) {
           </div>
 
           {/* Action Buttons */}
-          <div className="flex-shrink-0 px-3 py-1.5 flex items-center gap-1.5 border-t border-slate-300" style={{ backgroundColor: '#F0F0F0' }}>
+          <div className="flex-shrink-0 px-3 py-1.5 flex items-center gap-1.5 border-t border-slate-300 flex-wrap" style={{ backgroundColor: '#F0F0F0' }}>
             <button onClick={handleSave} className="h-7 px-3 rounded text-white text-[9px] font-semibold flex items-center gap-1 transition shadow-sm" style={{ backgroundColor: BLUE }}><Save className="h-3 w-3" /> Save <kbd className="text-[7px] bg-white/20 px-0.5 rounded">F2</kbd></button>
-            <button onClick={handlePrint} className="h-7 px-3 rounded text-white text-[9px] font-semibold flex items-center gap-1 transition shadow-sm" style={{ backgroundColor: BLUE }}><Printer className="h-3 w-3" /> Print <kbd className="text-[7px] bg-white/20 px-0.5 rounded">F3</kbd></button>
-            <button onClick={handleEmail} className="h-7 px-3 rounded text-white text-[9px] font-semibold flex items-center gap-1 transition shadow-sm" style={{ backgroundColor: BLUE }}><Mail className="h-3 w-3" /> Email</button>
+            <button onClick={handlePrint} disabled={!savedPurchaseId} title={!savedPurchaseId ? "Save the purchase first to print branded PDF" : "Print branded PDF"} className={cn("h-7 px-3 rounded text-white text-[9px] font-semibold flex items-center gap-1 transition shadow-sm", !savedPurchaseId && "opacity-40 cursor-not-allowed")} style={{ backgroundColor: BLUE }}><Printer className="h-3 w-3" /> Print <kbd className="text-[7px] bg-white/20 px-0.5 rounded">F3</kbd></button>
+            <button onClick={handleEmail} disabled={!selectedSupplier} title={!selectedSupplier ? "Select a supplier first" : "Email this supplier"} className={cn("h-7 px-3 rounded text-white text-[9px] font-semibold flex items-center gap-1 transition shadow-sm", !selectedSupplier && "opacity-40 cursor-not-allowed")} style={{ backgroundColor: BLUE }}><Mail className="h-3 w-3" /> Email</button>
             <button onClick={handleDelete} className="h-7 px-3 rounded text-white text-[9px] font-semibold flex items-center gap-1 transition shadow-sm" style={{ backgroundColor: BLUE }}><Trash2 className="h-3 w-3" /> Delete <kbd className="text-[7px] bg-white/20 px-0.5 rounded">F4</kbd></button>
-            <button onClick={handlePayment} className="h-7 px-3 rounded text-white text-[9px] font-semibold flex items-center gap-1 transition shadow-sm" style={{ backgroundColor: BLUE }}><CreditCard className="h-3 w-3" /> Payment <kbd className="text-[7px] bg-white/20 px-0.5 rounded">F5</kbd></button>
+            <button onClick={handlePayment} disabled={!selectedSupplier || totals.due <= 0} title={!selectedSupplier ? "Select a supplier first" : totals.due <= 0 ? "Already fully paid" : "Record supplier payment"} className={cn("h-7 px-3 rounded text-white text-[9px] font-semibold flex items-center gap-1 transition shadow-sm", (!selectedSupplier || totals.due <= 0) && "opacity-40 cursor-not-allowed")} style={{ backgroundColor: BLUE }}><CreditCard className="h-3 w-3" /> Payment <kbd className="text-[7px] bg-white/20 px-0.5 rounded">F5</kbd></button>
+            {/* Phase 4: New Supplier + Catalog buttons */}
+            <button onClick={() => setShowNewSupplier(true)} title="Add a new supplier to the system" className="h-7 px-3 rounded text-white text-[9px] font-semibold flex items-center gap-1 transition shadow-sm" style={{ backgroundColor: '#16A34A' }}><Plus className="h-3 w-3" /> New Supplier</button>
+            <button onClick={() => setShowCatalogDialog(true)} disabled={!selectedSupplier} title={!selectedSupplier ? "Select a supplier first to manage their catalog" : "Manage this supplier's product catalog — products added here appear in the Find Part No search"} className={cn("h-7 px-3 rounded text-white text-[9px] font-semibold flex items-center gap-1 transition shadow-sm", !selectedSupplier && "opacity-40 cursor-not-allowed")} style={{ backgroundColor: '#9333EA' }}>
+              <Package className="h-3 w-3" /> Catalog
+              {supplierCatalog.length > 0 && <Badge className="ml-0.5 h-3 px-1 text-[8px] bg-white/30 text-white border-0">{supplierCatalog.length}</Badge>}
+            </button>
+            {savedPurchaseId && <Badge className="bg-emerald-500 text-white text-[9px] uppercase border-0">Saved · {savedRefNo}</Badge>}
             <div className="flex-1" />
             {selectedLine !== null && <button onClick={() => removeLine(selectedLine)} className="h-7 px-2 rounded bg-rose-100 hover:bg-rose-200 text-rose-700 text-[9px] font-semibold flex items-center gap-1 transition"><Trash2 className="h-3 w-3" /> Remove Line</button>}
           </div>
@@ -436,13 +572,69 @@ export function SupplierForm({ onBack, products }: SupplierFormProps) {
         <AnimatePresence>
           {showStockList && (
             <StockListMiniPopup
-              products={products}
+              products={(() => {
+                // If supplier has a catalog, show catalog items first, then other products
+                if (supplierCatalog.length > 0) {
+                  const catalogProductIds = new Set(supplierCatalog.map((c: any) => c.productId));
+                  const catalogProducts = supplierCatalog.map((c: any) => ({
+                    ...c.product,
+                    // Override costPrice with supplierCost so the search popup shows the right price
+                    costPrice: c.supplierCost,
+                    // Use supplierSku if set
+                    sku: c.supplierSku || c.product.sku,
+                  } as Product));
+                  const otherProducts = products.filter(p => !catalogProductIds.has(p.id));
+                  return [...catalogProducts, ...otherProducts];
+                }
+                return products;
+              })()}
               searchText={findPartNo}
               onSelect={(product) => { addProductToLine(product); setShowStockList(false); }}
               onClose={() => setShowStockList(false)}
             />
           )}
         </AnimatePresence>
+
+        {/* ===== Premium Dialogs ===== */}
+        <SupplierEmailDialog
+          open={showEmailDialog}
+          onOpenChange={setShowEmailDialog}
+          supplierId={selectedSupplier?.id || null}
+          supplierName={selectedSupplier?.name || ""}
+          supplierEmail={selectedSupplier?.email}
+          supplierContactName={selectedSupplier?.contactName}
+        />
+
+        <PurchasePaymentDialog
+          open={showPaymentDialog}
+          onOpenChange={setShowPaymentDialog}
+          purchaseId={savedPurchaseId}
+          refNo={savedRefNo || invoiceNo}
+          supplierId={selectedSupplier?.id}
+          supplierName={selectedSupplier?.name || ""}
+          totalAmount={totals.grandTotal}
+          paidAmount={paidAmount}
+          onPaid={handlePaymentSuccess}
+        />
+
+        <SupplierCatalogDialog
+          open={showCatalogDialog}
+          onOpenChange={setShowCatalogDialog}
+          supplierId={selectedSupplier?.id || null}
+          supplierName={selectedSupplier?.name || ""}
+          allProducts={products}
+          onChanged={() => {
+            // Reload the catalog state when dialog changes it
+            if (selectedSupplier) {
+              fetch(`/api/suppliers/${selectedSupplier.id}/products`, { credentials: "include" })
+                .then(r => r.json())
+                .then(data => {
+                  if (data.catalog) setSupplierCatalog(data.catalog);
+                })
+                .catch(() => {});
+            }
+          }}
+        />
       </PopupWindow>
     </div>
   );
