@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, Save, Printer, Mail, Trash2, CreditCard, X, Search,
   Plus, Check, Package, Calendar, User, Hash, FileText, Edit2, StickyNote,
+  Image as ImageIcon, Tag,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -661,62 +662,211 @@ function StockListMiniPopup({ products, searchText, onSelect, onClose }: {
 }) {
   const { toast } = useToast();
   const [query, setQuery] = useState(searchText);
+  const [typeFilter, setTypeFilter] = useState("");
+  const [groupFilter, setGroupFilter] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { const t = setTimeout(() => inputRef.current?.focus(), 50); return () => clearTimeout(t); }, []);
 
+  // Filtered list — searches across name, sku, AND barcode
   const filtered = useMemo(() => {
     const q = (query || searchText).toLowerCase().trim();
-    if (!q) return products;
-    return products.filter(p => p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q) || p.barcode.includes(q));
-  }, [products, query, searchText]);
+    let result = products;
+    if (q) {
+      result = result.filter(p =>
+        p.name.toLowerCase().includes(q) ||
+        p.sku.toLowerCase().includes(q) ||
+        (p.barcode || '').toLowerCase().includes(q)
+      );
+    }
+    if (typeFilter) {
+      result = result.filter(p => (p.category || '').toLowerCase() === typeFilter.toLowerCase());
+    }
+    if (groupFilter) {
+      result = result.filter(p => (p.groupId || '') === groupFilter);
+    }
+    // Sort by name ascending (matches screenshot — alphabetical by product name)
+    return [...result].sort((a, b) => a.name.localeCompare(b.name));
+  }, [products, query, searchText, typeFilter, groupFilter]);
+
+  // Unique categories for the Type dropdown
+  const categories = useMemo(() => {
+    const set = new Set(products.map(p => p.category || '').filter(Boolean));
+    return Array.from(set).sort();
+  }, [products]);
 
   const handleSelect = () => {
     const product = filtered[selectedIndex];
     if (!product) {
-      toast({ title: 'No product selected', variant: 'destructive' });
+      toast({ title: 'No product selected', variant: "destructive" });
       return;
     }
     onSelect(product);
-    // ALWAYS close the popup after Select — the parent's onSelect handler
-    // may also close it, but this ensures the popup closes even if the
-    // handler throws or returns early.
     onClose();
   };
 
+  // Keyboard navigation
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') { e.preventDefault(); handleSelect(); }
+    if (e.key === 'Escape') { e.preventDefault(); onClose(); }
+    if (e.key === 'ArrowDown') { e.preventDefault(); setSelectedIndex(i => Math.min(filtered.length - 1, i + 1)); }
+    if (e.key === 'ArrowUp') { e.preventDefault(); setSelectedIndex(i => Math.max(0, i - 1)); }
+  };
+
+  // Icon button helper — matches the ezi-solution toolbar style (square icon + label below)
+  const IconButton = ({ icon, label, color, onClick, disabled, shortcut }: any) => (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      title={shortcut ? `${label} (${shortcut})` : label}
+      className="flex flex-col items-center gap-0.5 p-1.5 rounded hover:bg-slate-100 transition disabled:opacity-40 disabled:cursor-not-allowed"
+    >
+      <div className="h-8 w-8 rounded border border-slate-300 bg-white flex items-center justify-center shadow-sm">
+        {icon}
+      </div>
+      <span className="text-[8px] font-semibold text-slate-700 whitespace-nowrap">{label}</span>
+    </button>
+  );
+
+  const selectedProduct = filtered[selectedIndex];
+
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/40 flex items-start justify-center pt-4 sm:pt-20 z-50 p-4" onClick={onClose}>
-      <motion.div initial={{ scale: 0.95, y: -20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: -20 }} transition={{ type: "spring", damping: 25, stiffness: 300 }} onClick={(e) => e.stopPropagation()} className="bg-white rounded-lg shadow-2xl overflow-hidden flex flex-col w-full" style={{ width: '100%', maxWidth: '650px', maxHeight: '85vh', fontFamily: 'Arial, Helvetica, sans-serif' }}>
-        <div className="flex-shrink-0 flex items-center justify-between px-3 h-7 text-white" style={{ backgroundColor: '#5B9BD5' }}>
-          <span className="text-xs font-bold">Stock List</span>
-          <button onClick={onClose} className="h-5 w-5 rounded hover:bg-white/25 flex items-center justify-center transition"><X className="h-3.5 w-3.5" /></button>
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/40 flex items-start justify-center pt-4 sm:pt-10 z-50 p-4" onClick={onClose}>
+      <motion.div
+        initial={{ scale: 0.95, y: -20 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.95, y: -20 }}
+        transition={{ type: "spring", damping: 25, stiffness: 300 }}
+        onClick={(e) => e.stopPropagation()}
+        className="rounded-lg shadow-2xl overflow-hidden flex flex-col w-full"
+        style={{ width: '100%', maxWidth: '900px', maxHeight: '90vh', backgroundColor: '#669999', fontFamily: 'Tahoma, Arial, Helvetica, sans-serif' }}
+      >
+        {/* ===== Header — "Stock Search" title ===== */}
+        <div className="px-3 pt-2 pb-1.5">
+          <h2 className="text-base font-bold text-black">Stock Search</h2>
         </div>
-        <div className="flex-shrink-0 px-3 py-1.5 bg-white border-b border-slate-300 flex items-center gap-2">
-          <label className="text-[10px] font-bold text-slate-700">Search:</label>
-          <input ref={inputRef} value={query} onChange={(e) => { setQuery(e.target.value); setSelectedIndex(0); }} onKeyDown={(e) => { if (e.key === 'Enter') handleSelect(); if (e.key === 'Escape') onClose(); if (e.key === 'ArrowDown') { e.preventDefault(); setSelectedIndex(i => Math.min(filtered.length - 1, i + 1)); } if (e.key === 'ArrowUp') { e.preventDefault(); setSelectedIndex(i => Math.max(0, i - 1)); } }} placeholder="Type to search..." className="flex-1 h-7 px-2 text-xs border border-slate-400 rounded outline-none focus:ring-2 focus:ring-blue-400" />
-        </div>
-        <div className="flex-1 overflow-hidden flex flex-col min-h-0">
-          <div className="flex-shrink-0 grid grid-cols-[120px_1fr_45px_80px_80px] gap-1 px-2 py-1 text-[10px] font-bold text-white" style={{ backgroundColor: '#4A90E2' }}>
-            <div>Part No</div><div>Item Details</div><div className="text-right">Qty</div><div className="text-right">Cost GHC</div><div className="text-right">Trade GHC</div>
+
+        {/* ===== Search & Filter Panel — dark green headers + inputs ===== */}
+        <div className="mx-3 mb-2 bg-white border border-slate-400">
+          {/* Row 1: Details input + Search button + Type dropdown */}
+          <div className="grid grid-cols-[70px_1fr_70px_60px_140px] gap-1 p-1.5 items-center">
+            <div className="px-1.5 py-0.5 text-[10px] font-bold text-white text-center" style={{ backgroundColor: '#2E5D4B' }}>Details</div>
+            <input
+              ref={inputRef}
+              value={query}
+              onChange={(e) => { setQuery(e.target.value); setSelectedIndex(0); }}
+              onKeyDown={handleKeyDown}
+              placeholder="Type to search by name, SKU, or barcode..."
+              className="h-6 px-2 text-[10px] border border-slate-500 rounded bg-white outline-none focus:ring-1 focus:ring-blue-500"
+              style={{ boxShadow: 'inset 1px 1px 2px rgba(0,0,0,0.1)' }}
+            />
+            <button
+              onClick={() => { setSelectedIndex(0); }}
+              className="h-6 text-[10px] font-bold text-black rounded border border-slate-500 hover:bg-slate-200 transition"
+              style={{ backgroundColor: '#E8E8E8' }}
+            >
+              Search
+            </button>
+            <div className="px-1.5 py-0.5 text-[10px] font-bold text-white text-center" style={{ backgroundColor: '#2E5D4B' }}>Type</div>
+            <select
+              value={typeFilter}
+              onChange={(e) => { setTypeFilter(e.target.value); setSelectedIndex(0); }}
+              className="h-6 px-1 text-[10px] border border-slate-500 rounded bg-white outline-none"
+            >
+              <option value="">All Types</option>
+              {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+            </select>
           </div>
+          {/* Row 2: Stock Group filters (4 dropdowns) */}
+          <div className="grid grid-cols-[70px_140px_70px_140px_70px_140px] gap-1 px-1.5 pb-1.5 items-center">
+            <div className="px-1.5 py-0.5 text-[10px] font-bold text-white text-center" style={{ backgroundColor: '#2E5D4B' }}>Stock Group</div>
+            <select
+              value={groupFilter}
+              onChange={(e) => { setGroupFilter(e.target.value); setSelectedIndex(0); }}
+              className="h-6 px-1 text-[10px] border border-slate-500 rounded bg-white outline-none"
+            >
+              <option value="">All Groups</option>
+            </select>
+            <div className="px-1.5 py-0.5 text-[10px] font-bold text-white text-center" style={{ backgroundColor: '#2E5D4B' }}>Group1</div>
+            <select className="h-6 px-1 text-[10px] border border-slate-500 rounded bg-white outline-none">
+              <option value="">All</option>
+            </select>
+            <div className="px-1.5 py-0.5 text-[10px] font-bold text-white text-center" style={{ backgroundColor: '#2E5D4B' }}>Group2</div>
+            <select className="h-6 px-1 text-[10px] border border-slate-500 rounded bg-white outline-none">
+              <option value="">All</option>
+            </select>
+          </div>
+        </div>
+
+        {/* ===== Data Grid — white background, light grey header, 5 columns ===== */}
+        <div className="mx-3 mb-2 flex-1 overflow-hidden flex flex-col min-h-0 bg-white border border-slate-400">
+          {/* Column Headers — light grey background */}
+          <div
+            className="flex-shrink-0 grid gap-0 px-1 py-1 text-[10px] font-bold text-black border-b border-slate-400"
+            style={{ backgroundColor: '#E8E8E8', gridTemplateColumns: '24px 130px 1fr 70px 90px 90px' }}
+          >
+            <div></div>
+            <div className="px-1">Part no.</div>
+            <div className="px-1">Details</div>
+            <div className="px-1 text-right">Qty</div>
+            <div className="px-1 text-right">Retail</div>
+            <div className="px-1 text-right">Cost</div>
+          </div>
+
+          {/* Rows — scrollable */}
           <ScrollArea className="flex-1 min-h-0">
             <div>
-              {filtered.length === 0 ? <div className="text-center py-6 text-slate-400 text-xs">No products found</div> : (
-                filtered.map((p, idx) => (
-                  <div key={p.id} onClick={() => setSelectedIndex(idx)} onDoubleClick={() => onSelect(p)} className="grid grid-cols-[120px_1fr_45px_80px_80px] gap-1 px-2 py-1 text-[10px] cursor-pointer border-b border-slate-100" style={{ backgroundColor: idx === selectedIndex ? '#D6E8FF' : (idx % 2 === 1 ? '#F8F8F8' : '#FFFFFF') }}>
-                    <div className="font-mono truncate">{p.barcode}</div><div className="truncate">{p.emoji} {p.name}</div><div className="text-right font-mono">{p.stock}</div><div className="text-right font-mono">{p.costPrice.toFixed(2)}</div><div className="text-right font-mono">{p.costPrice.toFixed(2)}</div>
-                  </div>
-                ))
+              {filtered.length === 0 ? (
+                <div className="text-center py-10 text-slate-400 text-xs">
+                  <Package className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                  No products found{query ? ` for "${query}"` : ''}
+                </div>
+              ) : (
+                filtered.map((p, idx) => {
+                  const isSelected = idx === selectedIndex;
+                  const bg = isSelected ? '#CCE8FF' : '#FFFFFF';
+                  return (
+                    <div
+                      key={p.id}
+                      onClick={() => setSelectedIndex(idx)}
+                      onDoubleClick={() => { onSelect(p); onClose(); }}
+                      className="grid gap-0 px-1 py-0.5 text-[10px] cursor-pointer border-b"
+                      style={{ backgroundColor: bg, gridTemplateColumns: '24px 130px 1fr 70px 90px 90px', borderBottomColor: '#D4D4D4' }}
+                    >
+                      {/* Row selector column — arrow indicator when selected */}
+                      <div className="px-0.5 flex items-center justify-center">
+                        {isSelected && <span className="text-black text-[12px] leading-none">▶</span>}
+                      </div>
+                      <div className="px-1 font-mono text-slate-700 truncate">{p.sku || p.barcode}</div>
+                      <div className="px-1 truncate text-slate-900">{p.emoji} {p.name}</div>
+                      <div className="px-1 text-right font-mono text-slate-700">{Number(p.stock || p.quantity || 0).toFixed(3)}</div>
+                      <div className="px-1 text-right font-mono text-slate-700">{Number(p.price || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                      <div className="px-1 text-right font-mono text-slate-700">{Number(p.costPrice || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                    </div>
+                  );
+                })
               )}
             </div>
           </ScrollArea>
         </div>
-        <div className="flex-shrink-0 px-3 py-1.5 flex items-center gap-1.5 border-t border-slate-300" style={{ backgroundColor: '#E0F0E8' }}>
-          <button onClick={handleSelect} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1" style={{ backgroundColor: '#4CAF50' }}><Check className="h-3 w-3" /> Select (Enter)</button>
-          <button onClick={() => toast({ title: "New Product", description: "Use Stock File to add new products" })} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1" style={{ backgroundColor: '#2196F3' }}><Plus className="h-3 w-3" /> New</button>
+
+        {/* ===== Status Bar — showing count ===== */}
+        <div className="mx-3 mb-1 px-2 py-0.5 text-[10px] text-black flex items-center justify-between" style={{ backgroundColor: '#E8E8E8', border: '1px solid #808080' }}>
+          <span className="font-mono font-semibold">{filtered.length} of {products.length} products</span>
+          <span className="font-mono">Total Qty: {filtered.reduce((s, p) => s + Number(p.stock || p.quantity || 0), 0).toFixed(3)}</span>
+        </div>
+
+        {/* ===== Action Toolbar — 7 icon buttons matching ezi-solution ===== */}
+        <div className="mx-3 mb-2 px-2 py-2 flex items-center gap-1 bg-white border border-slate-300 overflow-x-auto">
+          <IconButton label="Select" shortcut="Enter" color="#28A745" onClick={handleSelect} disabled={!selectedProduct} icon={<Check className="h-5 w-5" style={{ color: '#28A745' }} />} />
+          <IconButton label="New" color="#0066CC" onClick={() => toast({ title: "New Product", description: "Use Stock File to add new products" })} icon={<><FileText className="h-5 w-5 text-blue-600" /><Plus className="h-3 w-3 text-green-600 absolute ml-3 -mt-2" /></>} />
+          <IconButton label="Picture" color="#666" onClick={() => selectedProduct ? toast({ title: "Picture", description: `View image for ${selectedProduct.name}` }) : toast({ title: "Select a product first", variant: "destructive" })} disabled={!selectedProduct} icon={<ImageIcon className="h-5 w-5 text-slate-500" />} />
+          <IconButton label="History" color="#0066CC" onClick={() => selectedProduct ? toast({ title: "History", description: `Stock history for ${selectedProduct.name}` }) : toast({ title: "Select a product first", variant: "destructive" })} disabled={!selectedProduct} icon={<Hash className="h-5 w-5 text-blue-600" />} />
+          <IconButton label="Labels" color="#0066CC" onClick={() => toast({ title: "Labels", description: "Print price labels for selected product" })} disabled={!selectedProduct} icon={<Tag className="h-5 w-5 text-blue-600" />} />
+          <IconButton label="Qty" color="#0066CC" onClick={() => selectedProduct ? toast({ title: "Qty", description: `${selectedProduct.name}: ${selectedProduct.stock || selectedProduct.quantity || 0} on hand` }) : toast({ title: "Select a product first", variant: "destructive" })} disabled={!selectedProduct} icon={<Hash className="h-5 w-5 text-blue-600" />} />
           <div className="flex-1" />
-          <button onClick={onClose} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1" style={{ backgroundColor: '#F44336' }}><X className="h-3 w-3" /> Close (Esc)</button>
+          <IconButton label="Close" shortcut="Esc" color="#DC3545" onClick={onClose} icon={<X className="h-5 w-5 text-red-600" />} />
         </div>
       </motion.div>
     </motion.div>
