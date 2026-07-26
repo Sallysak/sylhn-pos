@@ -65,6 +65,47 @@ export async function POST(req: NextRequest) {
   // Pull expectedAt separately (not in schema to keep it loose)
   const expectedAt = (body as any).expectedAt ? new Date((body as any).expectedAt) : null;
 
+  // FIX: Foreign-key constraint violation on purchase_supplierid_fkey.
+  // The client sometimes sends a supplier NAME (e.g. "AgriCorp Ghana") instead
+  // of the supplier UUID, which Prisma rejects with P2003. We verify the
+  // supplier exists BEFORE entering the transaction and return a friendly 400
+  // instead of letting the error bubble up as a 500.
+  if (p.supplierId) {
+    // Reject obvious non-UUID values (names, codes, etc.) — UUIDs are 36 chars
+    // with dashes. This catches the most common client-side mistake.
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!UUID_RE.test(String(p.supplierId))) {
+      return NextResponse.json(
+        {
+          error: "Invalid supplier reference",
+          detail: "The supplier value looks like a name, not an ID. Please re-select the supplier from the dropdown.",
+          code: "SUPPLIER_NOT_UUID",
+        },
+        { status: 400 }
+      );
+    }
+    const supplier = await db.supplier.findUnique({
+      where: { id: String(p.supplierId) },
+      select: { id: true, name: true, active: true },
+    });
+    if (!supplier) {
+      return NextResponse.json(
+        {
+          error: "Supplier not found",
+          detail: `No supplier exists with id "${p.supplierId}". Please re-select the supplier from the dropdown.`,
+          code: "SUPPLIER_NOT_FOUND",
+        },
+        { status: 400 }
+      );
+    }
+    if (!supplier.active) {
+      return NextResponse.json(
+        { error: "Supplier deactivated", detail: `Supplier "${supplier.name}" is inactive. Reactivate them first.` },
+        { status: 400 }
+      );
+    }
+  }
+
   try {
     const purchase = await db.$transaction(async (tx) => {
       const refNo = p.refNo || generatePurchaseRefNo();
@@ -164,6 +205,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, purchase });
   } catch (e: any) {
     console.error("POST /api/purchases error:", e);
+    // Surface FK violations as friendly 400s — defense in depth in case the
+    // pre-check above somehow misses a case (e.g. race condition where the
+    // supplier is deleted between the check and the create).
+    if (e?.code === "P2003" && typeof e?.meta?.constraint === "string" && e.meta.constraint.includes("supplierid")) {
+      return NextResponse.json(
+        { error: "Invalid supplier", detail: "The selected supplier does not exist. Please re-select the supplier.", code: "FK_SUPPLIER" },
+        { status: 400 }
+      );
+    }
+    if (e?.code === "P2003") {
+      return NextResponse.json(
+        { error: "Reference error", detail: `A referenced record does not exist: ${e?.meta?.constraint}`, code: "FK_VIOLATION" },
+        { status: 400 }
+      );
+    }
     return NextResponse.json({ error: e?.message || "Failed to create purchase" }, { status: 500 });
   }
 }

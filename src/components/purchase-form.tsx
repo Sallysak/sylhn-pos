@@ -15,6 +15,8 @@ import { COMPANY, CURRENCY, formatGHS, type Product, type StockGroup } from "@/l
 import { PopupWindow } from "@/components/popup-window";
 import { PurchaseListPopup, type PurchaseListRow } from "@/components/purchase-list-popup";
 import { PurchaseOrderListPopup, type PurchaseOrderListRow } from "@/components/purchase-order-list-popup";
+import { PurchaseEmailDialog } from "@/components/purchase-email-dialog";
+import { PurchasePaymentDialog } from "@/components/purchase-payment-dialog";
 
 // ===== Sample existing purchase transactions (linked to Purchase List) =====
 const existingPurchases: (PurchaseListRow & { items?: { sku: string; name: string; emoji: string; qty: number; cost: number; taxable: boolean }[]; supplier?: string; date?: string })[] = [
@@ -117,6 +119,12 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
   const [paidAmount, setPaidAmount] = useState(0);
   const [saved, setSaved] = useState(false);
   const [showDraftBanner, setShowDraftBanner] = useState(false);
+  // Track the saved purchase ID + refNo so Email/Payment/Delete buttons can call the right endpoints
+  const [savedPurchaseId, setSavedPurchaseId] = useState<string | null>(null);
+  const [savedRefNo, setSavedRefNo] = useState<string>("");
+  // Premium dialog open states
+  const [showEmailDialog, setShowEmailDialog] = useState(false);
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false);
 
   const findPartNoRef = useRef<HTMLInputElement>(null);
 
@@ -412,9 +420,24 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
       });
       const data = await res.json();
       if (!res.ok || !data.success) {
-        throw new Error(data.error || `HTTP ${res.status}`);
+        // Surface FK errors with a friendly message — this is the fix for
+        // "foreign key constraint violated on purchase_supplierid_fkey"
+        const errMsg = data.code === "SUPPLIER_NOT_FOUND" || data.code === "FK_SUPPLIER"
+          ? "Supplier not found. Please re-select the supplier from the dropdown."
+          : data.code === "SUPPLIER_NOT_UUID"
+          ? "The supplier value looks wrong. Please re-select the supplier from the dropdown."
+          : data.code === "SUPPLIER_DEACTIVATED"
+          ? "This supplier is deactivated. Reactivate them in the supplier master file first."
+          : data.error || `HTTP ${res.status}`;
+        throw new Error(errMsg);
       }
       setSaved(true);
+      // Track the saved purchase ID + refNo so Email/Payment buttons work
+      if (data.purchase?.id) setSavedPurchaseId(data.purchase.id);
+      if (data.purchase?.refNo) {
+        setSavedRefNo(data.purchase.refNo);
+        setInvoiceNo(data.purchase.refNo);
+      }
       toast({
         title: "Purchase saved to server",
         description: `${data.purchase.refNo} · ${lines.length} items · ${formatGHS(totals.grandTotal)} · stock updated`,
@@ -498,12 +521,40 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
   const handleEmail = () => {
     if (!supplier) { toast({ title: "Select a supplier first", variant: "destructive" }); return; }
     if (lines.length === 0) { toast({ title: "No items to email", variant: "destructive" }); return; }
-    toast({ title: "Email sent ✓", description: `Purchase order ${invoiceNo} emailed to ${supplier}` });
+    if (!savedPurchaseId) {
+      toast({ title: "Save the purchase first", description: "You can only email a saved purchase order.", variant: "destructive" });
+      return;
+    }
+    setShowEmailDialog(true);
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (lines.length === 0) { toast({ title: "Nothing to delete" }); return; }
+    // If the purchase has been saved to the server, cancel it server-side (soft delete)
+    if (savedPurchaseId) {
+      const reason = window.prompt("Reason for cancelling this purchase? (required)") || "";
+      if (!reason.trim()) return;
+      try {
+        const res = await fetch(`/api/purchases/${savedPurchaseId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ action: 'cancel' }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || `HTTP ${res.status}`);
+        }
+        toast({ title: "Purchase cancelled (F4)", description: `${savedRefNo || invoiceNo} marked as cancelled — ${reason}` });
+      } catch (e: any) {
+        toast({ title: "Failed to cancel", description: e?.message, variant: "destructive" });
+        return;
+      }
+    }
+    // Clear local form state
     setLines([]); setSelectedLine(null); setPaidAmount(0); setSaved(false);
+    setSavedPurchaseId(null); setSavedRefNo("");
+    setInvoiceNo(`PUR-${Date.now().toString().slice(-6)}`);
     toast({ title: "Purchase deleted (F4)", description: "All lines cleared" });
   };
 
@@ -511,8 +562,33 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
     if (lines.length === 0) { toast({ title: "No items", variant: "destructive" }); return; }
     const due = totals.due;
     if (due <= 0) { toast({ title: "Fully paid", description: "No balance due" }); return; }
+    if (!savedPurchaseId) {
+      toast({ title: "Save the purchase first", description: "You can only record a payment on a saved purchase.", variant: "destructive" });
+      return;
+    }
+    const supplierObj = suppliers.find(s => s.name === supplier || `${s.code}-${s.name}` === supplier);
+    if (!supplierObj) {
+      toast({ title: "Invalid supplier", description: "Please re-select the supplier from the dropdown.", variant: "destructive" });
+      return;
+    }
+    setShowPaymentDialog(true);
+  };
+
+  // Called after a successful payment — refresh local paid/due state
+  const handlePaymentSuccess = () => {
     setPaidAmount(totals.grandTotal);
-    toast({ title: "Payment recorded (F5)", description: `Paid ${formatGHS(totals.grandTotal)} · Due ${formatGHS(0)}` });
+    setSaved(false); // allow re-save or refresh from server
+    // Refresh the purchase from server to get the latest paidAmount
+    if (savedPurchaseId) {
+      fetch(`/api/purchases/${savedPurchaseId}`, { credentials: 'include' })
+        .then(r => r.json())
+        .then(data => {
+          if (data.purchase) {
+            setPaidAmount(Number(data.purchase.amountPaid) || 0);
+          }
+        })
+        .catch(() => {});
+    }
   };
 
   // ===== Keyboard shortcuts: F2/F3/F4/F5/F7/Esc =====
@@ -779,9 +855,9 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
           <div className="flex-shrink-0 px-3 py-1.5 flex items-center gap-1.5 border-t border-slate-300" style={{ backgroundColor: '#F0F0F0' }}>
             <button onClick={handleSave} className="h-7 px-3 rounded text-white text-[9px] font-semibold flex items-center gap-1 transition shadow-sm" style={{ backgroundColor: GREEN }}> <Save className="h-3 w-3" /> Save <kbd className="text-[7px] bg-white/20 px-0.5 rounded">F2</kbd></button>
             <button onClick={handlePrint} className="h-7 px-3 rounded text-white text-[9px] font-semibold flex items-center gap-1 transition shadow-sm" style={{ backgroundColor: GREEN }}> <Printer className="h-3 w-3" /> Print <kbd className="text-[7px] bg-white/20 px-0.5 rounded">F3</kbd></button>
-            <button onClick={handleEmail} className="h-7 px-3 rounded text-white text-[9px] font-semibold flex items-center gap-1 transition shadow-sm" style={{ backgroundColor: GREEN }}> <Mail className="h-3 w-3" /> Email</button>
+            <button onClick={handleEmail} disabled={!savedPurchaseId} title={!savedPurchaseId ? "Save the purchase first to enable email" : "Email this purchase order to the supplier"} className={cn("h-7 px-3 rounded text-white text-[9px] font-semibold flex items-center gap-1 transition shadow-sm", !savedPurchaseId && "opacity-40 cursor-not-allowed")} style={{ backgroundColor: GREEN }}> <Mail className="h-3 w-3" /> Email</button>
             <button onClick={handleDelete} className="h-7 px-3 rounded text-white text-[9px] font-semibold flex items-center gap-1 transition shadow-sm" style={{ backgroundColor: GREEN }}> <Trash2 className="h-3 w-3" /> Delete <kbd className="text-[7px] bg-white/20 px-0.5 rounded">F4</kbd></button>
-            <button onClick={handlePayment} className="h-7 px-3 rounded text-white text-[9px] font-semibold flex items-center gap-1 transition shadow-sm" style={{ backgroundColor: GREEN }}> <CreditCard className="h-3 w-3" /> Payment <kbd className="text-[7px] bg-white/20 px-0.5 rounded">F5</kbd></button>
+            <button onClick={handlePayment} disabled={!savedPurchaseId} title={!savedPurchaseId ? "Save the purchase first to enable payment" : "Record a supplier payment"} className={cn("h-7 px-3 rounded text-white text-[9px] font-semibold flex items-center gap-1 transition shadow-sm", !savedPurchaseId && "opacity-40 cursor-not-allowed")} style={{ backgroundColor: GREEN }}> <CreditCard className="h-3 w-3" /> Payment <kbd className="text-[7px] bg-white/20 px-0.5 rounded">F5</kbd></button>
             <div className="flex-1" />
             {selectedLine !== null && <button onClick={() => removeLine(selectedLine)} className="h-7 px-2 rounded bg-rose-100 hover:bg-rose-200 text-rose-700 text-[9px] font-semibold flex items-center gap-1 transition"><Trash2 className="h-3 w-3" /> Remove Line</button>}
           </div>
@@ -828,6 +904,30 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
           )}
         </AnimatePresence>
       </PopupWindow>
+
+      {/* ===== Premium Email Dialog ===== */}
+      <PurchaseEmailDialog
+        open={showEmailDialog}
+        onOpenChange={setShowEmailDialog}
+        purchaseId={savedPurchaseId}
+        refNo={savedRefNo || invoiceNo}
+        supplierName={supplier}
+        supplierEmail={suppliers.find(s => s.name === supplier)?.email}
+        totalAmount={totals.grandTotal}
+      />
+
+      {/* ===== Premium Payment Dialog ===== */}
+      <PurchasePaymentDialog
+        open={showPaymentDialog}
+        onOpenChange={setShowPaymentDialog}
+        purchaseId={savedPurchaseId}
+        refNo={savedRefNo || invoiceNo}
+        supplierId={suppliers.find(s => s.name === supplier)?.id}
+        supplierName={supplier}
+        totalAmount={totals.grandTotal}
+        paidAmount={paidAmount}
+        onPaid={handlePaymentSuccess}
+      />
     </div>
   );
 }
