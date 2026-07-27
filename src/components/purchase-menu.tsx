@@ -30,6 +30,7 @@ interface PurchaseMenuProps {
   products: Product[];
   onOpenPurchasingForm?: () => void;
   onOpenSupplierForm?: () => void;
+  onOpenPurchaseHub?: () => void;
 }
 
 // ===== Sample purchase transactions (linked to existing data) =====
@@ -66,12 +67,12 @@ const purchaseOrders: PurchaseOrderListRow[] = [
   { id: 'po6', transactionType: '6-AgriCorp Ghana', invoiceNo: 'PO-2026-006', date: '2026-07-08', amount: 920.00, paid: 0, due: 920.00, status: 'draft' },
 ];
 
-export function PurchaseMenu({ onBack, products, onOpenPurchasingForm, onOpenSupplierForm }: PurchaseMenuProps) {
+export function PurchaseMenu({ onBack, products, onOpenPurchasingForm, onOpenSupplierForm, onOpenPurchaseHub }: PurchaseMenuProps) {
   const { toast } = useToast();
   const [showPurchaseList, setShowPurchaseList] = useState(false);
   const [showOrderList, setShowOrderList] = useState(false);
 
-  // ===== Left panel: 3 menu items =====
+  // ===== Left panel: 4 menu items =====
   const menuItems = [
     {
       icon: Package,
@@ -91,6 +92,16 @@ export function PurchaseMenu({ onBack, products, onOpenPurchasingForm, onOpenSup
       action: () => {
         if (onOpenSupplierForm) onOpenSupplierForm();
         else toast({ title: 'Opening Supplier Form', description: 'Add or modify supplier records' });
+      },
+    },
+    {
+      icon: TrendingUp,
+      label: 'Purchase Hub',
+      desc: 'Real-time POs, invoices, returns, performance, payments',
+      shortcut: 'F4',
+      action: () => {
+        if (onOpenPurchaseHub) onOpenPurchaseHub();
+        else toast({ title: 'Opening Purchase Hub', description: 'Real-time procurement dashboard' });
       },
     },
     {

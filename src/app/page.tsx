@@ -79,6 +79,7 @@ const StockManagement = dynamic(() => import("@/components/stock-management").th
 const StockHistoryView = dynamic(() => import("@/components/stock-history").then(m => ({ default: m.StockHistory })), { ssr: false, loading: loadingFallback });
 const Reports = dynamic(() => import("@/components/reports").then(m => ({ default: m.Reports })), { ssr: false, loading: loadingFallback });
 const PurchaseMenu = dynamic(() => import("@/components/purchase-menu").then(m => ({ default: m.PurchaseMenu })), { ssr: false, loading: loadingFallback });
+const PurchaseHub = dynamic(() => import("@/components/purchase-hub").then(m => ({ default: m.PurchaseHub })), { ssr: false, loading: loadingFallback });
 const TelephoneModule = dynamic(() => import("@/components/telephone-module").then(m => ({ default: m.TelephoneModule })), { ssr: false, loading: loadingFallback });
 const TelephoneDirectory = dynamic(() => import("@/components/telephone-directory").then(m => ({ default: m.TelephoneDirectory })), { ssr: false, loading: loadingFallback });
 const MaintenanceModule = dynamic(() => import("@/components/maintenance-module").then(m => ({ default: m.MaintenanceModule })), { ssr: false, loading: loadingFallback });
@@ -1984,6 +1985,25 @@ export default function POSPage() {
           onBack={() => setView("pos")} products={products}
           onOpenPurchasingForm={() => setView("purchase-form")}
           onOpenSupplierForm={() => setView("supplier-form")}
+          onOpenPurchaseHub={() => setView("purchase-hub")}
+        />
+        <MobileNav
+          active={view}
+          onNavigate={(v) => { if (v === "cart") setMobileCartOpen(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
+          cartCount={cart.reduce((s, i) => s + i.quantity, 0)}
+          user={loggedInUser ? { fullName: loggedInUser.fullName, role: loggedInUser.role } : null}
+          onLogout={() => handleLogout()}
+        />
+      </>
+    );
+  }
+  if (view === "purchase-hub") {
+    return (
+      <>
+        <PurchaseHub
+          onBack={() => setView("purchase")}
+          onNewPO={() => setView("purchase-form")}
+          onOpenSuppliers={() => setView("supplier-form")}
         />
         <MobileNav
           active={view}

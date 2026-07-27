@@ -6,7 +6,7 @@ import {
   ArrowLeft, Save, Printer, Mail, Trash2, CreditCard, X, Search,
   Plus, Check, Package, Calendar, User, Hash,
   ChevronUp, ChevronDown, Paperclip, PackageCheck, Shield, Keyboard,
-  Image as ImageIcon, Tag,
+  Image as ImageIcon, Tag, Ban,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -1007,6 +1007,18 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
               ) : null;
             })()}
           </div>
+
+          {/* Tier 1.6 — Blacklist warning banner */}
+          {supplier && (() => {
+            const matched = suppliers.find(s => s.name === supplier);
+            return matched && (matched as any).blacklist ? (
+              <div className="flex-shrink-0 px-3 py-1.5 bg-rose-50 border-b border-rose-200 flex items-center gap-2 text-[10px] text-rose-800">
+                <Ban className="h-3.5 w-3.5 shrink-0" />
+                <span className="font-semibold">Blacklisted supplier:</span>
+                <span>{matched.name} is on the blacklist{(matched as any).blacklistReason ? ` — ${(matched as any).blacklistReason}` : ""}. Proceed only with manager approval. Consider switching to another supplier.</span>
+              </div>
+            ) : null;
+          })()}
 
           {/* Phase 3: Approval warning banner */}
           {requiresApproval && (
