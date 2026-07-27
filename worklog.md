@@ -2517,3 +2517,48 @@ Stage Summary:
 - If any file is deleted or modified, the system detects it and auto-restores from backup before the dev server starts.
 - The keep-alive.sh script (used to start the dev server) now automatically runs the full protection check + restore cycle.
 - Build passes. Server running.
+
+---
+Task ID: header-usermenu-and-featuresmap
+Agent: Main (Super Z)
+Task: (1) Fix hidden AI Assistant / Keyboard Shortcuts / Logout in header bar; (2) Add an admin-only option to see where all new features are — make it user-friendly.
+
+Work Log:
+- Diagnosed header overflow: right-side header section had 10+ flex-shrink-0 elements (OfflineSyncIndicator + 3 stats + user box + InstallButton + Dark + AI + ? + Logout) with no overflow handling → AI / ? / Logout got pushed off-screen on smaller desktop windows.
+- Added showUserMenu state + userMenuRef to page.tsx.
+- Extended the existing click-outside useEffect to also close the user menu.
+- Built a new UserMenu dropdown attached to the user avatar:
+    * User info header (avatar + name + role + time)
+    * Mobile-only compact 3-col stats block (Daily / Txns / Date)
+    * AI Assistant action (violet gradient icon)
+    * Keyboard Shortcuts action (emerald, dispatches '?' keydown)
+    * Dark Mode toggle action (slate)
+    * Features Map action (indigo, admin/manager only) → setView('features-map')
+    * Logout action (rose, last item with divider)
+  Each action has a colored icon, bold label, and helper description.
+- Moved header stats from `hidden lg:flex` to `hidden xl:flex` to give the user menu more breathing room on lg screens.
+- Kept a standalone Dark Mode toggle on md+ screens (one-tap access).
+- Removed the standalone AI / ? / Logout buttons from the header.
+- Imported `Map as MapIcon` from lucide-react (avoided shadowing the global Map class which broke `new Map<string, ...>()` on line 739).
+- Added a "🗺️ Features Map (Admin Guide)" entry to the Maintenance menu (admin/manager only).
+- Completely rewrote src/components/features-map.tsx:
+    * 80+ features across 15 categories covering ALL Phase 1-5 additions
+    * Each feature card shows: icon, name, description, EXACT location string,
+      location pill, phase badge (Phase 1-5), access-level badge (Admin/Mgr+),
+      optional shortcut key
+    * Search bar (filters by name / description / location / category)
+    * Filter pills: All / Recent / Admin-only / Quick Access
+    * Collapsible categories (click header to collapse)
+    * Sticky header with live stat counters (Total / Recent / Admin)
+    * Empty state for no-search-results
+    * Click any card → onNavigate(action) or window.location.href
+    * 100% mobile responsive (1-col phones, 2-col tablets+)
+
+Verification:
+- npx tsc --noEmit → passes
+- npx next build → ✓ Compiled successfully in 22.8s, 93/93 pages generated
+- Committed (46ad5ba) and pushed to GitHub (Sallysak/sylhn-pos)
+
+Stage Summary:
+- Header bar now has a single always-visible user avatar dropdown that contains AI Assistant, Keyboard Shortcuts, Dark Mode, Features Map (admin only), and Logout — these critical actions can never be hidden by viewport overflow again.
+- Admins/managers can open the Features Map from either the user dropdown or the Maintenance menu to see every feature's exact location, phase badge, and access level, with one-tap navigation to any feature.
