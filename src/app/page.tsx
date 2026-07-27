@@ -17,7 +17,7 @@ import {
   FileBarChart2, BookOpen, PhoneCall, Archive, Settings2, Lock,
   FileSearch, Copy, Image as ImageIcon, Tags,
   Smartphone, RefreshCw, Sparkles, Loader2, AlertTriangle, Calculator as CalcIcon, Mail, Send,
-  ExternalLink, Moon, Sun,
+  ExternalLink, Moon, Sun, Map as MapIcon,
 } from "lucide-react";
 import {
   products as INITIAL_PRODUCTS, categories, paymentMethods, quickCashAmounts,
@@ -307,6 +307,11 @@ export default function POSPage() {
   const [showPrinterPairing, setShowPrinterPairing] = useState(false);
   // Premium: AI Business Assistant
   const [showAiAssistant, setShowAiAssistant] = useState(false);
+  // Premium: User menu dropdown (consolidates AI Assistant, Keyboard Shortcuts,
+  // Features Map, Dark Mode, and Logout into one always-visible popover so
+  // these critical actions are never hidden by header overflow on smaller windows)
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
   // Premium: Quick Keys bar
   const [quickKeys, setQuickKeys] = useState<any[]>([]);
   // Premium: Dark mode — synced with next-themes (persists, hydrates safely)
@@ -558,14 +563,18 @@ export default function POSPage() {
     return () => clearInterval(interval);
   }, [now]);
 
-  // Close menu on outside click (covers both desktop and mobile menu bars)
+  // Close menu on outside click (covers both desktop and mobile menu bars + user menu)
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       const target = e.target as Node;
       const insideDesktop = menuRef.current?.contains(target);
       const insideMobile = mobileMenuRef.current?.contains(target);
+      const insideUserMenu = userMenuRef.current?.contains(target);
       if (!insideDesktop && !insideMobile) {
         setOpenMenu(null);
+      }
+      if (!insideUserMenu) {
+        setShowUserMenu(false);
       }
     };
     document.addEventListener('mousedown', handler);
@@ -1833,6 +1842,9 @@ export default function POSPage() {
         { label: "System Settings", icon: Settings2, action: () => setView("maintenance") },
         { label: "Backup Database", icon: Database, action: () => setView("maintenance") },
         { label: "📧 Email System", icon: Mail, action: () => setView("email-system" as any) },
+        ...(loggedInUser?.role === 'admin' || loggedInUser?.role === 'manager' ? [
+          { label: "🗺️ Features Map (Admin Guide)", icon: MapIcon, action: () => setView("features-map") },
+        ] : []),
         { header: "Security" },
         { label: "User Management", icon: Users, action: () => setView("maintenance") },
         { label: "Security & Permissions", icon: Lock, action: () => setView("maintenance") },
@@ -2392,11 +2404,11 @@ export default function POSPage() {
             </div>
           </div>
 
-          {/* Right: Stats + Logout (compact on mobile, full on desktop) */}
+          {/* Right: Stats + User Menu (compact on mobile, full on desktop) */}
           <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
             {/* Offline sync indicator — always visible, shows online/offline status + queued sales count */}
             <OfflineSyncIndicator />
-            <div className="hidden lg:flex items-center gap-2 text-right">
+            <div className="hidden xl:flex items-center gap-2 text-right">
               <div className="px-2.5 py-1 rounded-lg gradient-premium-glass ring-1 ring-white/25 backdrop-blur-md">
                 <div className="text-[9px] text-emerald-50/80 font-medium tracking-wide">{now ? now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : '--'}</div>
                 <div className="text-xs font-mono font-bold tabular">{now ? now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '--:--:--'}</div>
@@ -2410,41 +2422,171 @@ export default function POSPage() {
                 <div className="text-xs font-mono font-bold tabular">{transactionCount}</div>
               </div>
             </div>
-            <div className="flex items-center gap-2 px-2.5 py-1 rounded-lg gradient-premium-glass ring-1 ring-white/25 backdrop-blur-md">
-              <div className="h-7 w-7 rounded-full bg-gradient-to-br from-emerald-300 to-teal-400 ring-1 ring-white/40 flex items-center justify-center text-[10px] font-bold">
-                {loggedInUser ? loggedInUser.fullName.charAt(0) : 'S'}
-              </div>
-              <div className="hidden sm:block">
-                <div className="text-[10px] font-bold leading-tight">{loggedInUser ? loggedInUser.fullName : cashier}</div>
-                <div className="text-[9px] text-emerald-50/80 capitalize font-medium">{loggedInUser ? loggedInUser.role : 'Cashier'}</div>
-              </div>
+
+            {/* ===== User Menu Dropdown (consolidates AI Assistant, Keyboard Shortcuts,
+                  Features Map, Dark Mode, and Logout) =====
+                  This replaces the previous layout where these buttons were crammed at the
+                  right edge of the header and got pushed off-screen on smaller windows. */}
+            <div ref={userMenuRef} className="relative flex-shrink-0">
+              <button
+                onClick={() => setShowUserMenu(s => !s)}
+                className={cn(
+                  "flex items-center gap-2 px-2.5 py-1.5 rounded-lg gradient-premium-glass ring-1 ring-white/25 backdrop-blur-md transition active:scale-95",
+                  showUserMenu && "ring-white/60 bg-white/25"
+                )}
+                title="User menu — AI Assistant, Shortcuts, Features Map, Logout"
+                aria-label="Open user menu"
+                aria-expanded={showUserMenu}
+              >
+                <div className="h-7 w-7 rounded-full bg-gradient-to-br from-emerald-300 to-teal-400 ring-1 ring-white/40 flex items-center justify-center text-[10px] font-bold text-emerald-900">
+                  {loggedInUser ? loggedInUser.fullName.charAt(0) : 'S'}
+                </div>
+                <div className="hidden sm:block text-left min-w-0">
+                  <div className="text-[10px] font-bold leading-tight truncate max-w-[90px]">{loggedInUser ? loggedInUser.fullName : cashier}</div>
+                  <div className="text-[9px] text-emerald-50/80 capitalize font-medium">{loggedInUser ? loggedInUser.role : 'Cashier'}</div>
+                </div>
+                <ChevronDown className={cn("h-3.5 w-3.5 text-white/70 transition-transform hidden sm:block", showUserMenu && "rotate-180")} />
+              </button>
+
+              <AnimatePresence>
+                {showUserMenu && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -6, scale: 0.96 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -6, scale: 0.96 }}
+                    transition={{ duration: 0.16, ease: [0.32, 0.72, 0, 1] }}
+                    className="absolute right-0 top-full mt-2 w-72 bg-white rounded-2xl shadow-2xl ring-1 ring-slate-200 overflow-hidden z-[60] py-1.5"
+                    role="menu"
+                  >
+                    {/* User info header */}
+                    <div className="px-3.5 py-2.5 bg-gradient-to-br from-emerald-50 to-teal-50 border-b border-slate-100 mb-1">
+                      <div className="flex items-center gap-2.5">
+                        <div className="h-10 w-10 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 ring-2 ring-white shadow flex items-center justify-center text-sm font-bold text-white">
+                          {loggedInUser ? loggedInUser.fullName.charAt(0) : 'S'}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-bold text-slate-800 truncate">{loggedInUser ? loggedInUser.fullName : cashier}</div>
+                          <div className="text-[10px] text-slate-500 capitalize">{loggedInUser ? loggedInUser.role : 'Cashier'} · {now ? now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '--:--'}</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Quick stats — visible on mobile/tablet (replaces hidden header stats) */}
+                    <div className="sm:hidden px-3.5 py-2 bg-slate-50 border-b border-slate-100 mb-1">
+                      <div className="grid grid-cols-3 gap-1.5 text-center">
+                        <div>
+                          <div className="text-[9px] text-slate-500 font-medium">Daily</div>
+                          <div className="text-[11px] font-mono font-bold text-emerald-700 truncate">{formatGHS(dailyTotal)}</div>
+                        </div>
+                        <div>
+                          <div className="text-[9px] text-slate-500 font-medium">Txns</div>
+                          <div className="text-[11px] font-mono font-bold text-slate-700">{transactionCount}</div>
+                        </div>
+                        <div>
+                          <div className="text-[9px] text-slate-500 font-medium">Date</div>
+                          <div className="text-[11px] font-mono font-bold text-slate-700">{now ? now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : '--'}</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Action: AI Assistant */}
+                    <button
+                      onClick={() => { setShowAiAssistant(true); setShowUserMenu(false); }}
+                      className="w-full flex items-center gap-3 px-3.5 py-2.5 hover:bg-violet-50 text-slate-700 hover:text-violet-700 text-sm font-semibold transition group"
+                      role="menuitem"
+                    >
+                      <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-500 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
+                        <Sparkles className="h-4 w-4" />
+                      </div>
+                      <div className="flex-1 text-left min-w-0">
+                        <div className="text-sm font-bold">AI Assistant</div>
+                        <div className="text-[10px] text-slate-500">Ask business questions in plain English</div>
+                      </div>
+                    </button>
+
+                    {/* Action: Keyboard Shortcuts */}
+                    <button
+                      onClick={() => {
+                        window.dispatchEvent(new KeyboardEvent('keydown', { key: '?' }));
+                        setShowUserMenu(false);
+                      }}
+                      className="w-full flex items-center gap-3 px-3.5 py-2.5 hover:bg-emerald-50 text-slate-700 hover:text-emerald-700 text-sm font-semibold transition group"
+                      role="menuitem"
+                    >
+                      <div className="h-8 w-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0">
+                        <kbd className="text-xs font-mono font-bold">?</kbd>
+                      </div>
+                      <div className="flex-1 text-left min-w-0">
+                        <div className="text-sm font-bold">Keyboard Shortcuts</div>
+                        <div className="text-[10px] text-slate-500">Press ? anywhere to toggle the overlay</div>
+                      </div>
+                    </button>
+
+                    {/* Action: Dark Mode Toggle */}
+                    <button
+                      onClick={() => { toggleDarkMode(); }}
+                      className="w-full flex items-center gap-3 px-3.5 py-2.5 hover:bg-slate-100 text-slate-700 text-sm font-semibold transition group"
+                      role="menuitem"
+                    >
+                      <div className="h-8 w-8 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center flex-shrink-0">
+                        {darkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                      </div>
+                      <div className="flex-1 text-left min-w-0">
+                        <div className="text-sm font-bold">{darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}</div>
+                        <div className="text-[10px] text-slate-500">Toggle theme appearance</div>
+                      </div>
+                    </button>
+
+                    {/* Action: Features Map — admin/manager only */}
+                    {(loggedInUser?.role === 'admin' || loggedInUser?.role === 'manager') && (
+                      <button
+                        onClick={() => { setView("features-map"); setShowUserMenu(false); }}
+                        className="w-full flex items-center gap-3 px-3.5 py-2.5 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 text-sm font-semibold transition group"
+                        role="menuitem"
+                      >
+                        <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
+                          <MapIcon className="h-4 w-4" />
+                        </div>
+                        <div className="flex-1 text-left min-w-0">
+                          <div className="text-sm font-bold flex items-center gap-1.5">
+                            Features Map
+                            <span className="px-1.5 py-0 rounded-full bg-indigo-100 text-indigo-700 text-[8px] font-bold uppercase tracking-wider">Admin</span>
+                          </div>
+                          <div className="text-[10px] text-slate-500">See where every feature lives · jump to any tool</div>
+                        </div>
+                      </button>
+                    )}
+
+                    {/* Divider before destructive actions */}
+                    <div className="h-px bg-slate-100 my-1.5" />
+
+                    {/* Action: Logout */}
+                    <button
+                      onClick={() => { setShowUserMenu(false); handleLogout(); }}
+                      className="w-full flex items-center gap-3 px-3.5 py-2.5 hover:bg-rose-50 text-slate-700 hover:text-rose-700 text-sm font-semibold transition group"
+                      role="menuitem"
+                    >
+                      <div className="h-8 w-8 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center flex-shrink-0">
+                        <LogOut className="h-4 w-4" />
+                      </div>
+                      <div className="flex-1 text-left min-w-0">
+                        <div className="text-sm font-bold">Logout</div>
+                        <div className="text-[10px] text-slate-500">Sign out · cart will be cleared</div>
+                      </div>
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
+
             <InstallButton />
-            {/* Premium: Dark Mode toggle — uses Lucide icons, hydrates safely */}
+            {/* Premium: Dark Mode toggle — direct (kept for one-tap access) */}
             <button
               onClick={toggleDarkMode}
-              className="btn-premium h-9 w-9 rounded-lg gradient-premium-glass hover:bg-white/20 ring-1 ring-white/25 text-white flex items-center justify-center transition flex-shrink-0"
+              className="btn-premium hidden md:flex h-9 w-9 rounded-lg gradient-premium-glass hover:bg-white/20 ring-1 ring-white/25 text-white items-center justify-center transition flex-shrink-0"
               title={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
             >
               {darkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </button>
-            {/* Premium: AI Assistant button — always visible (mobile + desktop) */}
-            <button
-              onClick={() => setShowAiAssistant(true)}
-              className="btn-premium h-9 w-9 sm:px-3 rounded-lg bg-gradient-to-r from-violet-500/40 to-indigo-500/40 hover:from-violet-500/60 hover:to-indigo-500/60 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition ring-1 ring-white/30 flex-shrink-0"
-              title="Ask AI Assistant"
-            >
-              <Sparkles className="h-4 w-4" /> <span className="hidden sm:inline">AI</span>
-            </button>
-            <button
-              onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: '?' }))}
-              className="btn-premium h-9 w-9 rounded-lg bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition ring-1 ring-white/20 flex-shrink-0"
-              title="Keyboard Shortcuts (?)"
-            >
-              <span className="text-xs font-bold">?</span>
-            </button>
-            <button onClick={() => handleLogout()} className="btn-premium h-9 px-3 rounded-lg bg-rose-500/30 hover:bg-rose-500/50 ring-1 ring-rose-300/30 text-white text-xs font-bold flex items-center gap-1.5 transition flex-shrink-0" title="Sign out">
-              <LogOut className="h-4 w-4" /> <span>Logout</span>
             </button>
           </div>
         </div>
