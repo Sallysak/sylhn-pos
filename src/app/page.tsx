@@ -43,6 +43,7 @@ import { AIForecastDashboard } from "@/components/ai-forecast-dashboard";
 import { ExpiryManager } from "@/components/expiry-manager";
 import { AdvancedReportsDashboard } from "@/components/advanced-reports-dashboard";
 import { VoiceSearch } from "@/components/voice-search";
+import { RecurringPOManager } from "@/components/recurring-po-manager";
 import { detectNetwork } from "@/lib/mobile-money";
 import { initializePaystackTransaction, isPaystackConfigured } from "@/lib/paystack";
 import { useToast } from "@/hooks/use-toast";
@@ -326,6 +327,7 @@ export default function POSPage() {
   const [showAIForecast, setShowAIForecast] = useState(false);
   const [showExpiryManager, setShowExpiryManager] = useState(false);
   const [showAdvancedReports, setShowAdvancedReports] = useState(false);
+  const [showRecurringPO, setShowRecurringPO] = useState(false);
   const [dailyTotal, setDailyTotal] = useState(() => {
     if (typeof window !== 'undefined') { try { return parseFloat(localStorage.getItem('sylhn-daily-total') || '0') || 0; } catch {} }
     return 0;
@@ -1526,7 +1528,7 @@ export default function POSPage() {
     return () => window.removeEventListener('keydown', handler);
   });
 
-  const completePayment = async (method: string, amountPaid: number, creditDueDate?: string | null) => {
+  const completePayment = async (method: string, amountPaid: number, creditDueDate?: string | null, loyaltyPointsToRedeem?: number) => {
     const isCreditSale = method === "credit";
     const change = amountPaid - total;
     const result: PaymentResult = {
@@ -2478,6 +2480,15 @@ export default function POSPage() {
               className={cn("group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition-all active:scale-95 flex-shrink-0 bg-cyan-500/15 hover:bg-cyan-500/30 ring-1 ring-cyan-400/20 hover:ring-cyan-400/40 backdrop-blur-sm", loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" && "opacity-30 cursor-not-allowed hover:bg-cyan-500/15")}
             >
               <BarChart3 className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Reports
+            </button>
+            {/* Recurring POs */}
+            <button
+              onClick={() => setShowRecurringPO(true)}
+              disabled={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager"}
+              title={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" ? "Admin/Manager only" : "Set up recurring purchase orders (auto-generate weekly/monthly)"}
+              className={cn("group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition-all active:scale-95 flex-shrink-0 bg-teal-500/15 hover:bg-teal-500/30 ring-1 ring-teal-400/20 hover:ring-teal-400/40 backdrop-blur-sm", loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" && "opacity-30 cursor-not-allowed hover:bg-teal-500/15")}
+            >
+              <RefreshCw className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Recurring
             </button>
           </div>
         </div>
@@ -3505,6 +3516,9 @@ export default function POSPage() {
       {/* ===== Phase 4: Advanced Reports Dashboard ===== */}
       <AdvancedReportsDashboard open={showAdvancedReports} onOpenChange={setShowAdvancedReports} />
 
+      {/* ===== Recurring PO Manager ===== */}
+      <RecurringPOManager open={showRecurringPO} onOpenChange={setShowRecurringPO} suppliers={suppliers} products={products} />
+
       {/* ===== Cash Drawer Animation ===== */}
       <AnimatePresence>
         {showCashDrawer && (
@@ -3599,7 +3613,7 @@ function PaymentModal({ total, subtotal, tax, discount, itemCount, invoiceNumber
   customerName: string;
   customerId: string | null;
   onClose: () => void;
-  onComplete: (method: string, amountPaid: number, creditDueDate?: string | null) => void;
+  onComplete: (method: string, amountPaid: number, creditDueDate?: string | null, loyaltyPointsToRedeem?: number) => void;
 }) {
   const [method, setMethod] = useState("cash");
   const [amountInput, setAmountInput] = useState("");
@@ -3607,11 +3621,35 @@ function PaymentModal({ total, subtotal, tax, discount, itemCount, invoiceNumber
   const [momoStatus, setMomoStatus] = useState<"idle" | "initiating" | "pending" | "confirmed" | "failed">("idle");
   const [momoRef, setMomoRef] = useState<string | null>(null);
   const [momoError, setMomoError] = useState<string | null>(null);
+  const [loyaltyPointsToRedeem, setLoyaltyPointsToRedeem] = useState(0);
+  const [customerPoints, setCustomerPoints] = useState(0);
   const { toast } = useToast();
 
+  // Fetch customer's loyalty points when customer changes
+  useEffect(() => {
+    if (customerId) {
+      fetch(`/api/customers/${customerId}`, { credentials: "include" })
+        .then(r => r.json())
+        .then(data => {
+          if (data.customer) {
+            setCustomerPoints(data.customer.pointsBalance || 0);
+          }
+        })
+        .catch(() => {});
+    } else {
+      setCustomerPoints(0);
+      setLoyaltyPointsToRedeem(0);
+    }
+  }, [customerId]);
+
+  // Loyalty: 1 point = ₵0.01 (100 points = ₵1.00)
+  const POINTS_TO_GHS = 0.01;
+  const loyaltyDiscount = loyaltyPointsToRedeem * POINTS_TO_GHS;
+  const effectiveTotal = Math.max(0, total - loyaltyDiscount);
+
   const amountPaid = parseFloat(amountInput) || 0;
-  const change = amountPaid - total;
-  const canComplete = method === "cash" ? amountPaid >= total : method === "momo" ? momoStatus === "confirmed" : method === "credit" ? true : true;
+  const change = amountPaid - effectiveTotal;
+  const canComplete = method === "cash" ? amountPaid >= effectiveTotal : method === "momo" ? momoStatus === "confirmed" : method === "credit" ? true : true;
 
   // Initiate MoMo payment
   const initiateMomo = async () => {
@@ -3698,15 +3736,15 @@ function PaymentModal({ total, subtotal, tax, discount, itemCount, invoiceNumber
       toast({ title: "Customer required", description: "Select a customer from the dropdown for credit sales", variant: "destructive" });
       return;
     }
-    const paid = method === "cash" ? amountPaid : method === "credit" ? 0 : total;
-    if (method === "cash" && amountPaid < total) {
-      toast({ title: "Insufficient cash", description: `Need ${formatGHS(total - amountPaid)} more`, variant: "destructive" });
+    const paid = method === "cash" ? amountPaid : method === "credit" ? 0 : effectiveTotal;
+    if (method === "cash" && amountPaid < effectiveTotal) {
+      toast({ title: "Insufficient cash", description: `Need ${formatGHS(effectiveTotal - amountPaid)} more`, variant: "destructive" });
       return;
     }
     // Get credit due date if applicable
     const dueDateEl = document.getElementById("creditDueDate") as HTMLInputElement;
     const creditDueDate = method === "credit" && dueDateEl ? dueDateEl.value : null;
-    onComplete(method, paid, creditDueDate);
+    onComplete(method, paid, creditDueDate, loyaltyPointsToRedeem > 0 ? loyaltyPointsToRedeem : undefined);
   };
 
   return (
@@ -3739,7 +3777,8 @@ function PaymentModal({ total, subtotal, tax, discount, itemCount, invoiceNumber
         {/* Total Due — premium hero amount (mobile-optimized) */}
         <div className="px-5 py-4 bg-gradient-to-b from-slate-50 to-white border-b border-slate-200/80 text-center flex-shrink-0">
           <div className="text-[10px] sm:text-xs text-slate-500 font-semibold uppercase tracking-wider">Total Due</div>
-          <div className="text-4xl sm:text-5xl font-bold font-mono text-gradient-emerald mt-1 leading-none">{formatGHS(total)}</div>
+          <div className="text-4xl sm:text-5xl font-bold font-mono text-gradient-emerald mt-1 leading-none">{formatGHS(loyaltyDiscount > 0 ? effectiveTotal : total)}</div>
+          {loyaltyDiscount > 0 && <div className="text-xs text-amber-600 mt-1 line-through">{formatGHS(total)} (−{formatGHS(loyaltyDiscount)} points)</div>}
           {customerName && <div className="text-xs text-slate-500 mt-2">Customer: {customerName}</div>}
           <div className="flex justify-center gap-3 sm:gap-4 mt-2 text-[10px] sm:text-[11px] text-slate-500">
             <span>Sub: {formatGHS(subtotal)}</span>
@@ -3750,6 +3789,39 @@ function PaymentModal({ total, subtotal, tax, discount, itemCount, invoiceNumber
 
         {/* Scrollable body */}
         <div className="overflow-y-auto min-h-0 scroll-premium flex-1">
+          {/* Loyalty Redemption — shows when customer has points */}
+          {customerId && customerPoints > 0 && (
+            <div className="px-5 pt-4 pb-2">
+              <div className="rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-base">⭐</span>
+                    <span className="text-xs font-bold text-amber-800 dark:text-amber-300">Loyalty Points: {customerPoints}</span>
+                  </div>
+                  <span className="text-[10px] text-amber-600">Worth {formatGHS(customerPoints * POINTS_TO_GHS)}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="range"
+                    min={0}
+                    max={Math.min(customerPoints, Math.floor(total / POINTS_TO_GHS))}
+                    value={loyaltyPointsToRedeem}
+                    onChange={(e) => setLoyaltyPointsToRedeem(parseInt(e.target.value))}
+                    className="flex-1 h-2 accent-amber-500"
+                  />
+                  <span className="text-xs font-bold text-amber-800 dark:text-amber-300 w-16 text-right">
+                    −{formatGHS(loyaltyDiscount)}
+                  </span>
+                </div>
+                {loyaltyDiscount > 0 && (
+                  <div className="mt-2 text-[10px] text-amber-700 dark:text-amber-400">
+                    Redeeming {loyaltyPointsToRedeem} points → New total: <strong>{formatGHS(effectiveTotal)}</strong>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Payment Method — premium segmented control style on mobile */}
           <div className="px-5 pt-4 pb-3">
             <div className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Payment Method</div>
