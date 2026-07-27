@@ -35,6 +35,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
 import { OfflineSyncIndicator } from "@/components/offline-sync-indicator";
+import { Label as UILabel } from "@/components/ui/label";
 import { LabelPrinter } from "@/components/label-printer";
 import { ExpenseManager } from "@/components/expense-manager";
 import { StocktakeWizard } from "@/components/stocktake-wizard";
@@ -328,6 +329,7 @@ export default function POSPage() {
   const [showExpiryManager, setShowExpiryManager] = useState(false);
   const [showAdvancedReports, setShowAdvancedReports] = useState(false);
   const [showRecurringPO, setShowRecurringPO] = useState(false);
+  const [showForcePasswordChange, setShowForcePasswordChange] = useState(false);
   const [dailyTotal, setDailyTotal] = useState(() => {
     if (typeof window !== 'undefined') { try { return parseFloat(localStorage.getItem('sylhn-daily-total') || '0') || 0; } catch {} }
     return 0;
@@ -2209,7 +2211,13 @@ export default function POSPage() {
           onSuccess={(user) => {
             saveUserSession(user);
             setLoggedInUser(user);
-            setView("pos");
+            // Security: if passwordResetRequired is true, show forced password change dialog
+            if ((user as any)?.passwordResetRequired) {
+              setView("pos"); // enter the app but the dialog will block
+              setShowForcePasswordChange(true);
+            } else {
+              setView("pos");
+            }
             // Re-read business data from localStorage on login (not just on
             // initial mount). This fixes the issue where daily totals, held
             // orders, and history were lost after logout/login because
@@ -3518,6 +3526,72 @@ export default function POSPage() {
 
       {/* ===== Recurring PO Manager ===== */}
       <RecurringPOManager open={showRecurringPO} onOpenChange={setShowRecurringPO} suppliers={suppliers} products={products} />
+
+      {/* ===== Security: Forced Password Change Dialog ===== */}
+      <Dialog open={showForcePasswordChange} onOpenChange={(v) => { /* don't allow closing without changing password */ }}>
+        <DialogContent className="sm:max-w-md p-0 overflow-hidden">
+          <div className="bg-gradient-to-br from-rose-600 via-red-600 to-orange-600 text-white px-6 py-5">
+            <div className="flex items-center gap-3">
+              <div className="h-11 w-11 rounded-xl bg-white/20 ring-1 ring-white/30 flex items-center justify-center backdrop-blur-sm">
+                <Lock className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold tracking-tight">Password Change Required</h2>
+                <p className="text-[11px] opacity-85">For security, you must change your default password before continuing.</p>
+              </div>
+            </div>
+          </div>
+          <div className="px-6 py-5 space-y-4">
+            <div>
+              <UILabel className="text-[11px] font-bold uppercase text-slate-500 mb-1.5 block">Current Password</UILabel>
+              <Input id="forceCurrentPassword" type="password" className="h-10" />
+            </div>
+            <div>
+              <UILabel className="text-[11px] font-bold uppercase text-slate-500 mb-1.5 block">New Password</UILabel>
+              <Input id="forceNewPassword" type="password" className="h-10" placeholder="Min 8 chars, letters + numbers" />
+            </div>
+            <div>
+              <UILabel className="text-[11px] font-bold uppercase text-slate-500 mb-1.5 block">Confirm New Password</UILabel>
+              <Input id="forceConfirmPassword" type="password" className="h-10" />
+            </div>
+            <div className="text-[10px] text-slate-500 bg-slate-50 dark:bg-slate-800/50 rounded-lg p-2.5">
+              <strong>Password requirements:</strong> Min 8 characters, must contain at least one letter and one number. Cannot be a common weak password.
+            </div>
+          </div>
+          <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+            <Button
+              className="w-full h-11 bg-gradient-to-r from-rose-600 to-orange-600 hover:from-rose-700 hover:to-orange-700 text-white font-bold"
+              onClick={async () => {
+                const current = (document.getElementById("forceCurrentPassword") as HTMLInputElement)?.value;
+                const newPwd = (document.getElementById("forceNewPassword") as HTMLInputElement)?.value;
+                const confirm = (document.getElementById("forceConfirmPassword") as HTMLInputElement)?.value;
+                if (!current || !newPwd || !confirm) { toast({ title: "All fields required", variant: "destructive" }); return; }
+                if (newPwd !== confirm) { toast({ title: "Passwords don't match", variant: "destructive" }); return; }
+                if (newPwd.length < 8) { toast({ title: "Password too short", description: "Min 8 characters", variant: "destructive" }); return; }
+                try {
+                  const res = await fetch("/api/auth/change-password", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    credentials: "include",
+                    body: JSON.stringify({ currentPassword: current, newPassword: newPwd }),
+                  });
+                  const data = await res.json();
+                  if (res.ok && data.success) {
+                    toast({ title: "Password changed ✓", description: "Your account is now secure." });
+                    setShowForcePasswordChange(false);
+                  } else {
+                    toast({ title: "Failed", description: data.error, variant: "destructive" });
+                  }
+                } catch (e: any) {
+                  toast({ title: "Network error", description: e?.message, variant: "destructive" });
+                }
+              }}
+            >
+              <Lock className="h-4 w-4 mr-2" /> Change Password & Continue
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* ===== Cash Drawer Animation ===== */}
       <AnimatePresence>

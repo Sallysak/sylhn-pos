@@ -235,6 +235,7 @@ export async function POST(req: NextRequest) {
         phone: user.phone,
         email: user.email,
         permissions,
+        passwordResetRequired: user.passwordResetRequired || false,
       },
       // Session token for bearer auth fallback (when cookies don't work in iframe)
       sessionToken: token,

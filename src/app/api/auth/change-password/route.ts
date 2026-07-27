@@ -58,11 +58,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "New password must be different from current" }, { status: 400 });
     }
 
-    // Hash + save
+    // Hash + save + clear passwordResetRequired + update lastPasswordChange
     const newHash = await hashPassword(newPassword);
     await db.systemUser.update({
       where: { id: user.id },
-      data: { password: newHash },
+      data: {
+        password: newHash,
+        passwordResetRequired: false,
+        lastPasswordChange: new Date(),
+      },
     });
 
     await auditLog({
