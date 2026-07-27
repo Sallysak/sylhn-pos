@@ -2580,14 +2580,6 @@ export default function POSPage() {
             </div>
 
             <InstallButton />
-            {/* Premium: Dark Mode toggle — direct (kept for one-tap access) */}
-            <button
-              onClick={toggleDarkMode}
-              className="btn-premium hidden md:flex h-9 w-9 rounded-lg gradient-premium-glass hover:bg-white/20 ring-1 ring-white/25 text-white items-center justify-center transition flex-shrink-0"
-              title={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
-            >
-              {darkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </button>
           </div>
         </div>
 

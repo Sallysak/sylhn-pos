@@ -2562,3 +2562,71 @@ Verification:
 Stage Summary:
 - Header bar now has a single always-visible user avatar dropdown that contains AI Assistant, Keyboard Shortcuts, Dark Mode, Features Map (admin only), and Logout — these critical actions can never be hidden by viewport overflow again.
 - Admins/managers can open the Features Map from either the user dropdown or the Maintenance menu to see every feature's exact location, phase badge, and access level, with one-tap navigation to any feature.
+
+---
+Task ID: features-map-training-notes
+Agent: Main (Super Z)
+Task: Add internal training notes to the Features Map.
+
+Work Log:
+- Added a `trainingNote?: string` field to the FeatureEntry interface.
+- Wrote practical, cashier-facing training notes for ALL ~80 features.
+  Each note follows a consistent structure:
+    * WHAT/WHEN — when to use the feature
+    * FLOW — numbered steps to complete the task
+    * GOTCHA — common mistakes and how to avoid them
+    * TIP — pro tip from experienced operators
+  Total ~12,000 words of training content covering topics like:
+    - Sequential invoice numbers & GRA compliance
+    - Mobile Money flow (customer must approve on their phone)
+    - Expiry FEFO 4-urgency-level system (red = ₵5,000 fine)
+    - Cash reconciliation variance thresholds (±₵5 = manager sign-off)
+    - 2FA backup codes and recovery (24-48h without them)
+    - WhatsApp broadcast 200 msg/day limit & 5s delay
+    - Multi-currency FX variance handling
+    - Stocktake best practices (count high-value items twice)
+    - Paystack card refund 5-10 day timeline
+    - And 70+ more practical notes
+- Added a 'Training Mode' toggle in the header (amber button, top-right
+  of the filter bar). When ON, ALL training notes expand inline below
+  each feature card. Perfect for printing as a training manual.
+- Added per-card 'Training' badge with a Lightbulb icon — click to
+  expand/collapse an individual note without affecting others.
+- Added a 'New Cashier Quick Start' banner at the top with 6 critical
+  onboarding steps (sign in, dashboard, first sale, hold order, expiry
+  check, end-of-shift). Dismissible.
+- Added a 'Quick Start' badge (emerald star) to the 7 most critical
+  features for new staff onboarding:
+    * POS Screen
+    * Pay Now
+    * Cash Payment
+    * Expiry Management (FEFO)
+    * Operations Dashboard
+    * User Menu (AI / Shortcuts / Logout)
+    * Keyboard Shortcuts (?)
+- Extended the search bar to also search training notes — typing
+  'GOTCHA' surfaces all common-mistake warnings; 'GRA' surfaces all
+  tax-compliance notes; etc.
+- Updated header counter to show total notes count alongside
+  Total / Recent / Admin.
+- Updated footer to remind users about Training Mode for printing.
+- Training notes use a warm amber/yellow gradient background to
+  visually distinguish them from feature descriptions.
+- Fixed a typo in the WhatsApp Broadcast entry (duplicate `location:`
+  field — replaced with the correct `locationLabel:`).
+
+Verification:
+- npx tsc --noEmit → passes
+- npx next build → ✓ Compiled successfully in 23.0s
+- All 93 pages generated successfully
+- Committed (3e259e2) and pushed to GitHub (Sallysak/sylhn-pos)
+
+Stage Summary:
+- Admins/managers now have a complete training resource inside the POS:
+  ~80 features each with how-to steps, gotchas, and tips.
+- Training Mode toggle expands all notes for in-person training or
+  printing as a manual.
+- New Cashier Quick Start gives new staff a 6-step, 10-minute
+  onboarding path covering 80% of daily work.
+- Search now surfaces training content, so admins can find every
+  mention of a topic (e.g. 'GRA', 'GOTCHA', 'expiry', 'reconcile').

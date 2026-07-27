@@ -2104,12 +2104,12 @@ export function FeaturesMap({ onBack, onNavigate }: FeaturesMapProps) {
                                   transition={{ duration: 0.2 }}
                                   className="overflow-hidden mt-2"
                                 >
-                                  <div className="bg-gradient-to-br from-amber-50 to-yellow-50 ring-1 ring-amber-200 rounded-lg p-2.5">
+                                  <div className="bg-gradient-to-br from-slate-800 via-slate-900 to-indigo-950 ring-1 ring-slate-700 rounded-lg p-3">
                                     <div className="flex items-center gap-1.5 mb-1.5">
-                                      <Lightbulb className="h-3.5 w-3.5 text-amber-600 flex-shrink-0" />
-                                      <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800">Training Note</span>
+                                      <Lightbulb className="h-3.5 w-3.5 text-amber-300 flex-shrink-0" />
+                                      <span className="text-[10px] font-bold uppercase tracking-wider text-amber-200">Training Note</span>
                                     </div>
-                                    <div className="text-[11px] text-amber-900 leading-relaxed whitespace-pre-line">
+                                    <div className="text-[11px] text-white leading-relaxed whitespace-pre-line">
                                       {feature.trainingNote}
                                     </div>
                                   </div>
