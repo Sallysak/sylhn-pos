@@ -130,6 +130,24 @@ export async function POST(req: NextRequest) {
         notes: s.notes || "",
         balance: Number(s.balance) || 0,
         active: s.active !== false,
+        // Tier 1.6 — rating + blacklist (default 0/false)
+        rating: Math.max(0, Math.min(5, Number(s.rating) || 0)),
+        blacklist: Boolean(s.blacklist),
+        blacklistReason: String(s.blacklistReason || ""),
+        blacklistedAt: s.blacklist ? new Date() : null,
+        // Tier 1.8 — structured early-payment terms
+        earlyPayDiscountPct: Number(s.earlyPayDiscountPct) || 0,
+        earlyPayDays: Number(s.earlyPayDays) || 0,
+        netDays: Number(s.netDays) || 30,
+        // Tier 1.10 — TIN
+        tin: String(s.tin || ""),
+        // Tier 1.15 — bank details
+        bankName: String(s.bankName || ""),
+        bankAccountName: String(s.bankAccountName || ""),
+        bankAccountNo: String(s.bankAccountNo || ""),
+        bankBranchCode: String(s.bankBranchCode || ""),
+        mobileMoneyProvider: String(s.mobileMoneyProvider || ""),
+        mobileMoneyNumber: String(s.mobileMoneyNumber || ""),
       },
       include: { products: true, purchases: true },
     });

@@ -61,6 +61,15 @@ export async function POST(req: NextRequest) {
   try {
     const amount = Number(body.amount);
 
+    // Tier 1.10 — compute WHT amount if a rate was provided
+    const whtRate = Math.max(0, Math.min(0.25, Number(body.whtRate) || 0)); // cap at 25%
+    const whtAmount = Math.round(amount * whtRate * 100) / 100;
+
+    // Tier 1.8 — early-payment discount capture (informational only —
+    // the buyer may have paid less than the invoice total to take the discount)
+    const earlyPayDiscountApplied = Math.max(0, Number(body.earlyPayDiscountApplied) || 0);
+    const earlyPayDiscountPctUsed = Math.max(0, Number(body.earlyPayDiscountPctUsed) || 0);
+
     const payment = await db.$transaction(async (tx) => {
       // Create the payment record
       const isScheduled = body.scheduledFor && body.status !== "completed";
@@ -76,6 +85,13 @@ export async function POST(req: NextRequest) {
           paymentDate: isScheduled ? new Date(0) : (body.paymentDate ? new Date(body.paymentDate) : new Date()),
           scheduledFor: body.scheduledFor ? new Date(body.scheduledFor) : null,
           status: isScheduled ? "scheduled" : "completed",
+          // Tier 1.10 — WHT
+          whtRate,
+          whtAmount,
+          whtCertificateNo: String(body.whtCertificateNo || "").slice(0, 100),
+          // Tier 1.8 — early-pay discount
+          earlyPayDiscountApplied,
+          earlyPayDiscountPctUsed,
         },
         include: { supplier: { select: { name: true, code: true } } },
       });
@@ -83,10 +99,12 @@ export async function POST(req: NextRequest) {
       // Only update supplier balance + purchase amountPaid if NOT scheduled
       // (scheduled payments don't actually move money yet)
       if (!isScheduled) {
-        // Decrement supplier balance (cannot go below 0 — clamp)
+        // Decrement supplier balance by (amount - whtAmount) — WHT is withheld,
+        // not paid to the supplier. The withheld portion goes to GRA separately.
         const supplier = await tx.supplier.findUnique({ where: { id: body.supplierId }, select: { balance: true } });
         if (supplier) {
-          const newBalance = Math.max(0, supplier.balance - amount);
+          const effectivePayment = amount - whtAmount;
+          const newBalance = Math.max(0, supplier.balance - effectivePayment);
           await tx.supplier.update({
             where: { id: body.supplierId },
             data: { balance: newBalance },
@@ -118,7 +136,7 @@ export async function POST(req: NextRequest) {
         module: "accounts",
         details: isScheduled
           ? `Scheduled payment of GHS ${amount.toFixed(2)} to ${newPayment.supplier.name} (${newPayment.supplier.code}) for ${new Date(body.scheduledFor).toLocaleDateString()}`
-          : `Supplier payment of GHS ${amount.toFixed(2)} to ${newPayment.supplier.name} (${newPayment.supplier.code})${body.purchaseId ? ` for purchase ${body.purchaseId}` : ""}`,
+          : `Supplier payment of GHS ${amount.toFixed(2)} to ${newPayment.supplier.name} (${newPayment.supplier.code})${body.purchaseId ? ` for purchase ${body.purchaseId}` : ""}${whtAmount > 0 ? ` · WHT ${whtRate * 100}% = GHS ${whtAmount.toFixed(2)} withheld` : ""}${earlyPayDiscountApplied > 0 ? ` · early-pay discount: GHS ${earlyPayDiscountApplied.toFixed(2)} (${earlyPayDiscountPctUsed}%)` : ""}`,
         severity: isScheduled ? "info" : "info",
         ipAddress: ip,
         userAgent: req.headers.get("user-agent") || "",

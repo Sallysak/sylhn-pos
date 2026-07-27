@@ -122,6 +122,23 @@ export const SupplierSchema = z.object({
   notes: z.string().max(2000).optional().default(""),
   products: z.union([z.string(), z.array(z.any())]).optional(),
   active: z.boolean().optional().default(true),
+  // Tier 1.6 — rating + blacklist
+  rating: z.number().min(0).max(5).optional().default(0),
+  blacklist: z.boolean().optional().default(false),
+  blacklistReason: z.string().max(500).optional().default(""),
+  // Tier 1.8 — structured early-payment terms
+  earlyPayDiscountPct: z.number().min(0).max(100).optional().default(0),
+  earlyPayDays: z.number().min(0).max(365).optional().default(0),
+  netDays: z.number().min(0).max(365).optional().default(30),
+  // Tier 1.10 — TIN
+  tin: z.string().max(20).optional().default(""),
+  // Tier 1.15 — bank details
+  bankName: z.string().max(100).optional().default(""),
+  bankAccountName: z.string().max(100).optional().default(""),
+  bankAccountNo: z.string().max(50).optional().default(""),
+  bankBranchCode: z.string().max(30).optional().default(""),
+  mobileMoneyProvider: z.string().max(30).optional().default(""),
+  mobileMoneyNumber: z.string().max(20).optional().default(""),
 });
 
 export const SupplierUpdateSchema = SupplierSchema.partial();

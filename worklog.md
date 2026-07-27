@@ -2630,3 +2630,33 @@ Stage Summary:
   onboarding path covering 80% of daily work.
 - Search now surfaces training content, so admins can find every
   mention of a topic (e.g. 'GRA', 'GOTCHA', 'expiry', 'reconcile').
+
+---
+Task ID: training-readability-and-header-cleanup
+Agent: Main (Super Z)
+Task: (1) Fix training note text color in Features Map — change to white; (2) Remove standalone dark mode toggle from header bar; (3) Recommend purchase & supplier improvements.
+
+Work Log:
+- Changed training note styling in src/components/features-map.tsx:
+    Old: bg-gradient-to-br from-amber-50 to-yellow-50, text-amber-900
+    New: bg-gradient-to-br from-slate-800 via-slate-900 to-indigo-950,
+         text-white body, amber-200 label, amber-300 lightbulb icon
+- Removed the standalone dark mode toggle button from src/app/page.tsx
+  header bar. Dark mode is still accessible via the User Menu dropdown.
+- Delegated a deep audit of the purchase & supplier system to a
+  subagent. The audit covered 14 files (11 components + 3 API routes
+  + Prisma schema) and produced a comprehensive gap analysis with 22
+  recommendations grouped into 5 categories.
+
+Verification:
+- npx tsc --noEmit → passes
+- npx next build → ✓ Compiled successfully in 24.9s
+- Committed (9c16107) and pushed to GitHub
+
+Stage Summary:
+- Training notes are now dark-themed with white text — clearly
+  readable in both light and dark modes.
+- Header bar is cleaner (one less button); dark mode lives in the
+  User Menu only.
+- Audit identified 22 purchase/supplier improvements; presented
+  recommendations to user for selection.

@@ -74,6 +74,27 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         ...(body.taxInclusive !== undefined && { taxInclusive: Boolean(body.taxInclusive) }),
         ...(body.notes !== undefined && { notes: String(body.notes).slice(0, 2000) }),
         ...(body.active !== undefined && { active: Boolean(body.active) }),
+        // Tier 1.6 — rating + blacklist
+        ...(body.rating !== undefined && { rating: Math.max(0, Math.min(5, parseInt(body.rating, 10) || 0)) }),
+        ...(body.blacklist !== undefined && {
+          blacklist: Boolean(body.blacklist),
+          blacklistedAt: Boolean(body.blacklist) ? (existing.blacklistedAt || new Date()) : null,
+          ...(body.blacklistReason !== undefined && { blacklistReason: String(body.blacklistReason).slice(0, 500) }),
+        }),
+        ...(body.blacklistReason !== undefined && { blacklistReason: String(body.blacklistReason).slice(0, 500) }),
+        // Tier 1.8 — structured early-payment discount terms
+        ...(body.earlyPayDiscountPct !== undefined && { earlyPayDiscountPct: Number(body.earlyPayDiscountPct) || 0 }),
+        ...(body.earlyPayDays !== undefined && { earlyPayDays: parseInt(body.earlyPayDays, 10) || 0 }),
+        ...(body.netDays !== undefined && { netDays: parseInt(body.netDays, 10) || 30 }),
+        // Tier 1.10 — TIN
+        ...(body.tin !== undefined && { tin: String(body.tin).slice(0, 20) }),
+        // Tier 1.15 — bank details
+        ...(body.bankName !== undefined && { bankName: String(body.bankName).slice(0, 100) }),
+        ...(body.bankAccountName !== undefined && { bankAccountName: String(body.bankAccountName).slice(0, 100) }),
+        ...(body.bankAccountNo !== undefined && { bankAccountNo: String(body.bankAccountNo).slice(0, 50) }),
+        ...(body.bankBranchCode !== undefined && { bankBranchCode: String(body.bankBranchCode).slice(0, 30) }),
+        ...(body.mobileMoneyProvider !== undefined && { mobileMoneyProvider: String(body.mobileMoneyProvider).slice(0, 30) }),
+        ...(body.mobileMoneyNumber !== undefined && { mobileMoneyNumber: String(body.mobileMoneyNumber).slice(0, 20) }),
       },
     });
 

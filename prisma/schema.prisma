@@ -73,6 +73,11 @@ model SystemUser {
   autoReplenishRules AutoReplenishRule[]
   recurringPOs      RecurringPO[]
   currentRegister   Register?            @relation("CurrentRegisterCashier")
+  // Tier 1.3 / 1.4 / 1.14 — back-relations for new supplier-side models
+  invoicesMatched    SupplierInvoice[]     @relation("InvoiceMatchedBy")
+  creditNotesCreated SupplierCreditNote[]
+  returnsCreated     SupplierReturn[]      @relation("ReturnCreatedBy")
+  priceHistoryChanges SupplierPriceHistory[] @relation("PriceHistoryChangedBy")
 
   @@index([role])
   @@index([active])
@@ -361,6 +366,9 @@ model Product {
   transferItems   StockTransferItem[]
   autoReplenishRule AutoReplenishRule?
   forecastSnapshots ForecastSnapshot[]
+  // Tier 1.4 / 1.14 — back-relations for supplier returns + price history
+  supplierReturnItems SupplierReturnItem[]
+  supplierPriceHistory SupplierPriceHistory[]
 
   @@index([category])
   @@index([groupId])
@@ -452,6 +460,29 @@ model Supplier {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
+  // Tier 1.6 — Supplier rating + blacklist (admin-managed)
+  rating        Int       @default(0)     // 0-5 stars (0 = unrated)
+  blacklist     Boolean   @default(false) // if true, warn on PO creation
+  blacklistReason String  @default("")
+  blacklistedAt DateTime?
+
+  // Tier 1.8 — Structured early-payment discount terms (replaces free-text parsing)
+  // Example: "2/10 net 30" → earlyPayDiscountPct=2, earlyPayDays=10, netDays=30
+  earlyPayDiscountPct Float @default(0)  // 0 = no early-pay discount offered
+  earlyPayDays        Int   @default(0)  // pay within this many days to get the discount
+  netDays             Int   @default(30) // full payment due within this many days
+
+  // Tier 1.10 — Ghana TIN (Taxpayer Identification Number) for GRA compliance
+  tin           String    @default("")    // 11-character Ghana TIN (e.g. C0001234567)
+
+  // Tier 1.15 (Tier 2 originally) — Supplier bank details for one-tap payment
+  bankName        String  @default("")
+  bankAccountName String  @default("")
+  bankAccountNo   String  @default("")
+  bankBranchCode  String  @default("")
+  mobileMoneyProvider String @default("") // MTN | Telecel | AirtelTigo
+  mobileMoneyNumber  String @default("")
+
   // Relations
   products        ProductSupplier[]
   purchases       Purchase[]
@@ -459,11 +490,22 @@ model Supplier {
   // Premium: auto-replenish rules, recurring POs
   autoReplenishRules AutoReplenishRule[]
   recurringPOs      RecurringPO[]
+  // Tier 1.3 — Three-way matching
+  invoices        SupplierInvoice[]
+  // Tier 1.4 — Credit notes + returns
+  creditNotes     SupplierCreditNote[]
+  returns         SupplierReturn[]
+  // Tier 1.14 (Tier 2 originally) — Price history (append-only)
+  priceHistory    SupplierPriceHistory[]
 
   @@index([name])
   @@index([active])
   // Composite for outstanding-debt reports (WHERE active=true AND balance > 0)
   @@index([active, balance])
+  // Tier 1.6 — fast blacklist filter for PO-creation warnings
+  @@index([blacklist, active])
+  // Tier 1.10 — TIN lookup for WHT calculation
+  @@index([tin])
 }
 
 // Separate supplier payment model — tracks individual payments against
@@ -484,6 +526,16 @@ model SupplierPayment {
   reminderSentAt DateTime?  // last reminder notification timestamp
   status      String   @default("completed") // completed | scheduled | overdue | cancelled
 
+  // Tier 1.10 — Withholding Tax (WHT) tracking for GRA compliance
+  // Ghana businesses must withhold 5-15% on certain supplier payments
+  // and remit to GRA with a WHT certificate.
+  whtRate          Float  @default(0)  // e.g. 0.05 = 5% WHT deducted from payment
+  whtAmount        Float  @default(0)  // computed = amount × whtRate
+  whtCertificateNo String @default("") // GRA-issued certificate number once remitted
+  // Tier 1.8 — Early-payment discount captured on this payment
+  earlyPayDiscountApplied Float @default(0) // amount saved by paying early
+  earlyPayDiscountPctUsed Float @default(0) // discount % that was applied
+
   supplier Supplier      @relation(fields: [supplierId], references: [id], onDelete: Cascade)
   purchase Purchase?     @relation(fields: [purchaseId], references: [id], onDelete: SetNull)
   user     SystemUser?  @relation(fields: [createdBy], references: [id], onDelete: SetNull)
@@ -493,6 +545,7 @@ model SupplierPayment {
   @@index([paymentDate])
   @@index([scheduledFor])
   @@index([status])
+  @@index([whtCertificateNo])
 }
 
 // ============================================================
@@ -713,6 +766,15 @@ model Purchase {
   customsDuty     Float   @default(0)
   otherLandedCosts Float  @default(0)
 
+  // Tier 1.2 — Landed-cost allocation method
+  // How freight/insurance/customs/other are prorated to line items:
+  //   by_value  — proportional to line net total (default, most common)
+  //   by_qty     — proportional to quantity (good for uniform items)
+  //   by_weight  — proportional to weight (requires product.weight)
+  //   manual     — user enters per-line landed cost manually
+  //   none       — landed costs not allocated (legacy behaviour)
+  landedCostAllocationMethod String @default("none")
+
   // Phase 2: Approval workflow (nullable so existing purchases are unaffected)
   approvedById    String?
   approvedAt      DateTime?
@@ -733,6 +795,10 @@ model Purchase {
   items          PurchaseItem[]
   payments       SupplierPayment[]
   stockHistory   StockHistory[]
+  // Tier 1.3 / 1.4 — three-way matching + credit notes + returns
+  invoices       SupplierInvoice[]
+  creditNotes    SupplierCreditNote[]
+  returns        SupplierReturn[]
 
   @@index([createdAt])
   @@index([status])
@@ -775,6 +841,14 @@ model PurchaseItem {
   tradePrice      Float     @default(0)
   wholesalePrice  Float     @default(0)
 
+  // Tier 1.2 — Landed cost allocation per unit
+  // When a Purchase has freight/insurance/customs/other landed costs,
+  // the system prorates them to each line item. landedCostPerUnit is
+  // the per-unit share (already divided by quantity). totalLandedCost
+  // is landedCostPerUnit × quantity.
+  landedCostPerUnit Float   @default(0)
+  totalLandedCost   Float   @default(0)
+
   purchase Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
   product  Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
 
@@ -785,8 +859,148 @@ model PurchaseItem {
 }
 
 // ============================================================
-// TELEPHONE DIRECTORY & CUSTOMERS
+// TIER 1.3 — THREE-WAY MATCHING (PO ↔ GRN ↔ Supplier Invoice)
 // ============================================================
+// A supplier invoice is the bill the supplier sends after delivering
+// goods. The system matches it against the Purchase (what was ordered)
+// and the GRN (what was actually received). Variances are flagged for
+// review before payment is approved.
+
+model SupplierInvoice {
+  id            String   @id @default(cuid())
+  supplierId    String
+  purchaseId    String?  // linked PO (nullable for standalone invoices)
+  invoiceNo     String   // supplier's invoice number
+  invoiceDate   DateTime
+  invoiceTotal  Float    // total amount on the supplier's invoice
+  matchStatus   String   @default("pending") // pending | matched | variance | rejected
+  matchedAt     DateTime?
+  matchedById   String?
+  varianceAmount Float   @default(0) // invoiceTotal - purchase.total
+  variancePct    Float   @default(0) // variance as % of purchase.total
+  notes         String   @default("")
+  attachmentUrl String   @default("") // path to scanned invoice PDF
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  supplier  Supplier  @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  purchase  Purchase? @relation(fields: [purchaseId], references: [id], onDelete: SetNull)
+  matchedBy SystemUser? @relation("InvoiceMatchedBy", fields: [matchedById], references: [id], onDelete: SetNull)
+
+  @@index([supplierId])
+  @@index([purchaseId])
+  @@index([matchStatus])
+  @@index([invoiceDate])
+  @@unique([supplierId, invoiceNo])
+}
+
+// ============================================================
+// TIER 1.4 — SUPPLIER CREDIT NOTES + RETURNS (DEBIT NOTES)
+// ============================================================
+// Credit notes: supplier issues a credit (post-delivery price
+// adjustment, rebate, or accepting returned goods). Reduces the
+// supplier balance.
+//
+// Supplier returns: goods sent back to the supplier (damaged, expired,
+// wrong item). Decrements stock + creates a debit against the supplier.
+
+model SupplierCreditNote {
+  id            String   @id @default(cuid())
+  supplierId    String
+  purchaseId    String?  // optional — can be a general credit
+  creditNoteNo  String   // supplier's credit note number
+  creditDate    DateTime
+  amount        Float    // positive amount credited by supplier
+  reason        String   @default("") // price_adjustment | rebate | returned_goods | other
+  notes         String   @default("")
+  attachmentUrl String   @default("") // scanned credit note
+  createdBy     String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  supplier  Supplier  @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  purchase  Purchase? @relation(fields: [purchaseId], references: [id], onDelete: SetNull)
+  user      SystemUser? @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+  // Tier 1.4 — supplier returns linked to this credit note
+  returns   SupplierReturn[]
+
+  @@index([supplierId])
+  @@index([purchaseId])
+  @@index([creditDate])
+  @@index([reason])
+  @@unique([supplierId, creditNoteNo])
+}
+
+model SupplierReturn {
+  id            String   @id @default(cuid())
+  returnNo      String   @unique // RTN-YYYY-NNNNNN
+  supplierId    String
+  purchaseId    String?  // original PO the goods came from
+  returnType    String   @default("damaged") // damaged | expired | wrong_item | quality | other
+  status        String   @default("pending") // pending | shipped | received_by_supplier | credit_issued | cancelled
+  notes         String   @default("")
+  totalValue    Float    @default(0) // total cost of returned goods
+  shippedAt     DateTime?
+  receivedAt    DateTime? // when supplier confirms receipt
+  creditNoteId  String?  // link to SupplierCreditNote once supplier issues credit
+  createdById   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  supplier   Supplier   @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  purchase   Purchase?  @relation(fields: [purchaseId], references: [id], onDelete: SetNull)
+  creditNote SupplierCreditNote? @relation(fields: [creditNoteId], references: [id], onDelete: SetNull)
+  createdBy  SystemUser? @relation("ReturnCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  items      SupplierReturnItem[]
+
+  @@index([supplierId])
+  @@index([purchaseId])
+  @@index([status])
+  @@index([returnType])
+}
+
+model SupplierReturnItem {
+  id              String @id @default(cuid())
+  supplierReturnId String
+  productId       String?
+  partNo          String  @default("")
+  details         String  @default("")
+  quantity        Int
+  cost            Float   @default(0)
+  total           Float   @default(0)
+  reason          String  @default("")
+
+  supplierReturn SupplierReturn @relation(fields: [supplierReturnId], references: [id], onDelete: Cascade)
+  product        Product?        @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([supplierReturnId])
+  @@index([productId])
+}
+
+// ============================================================
+// TIER 1.14 — SUPPLIER PRICE HISTORY (append-only)
+// ============================================================
+// Tracks every change to ProductSupplier.supplierCost so buyers can
+// see price trends per supplier per product.
+
+model SupplierPriceHistory {
+  id           String   @id @default(cuid())
+  supplierId   String
+  productId    String
+  unitCost     Float
+  changedAt    DateTime @default(now())
+  changedById  String?
+  previousCost Float    @default(0) // for quick delta calc
+  notes        String   @default("") // e.g. "annual price review", "FX shift"
+
+  supplier Supplier     @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  product  Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  changedBy SystemUser? @relation("PriceHistoryChangedBy", fields: [changedById], references: [id], onDelete: SetNull)
+
+  @@index([supplierId, productId, changedAt])
+  @@index([productId])
+}
 
 // Customer model — links to sales and the telephone directory
 model Customer {
