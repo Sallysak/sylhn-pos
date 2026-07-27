@@ -61,8 +61,11 @@ export async function GET(req: NextRequest) {
     const products = await db.product.findMany({
       where,
       include: {
-        group: true,
-        suppliers: { include: { supplier: true } },
+        group: { select: { id: true, name: true, icon: true, color: true } },
+        // Only include suppliers if explicitly requested (heavy join)
+        ...(req.nextUrl.searchParams.get("includeSuppliers") === "true"
+          ? { suppliers: { include: { supplier: { select: { id: true, name: true, code: true } } } } }
+          : {}),
       },
       orderBy: { name: "asc" },
     });

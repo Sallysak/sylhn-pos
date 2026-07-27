@@ -4,6 +4,11 @@ import { requireAuth, requirePermission } from "@/lib/auth";
 import { StockGroupSchema, validate, validationError } from "@/lib/validation";
 import { rateLimitApiRead, rateLimitApiWrite, rateLimitResponse, getClientIp } from "@/lib/rate-limit";
 
+// Simple in-memory cache for stock groups (they rarely change during a shift)
+// Cache expires after 60 seconds
+let groupsCache: { data: any; expiry: number } | null = null;
+const CACHE_TTL = 60 * 1000; // 60 seconds
+
 export async function GET(req: NextRequest) {
   try { await requireAuth(); } catch (e) { return e as Response; }
 
@@ -11,14 +16,21 @@ export async function GET(req: NextRequest) {
   const rl = rateLimitApiRead(ip);
   if (!rl.allowed) return rateLimitResponse(rl);
 
+  // Return cached response if still fresh
+  if (groupsCache && Date.now() < groupsCache.expiry) {
+    return NextResponse.json({ groups: groupsCache.data, cached: true });
+  }
+
   try {
     const groups = await db.stockGroup.findMany({
       include: {
-        products: { where: { active: true } },
+        products: { where: { active: true }, select: { id: true, name: true, emoji: true, price: true, quantity: true, sku: true } },
         _count: { select: { products: true } },
       },
       orderBy: { name: "asc" },
     });
+    // Update cache
+    groupsCache = { data: groups, expiry: Date.now() + CACHE_TTL };
     return NextResponse.json({ groups });
   } catch (e) {
     console.error("GET /api/stock-groups error:", e);
@@ -76,6 +88,9 @@ export async function POST(req: NextRequest) {
       },
       include: { _count: { select: { products: true } } },
     });
+
+    // Invalidate cache
+    groupsCache = null;
 
     await db.auditLog.create({
       data: {

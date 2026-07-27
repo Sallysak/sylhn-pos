@@ -738,6 +738,9 @@ model Purchase {
   @@index([status])
   @@index([supplierId])
   @@index([type])
+  @@index([currency])
+  @@index([approvedById])
+  @@index([cancelledAt])
 }
 
 model PurchaseItem {
@@ -777,6 +780,8 @@ model PurchaseItem {
 
   @@index([purchaseId])
   @@index([productId])
+  @@index([batchNumber])
+  @@index([expiryDate])
 }
 
 // ============================================================
