@@ -10,7 +10,7 @@ import {
   ChevronRight, ScanLine, Pause, Play, RotateCcw, DollarSign, Receipt,
   ShoppingCart as Cart, Settings, Bell, LogOut, Menu as MenuIcon,
   TrendingUp, BarChart3, Tag, AlertCircle, CheckCircle2, ArrowLeft,
-  ClipboardCheck, MessageCircle, Brain,
+  ClipboardCheck, MessageCircle, Brain, Upload,
   Zap, Store, Hash, Boxes, FileBarChart, ChevronDown, FileText, Eye,
   Layers, ArrowUpDown, History, FileSpreadsheet, Home, Power,
   Phone, Truck, Users, Database, Wrench, Shield,
@@ -45,6 +45,7 @@ import { ExpiryManager } from "@/components/expiry-manager";
 import { AdvancedReportsDashboard } from "@/components/advanced-reports-dashboard";
 import { VoiceSearch } from "@/components/voice-search";
 import { RecurringPOManager } from "@/components/recurring-po-manager";
+import { BulkProductImport } from "@/components/bulk-product-import";
 import { detectNetwork } from "@/lib/mobile-money";
 import { initializePaystackTransaction, isPaystackConfigured } from "@/lib/paystack";
 import { useToast } from "@/hooks/use-toast";
@@ -330,6 +331,13 @@ export default function POSPage() {
   const [showAdvancedReports, setShowAdvancedReports] = useState(false);
   const [showRecurringPO, setShowRecurringPO] = useState(false);
   const [showForcePasswordChange, setShowForcePasswordChange] = useState(false);
+  const [showBulkImport, setShowBulkImport] = useState(false);
+  // Multi-store: current location
+  const [locations, setLocations] = useState<any[]>([]);
+  const [currentLocation, setCurrentLocation] = useState<string>(() => {
+    if (typeof window !== 'undefined') { try { return localStorage.getItem('sylhn-location') || 'Main Store'; } catch {} }
+    return 'Main Store';
+  });
   const [dailyTotal, setDailyTotal] = useState(() => {
     if (typeof window !== 'undefined') { try { return parseFloat(localStorage.getItem('sylhn-daily-total') || '0') || 0; } catch {} }
     return 0;
@@ -403,6 +411,19 @@ export default function POSPage() {
   }, [loggedInUser]);
 
   const { toast } = useToast();
+  // ===== Fetch locations from API on login =====
+  useEffect(() => {
+    if (!loggedInUser) return;
+    (async () => {
+      try {
+        const res = await fetch('/api/locations', { credentials: 'include' });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.locations && data.locations.length > 0) setLocations(data.locations);
+      } catch {}
+    })();
+  }, [loggedInUser]);
+
   const searchInputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
@@ -2275,9 +2296,23 @@ export default function POSPage() {
             </div>
             <div className="min-w-0 hidden min-[400px]:block">
               <div className="font-bold text-sm sm:text-base leading-tight tracking-tight truncate">{COMPANY.name}</div>
-              <div className="text-[9px] sm:text-[10px] text-emerald-50/90 leading-tight font-medium truncate">{COMPANY.address} · {COMPANY.contact}</div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[9px] sm:text-[10px] text-emerald-50/90 leading-tight font-medium truncate">{COMPANY.address} · {COMPANY.contact}</span>
+              </div>
             </div>
           </div>
+
+          {/* Multi-store location switcher — shows if locations exist */}
+          {locations.length > 0 && (
+            <select
+              value={currentLocation}
+              onChange={(e) => { setCurrentLocation(e.target.value); try { localStorage.setItem('sylhn-location', e.target.value); } catch {} toast({ title: "Location switched", description: e.target.value }); }}
+              className="h-7 px-2 text-[10px] font-bold rounded-lg bg-white/15 text-white border border-white/20 outline-none cursor-pointer hover:bg-white/25 transition flex-shrink-0"
+              title="Switch store location"
+            >
+              {locations.map(loc => <option key={loc.id} value={loc.name} className="text-slate-800">{loc.name}</option>)}
+            </select>
+          )}
 
           {/* Desktop Menu Bar — hidden on mobile (mobile uses the bar below) */}
           <div ref={menuRef} className="hidden lg:flex items-center gap-0.5 flex-shrink-0">
@@ -2497,6 +2532,15 @@ export default function POSPage() {
               className={cn("group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition-all active:scale-95 flex-shrink-0 bg-teal-500/15 hover:bg-teal-500/30 ring-1 ring-teal-400/20 hover:ring-teal-400/40 backdrop-blur-sm", loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" && "opacity-30 cursor-not-allowed hover:bg-teal-500/15")}
             >
               <RefreshCw className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Recurring
+            </button>
+            {/* Bulk Import — Admin/Manager only */}
+            <button
+              onClick={() => setShowBulkImport(true)}
+              disabled={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager"}
+              title={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" ? "Admin/Manager only" : "Bulk import products from CSV"}
+              className={cn("group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition-all active:scale-95 flex-shrink-0 bg-blue-500/15 hover:bg-blue-500/30 ring-1 ring-blue-400/20 hover:ring-blue-400/40 backdrop-blur-sm", loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" && "opacity-30 cursor-not-allowed hover:bg-blue-500/15")}
+            >
+              <Upload className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Import
             </button>
           </div>
         </div>
@@ -3526,6 +3570,9 @@ export default function POSPage() {
 
       {/* ===== Recurring PO Manager ===== */}
       <RecurringPOManager open={showRecurringPO} onOpenChange={setShowRecurringPO} suppliers={suppliers} products={products} />
+
+      {/* ===== Bulk Product Import ===== */}
+      <BulkProductImport open={showBulkImport} onOpenChange={setShowBulkImport} onImported={() => { /* could refresh products here */ }} />
 
       {/* ===== Security: Forced Password Change Dialog ===== */}
       <Dialog open={showForcePasswordChange} onOpenChange={(v) => { /* don't allow closing without changing password */ }}>
