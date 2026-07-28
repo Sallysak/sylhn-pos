@@ -1880,7 +1880,7 @@ export default function POSPage() {
         { separator: true },
         { label: "📊 Profit Margin Report (landed cost)", icon: TrendingUp, action: () => setView("profit-margin-report") },
         { label: "📄 Customer Statements (credit)", icon: FileText, action: () => setView("customer-statements") },
-        { label: "👥 Employee Performance + 💰 Cash Flow", icon: BarChart3, action: () => setView("financial-reports") },
+        { label: "📊 Advanced Reports (5 tabs: Employee, Cash Flow, Budget, Lead-Time, Reorder)", icon: BarChart3, action: () => setView("financial-reports") },
       ] : [],
     },
     {
@@ -2735,6 +2735,15 @@ export default function POSPage() {
         {/* ===== Phase 1-3 Feature Toolbar — premium pill bar, always visible ===== */}
         <div className="border-t border-white/10 bg-gradient-to-r from-black/20 via-black/15 to-black/20 backdrop-blur-md">
           <div className="flex items-center gap-1 px-3 py-1.5 overflow-x-auto scrollbar-hide max-w-full">
+            {/* Dashboard — always visible quick access (was only in POS menu / mobile bottom nav) */}
+            <button
+              onClick={() => setView("dashboard")}
+              className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition-all active:scale-95 flex-shrink-0 bg-emerald-500/20 hover:bg-emerald-500/40 ring-1 ring-emerald-400/30 hover:ring-emerald-400/50 backdrop-blur-sm"
+              title="Operations Dashboard — KPIs, low-stock alerts, reorder suggestions, expiry alerts"
+            >
+              <TrendingUp className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Dashboard
+            </button>
+            <div className="w-px h-5 bg-white/10 flex-shrink-0 mx-0.5" />
             <button
               onClick={() => setShowCashCalc(true)}
               className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition-all active:scale-95 flex-shrink-0 bg-white/5 hover:bg-white/15 ring-1 ring-white/10 hover:ring-white/20 backdrop-blur-sm"

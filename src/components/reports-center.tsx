@@ -6,6 +6,7 @@ import {
   ArrowLeft, Search, Filter, Download, FileText, Printer, TrendingUp,
   BarChart3, Percent, DollarSign, Package, Clock, Calendar, FileBarChart,
   FileBarChart2, BookOpen, Layers, FileSpreadsheet, ChevronRight, RotateCcw,
+  Target, Zap, Users, Wallet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -74,6 +75,9 @@ export function ReportsCenter({ onBack, onNavigate, onSetAccountsReport }: Repor
     { id: "customer-statements", title: "Customer Statements", description: "Monthly account statements for credit customers — printable PDF + email + aging", icon: FileText, color: "text-violet-600", category: "advanced", view: "customer-statements" },
     { id: "employee-performance", title: "Employee Performance", description: "Per-cashier sales, refunds, voids, sales/hour — with fraud-detection alerts", icon: BarChart3, color: "text-amber-600", category: "advanced", view: "financial-reports" },
     { id: "cash-flow", title: "Cash Flow Report", description: "Daily cash IN vs OUT — sales, supplier payments, expenses with running balance", icon: DollarSign, color: "text-rose-600", category: "advanced", view: "financial-reports" },
+    { id: "procurement-budget", title: "Budget vs Spend", description: "Monthly procurement budget tracking — set budgets per supplier/category, track variance", icon: Target, color: "text-indigo-600", category: "advanced", view: "financial-reports" },
+    { id: "lead-time", title: "Lead-Time Accuracy", description: "Promised vs actual delivery time per supplier — identifies consistently late suppliers", icon: Clock, color: "text-amber-600", category: "advanced", view: "financial-reports" },
+    { id: "reorder-effectiveness", title: "Reorder Effectiveness", description: "Auto-replenish rule health check — stale rules, stockouts, trigger counts", icon: Zap, color: "text-violet-600", category: "advanced", view: "financial-reports" },
     // Operations
     { id: "dashboard", title: "Operations Dashboard", description: "KPIs, reorder alerts, expiry tracking, profit analysis", icon: Clock, color: "text-violet-600", category: "operations", view: "dashboard" },
     { id: "accounts-reports", title: "Accounts Reports Hub", description: "Full accounts reporting suite with export", icon: FileSpreadsheet, color: "text-violet-600", category: "operations", view: "accounts-reports" },

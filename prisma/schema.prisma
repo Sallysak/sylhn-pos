@@ -78,6 +78,8 @@ model SystemUser {
   creditNotesCreated SupplierCreditNote[]
   returnsCreated     SupplierReturn[]      @relation("ReturnCreatedBy")
   priceHistoryChanges SupplierPriceHistory[] @relation("PriceHistoryChangedBy")
+  // Tier 3 #20 — procurement budgets created by this user
+  budgetsCreated     ProcurementBudget[]   @relation("BudgetCreatedBy")
 
   @@index([role])
   @@index([active])
@@ -497,6 +499,8 @@ model Supplier {
   returns         SupplierReturn[]
   // Tier 1.14 (Tier 2 originally) — Price history (append-only)
   priceHistory    SupplierPriceHistory[]
+  // Tier 3 #20 — Procurement budgets
+  budgets         ProcurementBudget[]
 
   @@index([name])
   @@index([active])
@@ -1000,6 +1004,34 @@ model SupplierPriceHistory {
 
   @@index([supplierId, productId, changedAt])
   @@index([productId])
+}
+
+// ============================================================
+// TIER 3 #20 — PROCUREMENT BUDGET
+// ============================================================
+// Monthly procurement budget per supplier or category. Managers set
+// a budget, then the variance report compares actual spend (from
+// received POs) vs the budget. Helps control costs and predict
+// shortfalls.
+
+model ProcurementBudget {
+  id            String   @id @default(cuid())
+  month         String   // "YYYY-MM" e.g. "2026-07"
+  supplierId    String?  // optional — if null, applies to all suppliers
+  category      String?  // optional — if null, applies to all categories
+  budgetAmount  Float    // the planned spend for this month/supplier/category
+  notes         String   @default("")
+  createdById   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  supplier Supplier? @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  createdBy SystemUser? @relation("BudgetCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@unique([month, supplierId, category])
+  @@index([month])
+  @@index([supplierId])
+  @@index([category])
 }
 
 // Customer model — links to sales and the telephone directory
