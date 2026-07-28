@@ -43,6 +43,23 @@ export interface Supplier {
   balance: number;
   taxInclusive: boolean;
   notes: string;
+  // Tier 1.6 — rating + blacklist
+  rating?: number;            // 0-5 stars (0 = unrated)
+  blacklist?: boolean;
+  blacklistReason?: string;
+  // Tier 1.10 — TIN (Ghana Taxpayer Identification Number)
+  tin?: string;
+  // Tier 1.15 — bank details
+  bankName?: string;
+  bankAccountName?: string;
+  bankAccountNo?: string;
+  bankBranchCode?: string;
+  mobileMoneyProvider?: string;   // MTN | Telecel | AirtelTigo
+  mobileMoneyNumber?: string;
+  // Tier 1.8 — structured early-payment discount terms
+  earlyPayDiscountPct?: number;   // e.g. 2 = 2%
+  earlyPayDays?: number;          // pay within this many days to get the discount
+  netDays?: number;               // full payment due within this many days
 }
 
 // Sample suppliers — exported so page.tsx can pass real supplier data to PurchaseForm
@@ -115,6 +132,20 @@ export function SupplierForm({ onBack, products }: SupplierFormProps) {
           balance: s.balance || 0,
           taxInclusive: s.taxInclusive || false,
           notes: s.notes || '',
+          // Tier 1 fields
+          rating: s.rating ?? 0,
+          blacklist: s.blacklist ?? false,
+          blacklistReason: s.blacklistReason || '',
+          tin: s.tin || '',
+          bankName: s.bankName || '',
+          bankAccountName: s.bankAccountName || '',
+          bankAccountNo: s.bankAccountNo || '',
+          bankBranchCode: s.bankBranchCode || '',
+          mobileMoneyProvider: s.mobileMoneyProvider || '',
+          mobileMoneyNumber: s.mobileMoneyNumber || '',
+          earlyPayDiscountPct: s.earlyPayDiscountPct ?? 0,
+          earlyPayDays: s.earlyPayDays ?? 0,
+          netDays: s.netDays ?? 30,
         }));
         if (serverSuppliers.length > 0) {
           setSuppliers(serverSuppliers);
@@ -237,6 +268,20 @@ export function SupplierForm({ onBack, products }: SupplierFormProps) {
           creditLimit: newSupplier.creditLimit || 0,
           taxInclusive: newSupplier.taxInclusive || false,
           notes: newSupplier.notes || '',
+          // Tier 1 fields
+          rating: newSupplier.rating ?? 0,
+          blacklist: newSupplier.blacklist ?? false,
+          blacklistReason: newSupplier.blacklistReason || '',
+          tin: newSupplier.tin || '',
+          bankName: newSupplier.bankName || '',
+          bankAccountName: newSupplier.bankAccountName || '',
+          bankAccountNo: newSupplier.bankAccountNo || '',
+          bankBranchCode: newSupplier.bankBranchCode || '',
+          mobileMoneyProvider: newSupplier.mobileMoneyProvider || '',
+          mobileMoneyNumber: newSupplier.mobileMoneyNumber || '',
+          earlyPayDiscountPct: newSupplier.earlyPayDiscountPct ?? 0,
+          earlyPayDays: newSupplier.earlyPayDays ?? 0,
+          netDays: newSupplier.netDays ?? 30,
         }),
       });
       const data = await res.json();
@@ -501,6 +546,20 @@ export function SupplierForm({ onBack, products }: SupplierFormProps) {
           creditLimit: updated.creditLimit || 0,
           taxInclusive: updated.taxInclusive || false,
           notes: updated.notes || '',
+          // Tier 1 fields
+          rating: updated.rating ?? 0,
+          blacklist: updated.blacklist ?? false,
+          blacklistReason: updated.blacklistReason || '',
+          tin: updated.tin || '',
+          bankName: updated.bankName || '',
+          bankAccountName: updated.bankAccountName || '',
+          bankAccountNo: updated.bankAccountNo || '',
+          bankBranchCode: updated.bankBranchCode || '',
+          mobileMoneyProvider: updated.mobileMoneyProvider || '',
+          mobileMoneyNumber: updated.mobileMoneyNumber || '',
+          earlyPayDiscountPct: updated.earlyPayDiscountPct ?? 0,
+          earlyPayDays: updated.earlyPayDays ?? 0,
+          netDays: updated.netDays ?? 30,
         }),
       });
       const data = await res.json();
@@ -1202,8 +1261,11 @@ function SupplierListPopup({ suppliers, searchText, canEditSupplier, onSelect, o
                   const isSelected = idx === selectedIndex;
                   const isOutstanding = Math.abs(s.balance || 0) > 0.01;
                   const isNegative = (s.balance || 0) < 0;
+                  const isBlacklisted = !!s.blacklist;
                   const bg = isSelected
                     ? '#D6E8FF'
+                    : isBlacklisted
+                    ? '#FECACA'  // light rose for blacklisted
                     : isOutstanding
                     ? '#FFE4E1'
                     : idx % 2 === 1
@@ -1218,7 +1280,21 @@ function SupplierListPopup({ suppliers, searchText, canEditSupplier, onSelect, o
                       style={{ backgroundColor: bg, gridTemplateColumns: '70px 1fr 1.4fr 100px 100px 110px' }}
                     >
                       <div className="px-1 font-mono text-slate-700">{s.code}</div>
-                      <div className="px-1 truncate font-medium text-slate-900">{s.name}</div>
+                      <div className="px-1 truncate font-medium text-slate-900 flex items-center gap-1">
+                        <span className="truncate">{s.name}</span>
+                        {/* Rating stars (compact) */}
+                        {(s.rating || 0) > 0 && (
+                          <span className="text-amber-500 text-[9px] flex-shrink-0" title={`${s.rating}/5 stars`}>
+                            {'★'.repeat(s.rating || 0)}
+                          </span>
+                        )}
+                        {/* Blacklist pill */}
+                        {isBlacklisted && (
+                          <span className="px-1 py-0 rounded bg-rose-600 text-white text-[8px] font-bold flex-shrink-0" title={s.blacklistReason || 'Blacklisted'}>
+                            BL
+                          </span>
+                        )}
+                      </div>
                       <div className="px-1 truncate text-slate-600">{[s.address, s.city].filter(Boolean).join(', ') || '—'}</div>
                       <div className="px-1 font-mono text-slate-600">{s.mobile || s.phone || '—'}</div>
                       <div className="px-1 font-mono text-slate-600">{s.phone || '—'}</div>
@@ -1266,10 +1342,15 @@ function SupplierListPopup({ suppliers, searchText, canEditSupplier, onSelect, o
 // ===== New / Edit Supplier Popup =====
 function NewSupplierPopup({ onSave, onClose, editSupplier }: { onSave: (s: Supplier) => void; onClose: () => void; editSupplier?: Supplier | null; }) {
   const { toast } = useToast();
-  const [tab, setTab] = useState<"trading" | "history" | "notes">("trading");
+  const [tab, setTab] = useState<"trading" | "compliance" | "banking" | "payment" | "history" | "notes">("trading");
   const isEditMode = !!editSupplier;
   const [form, setForm] = useState<Supplier>(editSupplier || {
     id: `s-${Date.now()}`, code: String(Date.now()).slice(-5), name: "", address: "", city: "", state: "", country: "Ghana", phone: "", mobile: "", fax: "", email: "", contactName: "", businessNo: "", title: "Mr", tradingTerms: "Net 30", creditLimit: 0, balance: 0, taxInclusive: false, notes: "",
+    // Tier 1 defaults
+    rating: 0, blacklist: false, blacklistReason: "", tin: "",
+    bankName: "", bankAccountName: "", bankAccountNo: "", bankBranchCode: "",
+    mobileMoneyProvider: "", mobileMoneyNumber: "",
+    earlyPayDiscountPct: 0, earlyPayDays: 0, netDays: 30,
   });
 
   const handleSave = () => {
@@ -1304,9 +1385,16 @@ function NewSupplierPopup({ onSave, onClose, editSupplier }: { onSave: (s: Suppl
           <div><label className="text-[9px] font-semibold text-slate-600 mb-0.5 block">Business No.</label><input value={form.businessNo} onChange={(e) => setForm({ ...form, businessNo: e.target.value })} placeholder="BN-XXX" className="w-full h-7 px-2 text-[10px] font-mono border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-400" /></div>
         </div>
         {/* Tabs */}
-        <div className="flex-shrink-0 flex border-b border-slate-200" style={{ backgroundColor: '#5B9BD5' }}>
-          {([["trading", "Trading Details"], ["history", "History"], ["notes", "Notes"]] as const).map(([id, label]) => (
-            <button key={id} onClick={() => setTab(id)} className={cn("px-4 py-1 text-[10px] font-bold text-white transition", tab === id ? "bg-white/20" : "hover:bg-white/10")}>{label}</button>
+        <div className="flex-shrink-0 flex border-b border-slate-200 overflow-x-auto scrollbar-hide" style={{ backgroundColor: '#5B9BD5' }}>
+          {([
+            ["trading", "Trading"],
+            ["compliance", "Compliance"],
+            ["banking", "Banking"],
+            ["payment", "Payment Terms"],
+            ["history", "History"],
+            ["notes", "Notes"],
+          ] as const).map(([id, label]) => (
+            <button key={id} onClick={() => setTab(id)} className={cn("px-3 py-1 text-[10px] font-bold text-white transition whitespace-nowrap", tab === id ? "bg-white/20" : "hover:bg-white/10")}>{label}</button>
           ))}
         </div>
         {/* Tab Content */}
@@ -1329,6 +1417,176 @@ function NewSupplierPopup({ onSave, onClose, editSupplier }: { onSave: (s: Suppl
                 {field("Trading Terms", "tradingTerms")}
                 <div><label className="text-[9px] font-semibold text-slate-600 mb-0.5 block">Credit Limit (GHC)</label><input type="number" value={form.creditLimit || ''} onChange={(e) => setForm({ ...form, creditLimit: parseFloat(e.target.value) || 0 })} className="w-full h-7 px-2 text-[10px] font-mono border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-400" placeholder="0" /></div>
                 <label className="flex items-center gap-1.5 text-[10px] text-slate-700 cursor-pointer"><input type="checkbox" checked={form.taxInclusive} onChange={(e) => setForm({ ...form, taxInclusive: e.target.checked })} className="h-3 w-3 accent-blue-600" /> Tax Inclusive</label>
+              </div>
+            </div>
+          )}
+          {tab === "compliance" && (
+            <div className="space-y-3">
+              {/* Rating — interactive star picker */}
+              <div>
+                <label className="text-[9px] font-semibold text-slate-600 mb-1 block">Supplier Rating (1-5 stars)</label>
+                <div className="flex items-center gap-1">
+                  {[1, 2, 3, 4, 5].map(i => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => setForm({ ...form, rating: form.rating === i ? 0 : i })}
+                      className="text-lg leading-none transition hover:scale-110"
+                      title={`${i} star${i > 1 ? "s" : ""}`}
+                    >
+                      <span className={i <= (form.rating || 0) ? "text-amber-400" : "text-slate-300"}>★</span>
+                    </button>
+                  ))}
+                  <span className="text-[10px] text-slate-500 ml-2">
+                    {form.rating ? `${form.rating}/5` : "Unrated"}
+                  </span>
+                </div>
+                <div className="text-[9px] text-slate-400 mt-1">Used by the Performance scorecard. 0 = unrated (auto-computed from PO history).</div>
+              </div>
+
+              {/* TIN */}
+              <div>
+                <label className="text-[9px] font-semibold text-slate-600 mb-0.5 block">TIN (Taxpayer Identification Number) — GRA</label>
+                <input
+                  value={form.tin || ""}
+                  onChange={(e) => setForm({ ...form, tin: e.target.value.toUpperCase() })}
+                  placeholder="C0001234567"
+                  className="w-full h-7 px-2 text-[10px] font-mono border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-400"
+                />
+                <div className="text-[9px] text-slate-400 mt-0.5">11-character Ghana TIN. Required for WHT calculation and GRA e-VAT filing.</div>
+              </div>
+
+              {/* Blacklist toggle */}
+              <div className="bg-rose-50 ring-1 ring-rose-200 rounded p-2">
+                <label className="flex items-center gap-2 text-[10px] text-rose-900 font-semibold cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.blacklist || false}
+                    onChange={(e) => setForm({ ...form, blacklist: e.target.checked })}
+                    className="h-3.5 w-3.5 accent-rose-600"
+                  />
+                  ⚠️ Blacklist this supplier
+                </label>
+                <div className="text-[9px] text-rose-700 mt-0.5">When enabled, a red warning banner appears in the Purchase Form when this supplier is selected.</div>
+                {(form.blacklist) && (
+                  <input
+                    value={form.blacklistReason || ""}
+                    onChange={(e) => setForm({ ...form, blacklistReason: e.target.value })}
+                    placeholder="Reason for blacklisting (e.g. 'Consistent late deliveries', 'Quality issues')"
+                    className="w-full h-7 px-2 text-[10px] border border-rose-300 rounded outline-none focus:ring-1 focus:ring-rose-400 mt-2 bg-white"
+                  />
+                )}
+              </div>
+            </div>
+          )}
+          {tab === "banking" && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <div>
+                  <label className="text-[9px] font-semibold text-slate-600 mb-0.5 block">Bank Name</label>
+                  <input value={form.bankName || ""} onChange={(e) => setForm({ ...form, bankName: e.target.value })} placeholder="e.g. Ecobank Ghana" className="w-full h-7 px-2 text-[10px] border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-400" />
+                </div>
+                <div>
+                  <label className="text-[9px] font-semibold text-slate-600 mb-0.5 block">Account Name</label>
+                  <input value={form.bankAccountName || ""} onChange={(e) => setForm({ ...form, bankAccountName: e.target.value })} placeholder="Account holder name" className="w-full h-7 px-2 text-[10px] border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-400" />
+                </div>
+                <div>
+                  <label className="text-[9px] font-semibold text-slate-600 mb-0.5 block">Account Number</label>
+                  <input value={form.bankAccountNo || ""} onChange={(e) => setForm({ ...form, bankAccountNo: e.target.value })} placeholder="1234567890123" className="w-full h-7 px-2 text-[10px] font-mono border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-400" />
+                </div>
+                <div>
+                  <label className="text-[9px] font-semibold text-slate-600 mb-0.5 block">Branch Code</label>
+                  <input value={form.bankBranchCode || ""} onChange={(e) => setForm({ ...form, bankBranchCode: e.target.value })} placeholder="BR-001" className="w-full h-7 px-2 text-[10px] font-mono border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-400" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <div>
+                  <label className="text-[9px] font-semibold text-slate-600 mb-0.5 block">Mobile Money Provider</label>
+                  <select
+                    value={form.mobileMoneyProvider || ""}
+                    onChange={(e) => setForm({ ...form, mobileMoneyProvider: e.target.value })}
+                    className="w-full h-7 px-2 text-[10px] border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-400"
+                  >
+                    <option value="">— None —</option>
+                    <option value="MTN">MTN MoMo</option>
+                    <option value="Telecel">Telecel Cash</option>
+                    <option value="AirtelTigo">AirtelTigo Money</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[9px] font-semibold text-slate-600 mb-0.5 block">MoMo Number</label>
+                  <input
+                    type="tel"
+                    value={form.mobileMoneyNumber || ""}
+                    onChange={(e) => setForm({ ...form, mobileMoneyNumber: e.target.value })}
+                    placeholder="+233247075044"
+                    className="w-full h-7 px-2 text-[10px] font-mono border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-400"
+                  />
+                </div>
+                <div className="text-[9px] text-slate-500 bg-blue-50 ring-1 ring-blue-200 rounded p-2 mt-2">
+                  💡 Bank details are used by the Purchase Hub → Payments tab for one-tap payment reference. MoMo number is also used when sending POs via WhatsApp.
+                </div>
+              </div>
+            </div>
+          )}
+          {tab === "payment" && (
+            <div className="space-y-3">
+              <div className="text-[10px] text-slate-600 bg-amber-50 ring-1 ring-amber-200 rounded p-2">
+                💰 <strong>Early-Payment Discount Terms</strong> — If this supplier offers a discount for early payment (e.g. "2/10 net 30" = 2% off if paid within 10 days, otherwise full amount due in 30 days), enter the structured values below. The Purchase Hub → Payments tab auto-calculates the discount and shows how much you save by paying early.
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="text-[9px] font-semibold text-slate-600 mb-0.5 block">Early-Pay Discount %</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="100"
+                    value={form.earlyPayDiscountPct ?? 0}
+                    onChange={(e) => setForm({ ...form, earlyPayDiscountPct: parseFloat(e.target.value) || 0 })}
+                    placeholder="2"
+                    className="w-full h-7 px-2 text-[10px] font-mono border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-400"
+                  />
+                  <div className="text-[9px] text-slate-400 mt-0.5">0 = no discount offered</div>
+                </div>
+                <div>
+                  <label className="text-[9px] font-semibold text-slate-600 mb-0.5 block">Early-Pay Window (days)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="365"
+                    value={form.earlyPayDays ?? 0}
+                    onChange={(e) => setForm({ ...form, earlyPayDays: parseInt(e.target.value) || 0 })}
+                    placeholder="10"
+                    className="w-full h-7 px-2 text-[10px] font-mono border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-400"
+                  />
+                  <div className="text-[9px] text-slate-400 mt-0.5">Pay within this many days to get the discount</div>
+                </div>
+                <div>
+                  <label className="text-[9px] font-semibold text-slate-600 mb-0.5 block">Net Days (full due)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="365"
+                    value={form.netDays ?? 30}
+                    onChange={(e) => setForm({ ...form, netDays: parseInt(e.target.value) || 30 })}
+                    placeholder="30"
+                    className="w-full h-7 px-2 text-[10px] font-mono border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-400"
+                  />
+                  <div className="text-[9px] text-slate-400 mt-0.5">Full payment due within this many days</div>
+                </div>
+              </div>
+              {/* Live preview */}
+              {(form.earlyPayDiscountPct ?? 0) > 0 && (form.earlyPayDays ?? 0) > 0 && (
+                <div className="bg-gradient-to-br from-amber-50 to-yellow-50 ring-1 ring-amber-200 rounded p-2.5">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-amber-700">Example</div>
+                  <div className="text-[10px] text-amber-900 mt-1">
+                    On a ₵1,000 invoice: pay <strong>₵{(1000 * (1 - (form.earlyPayDiscountPct || 0) / 100)).toFixed(2)}</strong> within <strong>{form.earlyPayDays} days</strong> (save ₵{(1000 * (form.earlyPayDiscountPct || 0) / 100).toFixed(2)}), or pay full ₵1,000.00 within <strong>{form.netDays} days</strong>.
+                  </div>
+                </div>
+              )}
+              <div className="text-[9px] text-slate-500">
+                ℹ️ The free-text "Trading Terms" field on the Trading tab is preserved for backward compatibility, but the structured values here drive the auto-calculation in the Payments tab.
               </div>
             </div>
           )}
