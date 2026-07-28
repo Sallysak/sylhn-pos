@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, Save, Printer, Mail, Trash2, CreditCard, X, Search,
   Plus, Check, Package, Calendar, User, Hash, FileText, Edit2, StickyNote,
-  Image as ImageIcon, Tag,
+  Image as ImageIcon, Tag, TrendingUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +20,7 @@ import { SupplierEmailDialog } from "@/components/supplier-email-dialog";
 import { SupplierCatalogDialog } from "@/components/supplier-catalog-dialog";
 import { SupplierNotesDialog } from "@/components/supplier-notes-dialog";
 import { SupplierHistoryDialog } from "@/components/supplier-history-dialog";
+import { SupplierPriceHistoryDialog } from "@/components/supplier-price-history-dialog";
 import { PurchasePaymentDialog } from "@/components/purchase-payment-dialog";
 
 // Supplier interface — exported so other components (e.g. PurchaseForm) can use real supplier data
@@ -181,6 +182,8 @@ export function SupplierForm({ onBack, products }: SupplierFormProps) {
   const [showCatalogDialog, setShowCatalogDialog] = useState(false);
   const [showNotesDialog, setShowNotesDialog] = useState(false);
   const [showHistoryDialog, setShowHistoryDialog] = useState(false);
+  // Tier 2 #14 — Price History dialog
+  const [showPriceHistoryDialog, setShowPriceHistoryDialog] = useState(false);
   // Edit-supplier mode: when set, NewSupplierPopup opens pre-filled with this supplier's data
   const [editSupplier, setEditSupplier] = useState<Supplier | null>(null);
   // Supplier's catalog (loaded when a supplier is selected) — drives the "Find Part no" search
@@ -744,6 +747,7 @@ export function SupplierForm({ onBack, products }: SupplierFormProps) {
               onNew={() => { setShowSupplierList(false); setEditSupplier(null); setShowNewSupplier(true); }}
               onNotes={(s) => { setShowSupplierList(false); setSelectedSupplier(s); setSupplierDetails(s.name); setShowNotesDialog(true); }}
               onHistory={(s) => { setShowSupplierList(false); setSelectedSupplier(s); setSupplierDetails(s.name); setShowHistoryDialog(true); }}
+              onPriceHistory={(s) => { setShowSupplierList(false); setSelectedSupplier(s); setSupplierDetails(s.name); setShowPriceHistoryDialog(true); }}
               onEmail={(s) => { setShowSupplierList(false); setSelectedSupplier(s); setSupplierDetails(s.name); setShowEmailDialog(true); }}
               onEdit={(s) => { setShowSupplierList(false); setSelectedSupplier(s); setSupplierDetails(s.name); setEditSupplier(s); setShowNewSupplier(true); }}
               onDelete={async (s) => {
@@ -834,6 +838,15 @@ export function SupplierForm({ onBack, products }: SupplierFormProps) {
           supplierId={selectedSupplier?.id || null}
           supplierName={selectedSupplier?.name || ""}
         />
+
+        {/* Tier 2 #14 — Supplier Price History dialog */}
+        {showPriceHistoryDialog && selectedSupplier && (
+          <SupplierPriceHistoryDialog
+            supplierId={selectedSupplier.id}
+            supplierName={selectedSupplier.name}
+            onClose={() => setShowPriceHistoryDialog(false)}
+          />
+        )}
 
         <PurchasePaymentDialog
           open={showPaymentDialog}
@@ -1091,7 +1104,7 @@ function StockListMiniPopup({ products, searchText, onSelect, onClose }: {
 }
 
 // ===== Supplier List Popup =====
-function SupplierListPopup({ suppliers, searchText, canEditSupplier, onSelect, onNew, onNotes, onHistory, onEmail, onEdit, onDelete, onClose }: {
+function SupplierListPopup({ suppliers, searchText, canEditSupplier, onSelect, onNew, onNotes, onHistory, onPriceHistory, onEmail, onEdit, onDelete, onClose }: {
   suppliers: Supplier[];
   searchText: string;
   canEditSupplier?: boolean;
@@ -1099,6 +1112,7 @@ function SupplierListPopup({ suppliers, searchText, canEditSupplier, onSelect, o
   onNew: () => void;
   onNotes?: (s: Supplier) => void;
   onHistory?: (s: Supplier) => void;
+  onPriceHistory?: (s: Supplier) => void;
   onEmail?: (s: Supplier) => void;
   onEdit?: (s: Supplier) => void;
   onDelete?: (s: Supplier) => void;
@@ -1326,6 +1340,7 @@ function SupplierListPopup({ suppliers, searchText, canEditSupplier, onSelect, o
           <IconButton label="New" color="#2196F3" onClick={onNew} icon={<Plus className="h-4 w-4 text-white" />} />
           <IconButton label="Notes" color="#9C27B0" onClick={() => selectedSupplier ? (onNotes ? onNotes(selectedSupplier) : toast({ title: "Notes", description: selectedSupplier.notes || 'No notes for this supplier' })) : toast({ title: "Select a supplier first", variant: "destructive" })} disabled={!selectedSupplier} icon={<StickyNote className="h-4 w-4 text-white" />} />
           <IconButton label="History" color="#2196F3" onClick={() => selectedSupplier ? (onHistory ? onHistory(selectedSupplier) : toast({ title: "History", description: `Transaction history for ${selectedSupplier.name}` })) : toast({ title: "Select a supplier first", variant: "destructive" })} disabled={!selectedSupplier} icon={<Hash className="h-4 w-4 text-white" />} />
+          <IconButton label="Price History" color="#7C3AED" onClick={() => selectedSupplier ? (onPriceHistory ? onPriceHistory(selectedSupplier) : toast({ title: "Price History", description: `Cost trend for ${selectedSupplier.name}` })) : toast({ title: "Select a supplier first", variant: "destructive" })} disabled={!selectedSupplier} icon={<TrendingUp className="h-4 w-4 text-white" />} />
           <IconButton label="Edit" color="#EA580C" onClick={() => selectedSupplier ? (onEdit ? onEdit(selectedSupplier) : toast({ title: "Edit", description: `Edit ${selectedSupplier.name}` })) : toast({ title: "Select a supplier first", variant: "destructive" })} disabled={!selectedSupplier || !canEditSupplier} icon={<Edit2 className="h-4 w-4 text-white" />} />
           <IconButton label="Delete" color="#DC2626" onClick={() => selectedSupplier ? (onDelete ? onDelete(selectedSupplier) : toast({ title: "Delete", description: `Deactivate ${selectedSupplier.name}` })) : toast({ title: "Select a supplier first", variant: "destructive" })} disabled={!selectedSupplier || !canEditSupplier} icon={<Trash2 className="h-4 w-4 text-white" />} />
           <IconButton label="Mail" color="#2196F3" onClick={() => selectedSupplier ? (onEmail ? onEmail(selectedSupplier) : toast({ title: "Mail", description: `Compose email to ${selectedSupplier.name}` })) : toast({ title: "Select a supplier first", variant: "destructive" })} disabled={!selectedSupplier} icon={<Mail className="h-4 w-4 text-white" />} />

@@ -148,6 +148,21 @@ export function SupplierCatalogDialog({
       if (res.ok) {
         // Update locally without full reload
         setCatalog(prev => prev.map(c => c.id === entry.id ? { ...c, ...patch } : c));
+        // Tier 2 #14 — Record a price-history entry if the cost changed
+        if (patch.supplierCost !== undefined && patch.supplierCost !== entry.supplierCost) {
+          fetch("/api/supplier-price-history", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+              supplierId,
+              productId: entry.productId,
+              unitCost: patch.supplierCost,
+              previousCost: entry.supplierCost,
+              notes: "Updated via supplier catalog",
+            }),
+          }).catch(() => {}); // best-effort, don't block
+        }
       }
     } catch {}
   };
