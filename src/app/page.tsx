@@ -103,6 +103,7 @@ const AutoReplenishRules = dynamic(() => import("@/components/auto-replenish-rul
 const ReportsCenter = dynamic(() => import("@/components/reports-center").then(m => ({ default: m.ReportsCenter })), { ssr: false, loading: loadingFallback });
 const ProfitMarginReport = dynamic(() => import("@/components/profit-margin-report").then(m => ({ default: m.ProfitMarginReport })), { ssr: false, loading: loadingFallback });
 const CustomerStatements = dynamic(() => import("@/components/customer-statements").then(m => ({ default: m.CustomerStatements })), { ssr: false, loading: loadingFallback });
+const FinancialReports = dynamic(() => import("@/components/financial-reports").then(m => ({ default: m.FinancialReports })), { ssr: false, loading: loadingFallback });
 const KeyboardShortcutsOverlay = dynamic(() => import("@/components/keyboard-shortcuts").then(m => ({ default: m.KeyboardShortcutsOverlay })), { ssr: false });
 
 // ===== Server → Client product transformer =====
@@ -1879,6 +1880,7 @@ export default function POSPage() {
         { separator: true },
         { label: "📊 Profit Margin Report (landed cost)", icon: TrendingUp, action: () => setView("profit-margin-report") },
         { label: "📄 Customer Statements (credit)", icon: FileText, action: () => setView("customer-statements") },
+        { label: "👥 Employee Performance + 💰 Cash Flow", icon: BarChart3, action: () => setView("financial-reports") },
       ] : [],
     },
     {
@@ -2092,6 +2094,20 @@ export default function POSPage() {
     return (
       <>
         <CustomerStatements onBack={() => setView("credit-management")} />
+        <MobileNav
+          active={view}
+          onNavigate={(v) => { if (v === "cart") setMobileCartOpen(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
+          cartCount={cart.reduce((s, i) => s + i.quantity, 0)}
+          user={loggedInUser ? { fullName: loggedInUser.fullName, role: loggedInUser.role } : null}
+          onLogout={() => handleLogout()}
+        />
+      </>
+    );
+  }
+  if (view === "financial-reports") {
+    return (
+      <>
+        <FinancialReports onBack={() => setView("reports-center")} />
         <MobileNav
           active={view}
           onNavigate={(v) => { if (v === "cart") setMobileCartOpen(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}

@@ -7,7 +7,7 @@ import {
   Package, AlertTriangle, Clock, BarChart3, Activity, RefreshCw,
   Search, Printer, RotateCcw, X, Calendar, AlertCircle, CheckCircle2,
   Star, Boxes, Percent, FileText, ChevronRight, ArrowUpRight, ArrowDownRight,
-  Plus, Download, FileBarChart, Filter,
+  Plus, Download, FileBarChart, Filter, Zap, Mail, MessageCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -969,7 +969,7 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
                       </div>
                     </div>
                     <div className="divide-y divide-slate-100 max-h-64 overflow-y-auto">
-                      {/* Low stock items */}
+                      {/* Low stock items — with ⚡ Quick Reorder button */}
                       {products.filter(p => p.quantity <= p.reorderLevel).slice(0, 5).map(p => (
                         <div key={p.id} className="p-3 flex items-center gap-3">
                           <div className="h-8 w-8 rounded-lg bg-rose-50 flex items-center justify-center text-base flex-shrink-0">{p.emoji}</div>
@@ -977,7 +977,30 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
                             <div className="text-xs font-semibold text-slate-800 truncate">{p.name}</div>
                             <div className="text-[10px] text-rose-600">Only {p.quantity} left (reorder at {p.reorderLevel})</div>
                           </div>
-                          <Badge className="text-[9px] bg-rose-100 text-rose-700 flex-shrink-0">LOW</Badge>
+                          <button
+                            onClick={async () => {
+                              try {
+                                const res = await fetch(`/api/products/${p.id}/quick-reorder`, {
+                                  method: "POST",
+                                  headers: { "Content-Type": "application/json" },
+                                  credentials: "include",
+                                  body: JSON.stringify({}),
+                                });
+                                const data = await res.json();
+                                if (res.ok && data.success) {
+                                  toast({ title: "⚡ Quick reorder draft created", description: data.message });
+                                } else {
+                                  toast({ title: "Quick reorder failed", description: data.detail || data.error, variant: "destructive" });
+                                }
+                              } catch (e: any) {
+                                toast({ title: "Quick reorder failed", description: e.message, variant: "destructive" });
+                              }
+                            }}
+                            className="h-7 px-2 rounded-lg bg-gradient-to-r from-violet-500 to-indigo-500 hover:from-violet-600 hover:to-indigo-600 text-white text-[10px] font-bold flex items-center gap-1 flex-shrink-0 transition active:scale-95"
+                            title={`One-click draft PO for ${p.name} (uses preferred supplier + auto quantity)`}
+                          >
+                            <Zap className="h-3 w-3" /> Reorder
+                          </button>
                         </div>
                       ))}
                       {/* Expiring soon items */}
@@ -1223,6 +1246,45 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
                     )}
                   </h2>
                   <div className="flex items-center gap-2">
+                    {/* Low-stock digest — email + WhatsApp buttons */}
+                    <button
+                      onClick={async () => {
+                        try {
+                          toast({ title: "Sending low-stock digest email…", description: "Sending to all managers/admins with email" });
+                          const res = await fetch("/api/alerts/low-stock-digest?sendEmail=true", { credentials: "include" });
+                          const data = await res.json();
+                          if (data.emailSent) {
+                            toast({ title: "📧 Digest sent", description: `Emailed to ${data.emailRecipients} manager(s) — ${data.count} items` });
+                          } else {
+                            toast({ title: "Email not sent", description: data.emailError || "Unknown error", variant: "destructive" });
+                          }
+                        } catch (e: any) {
+                          toast({ title: "Failed to send digest", description: e.message, variant: "destructive" });
+                        }
+                      }}
+                      className="h-8 px-3 rounded-lg bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs font-bold flex items-center gap-1.5 transition"
+                      title="Email the low-stock digest to all managers/admins"
+                    >
+                      <Mail className="h-3.5 w-3.5" /> Email Digest
+                    </button>
+                    <button
+                      onClick={async () => {
+                        try {
+                          const res = await fetch("/api/alerts/low-stock-digest?format=whatsapp", { credentials: "include" });
+                          const data = await res.json();
+                          if (data.waLink) {
+                            window.open(data.waLink, "_blank");
+                            toast({ title: "WhatsApp opened", description: `${data.count} items in the digest` });
+                          }
+                        } catch (e: any) {
+                          toast({ title: "Failed to generate WhatsApp digest", description: e.message, variant: "destructive" });
+                        }
+                      }}
+                      className="h-8 px-3 rounded-lg bg-green-100 hover:bg-green-200 text-green-700 text-xs font-bold flex items-center gap-1.5 transition"
+                      title="Open WhatsApp with the low-stock digest pre-filled"
+                    >
+                      <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
+                    </button>
                     {/* Show All Products toggle — lets user pin items even if above reorder level */}
                     <label className="flex items-center gap-1.5 text-[10px] font-semibold text-slate-600 cursor-pointer select-none">
                       <input
