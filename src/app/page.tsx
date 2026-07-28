@@ -101,6 +101,8 @@ const AdminHub = dynamic(() => import("@/components/admin-hub").then(m => ({ def
 const CreditManagement = dynamic(() => import("@/components/credit-management").then(m => ({ default: m.CreditManagement })), { ssr: false, loading: loadingFallback });
 const AutoReplenishRules = dynamic(() => import("@/components/auto-replenish-rules").then(m => ({ default: m.AutoReplenishRules })), { ssr: false, loading: loadingFallback });
 const ReportsCenter = dynamic(() => import("@/components/reports-center").then(m => ({ default: m.ReportsCenter })), { ssr: false, loading: loadingFallback });
+const ProfitMarginReport = dynamic(() => import("@/components/profit-margin-report").then(m => ({ default: m.ProfitMarginReport })), { ssr: false, loading: loadingFallback });
+const CustomerStatements = dynamic(() => import("@/components/customer-statements").then(m => ({ default: m.CustomerStatements })), { ssr: false, loading: loadingFallback });
 const KeyboardShortcutsOverlay = dynamic(() => import("@/components/keyboard-shortcuts").then(m => ({ default: m.KeyboardShortcutsOverlay })), { ssr: false });
 
 // ===== Server → Client product transformer =====
@@ -1822,6 +1824,9 @@ export default function POSPage() {
         { header: "Accounting" },
         { label: "General Ledger", icon: BookOpen, action: () => { setAccountsReport("general-ledger"); setView("accounts-reports"); } },
         { label: "Trial Balance", icon: FileBarChart2, action: () => { setAccountsReport("trial-balance"); setView("accounts-reports"); } },
+        { separator: true },
+        { label: "📊 Profit Margin Report (landed cost)", icon: TrendingUp, action: () => setView("profit-margin-report") },
+        { label: "📄 Customer Statements (credit)", icon: FileText, action: () => setView("customer-statements") },
       ] : [],
     },
     {
@@ -2007,6 +2012,34 @@ export default function POSPage() {
           onNewPO={() => setView("purchase-form")}
           onOpenSuppliers={() => setView("supplier-form")}
         />
+        <MobileNav
+          active={view}
+          onNavigate={(v) => { if (v === "cart") setMobileCartOpen(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
+          cartCount={cart.reduce((s, i) => s + i.quantity, 0)}
+          user={loggedInUser ? { fullName: loggedInUser.fullName, role: loggedInUser.role } : null}
+          onLogout={() => handleLogout()}
+        />
+      </>
+    );
+  }
+  if (view === "profit-margin-report") {
+    return (
+      <>
+        <ProfitMarginReport onBack={() => setView("reports-center")} />
+        <MobileNav
+          active={view}
+          onNavigate={(v) => { if (v === "cart") setMobileCartOpen(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
+          cartCount={cart.reduce((s, i) => s + i.quantity, 0)}
+          user={loggedInUser ? { fullName: loggedInUser.fullName, role: loggedInUser.role } : null}
+          onLogout={() => handleLogout()}
+        />
+      </>
+    );
+  }
+  if (view === "customer-statements") {
+    return (
+      <>
+        <CustomerStatements onBack={() => setView("credit-management")} />
         <MobileNav
           active={view}
           onNavigate={(v) => { if (v === "cart") setMobileCartOpen(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
