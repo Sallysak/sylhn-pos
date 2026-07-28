@@ -211,12 +211,24 @@ export function PurchaseHub({ onBack, onNewPO, onOpenSuppliers }: PurchaseHubPro
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             {onOpenSuppliers && (
-              <Button onClick={onOpenSuppliers} variant="secondary" size="sm" className="bg-white/15 hover:bg-white/25 text-white border-0">
+              <Button onClick={() => {
+                // Open suppliers in the same tab but remember to return to hub
+                if (typeof window !== "undefined") {
+                  try { sessionStorage.setItem("sylhn-return-to", "purchase-hub"); } catch {}
+                }
+                onOpenSuppliers();
+              }} variant="secondary" size="sm" className="bg-white/15 hover:bg-white/25 text-white border-0">
                 <Users className="h-4 w-4" /> <span className="hidden sm:inline">Suppliers</span>
               </Button>
             )}
             {onNewPO && (
-              <Button onClick={onNewPO} size="sm" className="bg-white text-amber-700 hover:bg-amber-50 font-bold">
+              <Button onClick={() => {
+                // Open PO form in the same tab but remember to return to hub
+                if (typeof window !== "undefined") {
+                  try { sessionStorage.setItem("sylhn-return-to", "purchase-hub"); } catch {}
+                }
+                onNewPO();
+              }} size="sm" className="bg-white text-amber-700 hover:bg-amber-50 font-bold">
                 <Plus className="h-4 w-4" /> New PO
               </Button>
             )}

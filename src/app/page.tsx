@@ -2018,9 +2018,22 @@ export default function POSPage() {
     );
   }
   if (view === "purchase-form") {
+    // Smart back-navigation: if the user came from the Purchase Hub,
+    // return there instead of the POS screen.
+    const handlePurchaseFormBack = () => {
+      try {
+        const returnTo = sessionStorage.getItem("sylhn-return-to");
+        if (returnTo === "purchase-hub") {
+          sessionStorage.removeItem("sylhn-return-to");
+          setView("purchase-hub");
+          return;
+        }
+      } catch {}
+      setView("pos");
+    };
     return (
       <>
-        <PurchaseForm onBack={() => setView("pos")} products={products} groups={groups} suppliers={suppliers} />
+        <PurchaseForm onBack={handlePurchaseFormBack} products={products} groups={groups} suppliers={suppliers} />
         <MobileNav
           active={view}
           onNavigate={(v) => { if (v === "cart") setMobileCartOpen(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
@@ -2132,9 +2145,22 @@ export default function POSPage() {
     );
   }
   if (view === "supplier-form") {
+    // Smart back-navigation: if the user came from the Purchase Hub,
+    // return there instead of the POS screen.
+    const handleSupplierFormBack = () => {
+      try {
+        const returnTo = sessionStorage.getItem("sylhn-return-to");
+        if (returnTo === "purchase-hub") {
+          sessionStorage.removeItem("sylhn-return-to");
+          setView("purchase-hub");
+          return;
+        }
+      } catch {}
+      setView("pos");
+    };
     return (
       <>
-        <SupplierForm onBack={() => setView("pos")} products={products} />
+        <SupplierForm onBack={handleSupplierFormBack} products={products} />
         <MobileNav
           active={view}
           onNavigate={(v) => { if (v === "cart") setMobileCartOpen(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
