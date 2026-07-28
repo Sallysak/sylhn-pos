@@ -1035,21 +1035,73 @@ export default function POSPage() {
   // including an EMPTY array (e.g. after data wipe). The previous guard
   // `data.products.length > 0` prevented the cache from ever being cleared,
   // so wiped data kept showing up in the UI.
+  // ===== Product fetching — optimized with incremental sync + ETag =====
+  // The /api/products endpoint supports:
+  //   1. ETag (If-None-Match) — server returns 304 Not Modified if nothing
+  //      changed. Saves bandwidth + JSON parse time.
+  //   2. `since` cursor — only return products updated after the cursor.
+  //      Useful for the 60-second polling interval.
+  //
+  // We use both:
+  //   - On FIRST load (no cursor yet): full fetch with ETag caching.
+  //   - On POLLING (every 60s): incremental fetch using the cursor.
+  //     Only changed products are returned, then merged into the local list.
+  //
+  // This reduces the typical poll response from ~50KB JSON (full list) to
+  // ~0.2KB (304 Not Modified) or ~1KB (one or two changed products).
+  const productSyncCursorRef = useRef<string | null>(null);
+  const productEtagRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (!loggedInUser) return;
+
     const fetchProducts = async () => {
       try {
-        const res = await authedFetch("/api/products");
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data.products)) {
-            setProducts(data.products.map(serverProductToClientProduct));
+        // Build the request — use incremental sync if we have a cursor
+        const cursor = productSyncCursorRef.current;
+        const url = cursor ? `/api/products?since=${encodeURIComponent(cursor)}` : "/api/products";
+        const headers: Record<string, string> = {};
+        if (!cursor && productEtagRef.current) {
+          // Only use ETag for full fetches (not incremental)
+          headers["If-None-Match"] = productEtagRef.current;
+        }
+
+        const res = await authedFetch(url, { headers });
+        if (res.status === 304) {
+          // Nothing changed — keep current state, just refresh the cursor
+          productSyncCursorRef.current = new Date().toISOString();
+          return;
+        }
+        if (!res.ok) return;
+
+        const data = await res.json();
+        // Save ETag for future full-fetches
+        const etag = res.headers.get("ETag");
+        if (etag) productEtagRef.current = etag;
+        // Save cursor for future incremental fetches
+        if (data.cursor) productSyncCursorRef.current = data.cursor;
+
+        if (Array.isArray(data.products)) {
+          const transformed = data.products.map(serverProductToClientProduct);
+          if (data.incremental && cursor) {
+            // Incremental: merge changed products into the existing list
+            setProducts(prev => {
+              const map = new Map(prev.map(p => [p.id, p]));
+              for (const p of transformed) {
+                map.set(p.id, p);
+              }
+              return Array.from(map.values());
+            });
+          } else {
+            // Full fetch: replace the list
+            setProducts(transformed);
           }
         }
       } catch { /* ignore */ }
     };
+
     fetchProducts();
-    const interval = setInterval(fetchProducts, 60000); // 60s (was 30s)
+    const interval = setInterval(fetchProducts, 60000); // 60s polling
     return () => clearInterval(interval);
   }, [loggedInUser]);
 
