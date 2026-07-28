@@ -2660,3 +2660,97 @@ Stage Summary:
   User Menu only.
 - Audit identified 22 purchase/supplier improvements; presented
   recommendations to user for selection.
+
+---
+Task ID: tier1-purchase-supplier-upgrade
+Agent: Main (Super Z)
+Task: Implement all 10 Tier 1 purchase & supplier improvements.
+
+Work Log:
+- Audited 14 existing purchase/supplier files via subagent (see
+  previous audit task). Identified 22 gaps; user selected Tier 1.
+
+SCHEMA CHANGES (prisma/schema.prisma + scripts/tier1-purchase-supplier-migration.sql)
+- Supplier: added 13 fields (rating, blacklist, blacklistReason,
+  blacklistedAt, earlyPayDiscountPct, earlyPayDays, netDays, tin,
+  bankName, bankAccountName, bankAccountNo, bankBranchCode,
+  mobileMoneyProvider, mobileMoneyNumber)
+- SupplierPayment: added 5 fields (whtRate, whtAmount,
+  whtCertificateNo, earlyPayDiscountApplied, earlyPayDiscountPctUsed)
+- Purchase: added landedCostAllocationMethod
+- PurchaseItem: added landedCostPerUnit, totalLandedCost
+- 5 new models: SupplierInvoice, SupplierCreditNote, SupplierReturn,
+  SupplierReturnItem, SupplierPriceHistory
+- Added back-relations on SystemUser, Product, Purchase, Supplier,
+  SupplierCreditNote
+- Wrote idempotent SQL migration script for Neon PostgreSQL
+  (all columns nullable/defaulted; existing rows unaffected)
+
+API LAYER (7 new endpoints + 3 extended)
+NEW:
+- GET /api/purchases/[id]/whatsapp              (T1.9)
+- GET /api/suppliers/[id]/performance           (T1.5)
+- GET /api/suppliers/price-comparison           (T1.7)
+- GET/POST /api/supplier-invoices               (T1.3)
+- POST /api/supplier-invoices/[id]/match        (T1.3)
+- GET/POST /api/supplier-credit-notes           (T1.4)
+- GET/POST /api/supplier-returns                (T1.4)
+- GET /api/suppliers/[id]/early-pay-discount    (T1.8)
+
+EXTENDED:
+- POST /api/purchases — accepts landedCostAllocationMethod
+  (by_value | by_qty | manual | none) and auto-allocates freight/
+  insurance/customs/other to per-line landedCostPerUnit. Updates
+  product.costPrice to LANDED cost (raw + landed per unit) so margin
+  reports reflect true COGS. (T1.2)
+- POST/PUT /api/suppliers — accepts all 13 new supplier fields
+- POST /api/supplier-payments — accepts whtRate + whtCertificateNo +
+  earlyPayDiscountApplied. Auto-computes whtAmount = amount × whtRate.
+  Decrements supplier balance by (amount − whtAmount) since WHT goes
+  to GRA separately. (T1.10, T1.8)
+
+VALIDATION
+- Extended SupplierSchema in src/lib/validation.ts with all 13 new
+  fields as optional with sensible defaults.
+
+UI LAYER
+NEW COMPONENT — Purchase Hub (src/components/purchase-hub.tsx, 1600 lines)
+- 6 tabs: Overview, Purchase Orders, Invoice Matching, Returns,
+  Performance, Payments
+- All data fetched from real API endpoints (no localStorage)
+- Each tab fully featured with search, filters, modals
+- Entry points: Purchase menu (F4) → Purchase Hub, or direct view
+
+BLACKLIST WARNING (purchase-form.tsx)
+- When a blacklisted supplier is selected, a rose-colored banner
+  appears with the blacklist reason + manager-approval warning.
+
+VIEWMODE
+- Added 'purchase-hub' to ViewMode union type
+- Wired PurchaseMenu.onOpenPurchaseHub callback
+
+COMMITS
+- 9c16107 → feat: training note readability + remove standalone dark mode toggle
+- (intermediate) → feat(purchase-supplier): Tier 1 schema + 7 new API endpoints
+- 7636481 → feat(purchase-hub): real-time procurement dashboard + blacklist warning
+
+Verification:
+- npx prisma generate → success
+- npx tsc --noEmit → passes
+- npx next build → ✓ Compiled successfully in 23.4s, 97/97 pages
+  (was 93 — 4 new API routes added)
+
+DEPLOYMENT NOTE
+After pushing, the user needs to run
+  scripts/tier1-purchase-supplier-migration.sql
+in the Neon SQL editor to create the new tables + columns. The
+Purchase Hub works immediately once the migration is applied.
+
+Stage Summary:
+- All 10 Tier 1 purchase & supplier improvements are implemented,
+  built, committed, and pushed.
+- New features: WhatsApp PO sending, three-way invoice matching,
+  supplier returns, credit notes, performance scorecard, blacklist
+  warnings, price comparison, structured early-pay discounts, WHT
+  tracking, landed-cost allocation.
+- Migration script ready to apply in Neon.
