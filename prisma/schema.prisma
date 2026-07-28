@@ -744,7 +744,7 @@ model Purchase {
   type          String    @default("purchase") // purchase | order | quote
   supplierId    String?
   supplierName  String    @default("") // denormalized
-  status        String    @default("received") // draft | ordered | received | cancelled
+  status        String    @default("received") // draft | pending_approval | approved | ordered | received | cancelled
   subtotal      Float     @default(0)
   discount      Float     @default(0)
   taxAmount     Float     @default(0)

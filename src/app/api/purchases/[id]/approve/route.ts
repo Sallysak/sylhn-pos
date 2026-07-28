@@ -8,15 +8,15 @@ import { auditLog } from "@/lib/audit";
 // Body: { managerUsername: string, managerPassword: string }
 //
 // Verifies manager credentials via the existing /api/auth/approve endpoint,
-// then marks the purchase as approved. Currently the SYLHN schema uses
-// status values "draft | ordered | received | cancelled" — we don't add a
-// new "approved" status here. Instead, "approval" is interpreted as:
-//   - For "ordered" purchases: mark them as ready to receive (no-op
-//     status-wise, just audit-logged)
-//   - For "received" purchases: confirms the receipt
+// then marks the purchase as approved.
 //
-// The approval is always audit-logged so there's a paper trail of who
-// approved what.
+// Tier 2 #16 — Real approval status:
+// Status flow is now: draft → pending_approval → approved → ordered → received
+//   - POs over the approval threshold are saved with status='pending_approval'
+//   - This endpoint transitions pending_approval → approved
+//   - Once approved, the PO can be Sent (status='ordered') and Received
+// For backwards compat: if the PO is already 'ordered' or 'received',
+// approval just confirms it (audit-logged, no status change).
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   let user;
   try { user = await requireAuth(); requirePermission(user.role, "purchase"); } catch (e) { return e as Response; }
@@ -28,12 +28,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   let purchase = await db.purchase.findUnique({
     where: { id },
-    select: { id: true, refNo: true, total: true, status: true, supplierId: true },
+    select: { id: true, refNo: true, total: true, status: true, supplierId: true, approvedById: true, approvedAt: true },
   });
   if (!purchase) {
     purchase = await db.purchase.findUnique({
       where: { refNo: id },
-      select: { id: true, refNo: true, total: true, status: true, supplierId: true },
+      select: { id: true, refNo: true, total: true, status: true, supplierId: true, approvedById: true, approvedAt: true },
     });
   }
   if (!purchase) return NextResponse.json({ error: "Purchase not found" }, { status: 404 });
@@ -70,12 +70,35 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     );
   }
 
+  // Tier 2 #16 — actually update the Purchase record:
+  // - Set approvedById + approvedAt (always)
+  // - If status was 'pending_approval', transition to 'approved'
+  // - For backwards compat, 'ordered' and 'received' stay as-is
+  const updateData: any = {
+    approvedById: approveData.approver.uid,
+    approvedAt: new Date(),
+  };
+  let statusChanged = false;
+  if (purchase.status === "pending_approval") {
+    updateData.status = "approved";
+    statusChanged = true;
+  }
+
+  const updated = await db.purchase.update({
+    where: { id: purchase.id },
+    data: updateData,
+    select: { id: true, refNo: true, status: true, approvedById: true, approvedAt: true },
+  }).catch((e) => {
+    console.error("Failed to update purchase approval:", e);
+    return null;
+  });
+
   await auditLog({
     userId: user.uid,
     user: user.username,
     action: "APPROVE",
     module: "purchase",
-    details: `PO ${purchase.refNo} approved by ${approveData.approver.username} (${approveData.approver.role}) — ₵${Number(purchase.total).toFixed(2)}`,
+    details: `PO ${purchase.refNo} approved by ${approveData.approver.username} (${approveData.approver.role}) — ₵${Number(purchase.total).toFixed(2)}${statusChanged ? ` · status: pending_approval → approved` : ` · status: ${purchase.status} (confirmed)`}`,
     severity: "warning",
     ipAddress: ip,
     userAgent: req.headers.get("user-agent") || "",
@@ -84,6 +107,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   return NextResponse.json({
     success: true,
     approver: approveData.approver,
-    approvedAt: new Date().toISOString(),
+    approvedAt: updated?.approvedAt?.toISOString() || new Date().toISOString(),
+    previousStatus: purchase.status,
+    newStatus: updated?.status || purchase.status,
+    statusChanged,
   });
 }

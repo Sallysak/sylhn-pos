@@ -445,6 +445,8 @@ function OrdersTab({ purchases, search, setSearch, statusFilter, setStatusFilter
 
   const statusColors: Record<string, string> = {
     draft: "bg-slate-100 text-slate-700",
+    pending_approval: "bg-amber-100 text-amber-700",
+    approved: "bg-violet-100 text-violet-700",
     ordered: "bg-blue-100 text-blue-700",
     received: "bg-emerald-100 text-emerald-700",
     cancelled: "bg-rose-100 text-rose-700",
@@ -490,6 +492,8 @@ function OrdersTab({ purchases, search, setSearch, statusFilter, setStatusFilter
           >
             <option value="">All Status</option>
             <option value="draft">Draft</option>
+            <option value="pending_approval">Pending Approval</option>
+            <option value="approved">Approved</option>
             <option value="ordered">Ordered</option>
             <option value="received">Received</option>
             <option value="cancelled">Cancelled</option>
@@ -988,6 +992,8 @@ function PaymentsTab({ payments, onRefresh }: { payments: Payment[]; onRefresh: 
 function StatusBadge({ status }: { status: string }) {
   const colors: Record<string, string> = {
     draft: "bg-slate-100 text-slate-700",
+    pending_approval: "bg-amber-100 text-amber-700",
+    approved: "bg-violet-100 text-violet-700",
     ordered: "bg-blue-100 text-blue-700",
     received: "bg-emerald-100 text-emerald-700",
     cancelled: "bg-rose-100 text-rose-700",
