@@ -21,6 +21,7 @@ import { SupplierCatalogDialog } from "@/components/supplier-catalog-dialog";
 import { SupplierNotesDialog } from "@/components/supplier-notes-dialog";
 import { SupplierHistoryDialog } from "@/components/supplier-history-dialog";
 import { SupplierPriceHistoryDialog } from "@/components/supplier-price-history-dialog";
+import { SupplierBulkEditDialog } from "@/components/supplier-bulk-edit-dialog";
 import { PurchasePaymentDialog } from "@/components/purchase-payment-dialog";
 
 // Supplier interface — exported so other components (e.g. PurchaseForm) can use real supplier data
@@ -184,6 +185,8 @@ export function SupplierForm({ onBack, products }: SupplierFormProps) {
   const [showHistoryDialog, setShowHistoryDialog] = useState(false);
   // Tier 2 #14 — Price History dialog
   const [showPriceHistoryDialog, setShowPriceHistoryDialog] = useState(false);
+  // Bulk Edit dialog — apply rating/blacklist/TIN/etc. to many suppliers at once
+  const [showBulkEditDialog, setShowBulkEditDialog] = useState(false);
   // Edit-supplier mode: when set, NewSupplierPopup opens pre-filled with this supplier's data
   const [editSupplier, setEditSupplier] = useState<Supplier | null>(null);
   // Supplier's catalog (loaded when a supplier is selected) — drives the "Find Part no" search
@@ -748,6 +751,7 @@ export function SupplierForm({ onBack, products }: SupplierFormProps) {
               onNotes={(s) => { setShowSupplierList(false); setSelectedSupplier(s); setSupplierDetails(s.name); setShowNotesDialog(true); }}
               onHistory={(s) => { setShowSupplierList(false); setSelectedSupplier(s); setSupplierDetails(s.name); setShowHistoryDialog(true); }}
               onPriceHistory={(s) => { setShowSupplierList(false); setSelectedSupplier(s); setSupplierDetails(s.name); setShowPriceHistoryDialog(true); }}
+              onBulkEdit={() => { setShowSupplierList(false); setShowBulkEditDialog(true); }}
               onEmail={(s) => { setShowSupplierList(false); setSelectedSupplier(s); setSupplierDetails(s.name); setShowEmailDialog(true); }}
               onEdit={(s) => { setShowSupplierList(false); setSelectedSupplier(s); setSupplierDetails(s.name); setEditSupplier(s); setShowNewSupplier(true); }}
               onDelete={async (s) => {
@@ -845,6 +849,42 @@ export function SupplierForm({ onBack, products }: SupplierFormProps) {
             supplierId={selectedSupplier.id}
             supplierName={selectedSupplier.name}
             onClose={() => setShowPriceHistoryDialog(false)}
+          />
+        )}
+
+        {/* Bulk Edit dialog — apply changes to all filtered suppliers */}
+        {showBulkEditDialog && (
+          <SupplierBulkEditDialog
+            suppliers={suppliers}
+            onClose={() => setShowBulkEditDialog(false)}
+            onSaved={() => {
+              // Refresh the supplier list from the API
+              fetch('/api/suppliers', { credentials: 'include' })
+                .then(r => r.json())
+                .then(data => {
+                  if (data.suppliers) {
+                    setSuppliers(data.suppliers.map((s: any) => ({
+                      id: s.id, code: s.code, name: s.name,
+                      contactName: s.contactName || '', phone: s.phone || '',
+                      mobile: s.mobile || '', email: s.email || '', fax: s.fax || '',
+                      address: s.address || '', city: s.city || '', state: s.state || '',
+                      country: s.country || 'Ghana', businessNo: s.businessNo || '',
+                      tradingTerms: s.tradingTerms || 'Net 30', creditLimit: s.creditLimit || 0,
+                      balance: s.balance || 0, taxInclusive: s.taxInclusive || false,
+                      notes: s.notes || '',
+                      rating: s.rating ?? 0, blacklist: s.blacklist ?? false,
+                      blacklistReason: s.blacklistReason || '', tin: s.tin || '',
+                      bankName: s.bankName || '', bankAccountName: s.bankAccountName || '',
+                      bankAccountNo: s.bankAccountNo || '', bankBranchCode: s.bankBranchCode || '',
+                      mobileMoneyProvider: s.mobileMoneyProvider || '',
+                      mobileMoneyNumber: s.mobileMoneyNumber || '',
+                      earlyPayDiscountPct: s.earlyPayDiscountPct ?? 0,
+                      earlyPayDays: s.earlyPayDays ?? 0, netDays: s.netDays ?? 30,
+                    })));
+                  }
+                })
+                .catch(() => {});
+            }}
           />
         )}
 
@@ -1104,7 +1144,7 @@ function StockListMiniPopup({ products, searchText, onSelect, onClose }: {
 }
 
 // ===== Supplier List Popup =====
-function SupplierListPopup({ suppliers, searchText, canEditSupplier, onSelect, onNew, onNotes, onHistory, onPriceHistory, onEmail, onEdit, onDelete, onClose }: {
+function SupplierListPopup({ suppliers, searchText, canEditSupplier, onSelect, onNew, onNotes, onHistory, onPriceHistory, onBulkEdit, onEmail, onEdit, onDelete, onClose }: {
   suppliers: Supplier[];
   searchText: string;
   canEditSupplier?: boolean;
@@ -1113,6 +1153,7 @@ function SupplierListPopup({ suppliers, searchText, canEditSupplier, onSelect, o
   onNotes?: (s: Supplier) => void;
   onHistory?: (s: Supplier) => void;
   onPriceHistory?: (s: Supplier) => void;
+  onBulkEdit?: () => void;
   onEmail?: (s: Supplier) => void;
   onEdit?: (s: Supplier) => void;
   onDelete?: (s: Supplier) => void;
@@ -1348,6 +1389,16 @@ function SupplierListPopup({ suppliers, searchText, canEditSupplier, onSelect, o
           <IconButton label="Labels" color="#2196F3" onClick={() => selectedSupplier ? toast({ title: "Labels", description: `Print address labels for ${selectedSupplier.name}` }) : toast({ title: "Select a supplier first", variant: "destructive" })} disabled={!selectedSupplier} icon={<FileText className="h-4 w-4 text-white" />} />
           <IconButton label="Envelope" shortcut="F3" color="#2196F3" onClick={() => selectedSupplier ? toast({ title: "Envelope (F3)", description: `Print envelope for ${selectedSupplier.name}` }) : toast({ title: "Select a supplier first", variant: "destructive" })} disabled={!selectedSupplier} icon={<Printer className="h-4 w-4 text-white" />} />
           <div className="flex-1" />
+          {/* Bulk Edit — admin/manager only. Applies changes to ALL filtered suppliers. */}
+          {canEditSupplier && (
+            <IconButton
+              label="Bulk Edit"
+              color="#7C3AED"
+              onClick={() => onBulkEdit ? onBulkEdit() : toast({ title: "Bulk Edit", description: `Apply rating/blacklist/TIN to all ${sorted.length} filtered suppliers` })}
+              disabled={sorted.length === 0}
+              icon={<TrendingUp className="h-4 w-4 text-white" />}
+            />
+          )}
           <IconButton label="Close" shortcut="Esc" color="#F44336" onClick={onClose} icon={<X className="h-4 w-4 text-white" />} />
         </div>
       </motion.div>

@@ -12,7 +12,7 @@ import {
   RefreshCw, Globe, BookOpen, FileBarChart, Clock3, Power, Sun, Moon,
   ChevronDown, ChevronRight, X, ArrowUpRight, Store, Zap, Layers,
   Key, Activity, Wifi, WifiOff, Bell, Calendar, BarChart2, PieChart,
-  Filter, Star, Crown, Lightbulb, GraduationCap, AlertOctagon,
+  Filter, Star, Crown, Lightbulb, GraduationCap, AlertOctagon, RotateCcw,
 } from "lucide-react";
 import { COMPANY } from "@/lib/pos-data";
 
@@ -579,6 +579,164 @@ const CATEGORIES: FeatureCategory[] = [
           "ACCESS: Suppliers need a login — admin creates accounts in Admin Panel → Supplier Users. " +
           "SECURITY: Suppliers see ONLY their own POs and balance — they cannot see other suppliers or your sales data. " +
           "TIP: Send the portal URL to your top 3 suppliers. They can submit quotes for new products without phone tag.",
+      },
+      {
+        name: "Purchase Hub (Real-time)",
+        description: "Real-time procurement dashboard — 6 tabs: Overview, POs, Invoice Matching, Returns, Performance, Payments",
+        icon: TrendingUp,
+        location: "Purchase menu → 📈 Purchase Hub (Real-time)  ·  or More → Purchasing → Purchase Hub (F4)",
+        locationLabel: "Purchase menu",
+        action: "purchase-hub",
+        color: "text-amber-600",
+        bg: "bg-amber-50",
+        phase: "phase5",
+        access: "all",
+        trainingNote:
+          "ONE-STOP SHOP for procurement. Replaces the old localStorage demo with real API data. " +
+          "TABS: Overview (KPIs + alerts), Purchase Orders (searchable list + WhatsApp sending), Invoice Matching (three-way PO↔GRN↔Invoice), Returns (supplier returns workflow), Performance (per-supplier scorecard with star rating), Payments (WHT + early-pay discount tracking). " +
+          "GOTCHA: 'Suppliers' and 'New PO' buttons navigate to those forms but remember to return to the Hub when you click Back. " +
+          "TIP: Check the Overview tab daily — alerts show pending invoices, awaiting-credit returns, and blacklisted suppliers.",
+      },
+      {
+        name: "WhatsApp PO Sending",
+        description: "Send a purchase order to a supplier via WhatsApp — auto-fills PO text + items + totals",
+        icon: MessageCircle,
+        location: "Purchase Hub → Purchase Orders tab → green WhatsApp button per row",
+        locationLabel: "Purchase Hub",
+        action: "purchase-hub",
+        color: "text-green-600",
+        bg: "bg-green-50",
+        phase: "phase5",
+        access: "all",
+        trainingNote:
+          "FLOW: Click the WhatsApp icon on any PO row → modal opens with the supplier's phone pre-filled → click 'Open WhatsApp' → WhatsApp opens with the PO text pre-filled → supplier receives it instantly. " +
+          "WHY: Ghanaian suppliers respond faster on WhatsApp than email. " +
+          "GOTCHA: The supplier's mobile number must be in their profile. If blank, you'll need to type it manually. " +
+          "TIP: Always confirm the supplier received the PO — WhatsApp delivery reports can be delayed.",
+      },
+      {
+        name: "Supplier Invoice Matching (3-way)",
+        description: "Three-way matching: PO ↔ GRN ↔ Supplier Invoice. Auto-flags variances for review.",
+        icon: Receipt,
+        location: "Purchase Hub → Invoice Matching tab",
+        locationLabel: "Purchase Hub",
+        action: "purchase-hub",
+        color: "text-amber-600",
+        bg: "bg-amber-50",
+        phase: "phase5",
+        access: "all",
+        trainingNote:
+          "WHY: GRA auditors require that the invoice you pay matches what you ordered AND what you received. " +
+          "FLOW: Click 'New Invoice' → enter supplier + invoice # + total → link to a PO (optional) → save. " +
+          "AUTO-MATCH: If variance ≤1% → status='matched'. 1-5% → 'variance' (needs review). >5% → 'variance' (large, needs review). " +
+          "RESOLVE: Click 'Match' (accept the variance) or 'Reject' (dispute the invoice with the supplier). " +
+          "GOTCHA: Always record the supplier invoice even if it matches — it's the audit trail that you paid the right amount.",
+      },
+      {
+        name: "Supplier Returns (Debit Notes)",
+        description: "Return damaged/expired/wrong goods to a supplier — auto-decrements stock + tracks the credit",
+        icon: RotateCcw,
+        location: "Purchase Hub → Returns tab → New Return button",
+        locationLabel: "Purchase Hub",
+        action: "purchase-hub",
+        color: "text-rose-600",
+        bg: "bg-rose-50",
+        phase: "phase5",
+        access: "all",
+        trainingNote:
+          "WHEN TO USE: Damaged goods, expired items, wrong products delivered, quality issues. " +
+          "FLOW: New Return → select supplier + return type → add items (qty + cost) → save. Stock is decremented immediately. " +
+          "STATUS PIPELINE: pending → shipped → received_by_supplier → credit_issued. " +
+          "GOTCHA: The supplier's balance is NOT changed until they issue a credit note. The return just documents what you sent back. " +
+          "TIP: Photograph damaged goods before returning — evidence for supplier disputes.",
+      },
+      {
+        name: "Supplier Performance Scorecard",
+        description: "1-5 star rating + on-time %, fill-rate %, rejection %, avg lead time, total spend per supplier",
+        icon: Star,
+        location: "Purchase Hub → Performance tab → pick supplier + window (30/90/180/365 days)",
+        locationLabel: "Purchase Hub",
+        action: "purchase-hub",
+        color: "text-amber-600",
+        bg: "bg-amber-50",
+        phase: "phase5",
+        access: "all",
+        trainingNote:
+          "STAR RATING: Auto-computed from PO history (40% on-time + 30% fill-rate + 30% quality). Override by setting a manual rating in the supplier form (Compliance tab). " +
+          "ON-TIME %: # POs received on or before expectedAt / # POs received. " +
+          "FILL RATE: units received / units ordered. " +
+          "REJECTION %: # items short-shipped / # items total. " +
+          "USE CASE: Shift volume to better suppliers. A 3-star supplier costs you more in stockouts + expiries than a 5-star one. " +
+          "TIP: Run this monthly. Review 1-2 star suppliers — consider blacklisting.",
+      },
+      {
+        name: "Quick Reorder Button",
+        description: "One-click draft PO from the Operations Dashboard low-stock alert — uses preferred supplier + auto quantity",
+        icon: Zap,
+        location: "Operations Dashboard → Overview → Action Needed panel → ⚡ Reorder button per low-stock item",
+        locationLabel: "Operations Dashboard",
+        action: "dashboard",
+        color: "text-violet-600",
+        bg: "bg-violet-50",
+        phase: "phase5",
+        access: "all",
+        trainingNote:
+          "ONE-CLICK: Click ⚡ Reorder next to any low-stock item → a draft PO is created instantly with the preferred supplier + auto quantity (reorder level × 2). " +
+          "REVIEW: The PO is created as 'draft' — review it in the Purchase Hub before sending. " +
+          "GOTCHA: If no supplier is linked to the product, you'll get a 'No supplier linked' error. Add one via Suppliers → Catalog first. " +
+          "TIP: Use this for fast-moving items you reorder often. For complex orders, use the full Purchase Form.",
+      },
+      {
+        name: "Low-Stock Digest Alerts",
+        description: "Email or WhatsApp the full low-stock list to all managers — grouped by preferred supplier",
+        icon: AlertCircle,
+        location: "Operations Dashboard → Reorder tab → 📧 Email Digest or WhatsApp button",
+        locationLabel: "Operations Dashboard",
+        action: "dashboard",
+        color: "text-blue-600",
+        bg: "bg-blue-50",
+        phase: "phase5",
+        access: "manager",
+        trainingNote:
+          "EMAIL DIGEST: Sends the complete low-stock list to ALL managers/admins with an email on file. Grouped by preferred supplier so you can create one PO per supplier. " +
+          "WHATSAPP: Opens WhatsApp with the digest pre-filled — send to any contact (your own phone, a co-manager, the supplier). " +
+          "DAILY CRON: Set up a Vercel Cron job to call /api/alerts/low-stock-digest?sendEmail=true every morning at 8 AM. " +
+          "TIP: Don't ignore the digest — every day you delay reordering is a day of lost sales.",
+      },
+      {
+        name: "Supplier Price History",
+        description: "Track every cost change per supplier per product — sparkline chart + trend stats",
+        icon: TrendingUp,
+        location: "Supplier list → select supplier → violet 'Price History' button",
+        locationLabel: "Supplier form",
+        action: "supplier-form",
+        color: "text-violet-600",
+        bg: "bg-violet-50",
+        phase: "phase5",
+        access: "all",
+        trainingNote:
+          "AUTO-RECORDED: Every time you edit a supplier's cost in the Catalog dialog, a price-history entry is created. " +
+          "TREND: Shows if the supplier is getting cheaper (green) or pricier (red) over time. " +
+          "STATS: First cost, latest cost, total change %, # increases, # decreases. " +
+          "USE CASE: Negotiate better prices — 'Your cost has gone up 15% in 6 months, can we lock in a rate?' " +
+          "TIP: Review quarterly for your top 5 suppliers. Switch suppliers if one is consistently increasing while others are stable.",
+      },
+      {
+        name: "Real Approval Workflow",
+        description: "POs over the threshold get 'pending_approval' status — manager approves before the PO can be sent",
+        icon: Shield,
+        location: "Automatic — POs over ₵5,000 are saved as 'pending_approval'. Manager approves via the approve button.",
+        locationLabel: "Automatic",
+        color: "text-amber-600",
+        bg: "bg-amber-50",
+        phase: "phase5",
+        access: "manager",
+        trainingNote:
+          "FLOW: Cashier creates a PO > ₵5,000 → status='pending_approval' (amber badge in Purchase Hub). " +
+          "Manager reviews → enters credentials → status='approved' (violet badge). " +
+          "Then the PO can be sent (status='ordered') and received. " +
+          "GOTCHA: A pending_approval PO cannot be received until approved. The approve button requires manager credentials. " +
+          "TIP: Set the approval threshold based on your business size. ₵5,000 is the default — adjust in the code if needed.",
       },
     ],
   },
@@ -1249,6 +1407,78 @@ const CATEGORIES: FeatureCategory[] = [
         access: "all",
         trainingNote:
           "See full notes under Sales & Checkout → Receipt Archive. Quick tip: ALWAYS reprint from here (preserves invoice number) — never re-sell to get a new receipt.",
+      },
+      {
+        name: "Profit Margin Report (Landed Cost)",
+        description: "Per-product profit margins using true landed cost — identifies loss-making items + suggests prices",
+        icon: TrendingUp,
+        location: "Accounts menu → 📊 Profit Margin Report (landed cost)",
+        locationLabel: "Accounts menu",
+        action: "profit-margin-report",
+        color: "text-emerald-600",
+        bg: "bg-emerald-50",
+        phase: "phase5",
+        access: "all",
+        trainingNote:
+          "TRUE MARGIN: Uses the landed cost (raw supplier cost + freight/customs/insurance) when available, falling back to Product.costPrice. " +
+          "LOSS ALERT: Red banner shows # of products selling at a loss. Sort by Margin % (low → high) to see them first. " +
+          "SUGGESTED PRICE: cost × 1.25 markup. Shows 'raise ↑' in amber when your current price is below suggested. " +
+          "FILTERS: Date range, category, sort (profit/margin/revenue/units), low-margin threshold (< 5/10/15/20%). " +
+          "TIP: Run weekly. Products with margins < 10% need a price increase or supplier switch.",
+      },
+      {
+        name: "Customer Statements (Credit)",
+        description: "Monthly account statements for credit customers — printable PDF + email + aging breakdown",
+        icon: FileText,
+        location: "Accounts menu → 📄 Customer Statements (credit)",
+        locationLabel: "Accounts menu",
+        action: "customer-statements",
+        color: "text-violet-600",
+        bg: "bg-violet-50",
+        phase: "phase5",
+        access: "all",
+        trainingNote:
+          "USE FOR: Monthly statements to credit customers, collections follow-up, dispute resolution, GRA audit. " +
+          "CONTENTS: Opening balance, all transactions in the period (credit sales + payments), running balance, closing balance, aging breakdown (current / 1-30 / 31-60 / 60+ days). " +
+          "PRINT: Opens a printable HTML statement — use 'Save as PDF' from the print dialog. " +
+          "EMAIL: Opens your email client with the summary pre-filled. Attach the PDF for the full transaction list. " +
+          "TIP: Send monthly to all credit customers with a balance. Reduces disputes and speeds up collections.",
+      },
+      {
+        name: "Employee Performance Report",
+        description: "Per-cashier sales, refunds, voids, avg sale, sales/hour — with fraud-detection alerts",
+        icon: Users,
+        location: "Accounts menu → 👥 Employee Performance + 💰 Cash Flow → Employee Performance tab",
+        locationLabel: "Accounts menu",
+        action: "financial-reports",
+        color: "text-amber-600",
+        bg: "bg-amber-50",
+        phase: "phase5",
+        access: "manager",
+        trainingNote:
+          "STATS PER CASHIER: Total sales + revenue, avg sale value, refund count + rate, void count + rate, days worked, sales/hour, revenue/hour. " +
+          "FRAUD DETECTION: Red alert when any cashier has refund or void rate > 10%. May indicate training issues, quality problems, or theft. " +
+          "USE FOR: HR, payroll, bonus calculations, performance reviews. " +
+          "TIP: Review weekly. Investigate any cashier with abnormally high void/refund rates — sit with them and watch a few transactions.",
+      },
+      {
+        name: "Cash Flow Report",
+        description: "Daily cash IN vs cash OUT — sales, supplier payments, expenses with running balance",
+        icon: Wallet,
+        location: "Accounts menu → 👥 Employee Performance + 💰 Cash Flow → Cash Flow tab",
+        locationLabel: "Accounts menu",
+        action: "financial-reports",
+        color: "text-rose-600",
+        bg: "bg-rose-50",
+        phase: "phase5",
+        access: "manager",
+        trainingNote:
+          "CASH IN: Sales by payment method (cash, MoMo, card, wallet). " +
+          "CASH OUT: Supplier payments (minus WHT, since WHT goes to GRA) + expenses by category. " +
+          "CHART: Daily bar chart — green = positive (more cash in), red = negative (more cash out). " +
+          "BREAKDOWN: Source bars (where cash came from) + category bars (where it went). " +
+          "USE FOR: Cash flow management, predicting shortfalls, bank deposit planning. " +
+          "TIP: If running balance trends negative for several days, you're spending more than you're earning — cut expenses or boost sales.",
       },
     ],
   },

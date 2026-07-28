@@ -37,6 +37,7 @@ const REPORT_CATEGORIES: { id: string; label: string; icon: any; color: string }
   { id: "inventory", label: "Inventory Reports", icon: Package, color: "text-amber-600" },
   { id: "financial", label: "Financial Reports", icon: DollarSign, color: "text-blue-600" },
   { id: "tax", label: "Tax & Compliance", icon: Percent, color: "text-rose-600" },
+  { id: "advanced", label: "Advanced Reports", icon: BarChart3, color: "text-violet-600" },
   { id: "operations", label: "Operations", icon: Clock, color: "text-violet-600" },
 ];
 
@@ -68,6 +69,11 @@ export function ReportsCenter({ onBack, onNavigate, onSetAccountsReport }: Repor
     { id: "trial-balance", title: "Trial Balance", description: "Debit/credit balance verification", icon: FileBarChart2, color: "text-blue-600", category: "financial", accountsReport: "trial-balance" },
     // Tax
     { id: "vat-tax", title: "VAT Tax Report", description: "VAT collected and payable summary", icon: Percent, color: "text-rose-600", category: "tax", accountsReport: "vat-tax" },
+    // Advanced (Tier 1 + Tier 2 new reports)
+    { id: "profit-margin", title: "Profit Margin Report", description: "Per-product margins using landed cost — identifies loss-making items + suggests prices", icon: TrendingUp, color: "text-emerald-600", category: "advanced", view: "profit-margin-report" },
+    { id: "customer-statements", title: "Customer Statements", description: "Monthly account statements for credit customers — printable PDF + email + aging", icon: FileText, color: "text-violet-600", category: "advanced", view: "customer-statements" },
+    { id: "employee-performance", title: "Employee Performance", description: "Per-cashier sales, refunds, voids, sales/hour — with fraud-detection alerts", icon: BarChart3, color: "text-amber-600", category: "advanced", view: "financial-reports" },
+    { id: "cash-flow", title: "Cash Flow Report", description: "Daily cash IN vs OUT — sales, supplier payments, expenses with running balance", icon: DollarSign, color: "text-rose-600", category: "advanced", view: "financial-reports" },
     // Operations
     { id: "dashboard", title: "Operations Dashboard", description: "KPIs, reorder alerts, expiry tracking, profit analysis", icon: Clock, color: "text-violet-600", category: "operations", view: "dashboard" },
     { id: "accounts-reports", title: "Accounts Reports Hub", description: "Full accounts reporting suite with export", icon: FileSpreadsheet, color: "text-violet-600", category: "operations", view: "accounts-reports" },
