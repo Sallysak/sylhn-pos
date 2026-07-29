@@ -719,6 +719,7 @@ function AddModifyStock({ products, setProducts, groups, setHistory }: {
       <AnimatePresence>
         {showForm && (
           <ProductForm
+            key={editing?.id || 'new-product'}
             product={editing}
             groups={groups}
             onSave={handleSave}
@@ -747,32 +748,38 @@ function ProductForm({ product, groups, onSave, onClose }: {
     ? (localStorage.getItem("sylhn-pending-barcode") || "")
     : "";
 
-  const [form, setForm] = useState<Product>(product || {
-    id: `p-${Date.now()}`,
-    sku: `NEW-${Math.floor(1000 + Math.random() * 9000)}`,
-    name: "",
-    price: 0,
-    costPrice: 0,
-    category: defaultGroupId || "other",
-    groupId: defaultGroupId,
-    unit: "each",
-    stock: 0,
-    reorderLevel: 10,
-    barcode: pendingBarcode, // Pre-fill with scanned barcode if available
-    emoji: "📦",
-    taxable: false,
-    batchNumber: `B-NEW-${Date.now().toString().slice(-4)}`,
-    receivedDate: new Date().toISOString().split('T')[0],
-    expiryDate: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
-    supplier: "",
+  const [form, setForm] = useState<Product>(() => {
+    // Initialize from product prop if provided, else use defaults
+    if (product) {
+      return { ...product };
+    }
+    return {
+      id: `p-${Date.now()}`,
+      sku: `NEW-${Math.floor(1000 + Math.random() * 9000)}`,
+      name: "",
+      price: 0,
+      costPrice: 0,
+      category: defaultGroupId || "other",
+      groupId: defaultGroupId,
+      unit: "each",
+      stock: 0,
+      reorderLevel: 10,
+      barcode: pendingBarcode,
+      emoji: "📦",
+      taxable: false,
+      batchNumber: `B-NEW-${Date.now().toString().slice(-4)}`,
+      receivedDate: new Date().toISOString().split('T')[0],
+      expiryDate: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
+      supplier: "",
+    };
   });
 
-  // CRITICAL: Sync form state when the product prop changes (e.g. when
-  // a different product is selected for editing). Without this, the form
-  // keeps showing the initial product data even when editingProduct changes.
+  // CRITICAL: Sync form state when the product prop changes.
+  // Combined with key={editing?.id} on the parent, this guarantees
+  // the form always shows the correct product data.
   useEffect(() => {
     if (product) {
-      setForm(product);
+      setForm({ ...product });
     }
   }, [product]);
 
