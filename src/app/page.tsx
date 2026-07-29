@@ -2955,30 +2955,34 @@ export default function POSPage() {
         </div>
       </header>
 
-      {/* ===== Category Navigation — Premium Pills ===== */}
-      <nav className="flex-shrink-0 bg-white/70 backdrop-blur-xl border-b border-slate-200/80 z-20 sticky top-0">
+      {/* ===== Category Navigation — Premium Pills with icons + active glow ===== */}
+      <nav className="flex-shrink-0 bg-white/80 backdrop-blur-xl border-b border-slate-200/80 z-20 sticky top-0 shadow-sm">
         <div className="flex items-center gap-1.5 px-3 sm:px-4 py-2 overflow-x-auto scrollbar-hide">
-          {categories.map(cat => (
-            <button
-              key={cat.id}
-              onClick={() => setActiveCategory(cat.id)}
-              className={cn(
-                "cat-pill-premium flex-shrink-0 flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap",
-                activeCategory === cat.id
-                  ? `bg-gradient-to-r ${cat.gradient} text-white active shadow-premium`
-                  : "bg-slate-100/80 text-slate-600 hover:bg-slate-200/80 hover:scale-105"
-              )}
-            >
-              <span className="text-base">{cat.icon}</span>
-              <span className="sm:hidden">{cat.id === 'confectionery' ? 'Confect.' : cat.id === 'soft-drinks' ? 'Drinks' : cat.id === 'hard-liquor' ? 'Liquor' : cat.id === 'households' ? 'Home' : cat.id === 'groceries' ? 'Grocery' : cat.name}</span>
-              <span className="hidden sm:inline">{cat.name}</span>
-              {activeCategory === cat.id && cat.id !== "all" && (
-                <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px] bg-white/25 text-white border-0">
-                  {products.filter(p => p.category === cat.id).length}
-                </Badge>
-              )}
-            </button>
-          ))}
+          {categories.map(cat => {
+            const count = cat.id === "all" ? products.length : products.filter(p => p.category === cat.id).length;
+            return (
+              <button
+                key={cat.id}
+                onClick={() => setActiveCategory(cat.id)}
+                className={cn(
+                  "cat-pill-premium flex-shrink-0 flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-200",
+                  activeCategory === cat.id
+                    ? `bg-gradient-to-r ${cat.gradient} text-white shadow-md scale-105`
+                    : "bg-slate-100/80 text-slate-600 hover:bg-slate-200/80 hover:scale-105"
+                )}
+              >
+                <span className={cn("text-base transition-transform", activeCategory === cat.id && "scale-125")}>{cat.icon}</span>
+                <span className="sm:hidden">{cat.id === 'confectionery' ? 'Confect.' : cat.id === 'soft-drinks' ? 'Drinks' : cat.id === 'hard-liquor' ? 'Liquor' : cat.id === 'households' ? 'Home' : cat.id === 'groceries' ? 'Grocery' : cat.name}</span>
+                <span className="hidden sm:inline">{cat.name}</span>
+                <span className={cn(
+                  "ml-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold transition-colors",
+                  activeCategory === cat.id ? "bg-white/25 text-white" : "bg-slate-200 text-slate-500"
+                )}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </nav>
 
@@ -3070,7 +3074,8 @@ export default function POSPage() {
             )}>
               {filteredProducts.map((product, idx) => {
                 const inCart = cart.find(item => item.productId === product.id);
-                const lowStock = product.stock <= product.reorderLevel;
+                const lowStock = (product.stock ?? product.quantity ?? 0) <= product.reorderLevel;
+                const outOfStock = (product.stock ?? product.quantity ?? 0) <= 0;
                 return (
                   <motion.button
                     key={product.id}
@@ -3078,58 +3083,73 @@ export default function POSPage() {
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ duration: 0.2, delay: Math.min(idx * 0.015, 0.3) }}
-                    whileHover={{ y: -3, scale: 1.02 }}
-                    whileTap={{ scale: 0.97 }}
+                    whileHover={{ y: -4, scale: 1.03 }}
+                    whileTap={{ scale: 0.96 }}
                     onClick={() => addToCart(product)}
                     onDoubleClick={(e) => {
                       e.preventDefault();
-                      // Double-click: add 5 units at once (bulk add)
                       for (let i = 0; i < 5; i++) addToCart(product);
                       toast({ title: `Added 5 × ${product.emoji} ${product.name}`, duration: 1200 });
                     }}
                     onContextMenu={(e) => {
                       e.preventDefault();
-                      // Right-click / long-press: show stock info
                       toast({
                         title: `${product.emoji} ${product.name}`,
-                        description: `Stock: ${product.stock} ${product.unit} · Price: ${formatGHS(product.price)} · SKU: ${product.sku}`,
+                        description: `Stock: ${product.stock ?? product.quantity ?? 0} ${product.unit} · Price: ${formatGHS(product.price)} · SKU: ${product.sku}`,
                       });
                     }}
-                    className="product-card-premium flex flex-col items-center text-center"
+                    className={cn(
+                      "product-card-premium flex flex-col items-center text-center relative overflow-hidden",
+                      outOfStock && "opacity-50"
+                    )}
                   >
+                    {/* In-cart badge */}
                     {inCart && (
-                      <div className="absolute top-1.5 right-1.5 z-10 h-6 w-6 rounded-full bg-emerald-500 text-white text-[11px] font-bold flex items-center justify-center shadow-glow-emerald ring-2 ring-white">
+                      <div className="absolute top-1.5 right-1.5 z-10 h-6 min-w-6 px-1 rounded-full bg-emerald-500 text-white text-[11px] font-bold flex items-center justify-center shadow-glow-emerald ring-2 ring-white">
                         {inCart.quantity}
                       </div>
                     )}
+                    {/* Taxable badge */}
                     {product.taxable && (
                       <div className="absolute top-1.5 left-1.5 z-10 px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700 text-[9px] font-bold ring-1 ring-amber-200">
                         VAT
                       </div>
                     )}
-                    {lowStock && (
-                      <div className="absolute bottom-1.5 left-1.5 z-10 px-1.5 py-0.5 rounded-md bg-rose-100 text-rose-700 text-[9px] font-bold ring-1 ring-rose-200">
-                        LOW
-                      </div>
-                    )}
-                    <div className="h-16 w-16 rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center text-4xl mb-2 group-hover:scale-110 transition-transform duration-200 ring-1 ring-slate-100">
-                      {product.emoji}
+                    {/* Product image or emoji */}
+                    <div className="h-20 w-20 sm:h-24 sm:w-24 rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center text-5xl mb-2 group-hover:scale-110 transition-transform duration-200 ring-1 ring-slate-100 overflow-hidden">
+                      {product.imageUrl || product.image ? (
+                        <img
+                          src={product.imageUrl || product.image}
+                          alt={product.name}
+                          className="h-full w-full object-cover rounded-2xl"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                            (e.target as HTMLImageElement).parentElement!.innerHTML = product.emoji;
+                          }}
+                        />
+                      ) : (
+                        product.emoji
+                      )}
                     </div>
-                    <div className="w-full">
+                    {/* Product info */}
+                    <div className="w-full px-1">
                       <div className="text-xs font-semibold text-slate-800 leading-tight line-clamp-2 min-h-[2rem]">
                         {product.name}
                       </div>
-                      <div className="text-[10px] text-slate-400 font-mono mt-0.5 tabular">
+                      <div className="text-[10px] text-slate-400 font-mono mt-0.5 tabular truncate">
                         {product.sku}
                       </div>
+                      {/* Price + stock row */}
                       <div className="flex items-center justify-between mt-1.5">
                         <div className="text-sm font-bold text-gradient-emerald">
                           {formatGHS(product.price)}
                         </div>
-                        <div className="text-[10px] text-slate-400">/{product.unit}</div>
-                      </div>
-                      <div className="text-[10px] text-slate-400 mt-0.5 tabular">
-                        Stock: {product.stock}
+                        <div className={cn(
+                          "text-[10px] font-medium tabular px-1.5 py-0.5 rounded-md",
+                          outOfStock ? "bg-rose-100 text-rose-600" : lowStock ? "bg-amber-100 text-amber-600" : "bg-slate-100 text-slate-500"
+                        )}>
+                          {outOfStock ? "OUT" : `${product.stock ?? product.quantity ?? 0}`}
+                        </div>
                       </div>
                     </div>
                   </motion.button>
@@ -3445,11 +3465,11 @@ export default function POSPage() {
                       </div>
                     </div>
 
-                    {/* Function Buttons — Premium grid */}
-                    <div className="flex-shrink-0 grid grid-cols-4 gap-1 p-2 bg-slate-100/60">
+                    {/* Function Buttons — Premium grid with prominent PAY NOW */}
+                    <div className="flex-shrink-0 grid grid-cols-4 gap-1.5 p-2 bg-slate-100/60">
                       <button
                         onClick={() => setShowFindProduct(true)}
-                        className="btn-premium col-span-4 h-10 rounded-lg gradient-premium-violet hover:shadow-glow-violet text-white font-bold text-xs flex items-center justify-center gap-1.5 transition"
+                        className="btn-premium col-span-4 h-10 rounded-xl gradient-premium-violet hover:shadow-glow-violet text-white font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95"
                       >
                         <Search className="h-3.5 w-3.5" />
                         FIND PRODUCT
@@ -3463,19 +3483,21 @@ export default function POSPage() {
                       <FuncBtn icon={<Check className="h-3 w-3" />} label="Enter" sub="↵" onClick={handleKeypadEnter} variant="emerald" />
                       <button
                         onClick={() => setShowCartPreview(true)}
-                        className="btn-premium col-span-1 h-10 rounded-lg bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white font-bold text-[10px] flex items-center justify-center gap-0.5 transition"
+                        className="btn-premium col-span-1 h-10 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white font-bold text-[10px] flex items-center justify-center gap-0.5 transition active:scale-95"
                       >
                         <Eye className="h-3 w-3" />
                         PREVIEW
                         <kbd className="ml-0.5 px-0.5 py-0.5 rounded bg-white/20 text-[8px] font-mono hidden lg:inline">F6</kbd>
                       </button>
+                      {/* PAY NOW — prominent, spans 3 cols, larger, glowing */}
                       <button
                         onClick={handlePay}
-                        className="btn-premium col-span-3 h-10 rounded-lg gradient-premium-emerald hover:shadow-glow-emerald text-white font-bold text-xs flex items-center justify-center gap-1.5 transition"
+                        disabled={cart.length === 0}
+                        className="btn-premium col-span-3 h-12 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-600 hover:via-teal-600 hover:to-emerald-700 text-white font-bold text-sm flex items-center justify-center gap-2 transition active:scale-95 shadow-lg hover:shadow-xl disabled:opacity-40 disabled:cursor-not-allowed"
                       >
-                        <CreditCard className="h-3.5 w-3.5" />
+                        <CreditCard className="h-4 w-4" />
                         PAY NOW
-                        <kbd className="ml-1 px-1 py-0.5 rounded bg-white/20 text-[9px] font-mono hidden lg:inline">F5</kbd>
+                        <kbd className="ml-1 px-1.5 py-0.5 rounded bg-white/20 text-[9px] font-mono hidden lg:inline">F5</kbd>
                       </button>
                     </div>
                   </div>
