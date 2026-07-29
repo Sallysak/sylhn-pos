@@ -8,6 +8,7 @@ import {
   Filter, ChevronRight, Calendar, User, Tag, DollarSign, Barcode,
   ArrowUpDown, ArrowUp, ArrowDown, RotateCcw,
   FileText, Copy, Image as ImageIcon, Tags, FileSearch, FolderTree, SlidersHorizontal,
+  Loader2,
   Monitor, Printer, Folder, FileBarChart, Download, Mail, MessageSquare, Send, ScanLine,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -779,6 +780,64 @@ function ProductForm({ product, groups, onSave, onClose }: {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [showScanner, setShowScanner] = useState(false);
+  // Product image upload state (directly inside Add/Modify form)
+  const [showImageUpload, setShowImageUpload] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+
+  // Handle image file selection → upload to API
+  const handleImageUpload = async (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      toast({ title: "Please select an image file", variant: "destructive" });
+      return;
+    }
+    if (file.size > 500000) {
+      toast({ title: "Image too large (max 500KB)", description: "Use a smaller image or compress it.", variant: "destructive" });
+      return;
+    }
+    setUploadingImage(true);
+    try {
+      // Convert to base64
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const base64 = e.target?.result as string;
+        // Update form locally for instant preview
+        setForm(prev => ({ ...prev, image: base64, imageUrl: base64 }));
+        // Save to database (only if product already has an ID from the DB)
+        if (product?.id && !product.id.startsWith('p-')) {
+          const res = await fetch(`/api/products/${product.id}/image`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ image: base64 }),
+          });
+          if (res.ok) {
+            toast({ title: "✅ Image uploaded", description: form.name || "Product image saved" });
+          } else {
+            toast({ title: "Image saved locally", description: "Will sync to server when product is saved", duration: 5000 });
+          }
+        } else {
+          toast({ title: "Image attached", description: "Save the product to persist the image" });
+        }
+        setUploadingImage(false);
+        setShowImageUpload(false);
+      };
+      reader.readAsDataURL(file);
+    } catch (e: any) {
+      toast({ title: "Upload failed", description: e.message, variant: "destructive" });
+      setUploadingImage(false);
+    }
+  };
+
+  const handleRemoveImage = async () => {
+    setForm(prev => ({ ...prev, image: undefined, imageUrl: "" }));
+    if (product?.id && !product.id.startsWith('p-')) {
+      try {
+        await fetch(`/api/products/${product.id}/image`, { method: "DELETE", credentials: "include" });
+      } catch {}
+    }
+    toast({ title: "Image removed" });
+    setShowImageUpload(false);
+  };
 
   // Handle scan result — pre-fill form fields from OpenFoodFacts lookup
   const handleScanResult = (result: ScannedProduct) => {
@@ -883,6 +942,69 @@ function ProductForm({ product, groups, onSave, onClose }: {
                 </FormField>
               </div>
             </FormSection>
+
+            {/* ===== Product Image (inline in Add/Modify form) ===== */}
+            <div className="rounded-xl border border-slate-200 p-3 bg-slate-50/50">
+              <div className="flex items-center gap-3">
+                {/* Image preview */}
+                <div className="flex-shrink-0">
+                  {form.image || form.imageUrl ? (
+                    <div className="relative">
+                      <img
+                        src={form.image || form.imageUrl}
+                        alt={form.name || "Product"}
+                        className="h-16 w-16 rounded-lg object-cover ring-2 ring-emerald-200"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleRemoveImage}
+                        className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-rose-500 hover:bg-rose-600 text-white flex items-center justify-center text-xs"
+                        title="Remove image"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="h-16 w-16 rounded-lg bg-slate-200 flex items-center justify-center text-slate-400">
+                      <ImageIcon className="h-6 w-6" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Upload button */}
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-bold text-slate-700 mb-1">Product Image</div>
+                  <p className="text-[10px] text-slate-500 mb-2">Upload a photo of the product (max 500KB). Shows in POS grid.</p>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    ref={(ref) => {
+                      // Store ref on the element for programmatic click
+                      if (ref) (window as any).__productImageInput = ref;
+                    }}
+                    style={{ display: 'none' }}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleImageUpload(file);
+                      e.target.value = ''; // reset for re-upload
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => (window as any).__productImageInput?.click()}
+                    disabled={uploadingImage}
+                    className="h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 transition active:scale-95 disabled:opacity-50"
+                  >
+                    {uploadingImage ? (
+                      <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Uploading…</>
+                    ) : (
+                      <><ImageIcon className="h-3.5 w-3.5" /> {form.image || form.imageUrl ? "Change Image" : "Upload Image"}</>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
 
             {/* ===== Section 2: Pricing ===== */}
             <FormSection title="Pricing" icon={<DollarSign className="h-3.5 w-3.5" />}>
