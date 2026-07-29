@@ -2316,6 +2316,7 @@ function StockFileView({ products, setProducts, groups, history, setHistory }: {
       <AnimatePresence>
         {showForm && (
           <ProductForm
+            key={editingProduct?.id || 'new-product'}
             product={editingProduct}
             groups={groups}
             onSave={handleSave}
@@ -2497,12 +2498,24 @@ function StockFileView({ products, setProducts, groups, history, setHistory }: {
         )}
       </AnimatePresence>
 
-      {/* Label Printer Modal */}
+      {/* Label Printer Modal — wrapped in overlay so it doesn't render inline */}
       {showLabelPrinter && (
-        <LabelPrinter
-          products={selected ? [selected] : []}
-          onClose={() => setShowLabelPrinter(false)}
-        />
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-0 sm:p-4" onClick={() => setShowLabelPrinter(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-t-2xl sticky top-0 z-10">
+              <h3 className="font-bold text-sm">Label Printer</h3>
+              <button onClick={() => setShowLabelPrinter(false)} className="h-8 w-8 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="p-5">
+              <LabelPrinter
+                products={selected ? [selected] : []}
+                onClose={() => setShowLabelPrinter(false)}
+              />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -2756,12 +2769,24 @@ function StockSearchView({ products, groups, history }: {
         )}
       </AnimatePresence>
 
-      {/* Label Printer Modal */}
+      {/* Label Printer Modal — wrapped in overlay */}
       {showLabelPrinter && (
-        <LabelPrinter
-          products={filtered[selectedIndex] ? [filtered[selectedIndex]] : []}
-          onClose={() => setShowLabelPrinter(false)}
-        />
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-0 sm:p-4" onClick={() => setShowLabelPrinter(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-t-2xl sticky top-0 z-10">
+              <h3 className="font-bold text-sm">Label Printer</h3>
+              <button onClick={() => setShowLabelPrinter(false)} className="h-8 w-8 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="p-5">
+              <LabelPrinter
+                products={filtered[selectedIndex] ? [filtered[selectedIndex]] : []}
+                onClose={() => setShowLabelPrinter(false)}
+              />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
