@@ -2310,8 +2310,8 @@ function StockFileView({ products, setProducts, groups, history, setHistory }: {
         {showPicture && (
           <PictureModal
             product={showPicture}
-            onSave={(imageData) => {
-              setProducts(prev => prev.map(p => p.id === showPicture.id ? { ...p, image: imageData } : p));
+            onSave={async (imageData) => {
+              setProducts(prev => prev.map(p => p.id === showPicture.id ? { ...p, image: imageData, imageUrl: imageData || "" } : p));
               setHistory(prev => [...prev, {
                 id: `h-${Date.now()}`,
                 productId: showPicture.id,
@@ -2325,6 +2325,26 @@ function StockFileView({ products, setProducts, groups, history, setHistory }: {
                 reason: imageData ? "Product picture updated" : "Product picture removed",
                 reference: `PIC-${Date.now().toString().slice(-6)}`,
               }]);
+
+              // Save to database via the new image API
+              try {
+                if (imageData) {
+                  await fetch(`/api/products/${showPicture.id}/image`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    credentials: "include",
+                    body: JSON.stringify({ image: imageData }),
+                  });
+                } else {
+                  await fetch(`/api/products/${showPicture.id}/image`, {
+                    method: "DELETE",
+                    credentials: "include",
+                  });
+                }
+              } catch (e) {
+                console.warn("Failed to save image to server:", e);
+              }
+
               toast({ title: imageData ? "Picture saved" : "Picture removed", description: showPicture.name });
               setShowPicture(null);
             }}
