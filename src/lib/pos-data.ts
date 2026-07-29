@@ -25,7 +25,8 @@ export interface Product {
   // Premium fix: optional active flag for soft-delete parity with Prisma
   active?: boolean;
   discount?: number;
-  image?: string; // Base64 data URL for product picture
+  image?: string; // Base64 data URL for product picture (legacy)
+  imageUrl?: string; // Product image URL (from DB — base64 data URL or external URL)
 }
 
 export interface Category {

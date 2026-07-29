@@ -1,4 +1,10 @@
 {
   "buildCommand": "prisma generate && next build",
-  "installCommand": "bun install"
+  "installCommand": "bun install",
+  "crons": [
+    {
+      "path": "/api/auto-po-cron?secret=CRON_SECRET",
+      "schedule": "0 8 * * *"
+    }
+  ]
 }

@@ -78,6 +78,7 @@ export function ReportsCenter({ onBack, onNavigate, onSetAccountsReport }: Repor
     { id: "procurement-budget", title: "Budget vs Spend", description: "Monthly procurement budget tracking — set budgets per supplier/category, track variance", icon: Target, color: "text-indigo-600", category: "advanced", view: "financial-reports" },
     { id: "lead-time", title: "Lead-Time Accuracy", description: "Promised vs actual delivery time per supplier — identifies consistently late suppliers", icon: Clock, color: "text-amber-600", category: "advanced", view: "financial-reports" },
     { id: "reorder-effectiveness", title: "Reorder Effectiveness", description: "Auto-replenish rule health check — stale rules, stockouts, trigger counts", icon: Zap, color: "text-violet-600", category: "advanced", view: "financial-reports" },
+    { id: "z-report", title: "Z-Report (End of Day)", description: "Daily register close — gross sales, voids, tax, payment breakdown, cash reconciliation", icon: FileText, color: "text-emerald-600", category: "advanced", view: "z-report" },
     // Operations
     { id: "dashboard", title: "Operations Dashboard", description: "KPIs, reorder alerts, expiry tracking, profit analysis", icon: Clock, color: "text-violet-600", category: "operations", view: "dashboard" },
     { id: "accounts-reports", title: "Accounts Reports Hub", description: "Full accounts reporting suite with export", icon: FileSpreadsheet, color: "text-violet-600", category: "operations", view: "accounts-reports" },

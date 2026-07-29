@@ -351,6 +351,7 @@ model Product {
   expiryDate    DateTime?
   receivedDate  DateTime?
   active        Boolean   @default(true)
+  imageUrl      String    @default("")  // product image (base64 data URL or external URL)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 

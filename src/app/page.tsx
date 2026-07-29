@@ -104,6 +104,7 @@ const ReportsCenter = dynamic(() => import("@/components/reports-center").then(m
 const ProfitMarginReport = dynamic(() => import("@/components/profit-margin-report").then(m => ({ default: m.ProfitMarginReport })), { ssr: false, loading: loadingFallback });
 const CustomerStatements = dynamic(() => import("@/components/customer-statements").then(m => ({ default: m.CustomerStatements })), { ssr: false, loading: loadingFallback });
 const FinancialReports = dynamic(() => import("@/components/financial-reports").then(m => ({ default: m.FinancialReports })), { ssr: false, loading: loadingFallback });
+const ZReport = dynamic(() => import("@/components/z-report").then(m => ({ default: m.ZReport })), { ssr: false, loading: loadingFallback });
 const KeyboardShortcutsOverlay = dynamic(() => import("@/components/keyboard-shortcuts").then(m => ({ default: m.KeyboardShortcutsOverlay })), { ssr: false });
 
 // ===== Server → Client product transformer =====
@@ -189,6 +190,7 @@ function serverProductToClientProduct(sp: any): Product {
     expiryDate: sp.expiryDate || "",
     supplier: sp.suppliers?.[0]?.supplier?.name || "",
     active: sp.active !== false,
+    imageUrl: sp.imageUrl || "",
   };
 }
 
@@ -1106,6 +1108,37 @@ export default function POSPage() {
     return () => clearInterval(interval);
   }, [loggedInUser]);
 
+  // ===== Live Stock Alerts =====
+  // Check for low-stock items after each product refresh and show toast
+  // notifications (but only once per product per session to avoid spam).
+  const lowStockNotifiedRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!products.length) return;
+    const lowStockItems = products.filter(p => (p.quantity || p.stock || 0) > 0 && (p.quantity || p.stock || 0) <= p.reorderLevel);
+    if (lowStockItems.length === 0) return;
+    // Only notify for items not yet notified this session
+    const newAlerts = lowStockItems.filter(p => !lowStockNotifiedRef.current.has(p.id));
+    if (newAlerts.length === 0) return;
+    // Add to notified set
+    newAlerts.forEach(p => lowStockNotifiedRef.current.add(p.id));
+    // Show toast (max 3 at a time to avoid spam)
+    const toShow = newAlerts.slice(0, 3);
+    toShow.forEach(p => {
+      toast({
+        title: `⚠️ Low Stock: ${p.name}`,
+        description: `Only ${p.quantity || p.stock || 0} left (reorder at ${p.reorderLevel})`,
+        duration: 8000,
+      });
+    });
+    if (newAlerts.length > 3) {
+      toast({
+        title: `⚠️ ${newAlerts.length} products need reordering`,
+        description: `${newAlerts.length - 3} more items are at or below reorder level. Check the Dashboard for details.`,
+        duration: 8000,
+      });
+    }
+  }, [products]);
+
   // ===== Customer search (for credit sales) =====
   useEffect(() => {
     if (!customerSearch || customerSearch.length < 1) {
@@ -1799,6 +1832,8 @@ export default function POSPage() {
         { label: "Daily Sales Report", icon: TrendingUp, action: () => setView("daily-sales") },
         { separator: true },
         { label: "🧾 Receipt Archive", icon: FileText, action: () => setView("receipt-archive") },
+        { separator: true },
+        { label: "📋 Z-Report (End of Day)", icon: FileText, action: () => setView("z-report") },
       ] : [],
     },
     {
@@ -2108,6 +2143,20 @@ export default function POSPage() {
     return (
       <>
         <FinancialReports onBack={() => setView("reports-center")} />
+        <MobileNav
+          active={view}
+          onNavigate={(v) => { if (v === "cart") setMobileCartOpen(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
+          cartCount={cart.reduce((s, i) => s + i.quantity, 0)}
+          user={loggedInUser ? { fullName: loggedInUser.fullName, role: loggedInUser.role } : null}
+          onLogout={() => handleLogout()}
+        />
+      </>
+    );
+  }
+  if (view === "z-report") {
+    return (
+      <>
+        <ZReport onBack={() => setView("sales-menu")} />
         <MobileNav
           active={view}
           onNavigate={(v) => { if (v === "cart") setMobileCartOpen(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}

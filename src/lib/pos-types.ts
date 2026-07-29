@@ -32,7 +32,7 @@ export interface PaymentResult {
   saleId?: string;
 }
 
-export type ViewMode = "login" | "pos" | "stock" | "reports" | "purchase" | "purchase-form" | "purchase-hub" | "telephone" | "telephone-directory" | "maintenance" | "sold-items" | "sales-menu" | "daily-sales" | "sales-history" | "supplier-form" | "accounts-reports" | "finance-ops" | "admin-login" | "admin-panel" | "admin-hub" | "dashboard" | "receipt-archive" | "sync-settings" | "stock-history-pro" | "features-map" | "email-system" | "credit-management" | "auto-replenish" | "reports-center" | "profit-margin-report" | "customer-statements" | "financial-reports";
+export type ViewMode = "login" | "pos" | "stock" | "reports" | "purchase" | "purchase-form" | "purchase-hub" | "telephone" | "telephone-directory" | "maintenance" | "sold-items" | "sales-menu" | "daily-sales" | "sales-history" | "supplier-form" | "accounts-reports" | "finance-ops" | "admin-login" | "admin-panel" | "admin-hub" | "dashboard" | "receipt-archive" | "sync-settings" | "stock-history-pro" | "features-map" | "email-system" | "credit-management" | "auto-replenish" | "reports-center" | "profit-margin-report" | "customer-statements" | "financial-reports" | "z-report";
 
 export type StockView = "add-modify" | "group-maintenance" | "quantity-adjustment" | "history" | "stock-file" | "stock-search";
 
