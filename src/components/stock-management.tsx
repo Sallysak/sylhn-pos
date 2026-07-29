@@ -23,6 +23,7 @@ import {
 } from "@/lib/pos-data";
 import { generateReport, exportReportToPDF, exportReportToExcel, exportReportToCSV, printReport } from "@/lib/report-utils";
 import type { StockView, ReportData } from "@/lib/pos-types";
+import { LabelPrinter } from "@/components/label-printer";
 import { PopupWindow } from "@/components/popup-window";
 import { StockQuantityAdjustment } from "@/components/stock-quantity-adjustment";
 import { ProductScanner, type ScannedProduct } from "@/components/product-scanner";
@@ -765,6 +766,15 @@ function ProductForm({ product, groups, onSave, onClose }: {
     expiryDate: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
     supplier: "",
   });
+
+  // CRITICAL: Sync form state when the product prop changes (e.g. when
+  // a different product is selected for editing). Without this, the form
+  // keeps showing the initial product data even when editingProduct changes.
+  useEffect(() => {
+    if (product) {
+      setForm(product);
+    }
+  }, [product]);
 
   // Clear the pending barcode once the form loads (so it doesn't persist)
   useEffect(() => {
@@ -1968,6 +1978,7 @@ function StockFileView({ products, setProducts, groups, history, setHistory }: {
   const [showQtyAdjust, setShowQtyAdjust] = useState<Product | null>(null);
   const [showPicture, setShowPicture] = useState<Product | null>(null);
   const [showHistory, setShowHistory] = useState<Product | null>(null);
+  const [showLabelPrinter, setShowLabelPrinter] = useState(false);
   const { toast } = useToast();
 
   const filtered = products.filter(p => {
@@ -2282,7 +2293,7 @@ function StockFileView({ products, setProducts, groups, history, setHistory }: {
         <button onClick={() => { if (!selected) { toast({ title: "Select a product first", variant: "destructive" }); return; } setShowHistory(selected); }} className="h-9 px-4 rounded bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition border border-slate-400">
           <History className="h-3.5 w-3.5" /> History
         </button>
-        <button onClick={() => toast({ title: "Print Labels", description: selected ? `Print labels for ${selected.name}` : "Select a product first" })} className="h-9 px-4 rounded bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition border border-slate-400">
+        <button onClick={() => { if (!selected) { toast({ title: "Select a product first", variant: "destructive" }); return; } setShowLabelPrinter(true); }} className="h-9 px-4 rounded bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition border border-slate-400">
           <Tags className="h-3.5 w-3.5" /> Labels
         </button>
         <div className="flex-1" />
@@ -2485,6 +2496,14 @@ function StockFileView({ products, setProducts, groups, history, setHistory }: {
           />
         )}
       </AnimatePresence>
+
+      {/* Label Printer Modal */}
+      {showLabelPrinter && (
+        <LabelPrinter
+          products={selected ? [selected] : []}
+          onClose={() => setShowLabelPrinter(false)}
+        />
+      )}
     </div>
   );
 }
@@ -2505,6 +2524,7 @@ function StockSearchView({ products, groups, history }: {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showPicture, setShowPicture] = useState<Product | null>(null);
   const [showHistory, setShowHistory] = useState<Product | null>(null);
+  const [showLabelPrinter, setShowLabelPrinter] = useState(false);
   const { toast } = useToast();
 
   const filtered = products.filter(p => {
@@ -2639,7 +2659,7 @@ function StockSearchView({ products, groups, history }: {
         <button onClick={() => { if (!filtered[selectedIndex]) { toast({ title: "Select a product first", variant: "destructive" }); return; } setShowHistory(filtered[selectedIndex]); }} className="h-9 px-4 rounded bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition border border-slate-400">
           <History className="h-3.5 w-3.5" /> History
         </button>
-        <button onClick={() => toast({ title: "Print Labels", description: filtered[selectedIndex] ? `Print labels for ${filtered[selectedIndex].name}` : "Select a product first" })} className="h-9 px-4 rounded bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition border border-slate-400">
+        <button onClick={() => { if (!filtered[selectedIndex]) { toast({ title: "Select a product first", variant: "destructive" }); return; } setShowLabelPrinter(true); }} className="h-9 px-4 rounded bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition border border-slate-400">
           <Tags className="h-3.5 w-3.5" /> Labels
         </button>
         <div className="flex-1" />
@@ -2735,6 +2755,14 @@ function StockSearchView({ products, groups, history }: {
           />
         )}
       </AnimatePresence>
+
+      {/* Label Printer Modal */}
+      {showLabelPrinter && (
+        <LabelPrinter
+          products={filtered[selectedIndex] ? [filtered[selectedIndex]] : []}
+          onClose={() => setShowLabelPrinter(false)}
+        />
+      )}
     </div>
   );
 }
