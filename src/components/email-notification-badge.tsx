@@ -4,9 +4,8 @@ import { useState, useEffect } from "react";
 import { authedFetch } from "@/lib/client-auth";
 import { cn } from "@/lib/utils";
 
-export function EmailNotificationBadge({ onClick }: { onClick?: () => void }) {
+export function EmailNotificationBadge({ variant = "absolute", onClick }: { variant?: "absolute" | "inline"; onClick?: () => void }) {
   const [count, setCount] = useState(0);
-  const [loading, setLoading] = useState(false);
 
   const fetchCount = async () => {
     try {
@@ -22,12 +21,10 @@ export function EmailNotificationBadge({ onClick }: { onClick?: () => void }) {
 
   useEffect(() => {
     fetchCount();
-    // Poll every 2 minutes
     const interval = setInterval(fetchCount, 120000);
     return () => clearInterval(interval);
   }, []);
 
-  // Refresh count when tab becomes visible
   useEffect(() => {
     const handleVisibility = () => {
       if (!document.hidden) fetchCount();
@@ -37,6 +34,23 @@ export function EmailNotificationBadge({ onClick }: { onClick?: () => void }) {
   }, []);
 
   if (count === 0) return null;
+
+  if (variant === "inline") {
+    return (
+      <span
+        onClick={(e) => { e.stopPropagation(); onClick?.(); }}
+        className={cn(
+          "inline-flex items-center justify-center",
+          "min-w-[16px] h-[16px] px-1 ml-1",
+          "bg-rose-500 text-white text-[9px] font-bold rounded-full",
+          "ring-2 ring-white shadow-sm animate-pulse"
+        )}
+        title={`${count} unread email${count > 1 ? "s" : ""}`}
+      >
+        {count > 9 ? "9+" : count}
+      </span>
+    );
+  }
 
   return (
     <span
