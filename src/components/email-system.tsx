@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, Mail, Send, Inbox, Settings as SettingsIcon, Loader2,
   Check, AlertTriangle, X, Search, Trash2, RefreshCw, Save,
-  Paperclip, Reply, Forward, Star, Archive,
+  Paperclip, Reply, Forward, Star, Archive, FileText,
   Bold, Italic, Underline, List, ListOrdered, Link as LinkIcon,
   AlignLeft, AlignCenter, AlignRight, Smile, Image as ImageIcon,
   Mail as MailIcon, ChevronDown, Eye, Code,
@@ -36,7 +36,7 @@ interface Attachment {
   size: number;
 }
 
-type EmailTab = "inbox" | "compose" | "settings";
+type EmailTab = "inbox" | "compose" | "templates" | "settings";
 
 const SMTP_PRESETS = [
   { id: "gmail", name: "Gmail", icon: "📧", description: "Google Mail — requires App Password (2FA)", host: "smtp.gmail.com", port: "587", helpUrl: "https://myaccount.google.com/apppasswords", helpText: "Enable 2-Step Verification, then create an App Password" },
@@ -219,7 +219,7 @@ export function EmailSystem({ onBack }: { onBack: () => void }) {
           </div>
         </div>
         <div className="flex items-center gap-1.5 px-3 sm:px-4 pb-2 overflow-x-auto scrollbar-hide">
-          {([{ id: "inbox" as const, icon: Inbox, short: "Inbox" }, { id: "compose" as const, icon: Send, short: "Compose" }, { id: "settings" as const, icon: SettingsIcon, short: "Settings" }]).map(t => {
+          {([{ id: "inbox" as const, icon: Inbox, short: "Inbox" }, { id: "compose" as const, icon: Send, short: "Compose" }, { id: "templates" as const, icon: FileText, short: "Templates" }, { id: "settings" as const, icon: SettingsIcon, short: "Settings" }]).map(t => {
             const Icon = t.icon;
             return <button key={t.id} onClick={() => setTab(t.id)} className={cn("flex items-center gap-1.5 px-3 sm:px-4 py-1.5 rounded-lg text-xs font-semibold transition whitespace-nowrap flex-shrink-0 active:scale-95", tab === t.id ? "bg-white text-emerald-700 shadow-md" : "bg-white/10 text-white hover:bg-white/20")}><Icon className="h-3.5 w-3.5" />{t.short}</button>;
           })}
@@ -324,6 +324,8 @@ export function EmailSystem({ onBack }: { onBack: () => void }) {
           </div>
         )}
 
+        {tab === "templates" && <EmailTemplates onUseTemplate={(t) => { setComposeSubject(t.subject); setComposeHtml(t.body); if (editorRef.current) editorRef.current.innerHTML = t.body; setTab("compose"); }} />}
+
         {tab === "settings" && (
           <div className="space-y-4">
             <div className="card-premium p-4">
@@ -376,4 +378,97 @@ function fileToBase64(file: File): Promise<string> {
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+}
+
+// ===== Email Templates Component =====
+function EmailTemplates({ onUseTemplate }: { onUseTemplate: (t: any) => void }) {
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<string>("all");
+  const { toast } = useToast();
+
+  const loadTemplates = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await authedFetch("/api/email/templates");
+      if (res.ok) {
+        const data = await res.json();
+        setTemplates(data.templates || []);
+      }
+    } catch (e: any) {
+      toast({ title: "Failed to load templates", description: e?.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
+
+  useEffect(() => { loadTemplates(); }, [loadTemplates]);
+
+  const categories = ["all", ...Array.from(new Set(templates.map(t => t.category || "custom")))];
+  const filtered = filter === "all" ? templates : templates.filter(t => (t.category || "custom") === filter);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between mb-2">
+        <h2 className="text-sm font-bold text-slate-700">Email Templates ({templates.length})</h2>
+        <button onClick={loadTemplates} className="h-8 w-8 rounded-lg bg-white hover:bg-slate-100 text-slate-600 flex items-center justify-center transition active:scale-90 ring-1 ring-slate-200" title="Refresh">
+          <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
+        </button>
+      </div>
+
+      <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide pb-2">
+        {categories.map(cat => (
+          <button
+            key={cat}
+            onClick={() => setFilter(cat)}
+            className={cn(
+              "px-3 py-1.5 rounded-lg text-xs font-semibold transition whitespace-nowrap flex-shrink-0",
+              filter === cat ? "bg-emerald-600 text-white shadow-md" : "bg-white text-slate-600 hover:bg-slate-100 ring-1 ring-slate-200"
+            )}
+          >
+            {cat.charAt(0).toUpperCase() + cat.slice(1)}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div className="text-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-emerald-500 mx-auto mb-2" />
+          <p className="text-xs text-slate-400">Loading templates…</p>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="card-premium p-8 text-center">
+          <FileText className="h-10 w-10 text-slate-300 mx-auto mb-3" />
+          <p className="text-sm text-slate-500 font-medium">No templates yet</p>
+          <p className="text-xs text-slate-400 mt-1">Templates are pre-written emails for common scenarios</p>
+        </div>
+      ) : (
+        filtered.map(t => (
+          <div key={t.id} className="card-premium p-3">
+            <div className="flex items-start justify-between gap-2 mb-2">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className={cn("text-[9px] font-bold uppercase px-2 py-0.5 rounded-full",
+                    t.category === "customer" ? "bg-blue-100 text-blue-700" :
+                    t.category === "supplier" ? "bg-purple-100 text-purple-700" : "bg-slate-100 text-slate-600")}>
+                    {t.category || "custom"}
+                  </span>
+                  <h3 className="text-xs font-bold text-slate-800 truncate">{t.name}</h3>
+                </div>
+                <p className="text-[11px] text-slate-600 font-medium truncate">{t.subject}</p>
+              </div>
+            </div>
+            <div className="text-[10px] text-slate-500 bg-slate-50 p-2 rounded-lg max-h-24 overflow-y-auto mb-2"
+                 dangerouslySetInnerHTML={{ __html: t.body.substring(0, 200) + (t.body.length > 200 ? "..." : "") }} />
+            <button
+              onClick={() => onUseTemplate(t)}
+              className="w-full h-8 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center justify-center gap-1 transition active:scale-95"
+            >
+              <Send className="h-3 w-3" /> Use Template
+            </button>
+          </div>
+        ))
+      )}
+    </div>
+  );
 }
