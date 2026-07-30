@@ -1208,3 +1208,19 @@ model BackupRecord {
   @@index([type])
   @@index([status])
 }
+model Email {
+  id           String   @id @default(cuid())
+  fromAddress  String
+  toAddress    String
+  subject      String
+  body         String   @db.Text
+  status       String   @default("sent")
+  attachments  Json?
+  messageId    String?
+  direction    String   @default("sent")
+  createdAt    DateTime @default(now())
+
+  @@index([messageId])
+  @@index([direction])
+  @@index([createdAt])
+}
