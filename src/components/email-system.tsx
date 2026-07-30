@@ -18,10 +18,12 @@ import { cn } from "@/lib/utils";
 interface EmailLog {
   id: string;
   to: string;
+  from?: string;
   cc: string;
   subject: string;
   body: string;
   status: string;
+  direction?: "sent" | "received";
   errorMessage: string;
   createdAt: string;
 }
