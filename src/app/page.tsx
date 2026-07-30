@@ -84,6 +84,7 @@ const TelephoneModule = dynamic(() => import("@/components/telephone-module").th
 const TelephoneDirectory = dynamic(() => import("@/components/telephone-directory").then(m => ({ default: m.TelephoneDirectory })), { ssr: false, loading: loadingFallback });
 const MaintenanceModule = dynamic(() => import("@/components/maintenance-module").then(m => ({ default: m.MaintenanceModule })), { ssr: false, loading: loadingFallback });
 const EmailSystem = dynamic(() => import("@/components/email-system").then(m => ({ default: m.EmailSystem })), { ssr: false, loading: loadingFallback });
+import { EmailNotificationBadge } from "@/components/email-notification-badge";
 const SoldItemsReport = dynamic(() => import("@/components/sold-items-report").then(m => ({ default: m.SoldItemsReport })), { ssr: false, loading: loadingFallback });
 const PurchaseForm = dynamic(() => import("@/components/purchase-form").then(m => ({ default: m.PurchaseForm })), { ssr: false, loading: loadingFallback });
 const SalesMenu = dynamic(() => import("@/components/sales-menu").then(m => ({ default: m.SalesMenu })), { ssr: false, loading: loadingFallback });
@@ -2611,7 +2612,10 @@ export default function POSPage() {
                             className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-emerald-50 text-slate-700 hover:text-emerald-700 text-xs font-medium transition text-left group"
                           >
                             <item.icon className="h-3.5 w-3.5 text-slate-400 group-hover:text-emerald-600" />
-                            <span className="flex-1">{item.label}</span>
+                            <span className="flex-1 flex items-center">
+                            {item.label}
+                            {item.label === "📧 Email System" && <EmailNotificationBadge variant="inline" />}
+                            </span>
                             {'shortcut' in item && item.shortcut && (
                               <kbd className="text-[9px] font-mono text-slate-400 bg-slate-100 px-1 py-0.5 rounded">{item.shortcut}</kbd>
                             )}
@@ -3091,7 +3095,10 @@ export default function POSPage() {
                         <div className="h-8 w-8 rounded-lg bg-emerald-50 group-hover:bg-emerald-100 flex items-center justify-center transition flex-shrink-0">
                           <item.icon className="h-4 w-4 text-emerald-600" />
                         </div>
-                        <span className="flex-1">{item.label}</span>
+                        <span className="flex-1 flex items-center">
+                          {item.label}
+                          {item.label === "📧 Email System" && <EmailNotificationBadge variant="inline" />}
+                          </span>
                         {'shortcut' in item && item.shortcut && (
                           <kbd className="text-[10px] font-mono text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">{item.shortcut}</kbd>
                         )}
