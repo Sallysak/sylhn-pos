@@ -2634,7 +2634,6 @@ export default function POSPage() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={(e) => {
-                  // #2 Price check mode — Enter shows price without adding to cart
                   if (e.key === 'Enter' && priceCheckMode) {
                     const product = findProductByCode(products, searchQuery) || filteredProducts[0];
                     if (product) {
@@ -2642,22 +2641,52 @@ export default function POSPage() {
                       setSearchQuery("");
                     }
                   }
+                  if (e.key === 'Enter' && !priceCheckMode && searchQuery) {
+                    const product = findProductByCode(products, searchQuery) || filteredProducts[0];
+                    if (product) { addToCart(product); setSearchQuery(""); }
+                  }
                 }}
-                placeholder={priceCheckMode ? "🔍 PRICE CHECK — scan/search to see price (won't add to cart)..." : "Search products, scan barcode, or enter SKU..."}
-                className={cn("w-full h-10 pl-11 pr-32 rounded-xl bg-white text-slate-800 text-sm shadow-premium outline-none ring-2 transition", priceCheckMode ? "ring-amber-400/70 bg-amber-50" : "ring-transparent focus:ring-emerald-400/70")}
+                placeholder={priceCheckMode ? "🔍 PRICE CHECK — scan/search to see price..." : "Search products, scan barcode, or enter SKU..."}
+                className={cn("w-full h-10 pl-11 pr-20 rounded-xl bg-white text-slate-800 text-sm shadow-premium outline-none ring-2 transition", priceCheckMode ? "ring-amber-400/70 bg-amber-50" : "ring-transparent focus:ring-emerald-400/70")}
               />
-              <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
+              <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
                 <VoiceSearch onResult={(text) => { setSearchQuery(text); toast({ title: "Voice search", description: text }); }} />
-                <button
-                onClick={() => setShowBarcodeScanner(true)}
-                className={cn("h-7 px-2.5 rounded-lg flex items-center gap-1 text-[11px] font-semibold transition",
-                  "bg-emerald-100 text-emerald-700 hover:bg-emerald-200 active:scale-95")}
-                title="Open barcode scanner (camera)"
-              >
-                <ScanLine className="h-3.5 w-3.5" />
-                Scan
-              </button>
+                <button onClick={() => setShowBarcodeScanner(true)} className="h-7 w-7 rounded-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 active:scale-95 flex items-center justify-center transition" title="Open barcode scanner (camera)">
+                  <ScanLine className="h-3.5 w-3.5" />
+                </button>
               </div>
+              {/* Live search results dropdown — shows product name + price inline */}
+              {searchQuery && !priceCheckMode && filteredProducts.length > 0 && (
+                <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-xl shadow-2xl ring-1 ring-slate-200 z-50 max-h-72 overflow-y-auto">
+                  {filteredProducts.slice(0, 8).map((p) => (
+                    <button key={p.id} onClick={() => { addToCart(p); setSearchQuery(""); searchInputRef.current?.focus(); }} className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-emerald-50 text-left transition border-b border-slate-50 last:border-0">
+                      <span className="text-lg flex-shrink-0">{p.emoji}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-semibold text-slate-800 truncate">{p.name}</div>
+                        <div className="text-[9px] text-slate-400 font-mono">{p.sku} · Stock: {p.stock ?? p.quantity ?? 0}</div>
+                      </div>
+                      <div className="text-sm font-bold text-emerald-600 flex-shrink-0">{formatGHS(p.price)}</div>
+                    </button>
+                  ))}
+                  {filteredProducts.length > 8 && <div className="px-3 py-1.5 text-[10px] text-slate-400 text-center bg-slate-50">+{filteredProducts.length - 8} more</div>}
+                </div>
+              )}
+              {/* Price check result dropdown */}
+              {searchQuery && priceCheckMode && filteredProducts.length > 0 && (
+                <div className="absolute top-full left-0 mt-1 w-full bg-amber-50 rounded-xl shadow-2xl ring-1 ring-amber-300 z-50 max-h-72 overflow-y-auto">
+                  <div className="px-3 py-1.5 text-[9px] font-bold uppercase tracking-wider text-amber-700 bg-amber-100">Price Check — click to add to cart</div>
+                  {filteredProducts.slice(0, 8).map((p) => (
+                    <div key={p.id} onClick={() => { addToCart(p); setSearchQuery(""); searchInputRef.current?.focus(); }} className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-amber-100 transition border-b border-amber-100 last:border-0 cursor-pointer">
+                      <span className="text-lg flex-shrink-0">{p.emoji}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-semibold text-slate-800 truncate">{p.name}</div>
+                        <div className="text-[9px] text-slate-400 font-mono">{p.sku} · Stock: {p.stock ?? p.quantity ?? 0}</div>
+                      </div>
+                      <div className="text-sm font-bold text-amber-700 flex-shrink-0">{formatGHS(p.price)}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
