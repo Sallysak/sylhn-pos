@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
         </div>
 
         <div style="background: #f9fafb; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-          <p style="margin: 2px 0;"><strong>Receipt #:</strong> ${sale.receiptNumber || sale.id.slice(-8).toUpperCase()}</p>
+          <p style="margin: 2px 0;"><strong>Receipt #:</strong> ${(sale as any).receiptNumber || (sale as any).invoiceNumber || (sale as any).receiptNo || sale.id.slice(-8).toUpperCase()}</p>
           <p style="margin: 2px 0;"><strong>Date:</strong> ${new Date(sale.createdAt).toLocaleString('en-GB')}</p>
           <p style="margin: 2px 0;"><strong>Customer:</strong> ${customerEmail}</p>
         </div>
@@ -102,7 +102,7 @@ export async function POST(req: NextRequest) {
     const info = await transporter.sendMail({
       from: cfg['smtp.from'] || cfg['smtp.user'],
       to: customerEmail,
-      subject: `Receipt ${sale.receiptNumber || sale.id.slice(-8).toUpperCase()} - SYLHN POS`,
+      subject: `Receipt ${(sale as any).receiptNumber || (sale as any).invoiceNumber || (sale as any).receiptNo || sale.id.slice(-8).toUpperCase()} - SYLHN POS`,
       html,
     })
 
