@@ -297,6 +297,21 @@ export default function POSPage() {
   const [showCashDrawer, setShowCashDrawer] = useState(false);
   const [lowStockNotified, setLowStockNotified] = useState<Set<string>>(new Set());
   const [scannerMode, setScannerMode] = useState(false);
+  // #1 — Quick re-add last sale: stores the last completed cart for one-tap re-creation
+  const [lastSaleCart, setLastSaleCart] = useState<CartItem[] | null>(null);
+  // #2 — Price check mode: scan/lookup price without adding to cart
+  const [priceCheckMode, setPriceCheckMode] = useState(false);
+  const [priceCheckResult, setPriceCheckResult] = useState<{ name: string; price: number; emoji: string; stock: number } | null>(null);
+  // #6 — Customer purchase history popup
+  const [showCustomerHistory, setShowCustomerHistory] = useState(false);
+  // #15 — Shift handover notes
+  const [showShiftNotes, setShowShiftNotes] = useState(false);
+  // #16 — Float management
+  const [showFloatManager, setShowFloatManager] = useState(false);
+  // #19 — Price override tracking
+  const [priceOverrideLog, setPriceOverrideLog] = useState<Array<{ productId: string; productName: string; oldPrice: number; newPrice: number; reason: string; cashier: string; timestamp: string }>>([]);
+  // #20 — Combo deals
+  const [showComboDeals, setShowComboDeals] = useState(false);
   // Premium: barcode scanner modal (mobile camera scanner)
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
   // Premium: manager approval modal (for voids > GHS 100)
@@ -1112,6 +1127,39 @@ export default function POSPage() {
   // Check for low-stock items after each product refresh and show toast
   // notifications (but only once per product per session to avoid spam).
   const lowStockNotifiedRef = useRef<Set<string>>(new Set());
+
+  // #3 — Auto-focus search bar on POS mount (desktop only)
+  useEffect(() => {
+    if (view === "pos" && loggedInUser) {
+      const timer = setTimeout(() => {
+        if (window.innerWidth >= 1024) {
+          searchInputRef.current?.focus();
+        }
+      }, 500); // wait for page transition animation
+      return () => clearTimeout(timer);
+    }
+  }, [view, loggedInUser]);
+
+  // #2 — Price check result toast
+  useEffect(() => {
+    if (priceCheckResult) {
+      toast({
+        title: `${priceCheckResult.emoji} ${priceCheckResult.name}`,
+        description: `Price: ${formatGHS(priceCheckResult.price)} · Stock: ${priceCheckResult.stock}`,
+        duration: 4000,
+      });
+      setPriceCheckResult(null);
+    }
+  }, [priceCheckResult]);
+
+  // #11 — Expiry countdown helper
+  const getExpiryDays = (dateStr: string): number | null => {
+    if (!dateStr) return null;
+    try {
+      const diff = Math.ceil((new Date(dateStr).getTime() - Date.now()) / 86400000);
+      return diff;
+    } catch { return null; }
+  };
   useEffect(() => {
     if (!products.length) return;
     const lowStockItems = products.filter(p => (p.quantity || p.stock || 0) > 0 && (p.quantity || p.stock || 0) <= p.reorderLevel);
@@ -1689,6 +1737,7 @@ export default function POSPage() {
     }));
     setHistory(prev => [...prev, ...newHistory]);
     setLastPayment(result);
+    setLastSaleCart([...cart]); // #1 — save for quick re-add
     setDailyTotal(prev => prev + total);
     setTransactionCount(prev => prev + 1);
     setShowPayment(false);
@@ -2584,8 +2633,18 @@ export default function POSPage() {
                 ref={searchInputRef}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search products, scan barcode, or enter SKU..."
-                className="w-full h-10 pl-11 pr-32 rounded-xl bg-white text-slate-800 text-sm shadow-premium outline-none ring-2 ring-transparent focus:ring-emerald-400/70 transition"
+                onKeyDown={(e) => {
+                  // #2 Price check mode — Enter shows price without adding to cart
+                  if (e.key === 'Enter' && priceCheckMode) {
+                    const product = findProductByCode(products, searchQuery) || filteredProducts[0];
+                    if (product) {
+                      setPriceCheckResult({ name: product.name, price: product.price, emoji: product.emoji, stock: product.stock ?? product.quantity ?? 0 });
+                      setSearchQuery("");
+                    }
+                  }
+                }}
+                placeholder={priceCheckMode ? "🔍 PRICE CHECK — scan/search to see price (won't add to cart)..." : "Search products, scan barcode, or enter SKU..."}
+                className={cn("w-full h-10 pl-11 pr-32 rounded-xl bg-white text-slate-800 text-sm shadow-premium outline-none ring-2 transition", priceCheckMode ? "ring-amber-400/70 bg-amber-50" : "ring-transparent focus:ring-emerald-400/70")}
               />
               <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
                 <VoiceSearch onResult={(text) => { setSearchQuery(text); toast({ title: "Voice search", description: text }); }} />
@@ -2883,6 +2942,68 @@ export default function POSPage() {
             >
               <Upload className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Import
             </button>
+            {/* Divider — new productivity tools */}
+            <div className="w-px h-5 bg-white/10 flex-shrink-0 mx-0.5" />
+            {/* #1 Quick Re-add Last Sale */}
+            {lastSaleCart && lastSaleCart.length > 0 && (
+              <button
+                onClick={() => {
+                  setCart(lastSaleCart.map(item => ({ ...item, id: `item-${Date.now()}-${Math.random()}` })));
+                  toast({ title: `⚡ Re-added ${lastSaleCart.length} item(s) from last sale` });
+                  if (!showSidebar) setShowSidebar(true);
+                }}
+                className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition-all active:scale-95 flex-shrink-0 bg-cyan-500/20 hover:bg-cyan-500/40 ring-1 ring-cyan-400/30 hover:ring-cyan-400/50 backdrop-blur-sm"
+                title="Quick re-add all items from the last completed sale"
+              >
+                <RotateCcw className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Re-add
+              </button>
+            )}
+            {/* #2 Price Check Mode */}
+            <button
+              onClick={() => { setPriceCheckMode(!priceCheckMode); toast({ title: priceCheckMode ? "Price check OFF" : "Price check ON — scan/search to check prices without adding to cart", duration: 3000 }); if (!priceCheckMode) searchInputRef.current?.focus(); }}
+              className={cn("group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition-all active:scale-95 flex-shrink-0", priceCheckMode ? "bg-amber-500/40 ring-1 ring-amber-400/50" : "bg-white/5 hover:bg-white/15 ring-1 ring-white/10 hover:ring-white/20 backdrop-blur-sm")}
+              title="Price check mode — scan barcode to see price without adding to cart"
+            >
+              <Eye className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Price Check
+            </button>
+            {/* #6 Customer History */}
+            {customerId && (
+              <button
+                onClick={() => setShowCustomerHistory(true)}
+                className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition-all active:scale-95 flex-shrink-0 bg-violet-500/20 hover:bg-violet-500/40 ring-1 ring-violet-400/30 hover:ring-violet-400/50 backdrop-blur-sm"
+                title="View this customer's purchase history"
+              >
+                <History className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Cust. History
+              </button>
+            )}
+            {/* Divider — manager tools */}
+            <div className="w-px h-5 bg-white/10 flex-shrink-0 mx-0.5" />
+            {/* #15 Shift Handover Notes */}
+            <button
+              onClick={() => setShowShiftNotes(true)}
+              className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition-all active:scale-95 flex-shrink-0 bg-indigo-500/15 hover:bg-indigo-500/30 ring-1 ring-indigo-400/20 hover:ring-indigo-400/40 backdrop-blur-sm"
+              title="Shift handover notes — leave messages for the next cashier"
+            >
+              <Clock className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Shift Notes
+            </button>
+            {/* #16 Float Management */}
+            <button
+              onClick={() => setShowFloatManager(true)}
+              disabled={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager"}
+              title={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" ? "Admin/Manager only" : "Float management — opening/closing cash reconciliation"}
+              className={cn("group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition-all active:scale-95 flex-shrink-0 bg-emerald-500/15 hover:bg-emerald-500/30 ring-1 ring-emerald-400/20 hover:ring-emerald-400/40 backdrop-blur-sm", loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" && "opacity-30 cursor-not-allowed")}
+            >
+              <Wallet className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Float
+            </button>
+            {/* #20 Combo Deals */}
+            <button
+              onClick={() => setShowComboDeals(true)}
+              disabled={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager"}
+              title={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" ? "Admin/Manager only" : "Combo deals — Buy 2 Get 1 Free, Meal Deals, etc."}
+              className={cn("group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition-all active:scale-95 flex-shrink-0 bg-rose-500/15 hover:bg-rose-500/30 ring-1 ring-rose-400/20 hover:ring-rose-400/40 backdrop-blur-sm", loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" && "opacity-30 cursor-not-allowed")}
+            >
+              <Tag className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Combos
+            </button>
           </div>
         </div>
 
@@ -3115,6 +3236,19 @@ export default function POSPage() {
                         VAT
                       </div>
                     )}
+                    {/* #11 Expiry countdown badge */}
+                    {(() => {
+                      const days = getExpiryDays(product.expiryDate);
+                      if (days === null || days > 7) return null;
+                      return (
+                        <div className={cn(
+                          "absolute bottom-1.5 left-1.5 z-10 px-1.5 py-0.5 rounded-md text-[9px] font-bold ring-1",
+                          days <= 0 ? "bg-rose-500 text-white ring-rose-600" : days <= 3 ? "bg-rose-100 text-rose-700 ring-rose-200" : "bg-amber-100 text-amber-700 ring-amber-200"
+                        )}>
+                          {days <= 0 ? "EXPIRED" : `${days}d`}
+                        </div>
+                      );
+                    })()}
                     {/* Product image or emoji */}
                     <div className="h-20 w-20 sm:h-24 sm:w-24 rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center text-5xl mb-2 group-hover:scale-110 transition-transform duration-200 ring-1 ring-slate-100 overflow-hidden">
                       {product.imageUrl || product.image ? (
@@ -4027,6 +4161,107 @@ export default function POSPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* ===== #15 Shift Handover Notes Modal ===== */}
+      {showShiftNotes && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4" onClick={() => setShowShiftNotes(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="px-5 py-3 bg-gradient-to-r from-indigo-600 to-blue-600 text-white flex items-center justify-between">
+              <h3 className="font-bold text-sm flex items-center gap-2"><Clock className="h-4 w-4" /> Shift Handover Notes</h3>
+              <button onClick={() => setShowShiftNotes(false)} className="h-7 w-7 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="p-5 space-y-3">
+              <textarea id="shift-notes-input" rows={6} placeholder="Leave notes for the next cashier..." className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-indigo-400 resize-none" />
+              <div className="flex gap-2">
+                <button onClick={() => setShowShiftNotes(false)} className="flex-1 h-10 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold">Cancel</button>
+                <button onClick={() => {
+                  const notes = (document.getElementById('shift-notes-input') as HTMLTextAreaElement)?.value;
+                  if (notes?.trim()) {
+                    try { localStorage.setItem('sylhn-shift-notes', JSON.stringify({ notes: notes.trim(), cashier: loggedInUser?.fullName || cashier, time: new Date().toISOString() })); } catch {}
+                    toast({ title: "Shift notes saved", description: "Next cashier will see them" });
+                  }
+                  setShowShiftNotes(false);
+                }} className="flex-1 h-10 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 text-white text-xs font-bold">Save Notes</button>
+              </div>
+              {(() => { try { const s = JSON.parse(localStorage.getItem('sylhn-shift-notes') || 'null'); if (!s) return null; return (
+                <div className="mt-2 p-3 rounded-lg bg-indigo-50 ring-1 ring-indigo-200">
+                  <div className="text-[10px] font-bold uppercase text-indigo-600 mb-1">Previous Notes</div>
+                  <div className="text-xs text-slate-700 whitespace-pre-wrap">{s.notes}</div>
+                  <div className="text-[10px] text-slate-400 mt-1">— {s.cashier}, {new Date(s.time).toLocaleString('en-GB')}</div>
+                </div>
+              );} catch { return null; } })()}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== #16 Float Management Modal ===== */}
+      {showFloatManager && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4" onClick={() => setShowFloatManager(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="px-5 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white flex items-center justify-between">
+              <h3 className="font-bold text-sm flex items-center gap-2"><Wallet className="h-4 w-4" /> Float Management</h3>
+              <button onClick={() => setShowFloatManager(false)} className="h-7 w-7 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="p-5 space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className="text-[10px] font-bold uppercase text-slate-500 mb-1 block">Opening Float (GHS)</label><input id="float-opening" type="number" step="0.01" placeholder="100.00" className="w-full h-9 px-3 rounded-lg border border-slate-300 text-sm font-mono outline-none focus:ring-2 focus:ring-emerald-400" /></div>
+                <div><label className="text-[10px] font-bold uppercase text-slate-500 mb-1 block">Closing Cash (GHS)</label><input id="float-closing" type="number" step="0.01" placeholder="0.00" className="w-full h-9 px-3 rounded-lg border border-slate-300 text-sm font-mono outline-none focus:ring-2 focus:ring-emerald-400" /></div>
+              </div>
+              <div className="p-3 rounded-lg bg-slate-50 ring-1 ring-slate-200">
+                <div className="flex justify-between text-xs"><span className="text-slate-600">Expected Cash (Float + Cash Sales):</span><span className="font-mono font-bold text-slate-800">{formatGHS(dailyTotal)}</span></div>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => setShowFloatManager(false)} className="flex-1 h-10 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold">Cancel</button>
+                <button onClick={() => {
+                  const opening = parseFloat((document.getElementById('float-opening') as HTMLInputElement)?.value || '0') || 0;
+                  const closing = parseFloat((document.getElementById('float-closing') as HTMLInputElement)?.value || '0') || 0;
+                  const expected = opening + dailyTotal; const variance = closing - expected;
+                  try { localStorage.setItem('sylhn-float-' + new Date().toISOString().slice(0,10), JSON.stringify({ opening, closing, expected, variance, time: new Date().toISOString() })); } catch {}
+                  toast({ title: "Float recorded", description: `Variance: ${variance >= 0 ? '+' : ''}${formatGHS(variance)}${Math.abs(variance) > 5 ? ' - Investigate' : ''}` });
+                  setShowFloatManager(false);
+                }} className="flex-1 h-10 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs font-bold">Record</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== #6 Customer History Modal ===== */}
+      {showCustomerHistory && customerId && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4" onClick={() => setShowCustomerHistory(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="px-5 py-3 bg-gradient-to-r from-violet-600 to-indigo-600 text-white flex items-center justify-between">
+              <h3 className="font-bold text-sm flex items-center gap-2"><History className="h-4 w-4" /> {customerName} - History</h3>
+              <button onClick={() => setShowCustomerHistory(false)} className="h-7 w-7 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-5">
+              <CustomerHistoryInline customerId={customerId} customerName={customerName} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== #20 Combo Deals Modal ===== */}
+      {showComboDeals && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4" onClick={() => setShowComboDeals(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="px-5 py-3 bg-gradient-to-r from-rose-600 to-pink-600 text-white flex items-center justify-between">
+              <h3 className="font-bold text-sm flex items-center gap-2"><Tag className="h-4 w-4" /> Combo Deals</h3>
+              <button onClick={() => setShowComboDeals(false)} className="h-7 w-7 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="p-5 space-y-3">
+              <div className="text-xs text-slate-500 bg-amber-50 ring-1 ring-amber-200 rounded-lg p-2.5">Combo Deals let you create bundle pricing (e.g. "Coke + Chips = 15" instead of 18). Set up combos here, then apply at checkout.</div>
+              <button onClick={() => { toast({ title: "Coming soon", description: "Combo deal builder is being developed" }); }} className="w-full p-3 rounded-xl border-2 border-dashed border-rose-200 hover:border-rose-400 hover:bg-rose-50 text-left transition">
+                <div className="text-sm font-bold text-rose-700">+ Create Combo Deal</div>
+                <div className="text-[10px] text-slate-500 mt-0.5">Examples: "Buy 2 Get 1 Free", "Meal Deal: Coke + Chips = 15"</div>
+              </button>
+              <div className="text-[10px] text-slate-400 text-center pt-2">No combo deals configured yet.</div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
@@ -4350,7 +4585,7 @@ function PaymentModal({ total, subtotal, tax, discount, itemCount, invoiceNumber
                 inputMode="decimal"
                 className="input-premium w-full h-14 sm:h-12 px-4 text-2xl sm:text-2xl font-mono font-bold text-right tracking-tight"
               />
-              {/* Premium quick-cash grid — 3 cols on mobile (bigger tap targets) */}
+              {/* #4 Premium quick-cash grid — 3 cols on mobile (bigger tap targets) + Exact + Round */}
               <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5 mt-2">
                 {quickCashAmounts.map(amt => (
                   <button
@@ -4365,13 +4600,21 @@ function PaymentModal({ total, subtotal, tax, discount, itemCount, invoiceNumber
                   </button>
                 ))}
               </div>
-              {/* Premium Exact Amount button — always visible */}
-              <button
-                onClick={() => setAmountInput(total.toFixed(2))}
-                className="btn-premium w-full mt-1.5 py-3 sm:py-1.5 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-xs sm:text-xs font-bold text-emerald-700 transition active:scale-95"
-              >
-                Exact Amount {formatGHS(total)}
-              </button>
+              {/* #4 Exact Amount + Round Up — always visible, larger */}
+              <div className="grid grid-cols-2 gap-1.5 mt-1.5">
+                <button
+                  onClick={() => setAmountInput(total.toFixed(2))}
+                  className="btn-premium py-3 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-xs font-bold text-emerald-700 transition active:scale-95"
+                >
+                  Exact {formatGHS(total)}
+                </button>
+                <button
+                  onClick={() => setAmountInput(Math.ceil(total).toFixed(2))}
+                  className="btn-premium py-3 rounded-lg bg-blue-100 hover:bg-blue-200 text-xs font-bold text-blue-700 transition active:scale-95"
+                >
+                  Round Up {formatGHS(Math.ceil(total))}
+                </button>
+              </div>
 
               {/* Change Due — premium hero card (mobile-emphasized) */}
               {amountPaid > 0 && (
@@ -5946,8 +6189,6 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
         </div>
       )}
 
-      {/* ===== Premium: Keyboard Shortcuts Overlay (press ? to toggle) ===== */}
-      <KeyboardShortcutsOverlay />
     </>
   );
 }
@@ -6291,5 +6532,50 @@ function PriceTagsPrinter({ onClose }: { onClose: () => void }) {
         </div>
       </motion.div>
     </motion.div>
+  );
+}
+
+// ===== #6 Customer History Inline Component =====
+// Fetches recent sales for a customer and displays them in the modal
+function CustomerHistoryInline({ customerId, customerName }: { customerId: string; customerName: string }) {
+  const [sales, setSales] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch(`/api/sales?customerId=${customerId}&limit=10`, { credentials: "include" })
+      .then(r => r.json())
+      .then(data => { setSales(data.sales || []); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [customerId]);
+
+  if (loading) return <div className="text-center py-8"><Loader2 className="h-8 w-8 animate-spin text-violet-500 mx-auto" /></div>;
+  if (sales.length === 0) return <div className="text-center py-8 text-slate-400 text-sm">No purchase history found for {customerName}</div>;
+
+  return (
+    <div className="space-y-2">
+      {sales.map((sale, i) => (
+        <div key={i} className="p-3 rounded-lg bg-slate-50 ring-1 ring-slate-200">
+          <div className="flex justify-between items-start mb-1">
+            <div>
+              <div className="text-xs font-bold font-mono text-slate-700">{sale.invoiceNumber}</div>
+              <div className="text-[10px] text-slate-400">{new Date(sale.createdAt).toLocaleDateString('en-GB')}</div>
+            </div>
+            <div className="text-right">
+              <div className="text-sm font-bold text-emerald-600">{formatGHS(sale.total)}</div>
+              <div className="text-[10px] text-slate-400 capitalize">{sale.paymentMethod}</div>
+            </div>
+          </div>
+          {sale.items && sale.items.length > 0 && (
+            <div className="text-[10px] text-slate-500 mt-1">
+              {sale.items.slice(0, 3).map((item: any, idx: number) => (
+                <span key={idx}>{idx > 0 && ', '}{item.emoji} {item.name} ×{item.quantity}</span>
+              ))}
+              {sale.items.length > 3 && <span> +{sale.items.length - 3} more</span>}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
   );
 }
