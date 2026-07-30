@@ -51,13 +51,17 @@ export async function POST(req: NextRequest) {
       auth: { user: cfg['smtp.user'], pass: cfg['smtp.password'] },
     })
 
+    // Helper function for safe number formatting
+    const safeNum = (n: any) => typeof n === 'number' ? n : parseFloat(n || '0') || 0
+    const receiptNum = (sale as any).receiptNumber || (sale as any).invoiceNumber || (sale as any).receiptNo || sale.id.slice(-8).toUpperCase()
+
     // Build HTML receipt
     const itemsHtml = sale.items.map((item: any) => `
       <tr>
-        <td style="padding: 6px 0; border-bottom: 1px solid #eee;">${item.name}</td>
-        <td style="padding: 6px 12px; border-bottom: 1px solid #eee; text-align: center;">${item.quantity}</td>
-        <td style="padding: 6px 12px; border-bottom: 1px solid #eee; text-align: right;">GHS ${item.price.toFixed(2)}</td>
-        <td style="padding: 6px 0; border-bottom: 1px solid #eee; text-align: right;">GHS ${(item.quantity * item.price).toFixed(2)}</td>
+        <td style="padding: 6px 0; border-bottom: 1px solid #eee;">${item.name || 'Item'}</td>
+        <td style="padding: 6px 12px; border-bottom: 1px solid #eee; text-align: center;">${safeNum(item.quantity)}</td>
+        <td style="padding: 6px 12px; border-bottom: 1px solid #eee; text-align: right;">GHS ${safeNum(item.price).toFixed(2)}</td>
+        <td style="padding: 6px 0; border-bottom: 1px solid #eee; text-align: right;">GHS ${(safeNum(item.quantity) * safeNum(item.price)).toFixed(2)}</td>
       </tr>
     `).join('')
 
@@ -69,7 +73,7 @@ export async function POST(req: NextRequest) {
         </div>
 
         <div style="background: #f9fafb; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-          <p style="margin: 2px 0;"><strong>Receipt #:</strong> ${(sale as any).receiptNumber || (sale as any).invoiceNumber || (sale as any).receiptNo || sale.id.slice(-8).toUpperCase()}</p>
+          <p style="margin: 2px 0;"><strong>Receipt #:</strong> ${receiptNum}</p>
           <p style="margin: 2px 0;"><strong>Date:</strong> ${new Date(sale.createdAt).toLocaleString('en-GB')}</p>
           <p style="margin: 2px 0;"><strong>Customer:</strong> ${customerEmail}</p>
         </div>
@@ -87,8 +91,8 @@ export async function POST(req: NextRequest) {
         </table>
 
         <div style="text-align: right; padding: 15px 0; border-top: 2px solid #10b981;">
-          <p style="margin: 5px 0; font-size: 18px;"><strong>Total: GHS ${sale.total.toFixed(2)}</strong></p>
-          <p style="margin: 5px 0; color: #666;">Paid via: ${sale.paymentMethod || 'Cash'}</p>
+          <p style="margin: 5px 0; font-size: 18px;"><strong>Total: GHS ${safeNum(sale.total).toFixed(2)}</strong></p>
+          <p style="margin: 5px 0; color: #666;">Paid via: ${(sale as any).paymentMethod || 'Cash'}</p>
         </div>
 
         <div style="text-align: center; margin-top: 40px; color: #999; font-size: 12px;">
@@ -102,7 +106,7 @@ export async function POST(req: NextRequest) {
     const info = await transporter.sendMail({
       from: cfg['smtp.from'] || cfg['smtp.user'],
       to: customerEmail,
-      subject: `Receipt ${(sale as any).receiptNumber || (sale as any).invoiceNumber || (sale as any).receiptNo || sale.id.slice(-8).toUpperCase()} - SYLHN POS`,
+      subject: `Receipt ${receiptNum} - SYLHN POS`,
       html,
     })
 
@@ -112,7 +116,7 @@ export async function POST(req: NextRequest) {
         direction: 'sent',
         fromAddress: cfg['smtp.from'] || cfg['smtp.user'],
         toAddress: customerEmail,
-        subject: `Receipt ${sale.receiptNumber || sale.id.slice(-8).toUpperCase()}`,
+        subject: `Receipt ${receiptNum}`,
         body: `Receipt for sale ${saleId}`,
         status: 'sent',
         messageId: info.messageId,
