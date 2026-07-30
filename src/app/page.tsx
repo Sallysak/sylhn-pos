@@ -5876,16 +5876,16 @@ function buildWhatsAppReceiptText(payment: any, verifyUrl?: string): string {
 function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: () => void }) {
   const [showQR, setShowQR] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState<string>("");
-  const [printMode, setPrintMode] = useState(false); // full-screen print overlay
+  const [printMode, setPrintMode] = useState(false);
   const [showCSV, setShowCSV] = useState(false);
   const [showWhatsApp, setShowWhatsApp] = useState(false);
   const [waPhone, setWaPhone] = useState("");
   const [copied, setCopied] = useState(false);
+  const [showEmail, setShowEmail] = useState(false);
+  const [emailAddr, setEmailAddr] = useState("");
+  const [sendingEmail, setSendingEmail] = useState(false);
   const { toast } = useToast();
 
-  // Compute the public receipt-verify URL once (used by QR code, WhatsApp
-  // message, and the "View Online" button). Prefers saleId when available
-  // because it's more reliable than invoice number for lookup.
   const verifyUrl = useMemo(() => {
     if (typeof window === 'undefined') return '';
     const origin = window.location.origin;
@@ -5895,17 +5895,13 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
     return `${origin}/api/receipt/verify?${params.toString()}`;
   }, [payment.saleId, payment.invoiceNumber]);
 
-  // Generate QR code
   useEffect(() => {
     if (!showQR || qrDataUrl || !verifyUrl) return;
     setQrDataUrl(`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(verifyUrl)}`);
   }, [showQR, verifyUrl, qrDataUrl]);
 
-  // Generate CSV string (defensive — item.total is optional in CartItem)
   const csvContent = useMemo(() => {
-    const ts = payment.timestamp instanceof Date
-      ? payment.timestamp
-      : new Date(payment.timestamp || Date.now());
+    const ts = payment.timestamp instanceof Date ? payment.timestamp : new Date(payment.timestamp || Date.now());
     const rows = [
       ["Field", "Value"],
       ["Invoice", payment.invoiceNumber || 'N/A'],
@@ -5922,25 +5918,18 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
       ["", ""],
       ["Items", ""],
       ...(payment.items || []).map((item: any) =>
-        [`${item.emoji || ''} ${item.name || 'Item'}`,
-         `${safeNum(item.quantity)} x ${formatGHS(item.price)} = ${formatGHS(itemTotalOf(item))}`]),
+        [`${item.emoji || ''} ${item.name || 'Item'}`, `${safeNum(item.quantity)} x ${formatGHS(item.price)} = ${formatGHS(itemTotalOf(item))}`]),
     ];
     return rows.map(r => r.map(c => `"${c}"`).join(",")).join("\n");
   }, [payment]);
 
-  // Generate WhatsApp receipt text (includes the verify URL so customers
-  // can tap to view the receipt in any browser)
   const waText = useMemo(() => buildWhatsAppReceiptText(payment, verifyUrl), [payment, verifyUrl]);
   const waLink = useMemo(() => {
     const phone = waPhone.replace(/[\s+\-()]/g, "");
-    return phone
-      ? `https://wa.me/${phone}?text=${encodeURIComponent(waText)}`
-      : `https://wa.me/?text=${encodeURIComponent(waText)}`;
+    return phone ? `https://wa.me/${phone}?text=${encodeURIComponent(waText)}` : `https://wa.me/?text=${encodeURIComponent(waText)}`;
   }, [waPhone, waText]);
 
-  // Copy to clipboard (works in iframe using execCommand)
   const copyToClipboard = (text: string) => {
-    // Method 1: execCommand (works in older browsers + iframes)
     const textarea = document.createElement('textarea');
     textarea.value = text;
     textarea.style.position = 'fixed';
@@ -5953,7 +5942,6 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
       setTimeout(() => setCopied(false), 2000);
       toast({ title: 'Copied to clipboard' });
     } catch {
-      // Method 2: navigator.clipboard
       navigator.clipboard?.writeText(text).then(() => {
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
@@ -5965,7 +5953,6 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
     document.body.removeChild(textarea);
   };
 
-  // Download file (works in iframe using Blob + anchor download)
   const downloadFile = (content: string, filename: string, mimeType: string) => {
     const blob = new Blob([content], { type: mimeType });
     const url = URL.createObjectURL(blob);
@@ -5975,13 +5962,40 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
     a.style.display = 'none';
     document.body.appendChild(a);
     a.click();
-    setTimeout(() => {
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    }, 100);
+    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
   };
 
-  // Print receipt HTML (full-screen overlay within the app) — defensive
+  // ===== Email Receipt =====
+  const handleSendEmailReceipt = async () => {
+    if (!emailAddr || !emailAddr.includes('@')) {
+      toast({ title: "Invalid email", description: "Please enter a valid email address", variant: "destructive" });
+      return;
+    }
+    if (!payment.saleId) {
+      toast({ title: "Cannot email receipt", description: "Sale ID is missing from payment record", variant: "destructive" });
+      return;
+    }
+    setSendingEmail(true);
+    try {
+      const res = await authedFetch("/api/email/receipt", {
+        method: "POST",
+        body: JSON.stringify({ saleId: payment.saleId, customerEmail: emailAddr }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast({ title: "✅ Receipt emailed!", description: `Sent to ${data.sentTo}` });
+        setShowEmail(false);
+        setEmailAddr("");
+      } else {
+        toast({ title: "Email failed", description: data.error, variant: "destructive" });
+      }
+    } catch (e: any) {
+      toast({ title: "Network error", description: e?.message, variant: "destructive" });
+    } finally {
+      setSendingEmail(false);
+    }
+  };
+
   const printReceiptHTML = useMemo(() => {
     const itemsHtml = (payment.items || []).map((item: any) => `
       <tr>
@@ -6037,7 +6051,6 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
           onClick={(e) => e.stopPropagation()}
           className="dialog-premium shadow-premium-xl w-full max-w-sm max-h-[92vh] flex flex-col overflow-hidden"
         >
-          {/* Header */}
           <div className="flex-shrink-0 bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-6 py-5 text-center">
             <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.2, type: "spring" }}
               className="h-16 w-16 rounded-full bg-white/20 mx-auto flex items-center justify-center mb-2">
@@ -6047,7 +6060,6 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
             <div className="text-xs opacity-90 mt-0.5">{(payment.timestamp instanceof Date ? payment.timestamp : new Date(payment.timestamp || Date.now())).toLocaleString('en-GB')}</div>
           </div>
 
-          {/* Receipt body — scrollable with max height */}
           <div className="overflow-y-auto min-h-0 scroll-premium" style={{ maxHeight: '45vh', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
             <div className="px-6 py-4 font-mono text-xs">
               <div className="text-center mb-3">
@@ -6101,8 +6113,9 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
             </div>
           </div>
 
-          {/* Action buttons — ALWAYS visible */}
+          {/* Action buttons */}
           <div className="flex-shrink-0 px-4 py-3 border-t border-slate-200 bg-slate-50 space-y-2">
+            {/* Row 1: Print, CSV, PDF, WhatsApp */}
             <div className="grid grid-cols-4 gap-2">
               <button onClick={() => setPrintMode(true)} className="h-10 rounded-xl bg-white ring-1 ring-slate-200 hover:bg-slate-100 text-slate-700 font-semibold text-xs flex items-center justify-center gap-1">
                 <Printer className="h-4 w-4" /> Print
@@ -6118,19 +6131,69 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
                 WhatsApp
               </button>
             </div>
+            {/* Row 2: Email Receipt (new!) + Show QR */}
             <div className="grid grid-cols-2 gap-2">
+              <button onClick={() => setShowEmail(true)} className="h-10 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs flex items-center justify-center gap-1">
+                <Mail className="h-4 w-4" /> Email Receipt
+              </button>
               <button onClick={() => setShowQR(s => !s)} className={`h-10 rounded-xl ring-1 ring-slate-200 text-slate-700 font-semibold text-xs flex items-center justify-center gap-1 ${showQR ? 'bg-emerald-100 ring-emerald-300 text-emerald-700' : 'bg-white hover:bg-slate-100'}`}>
                 {showQR ? 'Hide QR' : 'Show QR'}
               </button>
-              <button onClick={onClose} className="h-10 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold text-xs flex items-center justify-center gap-1 hover:shadow-lg">
-                <Check className="h-4 w-4" /> New Sale
-              </button>
             </div>
+            {/* Row 3: New Sale */}
+            <button onClick={onClose} className="w-full h-10 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold text-xs flex items-center justify-center gap-1 hover:shadow-lg">
+              <Check className="h-4 w-4" /> New Sale
+            </button>
           </div>
         </motion.div>
       </motion.div>
 
-      {/* PRINT OVERLAY — full-screen within the app */}
+      {/* EMAIL MODAL */}
+      {showEmail && (
+        <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4" onClick={() => setShowEmail(false)}>
+          <div className="dialog-premium shadow-premium-xl w-full max-w-md max-h-[80vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="flex-shrink-0 bg-indigo-600 text-white px-5 py-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Mail className="h-5 w-5" />
+                <span className="font-bold text-sm">Email Receipt</span>
+              </div>
+              <button onClick={() => setShowEmail(false)} className="h-7 w-7 rounded-lg bg-white/20 hover:bg-white/30 flex items-center justify-center">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-5 space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Customer Email Address</label>
+                <input
+                  type="email"
+                  value={emailAddr}
+                  onChange={(e) => setEmailAddr(e.target.value)}
+                  placeholder="customer@example.com"
+                  className="input-premium w-full h-11 px-4 text-sm"
+                  autoFocus
+                />
+                <div className="text-[10px] text-slate-400 mt-1">The customer will receive a digital copy of this receipt</div>
+              </div>
+              <div className="bg-slate-50 rounded-xl p-3 text-xs text-slate-600 space-y-1">
+                <div><strong>Invoice:</strong> #{payment.invoiceNumber}</div>
+                <div><strong>Total:</strong> {formatGHS(payment.total)}</div>
+                <div><strong>Items:</strong> {payment.items?.length || 0}</div>
+              </div>
+            </div>
+            <div className="flex-shrink-0 p-4 border-t border-slate-200">
+              <button
+                onClick={handleSendEmailReceipt}
+                disabled={sendingEmail || !emailAddr}
+                className="w-full h-11 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold text-sm flex items-center justify-center gap-2"
+              >
+                {sendingEmail ? <><Loader2 className="h-4 w-4 animate-spin" /> Sending...</> : <><Send className="h-4 w-4" /> Send Receipt</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PRINT OVERLAY */}
       {printMode && (
         <div className="fixed inset-0 z-[100] bg-white flex flex-col">
           <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 bg-slate-800 text-white print:hidden">
@@ -6148,7 +6211,7 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
         </div>
       )}
 
-      {/* WHATSAPP MODAL — in-app, no popups */}
+      {/* WHATSAPP MODAL */}
       {showWhatsApp && (
         <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4" onClick={() => setShowWhatsApp(false)}>
           <div className="dialog-premium shadow-premium-xl w-full max-w-md max-h-[80vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
@@ -6164,38 +6227,19 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
             <div className="flex-1 overflow-y-auto p-5 space-y-4">
               <div>
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Customer Phone Number</label>
-                <input
-                  type="tel"
-                  value={waPhone}
-                  onChange={(e) => setWaPhone(e.target.value)}
-                  placeholder="+233247075044"
-                  className="input-premium w-full h-11 px-4 text-sm font-mono font-bold"
-                />
+                <input type="tel" value={waPhone} onChange={(e) => setWaPhone(e.target.value)} placeholder="+233247075044" className="input-premium w-full h-11 px-4 text-sm font-mono font-bold" />
                 <div className="text-[10px] text-slate-400 mt-1">Enter the customer's phone number with country code</div>
               </div>
               <div>
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">WhatsApp Link</label>
-                <textarea
-                  readOnly
-                  value={waLink}
-                  rows={3}
-                  className="input-premium w-full px-3 py-2 text-[10px] font-mono resize-none"
-                  onClick={(e) => (e.target as HTMLTextAreaElement).select()}
-                />
+                <textarea readOnly value={waLink} rows={3} className="input-premium w-full px-3 py-2 text-[10px] font-mono resize-none" onClick={(e) => (e.target as HTMLTextAreaElement).select()} />
               </div>
               <div>
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Receipt Message</label>
-                <textarea
-                  readOnly
-                  value={waText}
-                  rows={8}
-                  className="input-premium w-full px-3 py-2 text-[10px] font-mono resize-none"
-                  onClick={(e) => (e.target as HTMLTextAreaElement).select()}
-                />
+                <textarea readOnly value={waText} rows={8} className="input-premium w-full px-3 py-2 text-[10px] font-mono resize-none" onClick={(e) => (e.target as HTMLTextAreaElement).select()} />
               </div>
             </div>
             <div className="flex-shrink-0 p-4 border-t border-slate-200 space-y-2">
-              {/* Primary: open WhatsApp with prefilled receipt text */}
               <div className="flex gap-2">
                 <button onClick={() => copyToClipboard(waLink)} className="btn-premium flex-1 h-10 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold flex items-center justify-center gap-1.5">
                   {copied ? <><Check className="h-3.5 w-3.5" /> Copied!</> : <><FileText className="h-3.5 w-3.5" /> Copy Link</>}
@@ -6207,7 +6251,6 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
                   <Send className="h-3.5 w-3.5" /> Open WhatsApp
                 </a>
               </div>
-              {/* Secondary: view the receipt online in any browser (no WhatsApp needed) */}
               <div className="flex gap-2">
                 <button onClick={() => copyToClipboard(verifyUrl)} className="btn-premium flex-1 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold flex items-center justify-center gap-1.5 ring-1 ring-slate-200">
                   <FileText className="h-3.5 w-3.5" /> Copy Receipt URL
@@ -6217,7 +6260,7 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
                 </a>
               </div>
               <div className="text-[10px] text-slate-400 text-center">
-                💡 “View Receipt Online” opens the receipt in any browser — no WhatsApp required.
+                💡 "View Receipt Online" opens the receipt in any browser — no WhatsApp required.
                 Share this link via SMS, email, or any messenger.
               </div>
             </div>
