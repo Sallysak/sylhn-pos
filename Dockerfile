@@ -46,7 +46,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy standalone build + public assets + prisma + ALL node_modules
-# (need full node_modules for prisma CLI + @prisma/client at runtime)
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
@@ -61,5 +60,6 @@ RUN mkdir -p /app/db /app/backups
 ENV NODE_ENV=production
 ENV HOSTNAME=0.0.0.0
 
-# Start the app — push Prisma schema first, then start server
-CMD ["sh", "-c", "node ./node_modules/prisma/build/index.js db push --accept-data-loss 2>&1; PORT=${PORT:-3000} node server.js"]
+# Start: run prisma db push with LOCAL binary (not npx!), then start server
+# Use semicolon so server starts even if db push fails
+CMD ["sh", "-c", "node ./node_modules/prisma/build/index.js db push --accept-data-loss 2>&1 || true; node server.js"]

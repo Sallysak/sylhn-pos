@@ -93,7 +93,11 @@ if (!globalForPrisma.__prismaDbPush) {
       console.log('[db] Tables not found. Running prisma db push...');
       try {
         const { execSync } = await import('child_process');
-        execSync('npx prisma db push --skip-generate --accept-data-loss', {
+        const { existsSync } = await import('fs');
+        const prismaBin = existsSync('./node_modules/.bin/prisma')
+          ? './node_modules/.bin/prisma'
+          : 'node ./node_modules/prisma/build/index.js';
+        execSync(`${prismaBin} db push --skip-generate --accept-data-loss`, {
           stdio: 'pipe',
           cwd: process.cwd(),
           env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL },
