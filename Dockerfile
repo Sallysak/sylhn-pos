@@ -1,67 +1,55 @@
-# SYLHN POS — Dockerfile (multi-stage production build)
-# Builds a minimal standalone Next.js image with Bun runtime.
+# SYLHN POS — Dockerfile for Railway (multi-stage production build)
+# Uses Node.js (Railway has Node.js natively, no Bun needed)
 
 # ===== Stage 1: Install deps =====
-FROM oven/bun:1 AS deps
+FROM node:22-slim AS deps
 WORKDIR /app
 
-# Copy lockfile + package.json first (better layer caching)
-COPY package.json bun.lock* ./
-RUN bun install --frozen-lockfile
+COPY package.json package-lock.json* ./
+RUN npm install --legacy-peer-deps
 
 # ===== Stage 2: Build =====
-FROM oven/bun:1 AS builder
+FROM node:22-slim AS builder
 WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Generate Prisma client (needs schema.prisma)
-RUN bun run db:generate
+# Generate Prisma client
+RUN npx prisma generate
 
 # Build Next.js (standalone output)
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN bun run build
+RUN npm run build
 
 # ===== Stage 3: Production runner =====
-FROM oven/bun:1-slim AS runner
+FROM node:22-slim AS runner
 WORKDIR /app
 
-# Install sqlite3 for backup/restore operations + curl for health checks
+# Install curl for health checks
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    sqlite3 curl ca-certificates \
+    curl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Create non-root user for security
-RUN groupadd -r sylhn && useradd -r -g sylhn -d /app -s /bin/bash sylhn
-
 # Copy standalone build + public assets + prisma
-COPY --from=builder --chown=sylhn:sylhn /app/.next/standalone ./
-COPY --from=builder --chown=sylhn:sylhn /app/.next/static ./.next/static
-COPY --from=builder --chown=sylhn:sylhn /app/public ./public
-COPY --from=builder --chown=sylhn:sylhn /app/prisma ./prisma
-COPY --from=builder --chown=sylhn:sylhn /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder --chown=sylhn:sylhn /app/node_modules/@prisma ./node_modules/@prisma
-COPY --from=builder --chown=sylhn:sylhn /app/package.json ./package.json
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder /app/package.json ./package.json
 
 # Create data directories
-RUN mkdir -p /app/db /app/backups && chown -R sylhn:sylhn /app/db /app/backups
+RUN mkdir -p /app/db /app/backups
 
-# Switch to non-root user
-USER sylhn
-
-# Expose port
-EXPOSE 3000
-
-# Set environment
+# Expose port (Railway sets $PORT automatically)
 ENV NODE_ENV=production
-ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
-ENV DATABASE_URL=file:/app/db/custom.db
 
-# Health check (every 30s, fail after 3 retries = 90s)
+# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD curl -f http://localhost:3000/api/health || exit 1
+  CMD curl -f http://localhost:${PORT:-3000}/api/health || exit 1
 
-# Start the app
-CMD ["bun", "server.js"]
+# Start the app — push Prisma schema first, then start server
+CMD ["sh", "-c", "npx prisma db push --accept-data-loss && node server.js"]
