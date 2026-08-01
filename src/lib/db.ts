@@ -73,6 +73,10 @@ function tuneDatabaseUrl(url: string | undefined): string | undefined {
   if (!params.has("connection_limit")) params.set("connection_limit", "5");
   if (!params.has("pool_timeout")) params.set("pool_timeout", "10");
   if (!params.has("connect_timeout")) params.set("connect_timeout", "30");
+  // Supabase requires SSL — add sslmode=require if not already present
+  if (!params.has("sslmode") && !params.has("ssl")) {
+    params.set("sslmode", "require");
+  }
   return url.split("?")[0] + "?" + params.toString();
 }
 
@@ -97,10 +101,15 @@ if (!globalForPrisma.__prismaDbPush) {
         const prismaBin = existsSync('./node_modules/.bin/prisma')
           ? './node_modules/.bin/prisma'
           : 'node ./node_modules/prisma/build/index.js';
+        // Ensure SSL is enabled for Supabase/Neon
+        let dbUrl = process.env.DATABASE_URL || '';
+        if (dbUrl && !dbUrl.includes('sslmode') && !dbUrl.includes('ssl=')) {
+          dbUrl += (dbUrl.includes('?') ? '&' : '?') + 'sslmode=require';
+        }
         execSync(`${prismaBin} db push --skip-generate --accept-data-loss`, {
           stdio: 'pipe',
           cwd: process.cwd(),
-          env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL },
+          env: { ...process.env, DATABASE_URL: dbUrl },
         });
         console.log('[db] Schema created. Seeding default users...');
         await seedDefaultUsers();
