@@ -1,21 +1,34 @@
 # SYLHN POS — Dockerfile for Railway (multi-stage production build)
-# Uses Node.js (Railway has Node.js natively, no Bun needed)
+# Uses Node.js 22 (Railway native)
 
 # ===== Stage 1: Install deps =====
 FROM node:22-slim AS deps
 WORKDIR /app
 
+# Install OpenSSL (Prisma requires it)
+RUN apt-get update && apt-get install -y --no-install-recommends openssl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy package files + prisma schema (needed for postinstall: prisma generate)
 COPY package.json package-lock.json* ./
-RUN npm install --legacy-peer-deps
+COPY prisma ./prisma
+
+# Install deps — use --ignore-scripts to skip postinstall (prisma generate),
+# then run it manually AFTER the prisma folder is in place
+RUN npm install --legacy-peer-deps --ignore-scripts
+RUN npx prisma generate
 
 # ===== Stage 2: Build =====
 FROM node:22-slim AS builder
 WORKDIR /app
 
+RUN apt-get update && apt-get install -y --no-install-recommends openssl \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Generate Prisma client
+# Generate Prisma client again (in case schema changed)
 RUN npx prisma generate
 
 # Build Next.js (standalone output)
@@ -26,9 +39,9 @@ RUN npm run build
 FROM node:22-slim AS runner
 WORKDIR /app
 
-# Install curl for health checks
+# Install curl for health checks + openssl for Prisma
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl ca-certificates \
+    curl ca-certificates openssl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy standalone build + public assets + prisma
