@@ -58,13 +58,12 @@ COPY --from=builder /app/package.json ./package.json
 # Create data directories
 RUN mkdir -p /app/db /app/backups
 
-# Expose port (Railway sets $PORT automatically)
+# Railway provides $PORT dynamically — the Next.js standalone server
+# reads process.env.PORT automatically. We just need to make sure
+# HOSTNAME is set to 0.0.0.0 so it accepts external connections.
 ENV NODE_ENV=production
 ENV HOSTNAME=0.0.0.0
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD curl -f http://localhost:${PORT:-3000}/api/health || exit 1
-
-# Start the app — push Prisma schema first (using LOCAL binary), then start server
-CMD ["sh", "-c", "./node_modules/.bin/prisma db push --accept-data-loss && node server.js"]
+# Start the app — push Prisma schema first, then start server
+# The server reads PORT from process.env.PORT (set by Railway)
+CMD ["sh", "-c", "./node_modules/.bin/prisma db push --accept-data-loss 2>&1 && PORT=${PORT:-3000} node server.js"]
