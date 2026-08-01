@@ -45,25 +45,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl ca-certificates openssl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy standalone build + public assets + prisma + prisma CLI
+# Copy standalone build + public assets + prisma + ALL node_modules
+# (need full node_modules for prisma CLI + @prisma/client at runtime)
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
-COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
+COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
 
 # Create data directories
 RUN mkdir -p /app/db /app/backups
 
-# Railway provides $PORT dynamically — the Next.js standalone server
-# reads process.env.PORT automatically. We just need to make sure
-# HOSTNAME is set to 0.0.0.0 so it accepts external connections.
+# Railway provides $PORT dynamically
 ENV NODE_ENV=production
 ENV HOSTNAME=0.0.0.0
 
 # Start the app — push Prisma schema first, then start server
-# The server reads PORT from process.env.PORT (set by Railway)
-CMD ["sh", "-c", "./node_modules/.bin/prisma db push --accept-data-loss 2>&1 && PORT=${PORT:-3000} node server.js"]
+CMD ["sh", "-c", "node ./node_modules/prisma/build/index.js db push --accept-data-loss 2>&1; PORT=${PORT:-3000} node server.js"]
