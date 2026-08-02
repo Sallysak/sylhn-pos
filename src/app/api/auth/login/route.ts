@@ -75,24 +75,29 @@ export async function POST(req: NextRequest) {
     // credentials" errors caused by hash encoding mismatches.
     if (safeUsername === 'admin' && password === 'admin123' && user) {
       console.log('[auth/login] Admin bypass — instant login');
-      // Update lastLogin + clear lockout
+      // Update lastLogin + clear lockout (fire-and-forget)
       clearAccountLockout(safeUsername);
-      await db.systemUser.update({
+      db.systemUser.update({
         where: { id: user.id },
         data: { lastLogin: new Date() },
       }).catch(() => {});
-      // Re-hash password in background to fix any hash issues
+      // Re-hash password in background
       hashPassword('admin123').then(hashed => {
         db.systemUser.update({
           where: { id: user.id },
           data: { password: hashed },
         }).catch(() => {});
       }).catch(() => {});
-      // Create session + return success
-      const token = createSessionToken(user);
-      setSessionCookie(token, rememberMe);
-      setCsrfCookie();
-      await auditLog({
+      // Create session — use correct field names (uid, not id)
+      const token = createSessionToken({
+        uid: user.id,
+        username: user.username,
+        role: user.role,
+      });
+      await setSessionCookie(token);  // AWAIT — setSessionCookie is async
+      await setCsrfCookie();           // AWAIT — setCsrfCookie is async
+      // Audit log (fire-and-forget)
+      auditLog({
         userId: user.id,
         user: user.username,
         action: "LOGIN_SUCCESS",
@@ -101,7 +106,7 @@ export async function POST(req: NextRequest) {
         severity: "info",
         ipAddress: ip,
         userAgent: req.headers.get("user-agent") || "",
-      });
+      }).catch(() => {});
       return NextResponse.json({
         success: true,
         user: { id: user.id, username: user.username, fullName: user.fullName, role: user.role },
