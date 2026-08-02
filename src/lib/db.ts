@@ -96,7 +96,7 @@ if (!globalForPrisma.__prismaDbPush) {
       // Table doesn't exist — only run db push on FIRST EVER deploy
       console.log('[db] Tables not found. Running prisma db push...');
       try {
-        const { execSync } = await import('child_process');
+        const { exec } = await import('child_process');
         const { existsSync } = await import('fs');
         const prismaBin = existsSync('./node_modules/.bin/prisma')
           ? './node_modules/.bin/prisma'
@@ -106,10 +106,24 @@ if (!globalForPrisma.__prismaDbPush) {
         if (dbUrl && !dbUrl.includes('sslmode') && !dbUrl.includes('ssl=')) {
           dbUrl += (dbUrl.includes('?') ? '&' : '?') + 'sslmode=require';
         }
-        execSync(`${prismaBin} db push --skip-generate --accept-data-loss`, {
-          stdio: 'pipe',
-          cwd: process.cwd(),
-          env: { ...process.env, DATABASE_URL: dbUrl },
+        // Use ASYNC exec instead of execSync — doesn't block the event loop
+        await new Promise<void>((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            reject(new Error('prisma db push timed out after 120s'));
+          }, 120000);
+          exec(`${prismaBin} db push --skip-generate --accept-data-loss`, {
+            cwd: process.cwd(),
+            env: { ...process.env, DATABASE_URL: dbUrl },
+          }, (err, stdout, stderr) => {
+            clearTimeout(timeout);
+            if (err) {
+              console.error('[db] prisma db push stderr:', stderr);
+              reject(err);
+            } else {
+              console.log('[db] prisma db push output:', stdout);
+              resolve();
+            }
+          });
         });
         console.log('[db] Schema created. Seeding default users...');
         await seedDefaultUsers();
