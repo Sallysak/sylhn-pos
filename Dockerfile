@@ -60,6 +60,6 @@ RUN mkdir -p /app/db /app/backups
 ENV NODE_ENV=production
 ENV HOSTNAME=0.0.0.0
 
-# Start: run prisma db push with LOCAL binary + SSL, then start server
-# Use semicolon so server starts even if db push fails
-CMD ["sh", "-c", "DB_URL=\"$DATABASE_URL\"; if [ -n \"$DB_URL\" ] && echo \"$DB_URL\" | grep -qv sslmode; then DB_URL=\"$DB_URL?sslmode=require\"; fi; DATABASE_URL=\"$DB_URL\" node ./node_modules/prisma/build/index.js db push --accept-data-loss 2>&1 || true; node server.js"]
+# SIMPLE start command — just start the server
+# The app's db.ts will auto-create tables (prisma db push) on first request
+CMD ["node", "server.js"]
