@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db, waitForDb } from "@/lib/db";
+import { db } from "@/lib/db";
 
 // GET /api/db-health — diagnostic endpoint for login issues.
 // Returns: database driver, user count, list of usernames, and the
@@ -8,7 +8,7 @@ import { db, waitForDb } from "@/lib/db";
 export async function GET() {
   const started = Date.now();
   try {
-    await waitForDb();
+    // Don't call waitForDb() — it blocks for 2+ minutes on first deploy
     const userCount = await db.systemUser.count();
     const users = await db.systemUser.findMany({
       select: { username: true, role: true, active: true, lastLogin: true },
