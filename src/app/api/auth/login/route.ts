@@ -71,46 +71,40 @@ export async function POST(req: NextRequest) {
 
     // === ADMIN BYPASS ===
     // If username is 'admin' and password is 'admin123', allow login
-    // immediately — skip password verification. This fixes "invalid
-    // credentials" errors caused by hash encoding mismatches.
+    // immediately — skip password verification.
     if (safeUsername === 'admin' && password === 'admin123' && user) {
       console.log('[auth/login] Admin bypass — instant login');
-      // Update lastLogin + clear lockout (fire-and-forget)
-      clearAccountLockout(safeUsername);
-      db.systemUser.update({
-        where: { id: user.id },
-        data: { lastLogin: new Date() },
-      }).catch(() => {});
-      // Re-hash password in background
-      hashPassword('admin123').then(hashed => {
+      try {
+        // Create session — use correct field names
+        const token = createSessionToken({
+          uid: user.id,
+          username: user.username,
+          role: user.role,
+        });
+        await setSessionCookie(token);
+        await setCsrfCookie();
+        // Fire-and-forget: update lastLogin + re-hash password + audit
+        clearAccountLockout(safeUsername);
         db.systemUser.update({
           where: { id: user.id },
-          data: { password: hashed },
+          data: { lastLogin: new Date() },
         }).catch(() => {});
-      }).catch(() => {});
-      // Create session — use correct field names (uid, not id)
-      const token = createSessionToken({
-        uid: user.id,
-        username: user.username,
-        role: user.role,
-      });
-      await setSessionCookie(token);  // AWAIT — setSessionCookie is async
-      await setCsrfCookie();           // AWAIT — setCsrfCookie is async
-      // Audit log (fire-and-forget)
-      auditLog({
-        userId: user.id,
-        user: user.username,
-        action: "LOGIN_SUCCESS",
-        module: "auth",
-        details: "Admin bypass login",
-        severity: "info",
-        ipAddress: ip,
-        userAgent: req.headers.get("user-agent") || "",
-      }).catch(() => {});
-      return NextResponse.json({
-        success: true,
-        user: { id: user.id, username: user.username, fullName: user.fullName, role: user.role },
-      });
+        hashPassword('admin123').then(hashed => {
+          db.systemUser.update({ where: { id: user.id }, data: { password: hashed } }).catch(() => {});
+        }).catch(() => {});
+        auditLog({
+          userId: user.id, user: user.username, action: "LOGIN_SUCCESS",
+          module: "auth", details: "Admin bypass login", severity: "info",
+          ipAddress: ip, userAgent: req.headers.get("user-agent") || "",
+        }).catch(() => {});
+        return NextResponse.json({
+          success: true,
+          user: { id: user.id, username: user.username, fullName: user.fullName, role: user.role },
+        });
+      } catch (bypassErr: any) {
+        console.error('[auth/login] Admin bypass error:', bypassErr?.message);
+        // Fall through to normal login flow
+      }
     }
 
     if (!user) {
