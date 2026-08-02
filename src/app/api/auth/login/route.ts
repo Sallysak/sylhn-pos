@@ -48,11 +48,11 @@ export async function POST(req: NextRequest) {
     }, { status: 429, headers: { "Retry-After": String(lockoutState.retryAfter) } });
   }
 
-  // Wait for DB initialization (table creation + auto-seed) to settle.
-  // This is critical on Vercel serverless where the SQLite file in /tmp
-  // may have been wiped by a cold start — the seed runs in the background
-  // and would otherwise race with this query.
-  await waitForDb();
+  // === DON'T wait for db push — it blocks the event loop ===
+  // The original waitForDb() blocks until prisma db push completes, which
+  // can take 2+ minutes on first deploy. This causes "Signing in..." to
+  // hang forever. Instead, we skip it and rely on the self-healing below.
+  // await waitForDb();  // REMOVED — causes login to hang
 
   // Find user in DB — with self-healing retry
   try {
