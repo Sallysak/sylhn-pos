@@ -39,14 +39,12 @@ export function AiAssistant({ open, onClose }: AiAssistantProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Auto-scroll to bottom on new message
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages, loading]);
 
-  // Focus input when opened
   useEffect(() => {
     if (open) {
       setTimeout(() => inputRef.current?.focus(), 300);
@@ -66,25 +64,39 @@ export function AiAssistant({ open, onClose }: AiAssistantProps) {
     setLoading(true);
 
     try {
-      const res = await authedFetch("/api/ai-assistant", {
+      // === UPDATED: Now calls /api/ai/chat (Groq Llama 3.3 70B) ===
+      const res = await authedFetch("/api/ai/chat", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          question: text,
-          conversationHistory: messages.slice(-6).map(m => ({ role: m.role, content: m.content })),
+          messages: [
+            ...messages.slice(-6).map(m => ({ role: m.role, content: m.content })),
+            { role: "user", content: text },
+          ],
+          context: {
+            includeBusinessData: true,
+            includeSales: true,
+            includeStock: true,
+            includeTopProducts: true,
+          },
         }),
       });
-      const data = await res.json();
+
+      // Handle session expiry
       if (res.status === 401) {
-        // Session expired — redirect to login
         toast({ title: "Session expired", description: "Please log in again to use AI Assistant", variant: "destructive" });
         setTimeout(() => window.location.href = "/", 1500);
         return;
       }
+
+      const data = await res.json();
+
+      // === UPDATED: Response now uses data.reply (not data.response) ===
       if (res.ok && data.success) {
         const aiMessage: ChatMessage = {
           role: "assistant",
-          content: data.response,
-          timestamp: data.timestamp,
+          content: data.reply,
+          timestamp: new Date().toISOString(),
         };
         setMessages(prev => [...prev, aiMessage]);
       } else {
@@ -109,11 +121,9 @@ export function AiAssistant({ open, onClose }: AiAssistantProps) {
     toast({ title: "Conversation cleared" });
   };
 
-  // Simple markdown-ish renderer (bold + bullet points + line breaks)
   const renderContent = (content: string) => {
     const lines = content.split("\n");
     return lines.map((line, i) => {
-      // Bullet point
       if (line.trim().startsWith("- ") || line.trim().startsWith("* ")) {
         return (
           <div key={i} className="flex gap-2 ml-2">
@@ -122,15 +132,12 @@ export function AiAssistant({ open, onClose }: AiAssistantProps) {
           </div>
         );
       }
-      // Numbered list
       if (/^\d+\.\s/.test(line.trim())) {
         return (
           <div key={i} className="ml-2" dangerouslySetInnerHTML={{ __html: line.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>") }} />
         );
       }
-      // Empty line
       if (!line.trim()) return <div key={i} className="h-2" />;
-      // Regular paragraph
       return (
         <div key={i} dangerouslySetInnerHTML={{ __html: line.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>") }} />
       );
@@ -141,7 +148,6 @@ export function AiAssistant({ open, onClose }: AiAssistantProps) {
     <AnimatePresence>
       {open && (
         <>
-          {/* Overlay */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -150,7 +156,6 @@ export function AiAssistant({ open, onClose }: AiAssistantProps) {
             className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[80]"
           />
 
-          {/* Panel — slides in from right, premium glass */}
           <motion.div
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
@@ -158,9 +163,8 @@ export function AiAssistant({ open, onClose }: AiAssistantProps) {
             transition={{ type: "spring", damping: 30, stiffness: 300 }}
             className="fixed top-0 right-0 bottom-0 w-full max-w-md bg-white z-[81] flex flex-col shadow-premium-xl"
           >
-            {/* Header — premium gradient with glow */}
+            {/* Header */}
             <div className="flex-shrink-0 gradient-premium-violet text-white px-5 py-4 relative overflow-hidden">
-              {/* Ambient glow */}
               <div className="pointer-events-none absolute -top-16 -right-16 h-48 w-48 rounded-full bg-white/10 blur-3xl" />
               <div className="pointer-events-none absolute -bottom-20 -left-16 h-48 w-48 rounded-full bg-indigo-400/20 blur-3xl" />
 
@@ -174,7 +178,7 @@ export function AiAssistant({ open, onClose }: AiAssistantProps) {
                   </div>
                   <div>
                     <div className="font-bold text-base leading-tight tracking-tight">SYLHN AI</div>
-                    <div className="text-[10px] text-violet-50/90 leading-tight font-medium">Business Intelligence Assistant</div>
+                    <div className="text-[10px] text-violet-50/90 leading-tight font-medium">Powered by Groq Llama 3.3 70B</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
@@ -197,14 +201,13 @@ export function AiAssistant({ open, onClose }: AiAssistantProps) {
               </div>
               <div className="flex items-center gap-1.5 text-[10px] text-violet-50/90 relative z-10 font-medium">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-300 pulse-ring" />
-                Connected to your store data
+                Connected to your live store data
               </div>
             </div>
 
             {/* Messages */}
             <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4 gradient-premium-mesh scroll-premium">
               {messages.length === 0 ? (
-                // Welcome screen with suggested questions
                 <div className="space-y-4">
                   <motion.div
                     initial={{ opacity: 0, y: 10 }}
@@ -252,7 +255,6 @@ export function AiAssistant({ open, onClose }: AiAssistantProps) {
                   </div>
                 </div>
               ) : (
-                // Conversation
                 messages.map((msg, i) => (
                   <motion.div
                     key={i}
@@ -288,7 +290,6 @@ export function AiAssistant({ open, onClose }: AiAssistantProps) {
                 ))
               )}
 
-              {/* Loading indicator */}
               {loading && (
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
@@ -313,7 +314,7 @@ export function AiAssistant({ open, onClose }: AiAssistantProps) {
               )}
             </div>
 
-            {/* Input — Premium */}
+            {/* Input */}
             <div className="flex-shrink-0 p-3 bg-white border-t border-slate-200/80">
               <div className="flex items-center gap-2">
                 <input
