@@ -57,6 +57,7 @@ import { ManagerApproval } from "@/components/manager-approval";
 import { PrinterPairing } from "@/components/printer-pairing";
 import { AiAssistant } from "@/components/ai-assistant";
 import { AiAssistantDashboard } from "@/components/ai-assistant-dashboard";
+import { AiPredictionsDashboard } from "@/components/ai-predictions-dashboard";
 import { SpeedDial } from "@/components/speed-dial";
 import { saveCart, loadCart, clearCart as clearPersistedCart } from "@/lib/cart-persistence";
 import { saveSessionToken, clearSessionToken, getSessionToken, authedFetch } from "@/lib/client-auth";
@@ -330,6 +331,7 @@ export default function POSPage() {
   // Premium: AI Business Assistant
   const [showAiAssistant, setShowAiAssistant] = useState(false);
   const [showBusinessAI, setShowBusinessAI] = useState(false);
+  const [showPredictions, setShowPredictions] = useState(false);
   // Premium: User menu dropdown (consolidates AI Assistant, Keyboard Shortcuts,
   // Features Map, Dark Mode, and Logout into one always-visible popover so
   // these critical actions are never hidden by header overflow on smaller windows)
@@ -2000,6 +2002,7 @@ export default function POSPage() {
         { label: "📧 Email System", icon: Mail, action: () => setView("email-system" as any) },
         ...(loggedInUser?.role === 'admin' || loggedInUser?.role === 'manager' ? [
           { label: "🧠 Business AI (Manager)", icon: Brain, action: () => setShowBusinessAI(true) },
+          { label: "📊 AI Predictions & Forecast", icon: TrendingUp, action: () => setShowPredictions(true) },
           { label: "🗺️ Features Map (Admin Guide)", icon: MapIcon, action: () => setView("features-map") },
         ] : []),
         { header: "Security" },
@@ -4133,6 +4136,7 @@ export default function POSPage() {
       {/* ===== Premium: AI Business Assistant ===== */}
       <AiAssistant open={showAiAssistant} onClose={() => setShowAiAssistant(false)} />
       <AiAssistantDashboard open={showBusinessAI} onClose={() => setShowBusinessAI(false)} />
+      <AiPredictionsDashboard open={showPredictions} onClose={() => setShowPredictions(false)} />
 
       {/* ===== Premium: Cash Denomination Calculator ===== */}
       <AnimatePresence>

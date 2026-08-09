@@ -5,9 +5,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Sparkles, X, Send, Bot, User, Loader2, TrendingUp,
   Package, AlertTriangle, DollarSign, Users, Truck, RefreshCw, ChevronRight,
+  Mic, Square,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { authedFetch } from "@/lib/client-auth";
+import { cn } from "@/lib/utils";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -36,8 +38,68 @@ export function AiAssistant({ open, onClose }: AiAssistantProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [voiceSupported, setVoiceSupported] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<any>(null);
+
+  // Check if browser supports voice recognition
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      setVoiceSupported(!!SpeechRecognition);
+    }
+  }, []);
+
+  // Start voice recognition
+  const startListening = useCallback(() => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      toast({ title: "Voice not supported", description: "Use Chrome, Edge, or Safari for voice input", variant: "destructive" });
+      return;
+    }
+    const recognition = new SpeechRecognition();
+    recognition.lang = "en-US";
+    recognition.interimResults = true;
+    recognition.continuous = false;
+    recognitionRef.current = recognition;
+    setIsListening(true);
+
+    let finalTranscript = "";
+    recognition.onresult = (event: any) => {
+      let interimTranscript = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalTranscript += transcript;
+        } else {
+          interimTranscript += transcript;
+        }
+      }
+      setInput(finalTranscript + interimTranscript);
+    };
+    recognition.onerror = (event: any) => {
+      setIsListening(false);
+      if (event.error === "not-allowed") {
+        toast({ title: "Microphone blocked", description: "Allow microphone access in browser settings", variant: "destructive" });
+      } else if (event.error !== "aborted") {
+        toast({ title: "Voice error", description: event.error, variant: "destructive" });
+      }
+    };
+    recognition.onend = () => {
+      setIsListening(false);
+      // Auto-focus input after voice ends so user can edit/send
+      setTimeout(() => inputRef.current?.focus(), 100);
+    };
+    recognition.start();
+  }, [toast]);
+
+  // Stop voice recognition
+  const stopListening = useCallback(() => {
+    recognitionRef.current?.stop();
+    setIsListening(false);
+  }, []);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -322,10 +384,28 @@ export function AiAssistant({ open, onClose }: AiAssistantProps) {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="Ask about your business..."
+                  placeholder={isListening ? "Listening..." : "Ask about your business..."}
                   disabled={loading}
-                  className="input-premium flex-1 h-11 px-4 text-sm disabled:opacity-50"
+                  className={cn(
+                    "input-premium flex-1 h-11 px-4 text-sm disabled:opacity-50",
+                    isListening && "ring-2 ring-rose-400 animate-pulse"
+                  )}
                 />
+                {voiceSupported && (
+                  <button
+                    onClick={isListening ? stopListening : startListening}
+                    disabled={loading}
+                    className={cn(
+                      "h-11 w-11 rounded-xl flex items-center justify-center transition flex-shrink-0 disabled:opacity-50",
+                      isListening
+                        ? "bg-rose-500 hover:bg-rose-600 text-white animate-pulse"
+                        : "bg-slate-100 hover:bg-slate-200 text-slate-600"
+                    )}
+                    title={isListening ? "Stop listening" : "Voice input"}
+                  >
+                    {isListening ? <Square className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                  </button>
+                )}
                 <button
                   onClick={() => sendMessage(input)}
                   disabled={loading || !input.trim()}
@@ -336,6 +416,7 @@ export function AiAssistant({ open, onClose }: AiAssistantProps) {
               </div>
               <div className="text-[9px] text-slate-400 text-center mt-1.5 font-medium">
                 AI analyzes your live store data · GHS amounts · Ghana context
+                {voiceSupported && " · 🎤 voice enabled"}
               </div>
             </div>
           </motion.div>
