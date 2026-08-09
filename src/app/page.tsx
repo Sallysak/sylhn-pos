@@ -348,6 +348,8 @@ export default function POSPage() {
   // Premium: Cash denomination calculator
   const [showCashCalc, setShowCashCalc] = useState(false);
   const [showStdCalc, setShowStdCalc] = useState(false);
+  // Live clock for header
+  const [currentTime, setCurrentTime] = useState(new Date());
   // Premium: Price tags printer
   const [showPriceTags, setShowPriceTags] = useState(false);
   const [showLabelPrinter, setShowLabelPrinter] = useState(false);
@@ -387,6 +389,12 @@ export default function POSPage() {
   const [financeTab, setFinanceTab] = useState<"expenses" | "cash-recon" | "mobile-money">("expenses");
   const [adminUser, setAdminUser] = useState<any>(null);
   const [loggedInUser, setLoggedInUser] = useState<any>(null);
+
+  // ===== Live Clock — updates every second =====
+  useEffect(() => {
+    const interval = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   // ===== Fetch held orders from API on login =====
   useEffect(() => {
@@ -3191,7 +3199,11 @@ export default function POSPage() {
               </span>
               <span className="text-slate-300">·</span>
               <span>Prices in {CURRENCY_CODE}</span>
-              <span className="text-slate-300">·</span>
+              <span className="text-slate-300 hidden sm:inline">·</span>
+              <span className="hidden sm:inline font-mono font-semibold text-slate-700 tabular">
+                {currentTime.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+              </span>
+              <span className="text-slate-300 hidden sm:inline">·</span>
               <span className="hidden sm:inline font-mono font-semibold text-slate-700">Today: {formatGHS(dailyTotal)}</span>
               <span className="text-slate-300 hidden sm:inline">·</span>
               <span className="hidden sm:inline">{transactionCount} txns</span>
@@ -3261,7 +3273,8 @@ export default function POSPage() {
                     }}
                     className={cn(
                       "product-card-premium flex flex-col items-center text-center relative overflow-hidden",
-                      outOfStock && "opacity-50"
+                      outOfStock && "opacity-50",
+                      lowStock && !outOfStock && "ring-2 ring-amber-300 ring-offset-1"
                     )}
                   >
                     {/* In-cart badge */}
@@ -3362,6 +3375,11 @@ export default function POSPage() {
                       <Cart className="h-3.5 w-3.5" />
                     </div>
                     <span className="text-xs font-bold tracking-tight">Invoice #{invoiceNumber || '------'}</span>
+                    {cart.length > 0 && (
+                      <span className="ml-1 px-1.5 py-0.5 rounded-full bg-white/20 text-[10px] font-bold tabular">
+                        {totalItems} {totalItems === 1 ? 'item' : 'items'}
+                      </span>
+                    )}
                   </div>
                   <button onClick={() => setShowSidebar(false)} className="h-7 w-7 rounded-lg hover:bg-white/20 flex items-center justify-center transition active:scale-90">
                     <X className="h-3.5 w-3.5" />
@@ -3580,10 +3598,21 @@ export default function POSPage() {
                         </AnimatePresence>
 
                         {cart.length === 0 && (
-                          <div className="flex flex-col items-center justify-center py-12 text-slate-400">
-                            <ShoppingCart className="h-10 w-10 mb-2 opacity-40" />
-                            <div className="text-sm font-medium">Cart is empty</div>
-                            <div className="text-xs mt-1">Type a Part No. above or click products below</div>
+                          <div className="flex flex-col items-center justify-center py-16 text-slate-400 select-none">
+                            <div className="relative mb-4">
+                              <div className="absolute inset-0 rounded-3xl bg-emerald-100 blur-2xl opacity-60 scale-150" />
+                              <div className="relative h-20 w-20 rounded-3xl bg-gradient-to-br from-emerald-50 to-teal-50 ring-1 ring-emerald-100 flex items-center justify-center shadow-sm">
+                                <ShoppingCart className="h-10 w-10 text-emerald-400" />
+                              </div>
+                            </div>
+                            <div className="text-sm font-bold text-slate-600">Cart is empty</div>
+                            <div className="text-xs mt-1 text-slate-400 text-center max-w-[200px]">
+                              Tap products below to add them,<br/>or scan a barcode to start
+                            </div>
+                            <div className="mt-3 flex items-center gap-1.5 text-[10px] text-slate-400">
+                              <kbd className="px-1.5 py-0.5 rounded bg-slate-100 font-mono font-bold text-slate-500">F1</kbd>
+                              <span>to search</span>
+                            </div>
                           </div>
                         )}
                       </div>
