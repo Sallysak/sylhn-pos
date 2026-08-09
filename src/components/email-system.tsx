@@ -70,6 +70,7 @@ export function EmailSystem({ onBack }: { onBack: () => void }) {
   const [savingSettings, setSavingSettings] = useState(false);
   const [testing, setTesting] = useState(false);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const [sendingAlert, setSendingAlert] = useState(false);
 
   const loadEmails = useCallback(async () => {
     setLoading(true);
@@ -201,6 +202,23 @@ export function EmailSystem({ onBack }: { onBack: () => void }) {
       if (data.success) toast({ title: "✅ Test email sent!", description: `Check ${data.sentTo} inbox` });
       else toast({ title: "Test failed", description: data.error, variant: "destructive" });
     } catch (e: any) { toast({ title: "Network error", description: e?.message, variant: "destructive" }); } finally { setTesting(false); }
+  };
+
+  const handleSendLowStockAlert = async () => {
+    setSendingAlert(true);
+    try {
+      const res = await authedFetch("/api/email/low-stock-alert", { method: "POST" });
+      const data = await res.json();
+      if (data.success) {
+        if (data.lowStockCount === 0) {
+          toast({ title: "No low-stock items", description: "All products are well-stocked — no alert needed" });
+        } else {
+          toast({ title: "✅ Alert sent!", description: `${data.lowStockCount} low-stock products reported to ${data.sentTo}` });
+        }
+      } else {
+        toast({ title: "Alert failed", description: data.error, variant: "destructive" });
+      }
+    } catch (e: any) { toast({ title: "Network error", description: e?.message, variant: "destructive" }); } finally { setSendingAlert(false); }
   };
 
   return (
@@ -359,6 +377,23 @@ export function EmailSystem({ onBack }: { onBack: () => void }) {
                 <button onClick={handleSaveSettings} disabled={savingSettings} className="btn-premium flex-1 h-11 rounded-xl gradient-premium-emerald hover:shadow-glow-emerald disabled:opacity-50 text-white text-sm font-bold flex items-center justify-center gap-2 transition active:scale-95">{savingSettings ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save</button>
                 <button onClick={handleTestEmail} disabled={testing} className="btn-premium flex-1 h-11 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-bold flex items-center justify-center gap-2 transition active:scale-95">{testing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Send Test</button>
               </div>
+            </div>
+
+            {/* Quick Actions — Automated Email Alerts */}
+            <div className="card-premium p-4">
+              <h3 className="text-sm font-bold text-slate-800 mb-1 flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-amber-500" /> Automated Email Alerts</h3>
+              <p className="text-[11px] text-slate-500 mb-3">Send yourself an instant alert about low-stock products. Can also be triggered automatically via cron.</p>
+              <button
+                onClick={handleSendLowStockAlert}
+                disabled={sendingAlert}
+                className="btn-premium w-full h-11 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 disabled:opacity-50 text-white text-sm font-bold flex items-center justify-center gap-2 transition active:scale-95"
+              >
+                {sendingAlert ? <Loader2 className="h-4 w-4 animate-spin" /> : <AlertTriangle className="h-4 w-4" />}
+                {sendingAlert ? "Sending..." : "Send Low-Stock Alert Now"}
+              </button>
+              <p className="text-[10px] text-slate-400 mt-2 text-center">
+                💡 The alert is sent to your configured "From Email" address. Auto-sends every 4 hours if stock is low (configure via cron-job.org).
+              </p>
             </div>
           </div>
         )}
