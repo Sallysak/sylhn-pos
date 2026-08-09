@@ -1,5 +1,5 @@
 'use client';
-import { KeyboardShortcuts } from "@/components/keyboard-shortcuts";
+import { KeyboardShortcutsOverlay } from "@/components/keyboard-shortcuts";
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useTheme } from "next-themes";
 import dynamic from "next/dynamic";
@@ -56,6 +56,7 @@ import { BarcodeScanner } from "@/components/barcode-scanner";
 import { ManagerApproval } from "@/components/manager-approval";
 import { PrinterPairing } from "@/components/printer-pairing";
 import { AiAssistant } from "@/components/ai-assistant";
+import { AiAssistantDashboard } from "@/components/ai-assistant-dashboard";
 import { SpeedDial } from "@/components/speed-dial";
 import { saveCart, loadCart, clearCart as clearPersistedCart } from "@/lib/cart-persistence";
 import { saveSessionToken, clearSessionToken, getSessionToken, authedFetch } from "@/lib/client-auth";
@@ -106,7 +107,6 @@ const ProfitMarginReport = dynamic(() => import("@/components/profit-margin-repo
 const CustomerStatements = dynamic(() => import("@/components/customer-statements").then(m => ({ default: m.CustomerStatements })), { ssr: false, loading: loadingFallback });
 const FinancialReports = dynamic(() => import("@/components/financial-reports").then(m => ({ default: m.FinancialReports })), { ssr: false, loading: loadingFallback });
 const ZReport = dynamic(() => import("@/components/z-report").then(m => ({ default: m.ZReport })), { ssr: false, loading: loadingFallback });
-const KeyboardShortcutsOverlay = dynamic(() => import("@/components/keyboard-shortcuts").then(m => ({ default: m.KeyboardShortcutsOverlay })), { ssr: false });
 
 // ===== Server → Client product transformer =====
 // The /api/products endpoint returns Prisma-shaped products (with `quantity`
@@ -329,6 +329,7 @@ export default function POSPage() {
   const [showPrinterPairing, setShowPrinterPairing] = useState(false);
   // Premium: AI Business Assistant
   const [showAiAssistant, setShowAiAssistant] = useState(false);
+  const [showBusinessAI, setShowBusinessAI] = useState(false);
   // Premium: User menu dropdown (consolidates AI Assistant, Keyboard Shortcuts,
   // Features Map, Dark Mode, and Logout into one always-visible popover so
   // these critical actions are never hidden by header overflow on smaller windows)
@@ -1990,6 +1991,7 @@ export default function POSPage() {
         { label: "Backup Database", icon: Database, action: () => setView("maintenance") },
         { label: "📧 Email System", icon: Mail, action: () => setView("email-system" as any) },
         ...(loggedInUser?.role === 'admin' || loggedInUser?.role === 'manager' ? [
+          { label: "🧠 Business AI (Manager)", icon: Brain, action: () => setShowBusinessAI(true) },
           { label: "🗺️ Features Map (Admin Guide)", icon: MapIcon, action: () => setView("features-map") },
         ] : []),
         { header: "Security" },
@@ -2543,7 +2545,7 @@ export default function POSPage() {
     return (
     <div className="min-h-screen w-full gradient-premium-mesh flex flex-col font-sans pb-[72px] lg:pb-0 lg:h-screen lg:overflow-hidden">
       {/* ===== Keyboard Shortcuts (F1-F10, /, ?, Esc, Ctrl+Enter) ===== */}
-      <KeyboardShortcuts />
+      <KeyboardShortcutsOverlay />
       {/* ===== Header Bar with Menu — Premium Glass (responsive) ===== */}
       <header className="header-premium flex-shrink-0 text-white z-30 relative">
         {/* Top row: Logo + Search + Stats (logo only on mobile, full on desktop) */}
@@ -3611,6 +3613,50 @@ export default function POSPage() {
                           <span>Subtotal ({totalItems} items)</span>
                           <span className="font-mono tabular">{formatGHS(subtotal)}</span>
                         </div>
+                        {/* Quick Discount Buttons */}
+                        {cart.length > 0 && (
+                          <div className="flex items-center gap-1 py-1">
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mr-1">Quick:</span>
+                            {[5, 10, 15, 20].map(pct => (
+                              <button
+                                key={pct}
+                                onClick={() => applyGlobalDiscount(pct)}
+                                className={`flex-1 h-7 rounded-lg text-[10px] font-bold transition active:scale-95 ${
+                                  globalDiscount === pct
+                                    ? 'bg-violet-600 text-white shadow-md ring-2 ring-violet-300'
+                                    : 'bg-violet-50 text-violet-700 hover:bg-violet-100 ring-1 ring-violet-200'
+                                }`}
+                              >
+                                {pct}%
+                              </button>
+                            ))}
+                            <button
+                              onClick={() => {
+                                const custom = prompt("Enter discount percentage (0-100):", String(globalDiscount || ''));
+                                if (custom !== null) {
+                                  const num = parseFloat(custom);
+                                  if (!isNaN(num) && num >= 0 && num <= 100) {
+                                    applyGlobalDiscount(num);
+                                  } else if (!isNaN(num)) {
+                                    toast({ title: "Invalid discount", description: "Enter a value between 0 and 100", variant: "destructive" });
+                                  }
+                                }
+                              }}
+                              className="flex-1 h-7 rounded-lg text-[10px] font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 ring-1 ring-slate-200 transition active:scale-95"
+                            >
+                              Custom
+                            </button>
+                            {globalDiscount > 0 && (
+                              <button
+                                onClick={() => applyGlobalDiscount(0)}
+                                className="h-7 px-2 rounded-lg text-[10px] font-bold bg-rose-50 text-rose-600 hover:bg-rose-100 ring-1 ring-rose-200 transition active:scale-95"
+                                title="Remove discount"
+                              >
+                                ✕
+                              </button>
+                            )}
+                          </div>
+                        )}
                         <div className="flex justify-between text-xs text-slate-600">
                           <span className="flex items-center gap-1">
                             <Percent className="h-3 w-3" /> Discount
@@ -4057,6 +4103,7 @@ export default function POSPage() {
 
       {/* ===== Premium: AI Business Assistant ===== */}
       <AiAssistant open={showAiAssistant} onClose={() => setShowAiAssistant(false)} />
+      <AiAssistantDashboard open={showBusinessAI} onClose={() => setShowBusinessAI(false)} />
 
       {/* ===== Premium: Cash Denomination Calculator ===== */}
       <AnimatePresence>
