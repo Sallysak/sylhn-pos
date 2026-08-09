@@ -1,5 +1,5 @@
 'use client';
-
+import { KeyboardShortcuts } from "@/components/keyboard-shortcuts";
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useTheme } from "next-themes";
 import dynamic from "next/dynamic";
@@ -2540,8 +2540,10 @@ export default function POSPage() {
   }
 
   // ===== Render POS =====
-  return (
+    return (
     <div className="min-h-screen w-full gradient-premium-mesh flex flex-col font-sans pb-[72px] lg:pb-0 lg:h-screen lg:overflow-hidden">
+      {/* ===== Keyboard Shortcuts (F1-F10, /, ?, Esc, Ctrl+Enter) ===== */}
+      <KeyboardShortcuts />
       {/* ===== Header Bar with Menu — Premium Glass (responsive) ===== */}
       <header className="header-premium flex-shrink-0 text-white z-30 relative">
         {/* Top row: Logo + Search + Stats (logo only on mobile, full on desktop) */}
