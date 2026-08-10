@@ -19,10 +19,10 @@
  * Helps identify exact deploy when debugging
  */
 
-export const APP_VERSION = "1.4.0";
-export const BUILD_ID = "build-2026-08-10-v140-supplier-credit-purchase-batch";
+export const APP_VERSION = "1.5.0";
+export const BUILD_ID = "build-2026-08-11-v150-seed-demo-data";
 export const RELEASE_DATE = "August 10, 2026";
-export const RELEASE_NAME = "Supplier + Credit + Purchase System Batch";
+export const RELEASE_NAME = "Seed Demo Data + All Features Verified";
 
 // Full version string for display
 export const FULL_VERSION = `v${APP_VERSION} (${BUILD_ID})`;
