@@ -50,6 +50,7 @@ import { AiAssistantDashboard } from "@/components/ai-assistant-dashboard";
 import { AiPredictionsDashboard } from "@/components/ai-predictions-dashboard";
 import { APP_VERSION, BUILD_ID } from "@/lib/version";
 import { SpeedDial } from "@/components/speed-dial";
+import { LiveClock } from "@/components/live-clock";
 
 // Loading fallback for lazy-loaded components (prevents white flash)
 const loadingFallback = () => (
@@ -356,8 +357,6 @@ export default function POSPage() {
   // Premium: Cash denomination calculator
   const [showCashCalc, setShowCashCalc] = useState(false);
   const [showStdCalc, setShowStdCalc] = useState(false);
-  // Live clock for header
-  const [currentTime, setCurrentTime] = useState(new Date());
   // Premium: Price tags printer
   const [showPriceTags, setShowPriceTags] = useState(false);
   const [showLabelPrinter, setShowLabelPrinter] = useState(false);
@@ -397,12 +396,6 @@ export default function POSPage() {
   const [financeTab, setFinanceTab] = useState<"expenses" | "cash-recon" | "mobile-money">("expenses");
   const [adminUser, setAdminUser] = useState<any>(null);
   const [loggedInUser, setLoggedInUser] = useState<any>(null);
-
-  // ===== Live Clock — updates every second =====
-  useEffect(() => {
-    const interval = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(interval);
-  }, []);
 
   // ===== Fetch held orders from API on login =====
   useEffect(() => {
@@ -530,7 +523,6 @@ export default function POSPage() {
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     setInvoiceNumber(generateInvoice());
-    setNow(new Date());
   }, []);
   /* eslint-enable react-hooks/set-state-in-effect */
 
@@ -593,14 +585,8 @@ export default function POSPage() {
     setView("login");
   }, []);
 
-  useEffect(() => {
-    if (!now) return;
-    // Update clock every 5 seconds (not every 1 second) — reduces
-    // unnecessary re-renders of the entire POS page by 80%.
-    // The header shows HH:MM:SS but 5s granularity is visually identical.
-    const interval = setInterval(() => setNow(new Date()), 5000);
-    return () => clearInterval(interval);
-  }, [now]);
+  // REMOVED: 5-second clock interval (was causing full page re-render every 5s)
+  // Clock is now handled by <LiveClock /> component which re-renders only itself
 
   // Close menu on outside click (covers both desktop and mobile menu bars + user menu)
   useEffect(() => {
@@ -1137,7 +1123,7 @@ export default function POSPage() {
     };
 
     fetchProducts();
-    const interval = setInterval(fetchProducts, 60000); // 60s polling
+    const interval = setInterval(fetchProducts, 300000); // 5 min polling (was 60s — too frequent)
     return () => clearInterval(interval);
   }, [loggedInUser]);
 
@@ -2721,8 +2707,7 @@ export default function POSPage() {
             <OfflineSyncIndicator />
             <div className="hidden xl:flex items-center gap-2 text-right">
               <div className="px-2.5 py-1 rounded-lg gradient-premium-glass ring-1 ring-white/25 backdrop-blur-md">
-                <div className="text-[9px] text-emerald-50/80 font-medium tracking-wide">{now ? now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : '--'}</div>
-                <div className="text-xs font-mono font-bold tabular">{now ? now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '--:--:--'}</div>
+                <LiveClock variant="header" />
               </div>
               <div className="px-2.5 py-1 rounded-lg gradient-premium-glass ring-1 ring-white/25 backdrop-blur-md">
                 <div className="text-[9px] text-emerald-50/80 font-medium tracking-wide">Daily Sales</div>
@@ -3210,7 +3195,7 @@ export default function POSPage() {
               <span>Prices in {CURRENCY_CODE}</span>
               <span className="text-slate-300 hidden sm:inline">·</span>
               <span className="hidden sm:inline font-mono font-semibold text-slate-700 tabular">
-                {currentTime.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                <LiveClock />
               </span>
               <span className="text-slate-300 hidden sm:inline">·</span>
               <span className="hidden sm:inline font-mono font-semibold text-slate-700">Today: {formatGHS(dailyTotal)}</span>
