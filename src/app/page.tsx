@@ -3615,19 +3615,19 @@ export default function POSPage() {
                         </AnimatePresence>
 
                         {cart.length === 0 && (
-                          <div className="flex flex-col items-center justify-center py-16 text-slate-400 select-none">
+                          <div className="flex flex-col items-center justify-center py-16 select-none" style={{ color: '#94a3b8' }}>
                             <div className="relative mb-4">
-                              <div className="absolute inset-0 rounded-3xl bg-emerald-100 blur-2xl opacity-60 scale-150" />
-                              <div className="relative h-20 w-20 rounded-3xl bg-gradient-to-br from-emerald-50 to-teal-50 ring-1 ring-emerald-100 flex items-center justify-center shadow-sm">
-                                <ShoppingCart className="h-10 w-10 text-emerald-400" />
+                              <div className="absolute inset-0 rounded-3xl blur-2xl opacity-60 scale-150" style={{ background: 'linear-gradient(135deg, #6ee7b7, #5eead4)' }} />
+                              <div className="relative h-20 w-20 rounded-3xl flex items-center justify-center shadow-sm" style={{ background: 'linear-gradient(135deg, #ecfdf5, #f0fdfa)', boxShadow: '0 0 0 1px rgba(16, 185, 129, 0.1)' }}>
+                                <ShoppingCart className="h-10 w-10" style={{ color: '#10b981' }} />
                               </div>
                             </div>
-                            <div className="text-sm font-bold text-slate-600">Cart is empty</div>
-                            <div className="text-xs mt-1 text-slate-400 text-center max-w-[200px]">
+                            <div className="text-sm font-bold" style={{ color: '#475569' }}>Cart is empty</div>
+                            <div className="text-xs mt-1 text-center max-w-[200px]" style={{ color: '#94a3b8' }}>
                               Tap products below to add them,<br/>or scan a barcode to start
                             </div>
-                            <div className="mt-3 flex items-center gap-1.5 text-[10px] text-slate-400">
-                              <kbd className="px-1.5 py-0.5 rounded bg-slate-100 font-mono font-bold text-slate-500">F1</kbd>
+                            <div className="mt-3 flex items-center gap-1.5 text-[10px]" style={{ color: '#94a3b8' }}>
+                              <kbd className="px-1.5 py-0.5 rounded font-mono font-bold" style={{ background: '#f1f5f9', color: '#64748b' }}>F1</kbd>
                               <span>to search</span>
                             </div>
                           </div>
