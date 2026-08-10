@@ -19,16 +19,27 @@
  * Helps identify exact deploy when debugging
  */
 
-export const APP_VERSION = "1.1.1";
-export const BUILD_ID = "build-2026-08-10-v111-bounce-fix-schema-sync";
+export const APP_VERSION = "1.1.2";
+export const BUILD_ID = "build-2026-08-10-v112-bounce-dropdown-fix";
 export const RELEASE_DATE = "August 10, 2026";
-export const RELEASE_NAME = "Bounce Fix + Schema Sync Update";
+export const RELEASE_NAME = "Dropdown Bounce Fix + Schema Sync (DIRECT_URL)";
 
 // Full version string for display
 export const FULL_VERSION = `v${APP_VERSION} (${BUILD_ID})`;
 
 // Changelog — keep last 5 versions
 export const CHANGELOG: { version: string; date: string; changes: string[] }[] = [
+  {
+    version: "1.1.2",
+    date: "August 10, 2026",
+    changes: [
+      "FIX: Removed 'y: -5' transform from dropdown menu animations (was triggering header layout shift)",
+      "FIX: Removed 'height: 0 → auto' animation from mobile dropdown (was causing bounce on expand)",
+      "FIX: Replaced 'transition-all' with 'transition' on 37 header buttons (prevents unintended property animations)",
+      "FIX: Schema sync now uses DIRECT_URL (session pooler, port 5432) — faster than transaction pooler",
+      "FIX: Increased schema sync timeout from 120s to 180s",
+    ],
+  },
   {
     version: "1.1.1",
     date: "August 10, 2026",

@@ -2608,9 +2608,9 @@ export default function POSPage() {
                 <AnimatePresence>
                   {openMenu === menu.id && (
                     <motion.div
-                      initial={{ opacity: 0, y: -5 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -5 }}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
                       transition={{ duration: 0.15 }}
                       className="absolute top-full left-0 mt-1 w-64 bg-white rounded-xl shadow-2xl ring-1 ring-slate-200 overflow-hidden z-50 py-1 max-h-[70vh] overflow-y-auto"
                     >
@@ -2895,7 +2895,7 @@ export default function POSPage() {
             {/* Dashboard — always visible quick access (was only in POS menu / mobile bottom nav) */}
             <button
               onClick={() => setView("dashboard")}
-              className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition-all active:scale-95 flex-shrink-0 bg-emerald-500/20 hover:bg-emerald-500/40 ring-1 ring-emerald-400/30 hover:ring-emerald-400/50 backdrop-blur-sm"
+              className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 bg-emerald-500/20 hover:bg-emerald-500/40 ring-1 ring-emerald-400/30 hover:ring-emerald-400/50 backdrop-blur-sm"
               title="Operations Dashboard — KPIs, low-stock alerts, reorder suggestions, expiry alerts"
             >
               <TrendingUp className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Dashboard
@@ -2903,21 +2903,21 @@ export default function POSPage() {
             <div className="w-px h-5 bg-white/10 flex-shrink-0 mx-0.5" />
             <button
               onClick={() => setShowCashCalc(true)}
-              className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition-all active:scale-95 flex-shrink-0 bg-white/5 hover:bg-white/15 ring-1 ring-white/10 hover:ring-white/20 backdrop-blur-sm"
+              className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 bg-white/5 hover:bg-white/15 ring-1 ring-white/10 hover:ring-white/20 backdrop-blur-sm"
               title="Cash Denomination Calculator"
             >
               <DollarSign className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Cash Calc
             </button>
             <button
               onClick={() => setShowPriceTags(true)}
-              className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition-all active:scale-95 flex-shrink-0 bg-white/5 hover:bg-white/15 ring-1 ring-white/10 hover:ring-white/20 backdrop-blur-sm"
+              className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 bg-white/5 hover:bg-white/15 ring-1 ring-white/10 hover:ring-white/20 backdrop-blur-sm"
               title="Print Price Tags (simple)"
             >
               <Printer className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Tags
             </button>
             <button
               onClick={() => setShowLabelPrinter(true)}
-              className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition-all active:scale-95 flex-shrink-0 bg-white/5 hover:bg-white/15 ring-1 ring-white/10 hover:ring-white/20 backdrop-blur-sm"
+              className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 bg-white/5 hover:bg-white/15 ring-1 ring-white/10 hover:ring-white/20 backdrop-blur-sm"
               title="Print Labels (multi-size + barcode)"
             >
               <Tag className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Labels
@@ -2926,7 +2926,7 @@ export default function POSPage() {
             <div className="w-px h-5 bg-white/10 flex-shrink-0 mx-0.5" />
             <button
               onClick={() => setShowExpenseManager(true)}
-              className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition-all active:scale-95 flex-shrink-0 bg-rose-500/15 hover:bg-rose-500/25 ring-1 ring-rose-400/20 hover:ring-rose-400/40 backdrop-blur-sm"
+              className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 bg-rose-500/15 hover:bg-rose-500/25 ring-1 ring-rose-400/20 hover:ring-rose-400/40 backdrop-blur-sm"
               title="Record expenses (rent, utilities, salaries, etc.)"
             >
               <Wallet className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Expenses
@@ -2935,7 +2935,7 @@ export default function POSPage() {
               onClick={() => setShowStocktakeWizard(true)}
               disabled={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager"}
               title={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" ? "Admin/Manager only" : "Run a stocktake (physical count → variance → update stock)"}
-              className={cn("group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition-all active:scale-95 flex-shrink-0 bg-indigo-500/15 hover:bg-indigo-500/25 ring-1 ring-indigo-400/20 hover:ring-indigo-400/40 backdrop-blur-sm", loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" && "opacity-30 cursor-not-allowed hover:bg-indigo-500/15")}
+              className={cn("group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 bg-indigo-500/15 hover:bg-indigo-500/25 ring-1 ring-indigo-400/20 hover:ring-indigo-400/40 backdrop-blur-sm", loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" && "opacity-30 cursor-not-allowed hover:bg-indigo-500/15")}
             >
               <ClipboardCheck className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Stocktake
             </button>
@@ -2945,7 +2945,7 @@ export default function POSPage() {
               onClick={() => setShowWhatsAppBroadcast(true)}
               disabled={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager"}
               title={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" ? "Admin/Manager only" : "Send WhatsApp broadcast to customers"}
-              className={cn("group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition-all active:scale-95 flex-shrink-0 bg-green-500/15 hover:bg-green-500/30 ring-1 ring-green-400/20 hover:ring-green-400/40 backdrop-blur-sm", loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" && "opacity-30 cursor-not-allowed hover:bg-green-500/15")}
+              className={cn("group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 bg-green-500/15 hover:bg-green-500/30 ring-1 ring-green-400/20 hover:ring-green-400/40 backdrop-blur-sm", loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" && "opacity-30 cursor-not-allowed hover:bg-green-500/15")}
             >
               <MessageCircle className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Broadcast
             </button>
@@ -2953,13 +2953,13 @@ export default function POSPage() {
               onClick={() => setShowAIForecast(true)}
               disabled={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager"}
               title={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" ? "Admin/Manager only" : "AI demand forecasting + reorder suggestions"}
-              className={cn("group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition-all active:scale-95 flex-shrink-0 bg-violet-500/15 hover:bg-violet-500/30 ring-1 ring-violet-400/20 hover:ring-violet-400/40 backdrop-blur-sm", loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" && "opacity-30 cursor-not-allowed hover:bg-violet-500/15")}
+              className={cn("group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 bg-violet-500/15 hover:bg-violet-500/30 ring-1 ring-violet-400/20 hover:ring-violet-400/40 backdrop-blur-sm", loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" && "opacity-30 cursor-not-allowed hover:bg-violet-500/15")}
             >
               <Brain className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> AI Forecast
             </button>
             <button
               onClick={() => setShowExpiryManager(true)}
-              className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition-all active:scale-95 flex-shrink-0 bg-orange-500/15 hover:bg-orange-500/30 ring-1 ring-orange-400/20 hover:ring-orange-400/40 backdrop-blur-sm"
+              className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 bg-orange-500/15 hover:bg-orange-500/30 ring-1 ring-orange-400/20 hover:ring-orange-400/40 backdrop-blur-sm"
               title="Expiry date management (FEFO) + alerts"
             >
               <AlertTriangle className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Expiry
@@ -2969,7 +2969,7 @@ export default function POSPage() {
               onClick={() => setShowAdvancedReports(true)}
               disabled={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager"}
               title={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" ? "Admin/Manager only" : "Advanced reports: ABC analysis, profit margins, hourly traffic, staff performance"}
-              className={cn("group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition-all active:scale-95 flex-shrink-0 bg-cyan-500/15 hover:bg-cyan-500/30 ring-1 ring-cyan-400/20 hover:ring-cyan-400/40 backdrop-blur-sm", loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" && "opacity-30 cursor-not-allowed hover:bg-cyan-500/15")}
+              className={cn("group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 bg-cyan-500/15 hover:bg-cyan-500/30 ring-1 ring-cyan-400/20 hover:ring-cyan-400/40 backdrop-blur-sm", loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" && "opacity-30 cursor-not-allowed hover:bg-cyan-500/15")}
             >
               <BarChart3 className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Reports
             </button>
@@ -2978,7 +2978,7 @@ export default function POSPage() {
               onClick={() => setShowRecurringPO(true)}
               disabled={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager"}
               title={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" ? "Admin/Manager only" : "Set up recurring purchase orders (auto-generate weekly/monthly)"}
-              className={cn("group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition-all active:scale-95 flex-shrink-0 bg-teal-500/15 hover:bg-teal-500/30 ring-1 ring-teal-400/20 hover:ring-teal-400/40 backdrop-blur-sm", loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" && "opacity-30 cursor-not-allowed hover:bg-teal-500/15")}
+              className={cn("group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 bg-teal-500/15 hover:bg-teal-500/30 ring-1 ring-teal-400/20 hover:ring-teal-400/40 backdrop-blur-sm", loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" && "opacity-30 cursor-not-allowed hover:bg-teal-500/15")}
             >
               <RefreshCw className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Recurring
             </button>
@@ -2987,7 +2987,7 @@ export default function POSPage() {
               onClick={() => setShowBulkImport(true)}
               disabled={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager"}
               title={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" ? "Admin/Manager only" : "Bulk import products from CSV"}
-              className={cn("group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition-all active:scale-95 flex-shrink-0 bg-blue-500/15 hover:bg-blue-500/30 ring-1 ring-blue-400/20 hover:ring-blue-400/40 backdrop-blur-sm", loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" && "opacity-30 cursor-not-allowed hover:bg-blue-500/15")}
+              className={cn("group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 bg-blue-500/15 hover:bg-blue-500/30 ring-1 ring-blue-400/20 hover:ring-blue-400/40 backdrop-blur-sm", loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" && "opacity-30 cursor-not-allowed hover:bg-blue-500/15")}
             >
               <Upload className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Import
             </button>
@@ -3001,7 +3001,7 @@ export default function POSPage() {
                   toast({ title: `⚡ Re-added ${lastSaleCart.length} item(s) from last sale` });
                   if (!showSidebar) setShowSidebar(true);
                 }}
-                className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition-all active:scale-95 flex-shrink-0 bg-cyan-500/20 hover:bg-cyan-500/40 ring-1 ring-cyan-400/30 hover:ring-cyan-400/50 backdrop-blur-sm"
+                className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 bg-cyan-500/20 hover:bg-cyan-500/40 ring-1 ring-cyan-400/30 hover:ring-cyan-400/50 backdrop-blur-sm"
                 title="Quick re-add all items from the last completed sale"
               >
                 <RotateCcw className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Re-add
@@ -3010,7 +3010,7 @@ export default function POSPage() {
             {/* #2 Price Check Mode */}
             <button
               onClick={() => { setPriceCheckMode(!priceCheckMode); toast({ title: priceCheckMode ? "Price check OFF" : "Price check ON — scan/search to check prices without adding to cart", duration: 3000 }); if (!priceCheckMode) searchInputRef.current?.focus(); }}
-              className={cn("group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition-all active:scale-95 flex-shrink-0", priceCheckMode ? "bg-amber-500/40 ring-1 ring-amber-400/50" : "bg-white/5 hover:bg-white/15 ring-1 ring-white/10 hover:ring-white/20 backdrop-blur-sm")}
+              className={cn("group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0", priceCheckMode ? "bg-amber-500/40 ring-1 ring-amber-400/50" : "bg-white/5 hover:bg-white/15 ring-1 ring-white/10 hover:ring-white/20 backdrop-blur-sm")}
               title="Price check mode — scan barcode to see price without adding to cart"
             >
               <Eye className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Price Check
@@ -3019,7 +3019,7 @@ export default function POSPage() {
             {customerId && (
               <button
                 onClick={() => setShowCustomerHistory(true)}
-                className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition-all active:scale-95 flex-shrink-0 bg-violet-500/20 hover:bg-violet-500/40 ring-1 ring-violet-400/30 hover:ring-violet-400/50 backdrop-blur-sm"
+                className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 bg-violet-500/20 hover:bg-violet-500/40 ring-1 ring-violet-400/30 hover:ring-violet-400/50 backdrop-blur-sm"
                 title="View this customer's purchase history"
               >
                 <History className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Cust. History
@@ -3030,7 +3030,7 @@ export default function POSPage() {
             {/* #15 Shift Handover Notes */}
             <button
               onClick={() => setShowShiftNotes(true)}
-              className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition-all active:scale-95 flex-shrink-0 bg-indigo-500/15 hover:bg-indigo-500/30 ring-1 ring-indigo-400/20 hover:ring-indigo-400/40 backdrop-blur-sm"
+              className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 bg-indigo-500/15 hover:bg-indigo-500/30 ring-1 ring-indigo-400/20 hover:ring-indigo-400/40 backdrop-blur-sm"
               title="Shift handover notes — leave messages for the next cashier"
             >
               <Clock className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Shift Notes
@@ -3040,7 +3040,7 @@ export default function POSPage() {
               onClick={() => setShowFloatManager(true)}
               disabled={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager"}
               title={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" ? "Admin/Manager only" : "Float management — opening/closing cash reconciliation"}
-              className={cn("group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition-all active:scale-95 flex-shrink-0 bg-emerald-500/15 hover:bg-emerald-500/30 ring-1 ring-emerald-400/20 hover:ring-emerald-400/40 backdrop-blur-sm", loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" && "opacity-30 cursor-not-allowed")}
+              className={cn("group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 bg-emerald-500/15 hover:bg-emerald-500/30 ring-1 ring-emerald-400/20 hover:ring-emerald-400/40 backdrop-blur-sm", loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" && "opacity-30 cursor-not-allowed")}
             >
               <Wallet className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Float
             </button>
@@ -3049,7 +3049,7 @@ export default function POSPage() {
               onClick={() => setShowComboDeals(true)}
               disabled={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager"}
               title={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" ? "Admin/Manager only" : "Combo deals — Buy 2 Get 1 Free, Meal Deals, etc."}
-              className={cn("group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition-all active:scale-95 flex-shrink-0 bg-rose-500/15 hover:bg-rose-500/30 ring-1 ring-rose-400/20 hover:ring-rose-400/40 backdrop-blur-sm", loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" && "opacity-30 cursor-not-allowed")}
+              className={cn("group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 bg-rose-500/15 hover:bg-rose-500/30 ring-1 ring-rose-400/20 hover:ring-rose-400/40 backdrop-blur-sm", loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" && "opacity-30 cursor-not-allowed")}
             >
               <Tag className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Combos
             </button>
@@ -3088,11 +3088,11 @@ export default function POSPage() {
           <AnimatePresence>
             {openMenu && (
               <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.22, ease: [0.32, 0.72, 0, 1] }}
-                className="overflow-hidden bg-white border-t border-slate-200 shadow-xl"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.15 }}
+                className="bg-white border-t border-slate-200 shadow-xl"
               >
                 <div className="py-2 max-h-[60vh] overflow-y-auto">
                   {menus.find(m => m.id === openMenu)?.items.map((item, i) => {

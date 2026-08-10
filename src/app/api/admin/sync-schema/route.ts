@@ -25,17 +25,18 @@ export async function POST(req: NextRequest) {
       ? './node_modules/.bin/prisma'
       : 'node ./node_modules/prisma/build/index.js'
 
-    let dbUrl = process.env.DATABASE_URL || ''
+    // Use DIRECT_URL (session pooler, port 5432) for migrations — faster than transaction pooler
+    let dbUrl = process.env.DIRECT_URL || process.env.DATABASE_URL || ''
     if (dbUrl && !dbUrl.includes('sslmode') && !dbUrl.includes('ssl=')) {
       dbUrl += (dbUrl.includes('?') ? '&' : '?') + 'sslmode=require'
     }
 
-    console.log('[sync-schema] Running prisma db push...')
+    console.log('[sync-schema] Running prisma db push with DIRECT_URL...')
 
     const output = await new Promise<string>((resolve, reject) => {
       const timeout = setTimeout(() => {
-        reject(new Error('prisma db push timed out after 90s'))
-      }, 90000)
+        reject(new Error('prisma db push timed out after 180s'))
+      }, 180000)
 
       exec(
         `${prismaBin} db push --skip-generate --accept-data-loss`,
