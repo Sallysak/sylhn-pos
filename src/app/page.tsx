@@ -51,17 +51,25 @@ import { AiPredictionsDashboard } from "@/components/ai-predictions-dashboard";
 import { APP_VERSION, BUILD_ID } from "@/lib/version";
 import { SpeedDial } from "@/components/speed-dial";
 
+// Loading fallback for lazy-loaded components (prevents white flash)
+const loadingFallback = () => (
+  <div className="h-screen flex flex-col items-center justify-center bg-slate-50 gap-3">
+    <div className="h-10 w-10 rounded-full border-4 border-slate-200 border-t-emerald-600 animate-spin" />
+    <div className="text-sm font-semibold text-slate-500">Loading…</div>
+  </div>
+);
+
 // Heavy components — lazy loaded to reduce initial bundle size
-const LabelPrinter = dynamic(() => import("@/components/label-printer").then(m => ({ default: m.LabelPrinter })), { ssr: false });
-const ExpenseManager = dynamic(() => import("@/components/expense-manager").then(m => ({ default: m.ExpenseManager })), { ssr: false });
-const StocktakeWizard = dynamic(() => import("@/components/stocktake-wizard").then(m => ({ default: m.StocktakeWizard })), { ssr: false });
-const WhatsAppBroadcast = dynamic(() => import("@/components/whatsapp-broadcast").then(m => ({ default: m.WhatsAppBroadcast })), { ssr: false });
-const AIForecastDashboard = dynamic(() => import("@/components/ai-forecast-dashboard").then(m => ({ default: m.AIForecastDashboard })), { ssr: false });
-const ExpiryManager = dynamic(() => import("@/components/expiry-manager").then(m => ({ default: m.ExpiryManager })), { ssr: false });
-const AdvancedReportsDashboard = dynamic(() => import("@/components/advanced-reports-dashboard").then(m => ({ default: m.AdvancedReportsDashboard })), { ssr: false });
-const VoiceSearch = dynamic(() => import("@/components/voice-search").then(m => ({ default: m.VoiceSearch })), { ssr: false });
-const RecurringPOManager = dynamic(() => import("@/components/recurring-po-manager").then(m => ({ default: m.RecurringPOManager })), { ssr: false });
-const BulkProductImport = dynamic(() => import("@/components/bulk-product-import").then(m => ({ default: m.BulkProductImport })), { ssr: false });
+const LabelPrinter = dynamic(() => import("@/components/label-printer").then(m => ({ default: m.LabelPrinter })), { ssr: false, loading: loadingFallback });
+const ExpenseManager = dynamic(() => import("@/components/expense-manager").then(m => ({ default: m.ExpenseManager })), { ssr: false, loading: loadingFallback });
+const StocktakeWizard = dynamic(() => import("@/components/stocktake-wizard").then(m => ({ default: m.StocktakeWizard })), { ssr: false, loading: loadingFallback });
+const WhatsAppBroadcast = dynamic(() => import("@/components/whatsapp-broadcast").then(m => ({ default: m.WhatsAppBroadcast })), { ssr: false, loading: loadingFallback });
+const AIForecastDashboard = dynamic(() => import("@/components/ai-forecast-dashboard").then(m => ({ default: m.AIForecastDashboard })), { ssr: false, loading: loadingFallback });
+const ExpiryManager = dynamic(() => import("@/components/expiry-manager").then(m => ({ default: m.ExpiryManager })), { ssr: false, loading: loadingFallback });
+const AdvancedReportsDashboard = dynamic(() => import("@/components/advanced-reports-dashboard").then(m => ({ default: m.AdvancedReportsDashboard })), { ssr: false, loading: loadingFallback });
+const VoiceSearch = dynamic(() => import("@/components/voice-search").then(m => ({ default: m.VoiceSearch })), { ssr: false, loading: loadingFallback });
+const RecurringPOManager = dynamic(() => import("@/components/recurring-po-manager").then(m => ({ default: m.RecurringPOManager })), { ssr: false, loading: loadingFallback });
+const BulkProductImport = dynamic(() => import("@/components/bulk-product-import").then(m => ({ default: m.BulkProductImport })), { ssr: false, loading: loadingFallback });
 import { saveCart, loadCart, clearCart as clearPersistedCart } from "@/lib/cart-persistence";
 import { saveSessionToken, clearSessionToken, getSessionToken, authedFetch } from "@/lib/client-auth";
 import { clearAuthState, saveUserSession, getCachedUser, hasUnsavedBusinessData } from "@/lib/session-data";
@@ -73,12 +81,7 @@ import {
 // ===== Lazy-loaded components (code-split for faster initial load) =====
 // Each form is loaded on-demand only when the user navigates to it.
 // This keeps the initial POS page bundle small and fast.
-const loadingFallback = () => (
-  <div className="h-screen flex flex-col items-center justify-center bg-slate-50 gap-3">
-    <div className="h-10 w-10 rounded-full border-4 border-slate-200 border-t-emerald-600 animate-spin" />
-    <div className="text-sm font-semibold text-slate-500">Loading…</div>
-  </div>
-);
+// (loadingFallback is defined above, near the other lazy imports)
 
 const StockManagement = dynamic(() => import("@/components/stock-management").then(m => ({ default: m.StockManagement })), { ssr: false, loading: loadingFallback });
 const StockHistoryView = dynamic(() => import("@/components/stock-history").then(m => ({ default: m.StockHistory })), { ssr: false, loading: loadingFallback });
@@ -3431,7 +3434,7 @@ export default function POSPage() {
                     )}
                     {/* Customer search dropdown — uses onMouseDown to fire before onBlur */}
                     {showCustomerDropdown && customerResults.length > 0 && (
-                      <div className="absolute top-full left-0 mt-1 w-80 bg-white rounded-lg shadow-2xl ring-2 ring-slate-200 max-h-60 overflow-y-auto" style={{ zIndex: 100 }}>
+                      <div className="absolute top-full left-0 mt-1 w-80 bg-white rounded-lg shadow-2xl ring-2 ring-slate-200 max-h-60 overflow-y-auto" style={{ zIndex: 30 }}>
                         {customerResults.map((c: any) => (
                           <div
                             key={c.id}
@@ -3456,7 +3459,7 @@ export default function POSPage() {
                       </div>
                     )}
                     {showCustomerDropdown && customerSearch && customerResults.length === 0 && (
-                      <div className="absolute top-full left-0 mt-1 w-80 bg-white rounded-lg shadow-2xl ring-2 ring-slate-200 p-3 text-center" style={{ zIndex: 100 }}>
+                      <div className="absolute top-full left-0 mt-1 w-80 bg-white rounded-lg shadow-2xl ring-2 ring-slate-200 p-3 text-center" style={{ zIndex: 30 }}>
                         <div className="text-[10px] text-slate-400">No customers found. Type a name to search.</div>
                       </div>
                     )}

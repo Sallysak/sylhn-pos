@@ -19,16 +19,32 @@
  * Helps identify exact deploy when debugging
  */
 
-export const APP_VERSION = "1.2.3";
-export const BUILD_ID = "build-2026-08-10-v123-zindex-fix-lazy-load";
+export const APP_VERSION = "1.3.0";
+export const BUILD_ID = "build-2026-08-10-v130-comprehensive-audit-fix";
 export const RELEASE_DATE = "August 10, 2026";
-export const RELEASE_NAME = "Z-Index Fix + Lazy Load Heavy Components";
+export const RELEASE_NAME = "Comprehensive Audit — White Flash + Bounce + Z-Index";
 
 // Full version string for display
 export const FULL_VERSION = `v${APP_VERSION} (${BUILD_ID})`;
 
 // Changelog — keep last 5 versions
 export const CHANGELOG: { version: string; date: string; changes: string[] }[] = [
+  {
+    version: "1.3.0",
+    date: "August 10, 2026",
+    changes: [
+      "FIX: White flash — added loading fallback to ALL 10 lazy components (was missing, showed blank white)",
+      "FIX: Bounce — removed global 'button:active { transform: scale(0.97) }' (applied to EVERY button)",
+      "FIX: Bounce — removed '.btn-premium:active { transform: scale(0.96) }'",
+      "FIX: Bounce — removed '.gradient-premium-emerald:active { transform: scale(0.93) }'",
+      "FIX: Bounce — removed grid button :active scale(0.95)",
+      "FIX: Bounce — removed FAB button :active scale(0.92)",
+      "FIX: Bounce — removed keypad button :active scale(0.94)",
+      "FIX: Bounce — removed cart item :active scale(0.98)",
+      "FIX: Bounce — replaced ALL 7 remaining 'transition: all' with specific properties",
+      "FIX: Floating search — lowered customer search z-index from 100 to 30 (header dropdowns z-[120] now on top)",
+    ],
+  },
   {
     version: "1.2.3",
     date: "August 10, 2026",
