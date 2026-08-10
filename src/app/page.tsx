@@ -1217,6 +1217,15 @@ export default function POSPage() {
     setCustomerSearch("");
     setCustomerResults([]);
     setShowCustomerDropdown(false);
+    // Credit limit alert — warn if customer has outstanding credit near limit
+    if (c.creditLimit > 0 && c.balance > 0) {
+      const pct = Math.round((c.balance / c.creditLimit) * 100)
+      if (pct >= 100) {
+        toast({ title: "⚠️ Credit Limit Exceeded", description: `${c.name} owes GHS ${c.balance.toFixed(2)} (limit: GHS ${c.creditLimit.toFixed(2)})`, variant: "destructive" })
+      } else if (pct >= 80) {
+        toast({ title: "⚠️ Credit Limit Warning", description: `${c.name} has used ${pct}% of credit limit (GHS ${c.balance.toFixed(2)} / ${c.creditLimit.toFixed(2)})`, variant: "default" })
+      }
+    }
   };
 
   const clearCustomer = () => {
