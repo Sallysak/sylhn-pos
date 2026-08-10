@@ -3386,10 +3386,11 @@ export default function POSPage() {
                 exit={{ opacity: 0 }}
                 className="flex flex-col w-full lg:h-full lg:overflow-y-auto scroll-premium"
               >
-                {/* Cart Header — Premium Gradient */}
-                <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 gradient-premium-emerald text-white relative">
+                {/* Cart Header — Premium Gradient with Glow */}
+                <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 gradient-premium-emerald text-white relative overflow-hidden">
+                  <div className="pointer-events-none absolute -top-8 -right-8 h-32 w-32 rounded-full" style={{ background: 'radial-gradient(circle, rgba(255,255,255,0.15), transparent 70%)' }} />
                   <div className="flex items-center gap-2 relative z-10">
-                    <div className="h-7 w-7 rounded-lg bg-white/15 ring-1 ring-white/25 flex items-center justify-center backdrop-blur-sm">
+                    <div className="h-7 w-7 rounded-lg bg-white/15 ring-1 ring-white/25 flex items-center justify-center backdrop-blur-sm" style={{ boxShadow: '0 0 12px rgba(255,255,255,0.15)' }}>
                       <Cart className="h-3.5 w-3.5" />
                     </div>
                     <span className="text-xs font-bold tracking-tight">Invoice #{invoiceNumber || '------'}</span>
@@ -3721,7 +3722,8 @@ export default function POSPage() {
                           <span className="font-mono tabular">{formatGHS(taxAmount)}</span>
                         </div>
                       </div>
-                      <div className="px-4 py-2 gradient-premium-emerald text-white relative">
+                      <div className="px-4 py-2 gradient-premium-emerald text-white relative overflow-hidden">
+                        <div className="pointer-events-none absolute -top-6 -right-6 h-20 w-20 rounded-full" style={{ background: 'radial-gradient(circle, rgba(255,255,255,0.15), transparent 70%)' }} />
                         <div className="flex justify-between items-baseline relative z-10">
                           <span className="text-xs font-semibold uppercase tracking-wider opacity-90">Total Due</span>
                           <span className="text-2xl font-bold font-mono tabular">{formatGHS(total)}</span>
@@ -3818,10 +3820,12 @@ export default function POSPage() {
           <button
             onClick={() => setShowSidebar(true)}
             className="absolute right-3 top-32 z-20 h-12 w-12 rounded-full bg-emerald-600 text-white shadow-lg flex items-center justify-center hover:bg-emerald-700 transition"
+            style={{ boxShadow: '0 4px 20px -2px rgba(5, 150, 105, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1) inset' }}
           >
-            <Cart className="h-5 w-5" />
+            <div className="absolute inset-0 rounded-full" style={{ background: 'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.2), transparent 60%)' }} />
+            <Cart className="h-5 w-5 relative z-10" />
             {cart.length > 0 && (
-              <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center">
+              <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-white/30">
                 {totalItems}
               </span>
             )}
@@ -4620,9 +4624,10 @@ function PaymentModal({ total, subtotal, tax, discount, itemCount, invoiceNumber
         onClick={(e) => e.stopPropagation()}
         className="dialog-premium shadow-premium-xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden"
       >
-        {/* Header — premium gradient with total due prominent */}
+        {/* Header — premium gradient with total due prominent + glow */}
         <div className="gradient-premium-emerald text-white px-5 py-4 flex items-center justify-between relative overflow-hidden flex-shrink-0">
-          <div className="pointer-events-none absolute -top-12 -right-12 h-40 w-40 rounded-full bg-white/10 blur-3xl" />
+          <div className="pointer-events-none absolute -top-12 -right-12 h-40 w-40 rounded-full" style={{ background: 'radial-gradient(circle, rgba(255,255,255,0.15), transparent 70%)' }} />
+          <div className="pointer-events-none absolute -bottom-16 -left-16 h-48 w-48 rounded-full" style={{ background: 'radial-gradient(circle, rgba(13, 148, 136, 0.2), transparent 70%)' }} />
           <div className="relative z-10 flex-1 min-w-0">
             <div className="text-[10px] sm:text-xs opacity-80 font-semibold uppercase tracking-wider truncate">PAYMENT · Invoice #{invoiceNumber || '------'}</div>
             <div className="text-base sm:text-lg font-bold">{itemCount} items</div>
@@ -5074,7 +5079,7 @@ function FindProductModal({ products, onAdd, onClose }: {
       >
         {/* Header — premium gradient */}
         <div className="flex-shrink-0 gradient-premium-violet text-white px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between relative overflow-hidden">
-          <div className="pointer-events-none absolute -top-12 -right-12 h-40 w-40 rounded-full bg-white/10 blur-3xl" />
+          <div className="pointer-events-none absolute -top-12 -right-12 h-40 w-40 rounded-full" style={{ background: "radial-gradient(circle, rgba(255,255,255,0.15), transparent 70%)" }} />
           <div className="flex items-center gap-2 sm:gap-3 min-w-0 relative z-10">
             <div className="relative flex-shrink-0">
               <div className="absolute inset-0 rounded-xl bg-white/25 blur-md scale-110" />
@@ -6152,9 +6157,10 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
           onClick={(e) => e.stopPropagation()}
           className="dialog-premium shadow-premium-xl w-full max-w-sm max-h-[92vh] flex flex-col overflow-hidden"
         >
-          <div className="flex-shrink-0 bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-6 py-5 text-center">
+          <div className="flex-shrink-0 bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-6 py-5 text-center relative overflow-hidden">
+            <div className="pointer-events-none absolute -top-10 left-1/2 -translate-x-1/2 h-32 w-32 rounded-full" style={{ background: 'radial-gradient(circle, rgba(255,255,255,0.2), transparent 70%)' }} />
             <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.2, type: "spring" }}
-              className="h-16 w-16 rounded-full bg-white/20 mx-auto flex items-center justify-center mb-2">
+              className="relative h-16 w-16 rounded-full bg-white/20 mx-auto flex items-center justify-center mb-2" style={{ boxShadow: '0 0 30px rgba(255,255,255,0.3)' }}>
               <Check className="h-9 w-9" />
             </motion.div>
             <div className="text-lg font-bold">Payment Successful!</div>
@@ -6676,7 +6682,7 @@ function PriceTagsPrinter({ onClose }: { onClose: () => void }) {
       <motion.div initial={{ scale: 0.95, y: 30 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 30 }}
         onClick={(e) => e.stopPropagation()} className="dialog-premium shadow-premium-xl w-full max-w-2xl max-h-[92vh] sm:max-h-[85vh] flex flex-col">
         <div className="gradient-premium-violet text-white px-6 py-4 flex items-center justify-between relative overflow-hidden">
-          <div className="pointer-events-none absolute -top-12 -right-12 h-40 w-40 rounded-full bg-white/10 blur-3xl" />
+          <div className="pointer-events-none absolute -top-12 -right-12 h-40 w-40 rounded-full" style={{ background: "radial-gradient(circle, rgba(255,255,255,0.15), transparent 70%)" }} />
           <div className="flex items-center gap-2 relative z-10">
             <div className="relative">
               <div className="absolute inset-0 rounded-xl bg-white/25 blur-md scale-110" />
