@@ -87,14 +87,34 @@ function tuneDatabaseUrl(url: string | undefined): string | undefined {
 // across warm invocations within the same serverless instance.
 if (!globalForPrisma.__prismaDbPush) {
   globalForPrisma.__prismaDbPush = (async () => {
+    let needsSync = false;
     try {
       // Quick health check — if this succeeds, tables exist and DB is ready
       await db.systemUser.count();
-      // Don't seed here — seeding is handled by /api/setup and /api/auth/login
-      // self-healing. This keeps cold start fast (single count query).
+      // Deep check: verify critical columns/tables exist
+      // This catches cases where SystemUser exists but other tables are missing
+      try {
+        // Check Product.imageUrl exists (commonly missing after schema updates)
+        await db.product.findFirst({ select: { imageUrl: true }, take: 1 });
+      } catch {
+        console.log('[db] Product.imageUrl column missing — needs sync');
+        needsSync = true;
+      }
+      // Check Email table exists
+      try {
+        await db.email.count();
+      } catch {
+        console.log('[db] Email table missing — needs sync');
+        needsSync = true;
+      }
     } catch (e: any) {
-      // Table doesn't exist — only run db push on FIRST EVER deploy
-      console.log('[db] Tables not found. Running prisma db push...');
+      // SystemUser table doesn't exist — definitely needs sync
+      needsSync = true;
+      console.log('[db] SystemUser table not found — needs sync');
+    }
+
+    if (needsSync) {
+      console.log('[db] Schema out of sync. Running prisma db push...');
       try {
         const { exec } = await import('child_process');
         const { existsSync } = await import('fs');
@@ -125,7 +145,7 @@ if (!globalForPrisma.__prismaDbPush) {
             }
           });
         });
-        console.log('[db] Schema created. Seeding default users...');
+        console.log('[db] Schema synced. Seeding default users...');
         await seedDefaultUsers();
       } catch (pushErr: any) {
         console.error('[db] prisma db push failed:', pushErr?.message || pushErr);
