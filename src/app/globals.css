@@ -754,6 +754,18 @@
   html.dark .dialog-premium {
     background: #1e293b !important;
   }
+  /* CRITICAL: Print receipt overlay must ALWAYS be white (exempt from dark mode)
+     Without this, receipt text is dark-on-dark = invisible */
+  html.dark .print-receipt-overlay,
+  html.dark .print-receipt-overlay * {
+    background-color: #ffffff !important;
+    color: #1e293b !important;
+  }
+  html.dark .print-receipt-overlay .bg-slate-800,
+  html.dark .print-receipt-overlay .bg-slate-800 * {
+    background-color: #1e293b !important;
+    color: #ffffff !important;
+  }
   /* Dark mode for form labels */
   html.dark label, html.dark .text-xs.font-bold {
     color: #94a3b8 !important;
