@@ -93,10 +93,10 @@ export function AiPredictionsDashboard({ open, onClose }: Props) {
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
-                  <button onClick={load} disabled={loading} className="h-8 w-8 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center transition active:scale-90" title="Refresh">
+                  <button onClick={load} disabled={loading} className="h-8 w-8 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center transition" title="Refresh">
                     <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
                   </button>
-                  <button onClick={onClose} className="h-8 w-8 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center transition active:scale-90">
+                  <button onClick={onClose} className="h-8 w-8 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center transition">
                     <X className="h-4 w-4" />
                   </button>
                 </div>

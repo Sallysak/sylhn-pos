@@ -75,7 +75,7 @@ export function KeyboardShortcutsOverlay() {
                   <p className="text-[10px] opacity-80">Press ? to toggle this overlay</p>
                 </div>
               </div>
-              <button onClick={() => setOpen(false)} className="h-8 w-8 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center transition active:scale-90">
+              <button onClick={() => setOpen(false)} className="h-8 w-8 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center transition">
                 <X className="h-4 w-4" />
               </button>
             </div>

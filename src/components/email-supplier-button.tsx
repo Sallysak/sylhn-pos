@@ -60,7 +60,7 @@ export function EmailSupplierButton({ supplierEmail, supplierName, variant = "bu
         <button
           onClick={() => setShowModal(true)}
           disabled={!supplierEmail}
-          className="h-8 w-8 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-600 disabled:opacity-40 flex items-center justify-center transition active:scale-90"
+          className="h-8 w-8 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-600 disabled:opacity-40 flex items-center justify-center transition"
           title={supplierEmail ? `Email ${supplierName || supplierEmail}` : "No email address"}
         >
           <Mail className="h-4 w-4" />
@@ -75,7 +75,7 @@ export function EmailSupplierButton({ supplierEmail, supplierName, variant = "bu
       <button
         onClick={() => setShowModal(true)}
         disabled={!supplierEmail}
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white text-xs font-semibold transition active:scale-95"
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white text-xs font-semibold transition"
       >
         <Mail className="h-3.5 w-3.5" />
         Email Supplier

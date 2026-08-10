@@ -2040,7 +2040,7 @@ export function FeaturesMap({ onBack, onNavigate }: FeaturesMapProps) {
       <header className="flex-shrink-0 bg-gradient-to-r from-violet-700 via-purple-700 to-indigo-700 text-white shadow-lg sticky top-0 z-30">
         <div className="flex items-center justify-between px-4 sm:px-6 py-3 gap-3">
           <div className="flex items-center gap-3 min-w-0">
-            <button onClick={onBack} className="h-9 w-9 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center transition active:scale-90 flex-shrink-0" aria-label="Back to POS">
+            <button onClick={onBack} className="h-9 w-9 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center transition flex-shrink-0" aria-label="Back to POS">
               <ArrowLeft className="h-5 w-5" />
             </button>
             <div className="flex items-center gap-2.5 min-w-0">

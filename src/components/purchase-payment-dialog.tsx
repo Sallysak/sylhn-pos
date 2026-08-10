@@ -164,7 +164,7 @@ export function PurchasePaymentDialog({
                   type="button"
                   onClick={() => setMethod(opt.value)}
                   className={cn(
-                    "flex flex-col items-center gap-1 py-2.5 rounded-xl ring-2 transition active:scale-95",
+                    "flex flex-col items-center gap-1 py-2.5 rounded-xl ring-2 transition",
                     method === opt.value
                       ? "ring-emerald-500 bg-emerald-50 dark:bg-emerald-950/40"
                       : "ring-slate-200 dark:ring-slate-700 hover:ring-slate-300 dark:hover:ring-slate-600"

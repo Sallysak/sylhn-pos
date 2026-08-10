@@ -1194,7 +1194,7 @@ function AddCustomerDialog({
                   key={opt.value}
                   onClick={() => setForm({ ...form, group: opt.value })}
                   className={cn(
-                    "flex flex-col items-center gap-1 py-2.5 rounded-xl ring-2 transition active:scale-95",
+                    "flex flex-col items-center gap-1 py-2.5 rounded-xl ring-2 transition",
                     form.group === opt.value
                       ? "ring-violet-500 bg-violet-50"
                       : "ring-slate-200 hover:ring-slate-300 bg-white"

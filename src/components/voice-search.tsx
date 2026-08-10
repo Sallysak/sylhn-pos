@@ -76,7 +76,7 @@ export function VoiceSearch({ onResult, className, disabled }: VoiceSearchProps)
       disabled={disabled}
       title={listening ? "Listening... click to stop" : "Voice search — speak a product name"}
       className={cn(
-        "flex items-center justify-center h-8 w-8 rounded-lg transition active:scale-95 shrink-0",
+        "flex items-center justify-center h-8 w-8 rounded-lg transition shrink-0",
         listening
           ? "bg-rose-500 text-white animate-pulse"
           : "bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400",

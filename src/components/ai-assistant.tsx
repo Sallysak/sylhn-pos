@@ -247,7 +247,7 @@ export function AiAssistant({ open, onClose }: AiAssistantProps) {
                   {messages.length > 0 && (
                     <button
                       onClick={clearConversation}
-                      className="h-8 w-8 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center transition active:scale-90"
+                      className="h-8 w-8 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center transition"
                       title="Clear conversation"
                     >
                       <RefreshCw className="h-3.5 w-3.5" />
@@ -255,7 +255,7 @@ export function AiAssistant({ open, onClose }: AiAssistantProps) {
                   )}
                   <button
                     onClick={onClose}
-                    className="h-8 w-8 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center transition active:scale-90"
+                    className="h-8 w-8 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center transition"
                   >
                     <X className="h-4 w-4" />
                   </button>
@@ -304,7 +304,7 @@ export function AiAssistant({ open, onClose }: AiAssistantProps) {
                           animate={{ opacity: 1, x: 0 }}
                           transition={{ delay: 0.05 * i }}
                           onClick={() => sendMessage(q.text)}
-                          className="w-full flex items-center gap-2.5 bg-white rounded-xl p-3 ring-1 ring-slate-200 hover:ring-violet-300 hover:shadow-premium transition text-left group active:scale-[0.98]"
+                          className="w-full flex items-center gap-2.5 bg-white rounded-xl p-3 ring-1 ring-slate-200 hover:ring-violet-300 hover:shadow-premium transition text-left group"
                         >
                           <div className={`h-8 w-8 rounded-lg bg-slate-100 group-hover:bg-violet-100 flex items-center justify-center transition ${q.color}`}>
                             <Icon className="h-4 w-4" />

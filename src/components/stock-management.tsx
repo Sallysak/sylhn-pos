@@ -181,7 +181,7 @@ export function StockManagement({ onBack, products, setProducts, groups, setGrou
                   else setView(tab.id);
                 }}
                 className={cn(
-                  "flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all whitespace-nowrap flex-shrink-0 active:scale-95",
+                  "flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all whitespace-nowrap flex-shrink-0",
                   (!isPopupTab && view === tab.id) || isActivePopup
                     ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md"
                     : "text-slate-600 hover:bg-slate-100 bg-slate-50"
@@ -920,7 +920,7 @@ function ProductForm({ product, groups, onSave, onClose }: {
               <p className="text-[10px] opacity-80 truncate">{form.name || "Untitled product"}</p>
             </div>
           </div>
-          <button onClick={onClose} className="h-8 w-8 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center transition active:scale-90 flex-shrink-0" aria-label="Close">
+          <button onClick={onClose} className="h-8 w-8 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center transition flex-shrink-0" aria-label="Close">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -949,7 +949,7 @@ function ProductForm({ product, groups, onSave, onClose }: {
                     <button
                       type="button"
                       onClick={() => setShowScanner(true)}
-                      className="flex-shrink-0 h-[34px] px-3 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold flex items-center gap-1.5 transition active:scale-95"
+                      className="flex-shrink-0 h-[34px] px-3 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold flex items-center gap-1.5 transition"
                       title="Scan barcode with camera (auto-looks up product info)"
                     >
                       <ScanLine className="h-3.5 w-3.5" />
@@ -1011,7 +1011,7 @@ function ProductForm({ product, groups, onSave, onClose }: {
                     type="button"
                     onClick={() => (window as any).__productImageInput?.click()}
                     disabled={uploadingImage}
-                    className="h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 transition active:scale-95 disabled:opacity-50"
+                    className="h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 transition disabled:opacity-50"
                   >
                     {uploadingImage ? (
                       <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Uploading…</>

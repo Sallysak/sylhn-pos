@@ -894,7 +894,7 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
                 key={t.id}
                 onClick={() => setTab(t.id)}
                 className={cn(
-                  "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition whitespace-nowrap flex-shrink-0 active:scale-95",
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition whitespace-nowrap flex-shrink-0",
                   tab === t.id ? "bg-emerald-500 text-white" : "bg-white/5 text-slate-300 hover:bg-white/10"
                 )}
               >
@@ -996,7 +996,7 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
                                 toast({ title: "Quick reorder failed", description: e.message, variant: "destructive" });
                               }
                             }}
-                            className="h-7 px-2 rounded-lg bg-gradient-to-r from-violet-500 to-indigo-500 hover:from-violet-600 hover:to-indigo-600 text-white text-[10px] font-bold flex items-center gap-1 flex-shrink-0 transition active:scale-95"
+                            className="h-7 px-2 rounded-lg bg-gradient-to-r from-violet-500 to-indigo-500 hover:from-violet-600 hover:to-indigo-600 text-white text-[10px] font-bold flex items-center gap-1 flex-shrink-0 transition"
                             title={`One-click draft PO for ${p.name} (uses preferred supplier + auto quantity)`}
                           >
                             <Zap className="h-3 w-3" /> Reorder

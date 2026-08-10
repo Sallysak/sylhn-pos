@@ -69,7 +69,7 @@ export function MaintenanceModule({ onBack, cashier, dailyTotal, transactionCoun
       <header className="flex-shrink-0 bg-gradient-to-r from-slate-700 via-slate-800 to-slate-900 text-white shadow-lg sticky top-0 z-30">
         <div className="flex items-center justify-between px-3 sm:px-6 py-3 gap-3">
           <div className="flex items-center gap-3 min-w-0">
-            <button onClick={onBack} className="h-9 w-9 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center transition active:scale-90 flex-shrink-0" aria-label="Back">
+            <button onClick={onBack} className="h-9 w-9 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center transition flex-shrink-0" aria-label="Back">
               <ArrowLeft className="h-4 w-4" />
             </button>
             <div className="flex items-center gap-2.5 min-w-0">
@@ -100,7 +100,7 @@ export function MaintenanceModule({ onBack, cashier, dailyTotal, transactionCoun
                 key={t.id}
                 onClick={() => setTab(t.id)}
                 className={cn(
-                  "flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all whitespace-nowrap flex-shrink-0 active:scale-95",
+                  "flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all whitespace-nowrap flex-shrink-0",
                   isActive
                     ? "bg-gradient-to-r from-slate-700 to-slate-800 text-white shadow-md"
                     : "text-slate-600 hover:bg-slate-100"
@@ -1031,7 +1031,7 @@ function WipeDataSection() {
               <button
                 onClick={handleDownloadBackup}
                 disabled={backingUp}
-                className={`mt-2 h-8 px-3 rounded-lg text-xs font-bold flex items-center gap-1.5 transition active:scale-95 ${
+                className={`mt-2 h-8 px-3 rounded-lg text-xs font-bold flex items-center gap-1.5 transition ${
                   backupDownloadedAt
                     ? "bg-emerald-100 hover:bg-emerald-200 text-emerald-700"
                     : "bg-amber-500 hover:bg-amber-600 text-white"
@@ -1098,7 +1098,7 @@ function WipeDataSection() {
             disabled={!backupDownloadedAt}
             className={`w-full h-10 rounded-lg text-white text-sm font-bold flex items-center justify-center gap-2 transition ${
               backupDownloadedAt
-                ? "bg-rose-600 hover:bg-rose-700 active:scale-95"
+                ? "bg-rose-600 hover:bg-rose-700"
                 : "bg-slate-300 cursor-not-allowed"
             }`}
             title={backupDownloadedAt ? "Click to proceed with wipe" : "Download a backup first to enable this button"}

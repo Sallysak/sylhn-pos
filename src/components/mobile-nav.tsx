@@ -198,7 +198,7 @@ export function MobileNav({ active, onNavigate, cartCount, user, onLogout }: Mob
                   </div>
                   <button
                     onClick={() => setDrawerOpen(false)}
-                    className="h-9 w-9 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center transition haptic-tap active:scale-90 ring-1 ring-white/20 backdrop-blur-sm"
+                    className="h-9 w-9 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center transition haptic-tap ring-1 ring-white/20 backdrop-blur-sm"
                     aria-label="Close menu"
                   >
                     <X className="h-4 w-4" />
@@ -342,7 +342,7 @@ export function MobileNav({ active, onNavigate, cartCount, user, onLogout }: Mob
                     const isDark = document.documentElement.classList.contains("dark");
                     setTheme(isDark ? "light" : "dark");
                   }}
-                  className="w-full h-11 rounded-xl bg-gradient-to-r from-violet-50 to-indigo-50 hover:from-violet-100 hover:to-indigo-100 text-violet-700 dark:text-violet-300 font-semibold text-sm flex items-center justify-center gap-2 transition haptic-tap ring-1 ring-violet-200 dark:ring-violet-800 active:scale-95"
+                  className="w-full h-11 rounded-xl bg-gradient-to-r from-violet-50 to-indigo-50 hover:from-violet-100 hover:to-indigo-100 text-violet-700 dark:text-violet-300 font-semibold text-sm flex items-center justify-center gap-2 transition haptic-tap ring-1 ring-violet-200 dark:ring-violet-800"
                 >
                   <Moon className="h-4 w-4" />
                   Toggle Dark Mode
@@ -352,7 +352,7 @@ export function MobileNav({ active, onNavigate, cartCount, user, onLogout }: Mob
                     if (onLogout) onLogout();
                     setDrawerOpen(false);
                   }}
-                  className="w-full h-11 rounded-xl bg-gradient-to-r from-rose-500 to-red-500 hover:from-rose-600 hover:to-red-600 text-white font-bold text-sm flex items-center justify-center gap-2 transition haptic-tap active:scale-95 shadow-md shadow-rose-500/30"
+                  className="w-full h-11 rounded-xl bg-gradient-to-r from-rose-500 to-red-500 hover:from-rose-600 hover:to-red-600 text-white font-bold text-sm flex items-center justify-center gap-2 transition haptic-tap shadow-md shadow-rose-500/30"
                 >
                   <LogOut className="h-4 w-4" />
                   Sign Out

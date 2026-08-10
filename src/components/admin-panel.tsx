@@ -460,7 +460,7 @@ export function AdminLogin({ onSuccess, onCancel, adminOnly = false }: { onSucce
                   <button
                     onClick={handleBiometricLogin}
                     disabled={bioLoading || locked}
-                    className="w-full h-12 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold transition disabled:opacity-50 flex items-center justify-center gap-2 ring-1 ring-slate-200 active:scale-95"
+                    className="w-full h-12 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold transition disabled:opacity-50 flex items-center justify-center gap-2 ring-1 ring-slate-200"
                   >
                     {bioLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Fingerprint className="h-5 w-5 text-emerald-600" />}
                     {bioLoading ? 'Authenticating…' : 'Login with Biometrics'}
@@ -469,7 +469,7 @@ export function AdminLogin({ onSuccess, onCancel, adminOnly = false }: { onSucce
                   <button
                     onClick={handleBiometricRegister}
                     disabled={bioLoading || !username || locked}
-                    className="w-full h-11 rounded-xl bg-violet-50 hover:bg-violet-100 text-violet-700 text-xs font-bold transition disabled:opacity-50 flex items-center justify-center gap-2 ring-1 ring-violet-200 active:scale-95"
+                    className="w-full h-11 rounded-xl bg-violet-50 hover:bg-violet-100 text-violet-700 text-xs font-bold transition disabled:opacity-50 flex items-center justify-center gap-2 ring-1 ring-violet-200"
                   >
                     <Fingerprint className="h-4 w-4" />
                     Enable Biometric Login {username ? `for ${username}` : '(enter username first)'}
@@ -767,7 +767,7 @@ export function AdminPanel({ currentUser, onBack }: { currentUser: SystemUser; o
       <nav className="flex-shrink-0 bg-white border-b border-slate-200 shadow-sm">
         <div className="flex items-center gap-1.5 px-3 sm:px-6 py-2 overflow-x-auto scrollbar-hide">
           {tabs.map(t => (
-            <button key={t.id} onClick={() => setTab(t.id)} className={cn("flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all whitespace-nowrap flex-shrink-0 active:scale-95", tab === t.id ? "bg-gradient-to-r from-rose-600 to-pink-600 text-white shadow-md" : "text-slate-600 hover:bg-slate-100")}>
+            <button key={t.id} onClick={() => setTab(t.id)} className={cn("flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all whitespace-nowrap flex-shrink-0", tab === t.id ? "bg-gradient-to-r from-rose-600 to-pink-600 text-white shadow-md" : "text-slate-600 hover:bg-slate-100")}>
               <t.icon className="h-4 w-4" /> {t.label}
             </button>
           ))}

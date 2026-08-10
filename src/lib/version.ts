@@ -19,16 +19,29 @@
  * Helps identify exact deploy when debugging
  */
 
-export const APP_VERSION = "1.1.4";
-export const BUILD_ID = "build-2026-08-10-v114-scrollbar-gutter-fix";
+export const APP_VERSION = "1.2.0";
+export const BUILD_ID = "build-2026-08-10-v120-nuclear-bounce-fix";
 export const RELEASE_DATE = "August 10, 2026";
-export const RELEASE_NAME = "Scrollbar Gutter Fix (PC Bounce)";
+export const RELEASE_NAME = "Nuclear Bounce Fix — All Transforms Removed";
 
 // Full version string for display
 export const FULL_VERSION = `v${APP_VERSION} (${BUILD_ID})`;
 
 // Changelog — keep last 5 versions
 export const CHANGELOG: { version: string; date: string; changes: string[] }[] = [
+  {
+    version: "1.2.0",
+    date: "August 10, 2026",
+    changes: [
+      "NUCLEAR FIX: Removed ALL 'active:scale-95/90/98' from entire app (64+ instances)",
+      "FIX: Removed 'whileTap' scale from product cards and speed dial",
+      "FIX: Removed 'hover:scale-105' from speed dial buttons",
+      "FIX: Removed 'transition-transform' + reduced 'scale-125' to 'scale-110' on category icons",
+      "FIX: Removed 'transition-all' from payment change card",
+      "REASON: Every 'active:scale' shrinks the button on tap → neighbors shift to fill gap → bounce",
+      "This is the definitive fix. Buttons still change COLOR on tap/active, just no longer RESIZE.",
+    ],
+  },
   {
     version: "1.1.4",
     date: "August 10, 2026",

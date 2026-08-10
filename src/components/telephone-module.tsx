@@ -209,7 +209,7 @@ export function TelephoneModule({ onBack }: TelephoneProps) {
                 }
               }}
               className={cn(
-                "flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all whitespace-nowrap flex-shrink-0 active:scale-95",
+                "flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all whitespace-nowrap flex-shrink-0",
                 tab === t.id ? "bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-md" : "text-slate-600 hover:bg-slate-100"
               )}
             >

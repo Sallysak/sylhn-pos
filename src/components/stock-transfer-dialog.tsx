@@ -182,7 +182,7 @@ export function StockTransferDialog({ open, onClose }: StockTransferDialogProps)
                 </div>
                 <h2 className="text-base font-bold tracking-tight">Stock Transfer</h2>
               </div>
-              <button onClick={onClose} className="h-9 w-9 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center transition active:scale-90 relative z-10">
+              <button onClick={onClose} className="h-9 w-9 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center transition relative z-10">
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -241,7 +241,7 @@ export function StockTransferDialog({ open, onClose }: StockTransferDialogProps)
                       <button
                         key={product.id}
                         onClick={() => addItem(product)}
-                        className="w-full flex items-center gap-3 px-3 py-2 hover:bg-emerald-50 transition text-left active:scale-[0.99]"
+                        className="w-full flex items-center gap-3 px-3 py-2 hover:bg-emerald-50 transition text-left"
                       >
                         <span className="text-xl">{product.emoji}</span>
                         <div className="flex-1 min-w-0">
@@ -282,7 +282,7 @@ export function StockTransferDialog({ open, onClose }: StockTransferDialogProps)
                         />
                         <button
                           onClick={() => removeItem(item.product.id)}
-                          className="h-9 w-9 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 flex items-center justify-center transition active:scale-90"
+                          className="h-9 w-9 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 flex items-center justify-center transition"
                         >
                           <X className="h-4 w-4" />
                         </button>

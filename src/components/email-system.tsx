@@ -240,7 +240,7 @@ export function EmailSystem({ onBack }: { onBack: () => void }) {
       <header className="flex-shrink-0 gradient-premium-emerald text-white shadow-lg relative z-30">
         <div className="flex items-center justify-between px-3 sm:px-4 py-3 gap-3">
           <div className="flex items-center gap-3 min-w-0">
-            <button onClick={onBack} className="h-9 w-9 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center transition active:scale-90 flex-shrink-0" aria-label="Back"><ArrowLeft className="h-5 w-5" /></button>
+            <button onClick={onBack} className="h-9 w-9 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center transition flex-shrink-0" aria-label="Back"><ArrowLeft className="h-5 w-5" /></button>
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="h-9 w-9 rounded-xl bg-white/15 ring-1 ring-white/30 flex items-center justify-center flex-shrink-0"><MailIcon className="h-5 w-5" /></div>
               <div className="min-w-0">
@@ -253,7 +253,7 @@ export function EmailSystem({ onBack }: { onBack: () => void }) {
         <div className="flex items-center gap-1.5 px-3 sm:px-4 pb-2 overflow-x-auto scrollbar-hide">
           {([{ id: "inbox" as const, icon: Inbox, short: "Inbox" }, { id: "compose" as const, icon: Send, short: "Compose" }, { id: "templates" as const, icon: FileText, short: "Templates" }, { id: "settings" as const, icon: SettingsIcon, short: "Settings" }]).map(t => {
             const Icon = t.icon;
-            return <button key={t.id} onClick={() => setTab(t.id)} className={cn("flex items-center gap-1.5 px-3 sm:px-4 py-1.5 rounded-lg text-xs font-semibold transition whitespace-nowrap flex-shrink-0 active:scale-95", tab === t.id ? "bg-white text-emerald-700 shadow-md" : "bg-white/10 text-white hover:bg-white/20")}><Icon className="h-3.5 w-3.5" />{t.short}</button>;
+            return <button key={t.id} onClick={() => setTab(t.id)} className={cn("flex items-center gap-1.5 px-3 sm:px-4 py-1.5 rounded-lg text-xs font-semibold transition whitespace-nowrap flex-shrink-0", tab === t.id ? "bg-white text-emerald-700 shadow-md" : "bg-white/10 text-white hover:bg-white/20")}><Icon className="h-3.5 w-3.5" />{t.short}</button>;
           })}
         </div>
       </header>
@@ -265,7 +265,7 @@ export function EmailSystem({ onBack }: { onBack: () => void }) {
               <h2 className="text-sm font-bold text-slate-700">Inbox ({emails.length})</h2>
               <div className="flex items-center gap-2">
                 <EmailSyncButton onSynced={loadEmails} />
-                <button onClick={loadEmails} className="h-8 w-8 rounded-lg bg-white hover:bg-slate-100 text-slate-600 flex items-center justify-center transition active:scale-90 ring-1 ring-slate-200" title="Refresh"><RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} /></button>
+                <button onClick={loadEmails} className="h-8 w-8 rounded-lg bg-white hover:bg-slate-100 text-slate-600 flex items-center justify-center transition ring-1 ring-slate-200" title="Refresh"><RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} /></button>
               </div>
             </div>
             <div className="flex items-center gap-2 mb-2">
@@ -280,7 +280,7 @@ export function EmailSystem({ onBack }: { onBack: () => void }) {
               emails.map(email => {
                 const isReceived = email.direction === "received";
                 return (
-                  <div key={email.id} onClick={() => setSelectedEmail(selectedEmail?.id === email.id ? null : email)} className={cn("card-premium p-3 cursor-pointer hover:shadow-md transition active:scale-[0.98]", isReceived && "ring-2 ring-blue-200")}>
+                  <div key={email.id} onClick={() => setSelectedEmail(selectedEmail?.id === email.id ? null : email)} className={cn("card-premium p-3 cursor-pointer hover:shadow-md transition", isReceived && "ring-2 ring-blue-200")}>
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
@@ -345,14 +345,14 @@ export function EmailSystem({ onBack }: { onBack: () => void }) {
                     <div key={i} className="flex items-center gap-2 bg-slate-50 rounded-lg p-2 ring-1 ring-slate-200">
                       <Paperclip className="h-4 w-4 text-slate-400 flex-shrink-0" />
                       <div className="min-w-0 flex-1"><div className="text-xs font-medium text-slate-700 truncate">{att.filename}</div><div className="text-[10px] text-slate-400">{formatFileSize(att.size)}</div></div>
-                      <button onClick={() => removeAttachment(i)} className="h-7 w-7 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 flex items-center justify-center transition active:scale-90 flex-shrink-0"><X className="h-3.5 w-3.5" /></button>
+                      <button onClick={() => removeAttachment(i)} className="h-7 w-7 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 flex items-center justify-center transition flex-shrink-0"><X className="h-3.5 w-3.5" /></button>
                     </div>
                   ))}
                 </div>
               )}
               <button onClick={() => fileInputRef.current?.click()} className="w-full h-10 rounded-xl border-2 border-dashed border-slate-300 hover:border-emerald-400 hover:bg-emerald-50/50 text-slate-500 hover:text-emerald-600 text-xs font-semibold transition flex items-center justify-center gap-2"><Paperclip className="h-4 w-4" /> Attach Files (max 5MB each)</button>
             </div>
-            <button onClick={handleSend} disabled={sending || !composeTo || !composeSubject} className="btn-premium w-full h-12 rounded-xl gradient-premium-emerald hover:shadow-glow-emerald disabled:opacity-50 text-white text-sm font-bold flex items-center justify-center gap-2 transition active:scale-95">{sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}{sending ? "Sending…" : `Send Email${attachments.length > 0 ? ` (${attachments.length} attachment${attachments.length > 1 ? "s" : ""})` : ""}`}</button>
+            <button onClick={handleSend} disabled={sending || !composeTo || !composeSubject} className="btn-premium w-full h-12 rounded-xl gradient-premium-emerald hover:shadow-glow-emerald disabled:opacity-50 text-white text-sm font-bold flex items-center justify-center gap-2 transition">{sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}{sending ? "Sending…" : `Send Email${attachments.length > 0 ? ` (${attachments.length} attachment${attachments.length > 1 ? "s" : ""})` : ""}`}</button>
           </div>
         )}
 
@@ -374,7 +374,7 @@ export function EmailSystem({ onBack }: { onBack: () => void }) {
               <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2"><MailIcon className="h-4 w-4 text-emerald-600" /> Email Provider</h3>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {SMTP_PRESETS.map(preset => (
-                  <button key={preset.id} onClick={() => applyPreset(preset.id)} className={cn("flex flex-col items-start gap-1 p-3 rounded-xl text-left transition active:scale-95 ring-1", selectedPreset === preset.id ? "bg-emerald-50 ring-2 ring-emerald-400 shadow-md" : "bg-white ring-slate-200 hover:ring-emerald-200 hover:bg-emerald-50/30")}>
+                  <button key={preset.id} onClick={() => applyPreset(preset.id)} className={cn("flex flex-col items-start gap-1 p-3 rounded-xl text-left transition ring-1", selectedPreset === preset.id ? "bg-emerald-50 ring-2 ring-emerald-400 shadow-md" : "bg-white ring-slate-200 hover:ring-emerald-200 hover:bg-emerald-50/30")}>
                     <span className="text-xl">{preset.icon}</span><span className="text-xs font-bold text-slate-800">{preset.name}</span><span className="text-[10px] text-slate-500 leading-tight">{preset.description}</span>
                   </button>
                 ))}
@@ -398,8 +398,8 @@ export function EmailSystem({ onBack }: { onBack: () => void }) {
                 <div className="col-span-2"><label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Password / App Password</label><input type="password" value={smtpPass} onChange={(e) => setSmtpPass(e.target.value)} placeholder="••••••••" className="input-premium w-full h-11 px-4 text-sm" />{!settingsLoaded && <p className="text-[10px] text-slate-400 mt-1">Loading current settings…</p>}</div>
               </div>
               <div className="flex gap-2 pt-1">
-                <button onClick={handleSaveSettings} disabled={savingSettings} className="btn-premium flex-1 h-11 rounded-xl gradient-premium-emerald hover:shadow-glow-emerald disabled:opacity-50 text-white text-sm font-bold flex items-center justify-center gap-2 transition active:scale-95">{savingSettings ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save</button>
-                <button onClick={handleTestEmail} disabled={testing} className="btn-premium flex-1 h-11 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-bold flex items-center justify-center gap-2 transition active:scale-95">{testing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Send Test</button>
+                <button onClick={handleSaveSettings} disabled={savingSettings} className="btn-premium flex-1 h-11 rounded-xl gradient-premium-emerald hover:shadow-glow-emerald disabled:opacity-50 text-white text-sm font-bold flex items-center justify-center gap-2 transition">{savingSettings ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save</button>
+                <button onClick={handleTestEmail} disabled={testing} className="btn-premium flex-1 h-11 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-bold flex items-center justify-center gap-2 transition">{testing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Send Test</button>
               </div>
             </div>
 
@@ -411,7 +411,7 @@ export function EmailSystem({ onBack }: { onBack: () => void }) {
                 <button
                   onClick={handleSendLowStockAlert}
                   disabled={sendingAlert}
-                  className="btn-premium w-full h-11 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 disabled:opacity-50 text-white text-sm font-bold flex items-center justify-center gap-2 transition active:scale-95"
+                  className="btn-premium w-full h-11 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 disabled:opacity-50 text-white text-sm font-bold flex items-center justify-center gap-2 transition"
                 >
                   {sendingAlert ? <Loader2 className="h-4 w-4 animate-spin" /> : <AlertTriangle className="h-4 w-4" />}
                   {sendingAlert ? "Sending..." : "Send Low-Stock Alert Now"}
@@ -419,7 +419,7 @@ export function EmailSystem({ onBack }: { onBack: () => void }) {
                 <button
                   onClick={handleSendDailySummary}
                   disabled={sendingSummary}
-                  className="btn-premium w-full h-11 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 disabled:opacity-50 text-white text-sm font-bold flex items-center justify-center gap-2 transition active:scale-95"
+                  className="btn-premium w-full h-11 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 disabled:opacity-50 text-white text-sm font-bold flex items-center justify-center gap-2 transition"
                 >
                   {sendingSummary ? <Loader2 className="h-4 w-4 animate-spin" /> : <BarChart3 className="h-4 w-4" />}
                   {sendingSummary ? "Sending..." : "Send Daily Summary Now"}
@@ -437,7 +437,7 @@ export function EmailSystem({ onBack }: { onBack: () => void }) {
 }
 
 function ToolbarButton({ onClick, title, children }: { onClick: () => void; title: string; children: React.ReactNode }) {
-  return <button type="button" onClick={onClick} title={title} className="h-8 w-8 rounded-lg hover:bg-white text-slate-600 hover:text-emerald-600 flex items-center justify-center transition active:scale-90 text-xs font-bold">{children}</button>;
+  return <button type="button" onClick={onClick} title={title} className="h-8 w-8 rounded-lg hover:bg-white text-slate-600 hover:text-emerald-600 flex items-center justify-center transition text-xs font-bold">{children}</button>;
 }
 function Divider() { return <div className="w-px h-5 bg-slate-300 mx-0.5" />; }
 function fileToBase64(file: File): Promise<string> {
@@ -480,7 +480,7 @@ function EmailTemplates({ onUseTemplate }: { onUseTemplate: (t: any) => void }) 
     <div className="space-y-3">
       <div className="flex items-center justify-between mb-2">
         <h2 className="text-sm font-bold text-slate-700">Email Templates ({templates.length})</h2>
-        <button onClick={loadTemplates} className="h-8 w-8 rounded-lg bg-white hover:bg-slate-100 text-slate-600 flex items-center justify-center transition active:scale-90 ring-1 ring-slate-200" title="Refresh">
+        <button onClick={loadTemplates} className="h-8 w-8 rounded-lg bg-white hover:bg-slate-100 text-slate-600 flex items-center justify-center transition ring-1 ring-slate-200" title="Refresh">
           <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
         </button>
       </div>
@@ -531,7 +531,7 @@ function EmailTemplates({ onUseTemplate }: { onUseTemplate: (t: any) => void }) 
                  dangerouslySetInnerHTML={{ __html: t.body.substring(0, 200) + (t.body.length > 200 ? "..." : "") }} />
             <button
               onClick={() => onUseTemplate(t)}
-              className="w-full h-8 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center justify-center gap-1 transition active:scale-95"
+              className="w-full h-8 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center justify-center gap-1 transition"
             >
               <Send className="h-3 w-3" /> Use Template
             </button>

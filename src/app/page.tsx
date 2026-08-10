@@ -2671,7 +2671,7 @@ export default function POSPage() {
               />
               <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
                 <VoiceSearch onResult={(text) => { setSearchQuery(text); toast({ title: "Voice search", description: text }); }} />
-                <button onClick={() => setShowBarcodeScanner(true)} className="h-7 w-7 rounded-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 active:scale-95 flex items-center justify-center transition" title="Open barcode scanner (camera)">
+                <button onClick={() => setShowBarcodeScanner(true)} className="h-7 w-7 rounded-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 flex items-center justify-center transition" title="Open barcode scanner (camera)">
                   <ScanLine className="h-3.5 w-3.5" />
                 </button>
               </div>
@@ -2737,7 +2737,7 @@ export default function POSPage() {
               <button
                 onClick={() => setShowUserMenu(s => !s)}
                 className={cn(
-                  "flex items-center gap-2 px-2.5 py-1.5 rounded-lg gradient-premium-glass ring-1 ring-white/25 backdrop-blur-md transition active:scale-95",
+                  "flex items-center gap-2 px-2.5 py-1.5 rounded-lg gradient-premium-glass ring-1 ring-white/25 backdrop-blur-md transition",
                   showUserMenu && "ring-white/60 bg-white/25"
                 )}
                 title="User menu — AI Assistant, Shortcuts, Features Map, Logout"
@@ -2895,7 +2895,7 @@ export default function POSPage() {
             {/* Dashboard — always visible quick access (was only in POS menu / mobile bottom nav) */}
             <button
               onClick={() => setView("dashboard")}
-              className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 bg-emerald-500/20 hover:bg-emerald-500/40 ring-1 ring-emerald-400/30 hover:ring-emerald-400/50 backdrop-blur-sm"
+              className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition flex-shrink-0 bg-emerald-500/20 hover:bg-emerald-500/40 ring-1 ring-emerald-400/30 hover:ring-emerald-400/50 backdrop-blur-sm"
               title="Operations Dashboard — KPIs, low-stock alerts, reorder suggestions, expiry alerts"
             >
               <TrendingUp className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Dashboard
@@ -2903,21 +2903,21 @@ export default function POSPage() {
             <div className="w-px h-5 bg-white/10 flex-shrink-0 mx-0.5" />
             <button
               onClick={() => setShowCashCalc(true)}
-              className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 bg-white/5 hover:bg-white/15 ring-1 ring-white/10 hover:ring-white/20 backdrop-blur-sm"
+              className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition flex-shrink-0 bg-white/5 hover:bg-white/15 ring-1 ring-white/10 hover:ring-white/20 backdrop-blur-sm"
               title="Cash Denomination Calculator"
             >
               <DollarSign className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Cash Calc
             </button>
             <button
               onClick={() => setShowPriceTags(true)}
-              className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 bg-white/5 hover:bg-white/15 ring-1 ring-white/10 hover:ring-white/20 backdrop-blur-sm"
+              className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition flex-shrink-0 bg-white/5 hover:bg-white/15 ring-1 ring-white/10 hover:ring-white/20 backdrop-blur-sm"
               title="Print Price Tags (simple)"
             >
               <Printer className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Tags
             </button>
             <button
               onClick={() => setShowLabelPrinter(true)}
-              className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 bg-white/5 hover:bg-white/15 ring-1 ring-white/10 hover:ring-white/20 backdrop-blur-sm"
+              className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition flex-shrink-0 bg-white/5 hover:bg-white/15 ring-1 ring-white/10 hover:ring-white/20 backdrop-blur-sm"
               title="Print Labels (multi-size + barcode)"
             >
               <Tag className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Labels
@@ -2926,7 +2926,7 @@ export default function POSPage() {
             <div className="w-px h-5 bg-white/10 flex-shrink-0 mx-0.5" />
             <button
               onClick={() => setShowExpenseManager(true)}
-              className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 bg-rose-500/15 hover:bg-rose-500/25 ring-1 ring-rose-400/20 hover:ring-rose-400/40 backdrop-blur-sm"
+              className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition flex-shrink-0 bg-rose-500/15 hover:bg-rose-500/25 ring-1 ring-rose-400/20 hover:ring-rose-400/40 backdrop-blur-sm"
               title="Record expenses (rent, utilities, salaries, etc.)"
             >
               <Wallet className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Expenses
@@ -2935,7 +2935,7 @@ export default function POSPage() {
               onClick={() => setShowStocktakeWizard(true)}
               disabled={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager"}
               title={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" ? "Admin/Manager only" : "Run a stocktake (physical count → variance → update stock)"}
-              className={cn("group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 bg-indigo-500/15 hover:bg-indigo-500/25 ring-1 ring-indigo-400/20 hover:ring-indigo-400/40 backdrop-blur-sm", loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" && "opacity-30 cursor-not-allowed hover:bg-indigo-500/15")}
+              className={cn("group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition flex-shrink-0 bg-indigo-500/15 hover:bg-indigo-500/25 ring-1 ring-indigo-400/20 hover:ring-indigo-400/40 backdrop-blur-sm", loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" && "opacity-30 cursor-not-allowed hover:bg-indigo-500/15")}
             >
               <ClipboardCheck className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Stocktake
             </button>
@@ -2945,7 +2945,7 @@ export default function POSPage() {
               onClick={() => setShowWhatsAppBroadcast(true)}
               disabled={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager"}
               title={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" ? "Admin/Manager only" : "Send WhatsApp broadcast to customers"}
-              className={cn("group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 bg-green-500/15 hover:bg-green-500/30 ring-1 ring-green-400/20 hover:ring-green-400/40 backdrop-blur-sm", loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" && "opacity-30 cursor-not-allowed hover:bg-green-500/15")}
+              className={cn("group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition flex-shrink-0 bg-green-500/15 hover:bg-green-500/30 ring-1 ring-green-400/20 hover:ring-green-400/40 backdrop-blur-sm", loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" && "opacity-30 cursor-not-allowed hover:bg-green-500/15")}
             >
               <MessageCircle className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Broadcast
             </button>
@@ -2953,13 +2953,13 @@ export default function POSPage() {
               onClick={() => setShowAIForecast(true)}
               disabled={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager"}
               title={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" ? "Admin/Manager only" : "AI demand forecasting + reorder suggestions"}
-              className={cn("group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 bg-violet-500/15 hover:bg-violet-500/30 ring-1 ring-violet-400/20 hover:ring-violet-400/40 backdrop-blur-sm", loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" && "opacity-30 cursor-not-allowed hover:bg-violet-500/15")}
+              className={cn("group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition flex-shrink-0 bg-violet-500/15 hover:bg-violet-500/30 ring-1 ring-violet-400/20 hover:ring-violet-400/40 backdrop-blur-sm", loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" && "opacity-30 cursor-not-allowed hover:bg-violet-500/15")}
             >
               <Brain className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> AI Forecast
             </button>
             <button
               onClick={() => setShowExpiryManager(true)}
-              className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 bg-orange-500/15 hover:bg-orange-500/30 ring-1 ring-orange-400/20 hover:ring-orange-400/40 backdrop-blur-sm"
+              className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition flex-shrink-0 bg-orange-500/15 hover:bg-orange-500/30 ring-1 ring-orange-400/20 hover:ring-orange-400/40 backdrop-blur-sm"
               title="Expiry date management (FEFO) + alerts"
             >
               <AlertTriangle className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Expiry
@@ -2969,7 +2969,7 @@ export default function POSPage() {
               onClick={() => setShowAdvancedReports(true)}
               disabled={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager"}
               title={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" ? "Admin/Manager only" : "Advanced reports: ABC analysis, profit margins, hourly traffic, staff performance"}
-              className={cn("group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 bg-cyan-500/15 hover:bg-cyan-500/30 ring-1 ring-cyan-400/20 hover:ring-cyan-400/40 backdrop-blur-sm", loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" && "opacity-30 cursor-not-allowed hover:bg-cyan-500/15")}
+              className={cn("group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition flex-shrink-0 bg-cyan-500/15 hover:bg-cyan-500/30 ring-1 ring-cyan-400/20 hover:ring-cyan-400/40 backdrop-blur-sm", loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" && "opacity-30 cursor-not-allowed hover:bg-cyan-500/15")}
             >
               <BarChart3 className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Reports
             </button>
@@ -2978,7 +2978,7 @@ export default function POSPage() {
               onClick={() => setShowRecurringPO(true)}
               disabled={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager"}
               title={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" ? "Admin/Manager only" : "Set up recurring purchase orders (auto-generate weekly/monthly)"}
-              className={cn("group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 bg-teal-500/15 hover:bg-teal-500/30 ring-1 ring-teal-400/20 hover:ring-teal-400/40 backdrop-blur-sm", loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" && "opacity-30 cursor-not-allowed hover:bg-teal-500/15")}
+              className={cn("group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition flex-shrink-0 bg-teal-500/15 hover:bg-teal-500/30 ring-1 ring-teal-400/20 hover:ring-teal-400/40 backdrop-blur-sm", loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" && "opacity-30 cursor-not-allowed hover:bg-teal-500/15")}
             >
               <RefreshCw className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Recurring
             </button>
@@ -2987,7 +2987,7 @@ export default function POSPage() {
               onClick={() => setShowBulkImport(true)}
               disabled={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager"}
               title={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" ? "Admin/Manager only" : "Bulk import products from CSV"}
-              className={cn("group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 bg-blue-500/15 hover:bg-blue-500/30 ring-1 ring-blue-400/20 hover:ring-blue-400/40 backdrop-blur-sm", loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" && "opacity-30 cursor-not-allowed hover:bg-blue-500/15")}
+              className={cn("group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition flex-shrink-0 bg-blue-500/15 hover:bg-blue-500/30 ring-1 ring-blue-400/20 hover:ring-blue-400/40 backdrop-blur-sm", loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" && "opacity-30 cursor-not-allowed hover:bg-blue-500/15")}
             >
               <Upload className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Import
             </button>
@@ -3001,7 +3001,7 @@ export default function POSPage() {
                   toast({ title: `⚡ Re-added ${lastSaleCart.length} item(s) from last sale` });
                   if (!showSidebar) setShowSidebar(true);
                 }}
-                className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 bg-cyan-500/20 hover:bg-cyan-500/40 ring-1 ring-cyan-400/30 hover:ring-cyan-400/50 backdrop-blur-sm"
+                className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition flex-shrink-0 bg-cyan-500/20 hover:bg-cyan-500/40 ring-1 ring-cyan-400/30 hover:ring-cyan-400/50 backdrop-blur-sm"
                 title="Quick re-add all items from the last completed sale"
               >
                 <RotateCcw className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Re-add
@@ -3010,7 +3010,7 @@ export default function POSPage() {
             {/* #2 Price Check Mode */}
             <button
               onClick={() => { setPriceCheckMode(!priceCheckMode); toast({ title: priceCheckMode ? "Price check OFF" : "Price check ON — scan/search to check prices without adding to cart", duration: 3000 }); if (!priceCheckMode) searchInputRef.current?.focus(); }}
-              className={cn("group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0", priceCheckMode ? "bg-amber-500/40 ring-1 ring-amber-400/50" : "bg-white/5 hover:bg-white/15 ring-1 ring-white/10 hover:ring-white/20 backdrop-blur-sm")}
+              className={cn("group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition flex-shrink-0", priceCheckMode ? "bg-amber-500/40 ring-1 ring-amber-400/50" : "bg-white/5 hover:bg-white/15 ring-1 ring-white/10 hover:ring-white/20 backdrop-blur-sm")}
               title="Price check mode — scan barcode to see price without adding to cart"
             >
               <Eye className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Price Check
@@ -3019,7 +3019,7 @@ export default function POSPage() {
             {customerId && (
               <button
                 onClick={() => setShowCustomerHistory(true)}
-                className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 bg-violet-500/20 hover:bg-violet-500/40 ring-1 ring-violet-400/30 hover:ring-violet-400/50 backdrop-blur-sm"
+                className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition flex-shrink-0 bg-violet-500/20 hover:bg-violet-500/40 ring-1 ring-violet-400/30 hover:ring-violet-400/50 backdrop-blur-sm"
                 title="View this customer's purchase history"
               >
                 <History className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Cust. History
@@ -3030,7 +3030,7 @@ export default function POSPage() {
             {/* #15 Shift Handover Notes */}
             <button
               onClick={() => setShowShiftNotes(true)}
-              className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 bg-indigo-500/15 hover:bg-indigo-500/30 ring-1 ring-indigo-400/20 hover:ring-indigo-400/40 backdrop-blur-sm"
+              className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition flex-shrink-0 bg-indigo-500/15 hover:bg-indigo-500/30 ring-1 ring-indigo-400/20 hover:ring-indigo-400/40 backdrop-blur-sm"
               title="Shift handover notes — leave messages for the next cashier"
             >
               <Clock className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Shift Notes
@@ -3040,7 +3040,7 @@ export default function POSPage() {
               onClick={() => setShowFloatManager(true)}
               disabled={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager"}
               title={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" ? "Admin/Manager only" : "Float management — opening/closing cash reconciliation"}
-              className={cn("group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 bg-emerald-500/15 hover:bg-emerald-500/30 ring-1 ring-emerald-400/20 hover:ring-emerald-400/40 backdrop-blur-sm", loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" && "opacity-30 cursor-not-allowed")}
+              className={cn("group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition flex-shrink-0 bg-emerald-500/15 hover:bg-emerald-500/30 ring-1 ring-emerald-400/20 hover:ring-emerald-400/40 backdrop-blur-sm", loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" && "opacity-30 cursor-not-allowed")}
             >
               <Wallet className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Float
             </button>
@@ -3049,7 +3049,7 @@ export default function POSPage() {
               onClick={() => setShowComboDeals(true)}
               disabled={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager"}
               title={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" ? "Admin/Manager only" : "Combo deals — Buy 2 Get 1 Free, Meal Deals, etc."}
-              className={cn("group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0 bg-rose-500/15 hover:bg-rose-500/30 ring-1 ring-rose-400/20 hover:ring-rose-400/40 backdrop-blur-sm", loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" && "opacity-30 cursor-not-allowed")}
+              className={cn("group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition flex-shrink-0 bg-rose-500/15 hover:bg-rose-500/30 ring-1 ring-rose-400/20 hover:ring-rose-400/40 backdrop-blur-sm", loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" && "opacity-30 cursor-not-allowed")}
             >
               <Tag className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Combos
             </button>
@@ -3069,7 +3069,7 @@ export default function POSPage() {
                     key={menu.id}
                     onClick={() => setOpenMenu(isOpen ? null : menu.id)}
                     className={cn(
-                      "flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition active:scale-95 flex-shrink-0",
+                      "flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition flex-shrink-0",
                       isOpen
                         ? "bg-white text-emerald-700 shadow-md"
                         : "bg-white/10 text-white hover:bg-white/20 ring-1 ring-white/15"
@@ -3144,7 +3144,7 @@ export default function POSPage() {
                     : "bg-slate-100/80 text-slate-600 hover:bg-slate-200/80"
                 )}
               >
-                <span className={cn("text-base transition-transform", activeCategory === cat.id && "scale-125")}>{cat.icon}</span>
+                <span className={cn("text-base", activeCategory === cat.id && "scale-110")}>{cat.icon}</span>
                 <span className="sm:hidden">{cat.id === 'confectionery' ? 'Confect.' : cat.id === 'soft-drinks' ? 'Drinks' : cat.id === 'hard-liquor' ? 'Liquor' : cat.id === 'households' ? 'Home' : cat.id === 'groceries' ? 'Grocery' : cat.name}</span>
                 <span className="hidden sm:inline">{cat.name}</span>
                 <span className={cn(
@@ -3235,7 +3235,7 @@ export default function POSPage() {
               {productSearch && (
                 <button
                   onClick={() => setProductSearch("")}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 rounded-full bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition active:scale-90"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 rounded-full bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition"
                 >
                   <X className="h-3.5 w-3.5 text-slate-600" />
                 </button>
@@ -3261,8 +3261,8 @@ export default function POSPage() {
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ duration: 0.2, delay: Math.min(idx * 0.015, 0.3) }}
-                    whileHover={{ scale: 1.03 }}
-                    whileTap={{ scale: 0.96 }}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 1 }}
                     onClick={() => addToCart(product)}
                     onDoubleClick={(e) => {
                       e.preventDefault();
@@ -3400,7 +3400,7 @@ export default function POSPage() {
                       </span>
                     )}
                   </div>
-                  <button onClick={() => setShowSidebar(false)} className="h-7 w-7 rounded-lg hover:bg-white/20 flex items-center justify-center transition active:scale-90">
+                  <button onClick={() => setShowSidebar(false)} className="h-7 w-7 rounded-lg hover:bg-white/20 flex items-center justify-center transition">
                     <X className="h-3.5 w-3.5" />
                   </button>
                 </div>
@@ -3563,11 +3563,11 @@ export default function POSPage() {
                                   </div>
                                   {/* Col 2: Qty with compact +/- buttons */}
                                   <div className="flex items-center gap-0.5 justify-center flex-shrink-0">
-                                    <button onClick={(e) => { e.stopPropagation(); updateQuantity(index, -1); }} className="h-4 w-4 rounded bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition active:scale-90">
+                                    <button onClick={(e) => { e.stopPropagation(); updateQuantity(index, -1); }} className="h-4 w-4 rounded bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition">
                                       <Minus className="h-2 w-2" />
                                     </button>
                                     <span className="w-6 text-center font-mono font-bold text-[10px]">{item.quantity.toFixed(item.unit === 'kg' ? 2 : 0)}</span>
-                                    <button onClick={(e) => { e.stopPropagation(); updateQuantity(index, 1); }} className="h-4 w-4 rounded bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition active:scale-90">
+                                    <button onClick={(e) => { e.stopPropagation(); updateQuantity(index, 1); }} className="h-4 w-4 rounded bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition">
                                       <Plus className="h-2 w-2" />
                                     </button>
                                   </div>
@@ -3587,7 +3587,7 @@ export default function POSPage() {
                                     <span className="font-mono font-bold text-[11px]">{formatGHS(lineFinal)}</span>
                                   </div>
                                   {/* Col 5: Delete button (separate column, doesn't affect Total alignment) */}
-                                  <button onClick={(e) => { e.stopPropagation(); removeLine(index); }} className="h-4 w-4 rounded bg-rose-50 text-rose-400 hover:bg-rose-100 hover:text-rose-600 flex items-center justify-center transition active:scale-90 flex-shrink-0">
+                                  <button onClick={(e) => { e.stopPropagation(); removeLine(index); }} className="h-4 w-4 rounded bg-rose-50 text-rose-400 hover:bg-rose-100 hover:text-rose-600 flex items-center justify-center transition flex-shrink-0">
                                     <Trash2 className="h-2.5 w-2.5" />
                                   </button>
                                 </div>
@@ -3668,7 +3668,7 @@ export default function POSPage() {
                               <button
                                 key={pct}
                                 onClick={() => applyGlobalDiscount(pct)}
-                                className={`flex-1 h-7 rounded-lg text-[10px] font-bold transition active:scale-95 ${
+                                className={`flex-1 h-7 rounded-lg text-[10px] font-bold transition ${
                                   globalDiscount === pct
                                     ? 'bg-violet-600 text-white shadow-md ring-2 ring-violet-300'
                                     : 'bg-violet-50 text-violet-700 hover:bg-violet-100 ring-1 ring-violet-200'
@@ -3689,14 +3689,14 @@ export default function POSPage() {
                                   }
                                 }
                               }}
-                              className="flex-1 h-7 rounded-lg text-[10px] font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 ring-1 ring-slate-200 transition active:scale-95"
+                              className="flex-1 h-7 rounded-lg text-[10px] font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 ring-1 ring-slate-200 transition"
                             >
                               Custom
                             </button>
                             {globalDiscount > 0 && (
                               <button
                                 onClick={() => applyGlobalDiscount(0)}
-                                className="h-7 px-2 rounded-lg text-[10px] font-bold bg-rose-50 text-rose-600 hover:bg-rose-100 ring-1 ring-rose-200 transition active:scale-95"
+                                className="h-7 px-2 rounded-lg text-[10px] font-bold bg-rose-50 text-rose-600 hover:bg-rose-100 ring-1 ring-rose-200 transition"
                                 title="Remove discount"
                               >
                                 ✕
@@ -3734,7 +3734,7 @@ export default function POSPage() {
                     <div className="flex-shrink-0 grid grid-cols-4 gap-1.5 p-2 bg-slate-100/60">
                       <button
                         onClick={() => setShowFindProduct(true)}
-                        className="btn-premium col-span-4 h-10 rounded-xl gradient-premium-violet hover:shadow-glow-violet text-white font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95"
+                        className="btn-premium col-span-4 h-10 rounded-xl gradient-premium-violet hover:shadow-glow-violet text-white font-bold text-xs flex items-center justify-center gap-1.5 transition"
                       >
                         <Search className="h-3.5 w-3.5" />
                         FIND PRODUCT
@@ -3748,7 +3748,7 @@ export default function POSPage() {
                       <FuncBtn icon={<Check className="h-3 w-3" />} label="Enter" sub="↵" onClick={handleKeypadEnter} variant="emerald" />
                       <button
                         onClick={() => setShowCartPreview(true)}
-                        className="btn-premium col-span-1 h-10 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white font-bold text-[10px] flex items-center justify-center gap-0.5 transition active:scale-95"
+                        className="btn-premium col-span-1 h-10 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white font-bold text-[10px] flex items-center justify-center gap-0.5 transition"
                       >
                         <Eye className="h-3 w-3" />
                         PREVIEW
@@ -3758,7 +3758,7 @@ export default function POSPage() {
                       <button
                         onClick={handlePay}
                         disabled={cart.length === 0}
-                        className="btn-premium col-span-3 h-12 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-600 hover:via-teal-600 hover:to-emerald-700 text-white font-bold text-sm flex items-center justify-center gap-2 transition active:scale-95 shadow-lg hover:shadow-xl disabled:opacity-40 disabled:cursor-not-allowed"
+                        className="btn-premium col-span-3 h-12 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-600 hover:via-teal-600 hover:to-emerald-700 text-white font-bold text-sm flex items-center justify-center gap-2 transition shadow-lg hover:shadow-xl disabled:opacity-40 disabled:cursor-not-allowed"
                       >
                         <CreditCard className="h-4 w-4" />
                         PAY NOW
@@ -4450,7 +4450,7 @@ function KeypadBtn({ label, onClick, variant, wide, rowSpan }: {
     <button
       onClick={onClick}
       className={cn(
-        "h-8 rounded-lg font-bold text-sm flex items-center justify-center transition active:scale-95",
+        "h-8 rounded-lg font-bold text-sm flex items-center justify-center transition",
         variant ? variants[variant] : defaultClass,
         wide && "col-span-2",
         rowSpan && "row-span-2 h-[4.25rem]"
@@ -4628,7 +4628,7 @@ function PaymentModal({ total, subtotal, tax, discount, itemCount, invoiceNumber
             <div className="text-[10px] sm:text-xs opacity-80 font-semibold uppercase tracking-wider truncate">PAYMENT · Invoice #{invoiceNumber || '------'}</div>
             <div className="text-base sm:text-lg font-bold">{itemCount} items</div>
           </div>
-          <button onClick={onClose} className="h-9 w-9 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center transition active:scale-90 relative z-10 flex-shrink-0" aria-label="Close">
+          <button onClick={onClose} className="h-9 w-9 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center transition relative z-10 flex-shrink-0" aria-label="Close">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -4690,7 +4690,7 @@ function PaymentModal({ total, subtotal, tax, discount, itemCount, invoiceNumber
                   key={pm.id}
                   onClick={() => { setMethod(pm.id); setMomoStatus("idle"); setMomoError(null); }}
                   className={cn(
-                    "flex flex-col items-center gap-1 py-3 rounded-xl ring-2 transition active:scale-95",
+                    "flex flex-col items-center gap-1 py-3 rounded-xl ring-2 transition",
                     method === pm.id ? "ring-emerald-500 bg-emerald-50" : "ring-slate-200 hover:ring-slate-300 bg-white"
                   )}
                 >
@@ -4702,7 +4702,7 @@ function PaymentModal({ total, subtotal, tax, discount, itemCount, invoiceNumber
               <button
                 onClick={() => { setMethod("credit"); setMomoStatus("idle"); setMomoError(null); }}
                 className={cn(
-                  "flex flex-col items-center gap-1 py-3 rounded-xl ring-2 transition active:scale-95",
+                  "flex flex-col items-center gap-1 py-3 rounded-xl ring-2 transition",
                   method === "credit" ? "ring-violet-500 bg-violet-50" : "ring-slate-200 hover:ring-slate-300 bg-white"
                 )}
               >
@@ -4732,7 +4732,7 @@ function PaymentModal({ total, subtotal, tax, discount, itemCount, invoiceNumber
                     key={amt}
                     onClick={() => setAmountInput(amt.toString())}
                     className={cn(
-                      "btn-premium py-2.5 sm:py-1.5 rounded-lg text-xs sm:text-xs font-bold transition active:scale-95",
+                      "btn-premium py-2.5 sm:py-1.5 rounded-lg text-xs sm:text-xs font-bold transition",
                       amountPaid === amt ? "bg-emerald-500 text-white" : "bg-slate-100 hover:bg-slate-200 text-slate-700"
                     )}
                   >
@@ -4744,13 +4744,13 @@ function PaymentModal({ total, subtotal, tax, discount, itemCount, invoiceNumber
               <div className="grid grid-cols-2 gap-1.5 mt-1.5">
                 <button
                   onClick={() => setAmountInput(total.toFixed(2))}
-                  className="btn-premium py-3 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-xs font-bold text-emerald-700 transition active:scale-95"
+                  className="btn-premium py-3 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-xs font-bold text-emerald-700 transition"
                 >
                   Exact {formatGHS(total)}
                 </button>
                 <button
                   onClick={() => setAmountInput(Math.ceil(total).toFixed(2))}
-                  className="btn-premium py-3 rounded-lg bg-blue-100 hover:bg-blue-200 text-xs font-bold text-blue-700 transition active:scale-95"
+                  className="btn-premium py-3 rounded-lg bg-blue-100 hover:bg-blue-200 text-xs font-bold text-blue-700 transition"
                 >
                   Round Up {formatGHS(Math.ceil(total))}
                 </button>
@@ -4809,7 +4809,7 @@ function PaymentModal({ total, subtotal, tax, discount, itemCount, invoiceNumber
                   <button
                     onClick={initiateMomo}
                     disabled={momoPhone.length < 10}
-                    className="btn-premium w-full h-12 rounded-xl gradient-premium-amber hover:shadow-glow-emerald disabled:opacity-50 text-white text-sm font-bold flex items-center justify-center gap-2 transition active:scale-95"
+                    className="btn-premium w-full h-12 rounded-xl gradient-premium-amber hover:shadow-glow-emerald disabled:opacity-50 text-white text-sm font-bold flex items-center justify-center gap-2 transition"
                   >
                     <Smartphone className="h-4 w-4" />
                     Send Payment Request · {formatGHS(total)}
@@ -4842,7 +4842,7 @@ function PaymentModal({ total, subtotal, tax, discount, itemCount, invoiceNumber
                   {momoRef && momoRef.startsWith("manual-") && (
                     <button
                       onClick={() => setMomoStatus("confirmed")}
-                      className="btn-premium mt-4 w-full h-11 rounded-lg gradient-premium-emerald hover:shadow-glow-emerald text-white text-xs font-bold transition active:scale-95"
+                      className="btn-premium mt-4 w-full h-11 rounded-lg gradient-premium-emerald hover:shadow-glow-emerald text-white text-xs font-bold transition"
                     >
                       <Check className="h-3.5 w-3.5" /> I've received the money — Confirm
                     </button>
@@ -4867,7 +4867,7 @@ function PaymentModal({ total, subtotal, tax, discount, itemCount, invoiceNumber
                   <div className="text-xs text-rose-600 mt-1">{momoError || "The customer rejected or the payment timed out"}</div>
                   <button
                     onClick={() => { setMomoStatus("idle"); setMomoError(null); }}
-                    className="btn-premium mt-3 w-full h-11 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-700 text-xs font-bold transition active:scale-95"
+                    className="btn-premium mt-3 w-full h-11 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-700 text-xs font-bold transition"
                   >
                     Try Again
                   </button>
@@ -4900,7 +4900,7 @@ function PaymentModal({ total, subtotal, tax, discount, itemCount, invoiceNumber
                         toast({ title: "Paystack error", description: e?.message, variant: "destructive" });
                       }
                     }}
-                    className="btn-premium w-full h-12 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-sm font-bold flex items-center justify-center gap-2 transition active:scale-95"
+                    className="btn-premium w-full h-12 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-sm font-bold flex items-center justify-center gap-2 transition"
                   >
                     <CreditCard className="h-4 w-4" />
                     Pay {formatGHS(total)} via Paystack
@@ -4971,7 +4971,7 @@ function PaymentModal({ total, subtotal, tax, discount, itemCount, invoiceNumber
             onClick={handleComplete}
             disabled={!canComplete}
             className={cn(
-              "btn-premium w-full h-14 rounded-xl font-bold text-base flex items-center justify-center gap-2 transition active:scale-95",
+              "btn-premium w-full h-14 rounded-xl font-bold text-base flex items-center justify-center gap-2 transition",
               canComplete ? "gradient-premium-emerald hover:shadow-glow-emerald text-white" : "bg-slate-200 text-slate-400 cursor-not-allowed"
             )}
           >
@@ -5090,7 +5090,7 @@ function FindProductModal({ products, onAdd, onClose }: {
           </div>
           <div className="flex items-center gap-2 flex-shrink-0 relative z-10">
             <kbd className="hidden sm:inline-block px-2 py-1 rounded-md bg-white/15 text-[10px] font-mono ring-1 ring-white/20">F1 to open</kbd>
-            <button onClick={onClose} className="h-9 w-9 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center transition active:scale-90">
+            <button onClick={onClose} className="h-9 w-9 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center transition">
               <X className="h-5 w-5" />
             </button>
           </div>
@@ -5115,7 +5115,7 @@ function FindProductModal({ products, onAdd, onClose }: {
             {query && (
               <button
                 onClick={() => { setQuery(""); inputRef.current?.focus(); }}
-                className="absolute right-3 top-1/2 -translate-y-1/2 h-6 w-6 rounded-full bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition active:scale-90"
+                className="absolute right-3 top-1/2 -translate-y-1/2 h-6 w-6 rounded-full bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition"
               >
                 <X className="h-3.5 w-3.5 text-slate-600" />
               </button>
@@ -6691,7 +6691,7 @@ function PriceTagsPrinter({ onClose }: { onClose: () => void }) {
             <button onClick={printTags} disabled={selected.size === 0} className="btn-premium h-9 px-3 rounded-lg gradient-premium-emerald hover:shadow-glow-emerald disabled:opacity-40 text-white text-xs font-bold flex items-center gap-1.5 transition">
               <Printer className="h-3.5 w-3.5" /> Print ({selected.size})
             </button>
-            <button onClick={onClose} className="h-9 w-9 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center transition active:scale-90">
+            <button onClick={onClose} className="h-9 w-9 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center transition">
               <X className="h-4 w-4" />
             </button>
           </div>

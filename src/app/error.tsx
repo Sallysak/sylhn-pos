@@ -26,10 +26,10 @@ export default function Error({ error, reset }: { error: Error; reset: () => voi
             Your data is safe. Try refreshing the page, or go back to the home screen.
           </p>
           <div className="flex gap-2 justify-center">
-            <button onClick={reset} className="h-11 px-5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-sm font-bold flex items-center gap-2 hover:shadow-lg transition active:scale-95">
+            <button onClick={reset} className="h-11 px-5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-sm font-bold flex items-center gap-2 hover:shadow-lg transition">
               <RefreshCw className="h-4 w-4" /> Try Again
             </button>
-            <Link href="/" className="h-11 px-5 rounded-xl bg-slate-100 text-slate-700 text-sm font-bold flex items-center gap-2 hover:bg-slate-200 transition active:scale-95">
+            <Link href="/" className="h-11 px-5 rounded-xl bg-slate-100 text-slate-700 text-sm font-bold flex items-center gap-2 hover:bg-slate-200 transition">
               <Home className="h-4 w-4" /> Home
             </Link>
           </div>

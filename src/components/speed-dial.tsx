@@ -117,7 +117,7 @@ export function SpeedDial({ actions }: SpeedDialProps) {
                     {/* Action button — premium (on left, label on right) */}
                     <button
                       onClick={() => handleAction(action)}
-                      className={`btn-premium h-12 w-12 rounded-full bg-gradient-to-br ${action.color} text-white flex items-center justify-center transition active:scale-90 hover:scale-105 ring-1 ring-white/30`}
+                      className={`btn-premium h-12 w-12 rounded-full bg-gradient-to-br ${action.color} text-white flex items-center justify-center transition ring-1 ring-white/30`}
                       title={action.label}
                     >
                       <Icon className="h-5 w-5" />
@@ -136,7 +136,7 @@ export function SpeedDial({ actions }: SpeedDialProps) {
         {/* Main FAB button — premium gradient with glow */}
         <motion.button
           onClick={() => setOpen(!open)}
-          whileTap={{ scale: 0.9 }}
+          whileTap={{ scale: 1 }}
           animate={{ rotate: open ? 135 : 0 }}
           transition={{ type: "spring", stiffness: 300, damping: 20 }}
           className={`btn-premium h-14 w-14 rounded-full flex items-center justify-center transition-colors ring-1 ring-white/30 ${

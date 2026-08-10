@@ -341,7 +341,7 @@ export function SalesHistory({ onBack }: { onBack: () => void }) {
     <div className="h-screen flex flex-col bg-slate-100 dark:bg-slate-950">
       <header className="flex-shrink-0 bg-gradient-to-r from-blue-700 to-indigo-600 text-white shadow-lg px-4 py-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
-          <button onClick={onBack} className="h-9 w-9 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center transition active:scale-90 flex-shrink-0"><ArrowLeft className="h-4 w-4" /></button>
+          <button onClick={onBack} className="h-9 w-9 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center transition flex-shrink-0"><ArrowLeft className="h-4 w-4" /></button>
           <History className="h-5 w-5 flex-shrink-0" />
           <div className="min-w-0">
             <div className="text-sm font-bold truncate">Sales History</div>
@@ -457,7 +457,7 @@ function MobileSaleCard({ t, statusColors }: { t: SaleRow; statusColors: Record<
   return (
     <div
       onClick={() => setExpanded(!expanded)}
-      className="bg-white dark:bg-slate-900 rounded-xl shadow-sm ring-1 ring-slate-200 dark:ring-slate-800 p-3 active:scale-[0.98] transition cursor-pointer"
+      className="bg-white dark:bg-slate-900 rounded-xl shadow-sm ring-1 ring-slate-200 dark:ring-slate-800 p-3 transition cursor-pointer"
     >
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="min-w-0 flex-1">

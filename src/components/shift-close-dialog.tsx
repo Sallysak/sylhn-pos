@@ -136,7 +136,7 @@ export function ShiftCloseDialog({ open, onClose, onShiftClosed }: ShiftClosePro
                 </div>
                 <h2 className="text-base font-bold tracking-tight">Close Cashier Shift</h2>
               </div>
-              <button onClick={onClose} className="h-9 w-9 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center transition active:scale-90 relative z-10">
+              <button onClick={onClose} className="h-9 w-9 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center transition relative z-10">
                 <X className="h-4 w-4" />
               </button>
             </div>

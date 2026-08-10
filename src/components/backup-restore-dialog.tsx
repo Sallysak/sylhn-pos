@@ -156,7 +156,7 @@ export function BackupRestoreDialog({ open, onClose }: BackupRestoreDialogProps)
                 </div>
                 <h2 className="text-base font-bold tracking-tight">Backups & Restore</h2>
               </div>
-              <button onClick={onClose} className="h-9 w-9 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center transition active:scale-90 relative z-10">
+              <button onClick={onClose} className="h-9 w-9 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center transition relative z-10">
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -219,7 +219,7 @@ export function BackupRestoreDialog({ open, onClose }: BackupRestoreDialogProps)
                         <div className="flex items-center gap-1 flex-shrink-0">
                           <button
                             onClick={() => setRestoreTarget(backup.filename)}
-                            className="h-8 px-2.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 text-[10px] font-bold flex items-center gap-1 transition active:scale-95"
+                            className="h-8 px-2.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 text-[10px] font-bold flex items-center gap-1 transition"
                             title="Restore from this backup"
                           >
                             <Upload className="h-3 w-3" />
@@ -227,7 +227,7 @@ export function BackupRestoreDialog({ open, onClose }: BackupRestoreDialogProps)
                           </button>
                           <button
                             onClick={() => handleDelete(backup.filename)}
-                            className="h-8 w-8 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 flex items-center justify-center transition active:scale-95"
+                            className="h-8 w-8 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 flex items-center justify-center transition"
                             title="Delete backup"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
