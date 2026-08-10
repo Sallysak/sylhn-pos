@@ -129,24 +129,9 @@
   /* Fix 100vh on mobile browsers (accounts for address bar) */
   html {
     height: 100%;
-    /* CRITICAL: Prevent overscroll bounce on mobile Chrome/Safari
-       This stops the page from "bouncing" when tapping buttons */
-    overscroll-behavior: none;
-    /* CRITICAL: Do NOT use scroll-behavior: smooth — it causes bouncing
-       when tab content changes (browser smoothly scrolls to new position) */
-    scroll-behavior: auto;
-    /* Reserve space for scrollbar to prevent layout shift when content
-       height changes (e.g., switching tabs with different content lengths) */
-    scrollbar-gutter: stable;
   }
   body {
     min-height: 100%;
-    /* Lock body scrolling — only inner containers should scroll */
-    overflow: hidden;
-    /* Prevent pull-to-refresh (causes bounce on Android Chrome) */
-    overscroll-behavior-y: none;
-    /* Prevent rubber-band scrolling on iOS */
-    -webkit-overflow-scrolling: touch;
   }
   /* Use 100dvh (dynamic viewport height) where supported */
   @supports (height: 100dvh) {
@@ -156,26 +141,10 @@
     .min-h-screen {
       min-height: 100dvh !important;
     }
-    /* Fix for elements using 100vh directly */
-    [style*="100vh"], [style*="100vh"] {
-      height: 100dvh !important;
-    }
   }
   /* Radix ScrollArea: ensure it works on mobile */
   [data-radix-scroll-area-viewport] {
     -webkit-overflow-scrolling: touch;
-  }
-
-  /* CRITICAL: Prevent layout shift (bounce) when switching tabs
-     When tab content changes height, scrollbar appears/disappears,
-     causing horizontal content shift. This reserves space always. */
-  .overflow-y-auto,
-  .overflow-auto {
-    scrollbar-gutter: stable;
-  }
-  /* Exception: no-scrollbar elements (mobile carts, etc.) */
-  .no-scrollbar {
-    scrollbar-gutter: auto !important;
   }
 
   /* ============================================================

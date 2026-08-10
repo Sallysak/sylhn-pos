@@ -236,8 +236,8 @@ export function EmailSystem({ onBack }: { onBack: () => void }) {
   };
 
   return (
-    <div className="h-screen bg-slate-50 flex flex-col lg:h-screen overflow-hidden">
-      <header className="flex-shrink-0 gradient-premium-emerald text-white shadow-lg relative z-30">
+    <div className="min-h-[100dvh] bg-slate-50 flex flex-col lg:h-screen">
+      <header className="flex-shrink-0 gradient-premium-emerald text-white shadow-lg sticky top-0 z-30">
         <div className="flex items-center justify-between px-3 sm:px-4 py-3 gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <button onClick={onBack} className="h-9 w-9 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center transition flex-shrink-0" aria-label="Back"><ArrowLeft className="h-5 w-5" /></button>

@@ -19,16 +19,31 @@
  * Helps identify exact deploy when debugging
  */
 
-export const APP_VERSION = "1.2.0";
-export const BUILD_ID = "build-2026-08-10-v120-nuclear-bounce-fix";
+export const APP_VERSION = "1.2.1";
+export const BUILD_ID = "build-2026-08-10-v121-revert-css-restore-original";
 export const RELEASE_DATE = "August 10, 2026";
-export const RELEASE_NAME = "Nuclear Bounce Fix — All Transforms Removed";
+export const RELEASE_NAME = "Revert CSS Changes — Restore Original Behavior";
 
 // Full version string for display
 export const FULL_VERSION = `v${APP_VERSION} (${BUILD_ID})`;
 
 // Changelog — keep last 5 versions
 export const CHANGELOG: { version: string; date: string; changes: string[] }[] = [
+  {
+    version: "1.2.1",
+    date: "August 10, 2026",
+    changes: [
+      "REVERT: Restored original globals.css (removed body overflow:hidden, scrollbar-gutter, overscroll-behavior)",
+      "REVERT: Restored viewport meta (maximumScale=5, userScalable=true)",
+      "REVERT: Restored min-h-screen on main POS container (was h-screen overflow-hidden)",
+      "REVERT: Restored sticky top-0 on category nav",
+      "REVERT: Restored transition-all + scale-105 on category pills",
+      "REVERT: Restored transition-all duration-300 on cart sidebar",
+      "KEPT: active:scale removal (64+ instances) — this is a safe change",
+      "KEPT: Schema sync improvements (DIRECT_URL, deep health check)",
+      "KEPT: All new features (AI, email, PWA, etc.)",
+    ],
+  },
   {
     version: "1.2.0",
     date: "August 10, 2026",

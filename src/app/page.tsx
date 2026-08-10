@@ -2555,7 +2555,7 @@ export default function POSPage() {
 
   // ===== Render POS =====
     return (
-    <div className="h-screen w-full gradient-premium-mesh flex flex-col font-sans pb-[72px] lg:pb-0 lg:h-screen overflow-hidden">
+    <div className="min-h-screen w-full gradient-premium-mesh flex flex-col font-sans pb-[72px] lg:pb-0 lg:h-screen lg:overflow-hidden">
       {/* ===== Keyboard Shortcuts (F1-F10, /, ?, Esc, Ctrl+Enter) ===== */}
       <KeyboardShortcutsOverlay />
       {/* ===== Header Bar with Menu — Premium Glass (responsive) ===== */}
@@ -3129,7 +3129,7 @@ export default function POSPage() {
       </header>
 
       {/* ===== Category Navigation — Premium Pills with icons + active glow ===== */}
-      <nav className="flex-shrink-0 bg-white/80 backdrop-blur-xl border-b border-slate-200/80 z-20 relative shadow-sm">
+      <nav className="flex-shrink-0 bg-white/80 backdrop-blur-xl border-b border-slate-200/80 z-20 sticky top-0 shadow-sm">
         <div className="flex items-center gap-1.5 px-3 sm:px-4 py-2 overflow-x-auto scrollbar-hide">
           {categories.map(cat => {
             const count = cat.id === "all" ? products.length : products.filter(p => p.category === cat.id).length;
@@ -3138,13 +3138,13 @@ export default function POSPage() {
                 key={cat.id}
                 onClick={() => setActiveCategory(cat.id)}
                 className={cn(
-                  "cat-pill-premium flex-shrink-0 flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition duration-200",
+                  "cat-pill-premium flex-shrink-0 flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-200",
                   activeCategory === cat.id
-                    ? `bg-gradient-to-r ${cat.gradient} text-white shadow-md`
-                    : "bg-slate-100/80 text-slate-600 hover:bg-slate-200/80"
+                    ? `bg-gradient-to-r ${cat.gradient} text-white shadow-md scale-105`
+                    : "bg-slate-100/80 text-slate-600 hover:bg-slate-200/80 hover:scale-105"
                 )}
               >
-                <span className={cn("text-base", activeCategory === cat.id && "scale-110")}>{cat.icon}</span>
+                <span className={cn("text-base transition-transform", activeCategory === cat.id && "scale-125")}>{cat.icon}</span>
                 <span className="sm:hidden">{cat.id === 'confectionery' ? 'Confect.' : cat.id === 'soft-drinks' ? 'Drinks' : cat.id === 'hard-liquor' ? 'Liquor' : cat.id === 'households' ? 'Home' : cat.id === 'groceries' ? 'Grocery' : cat.name}</span>
                 <span className="hidden sm:inline">{cat.name}</span>
                 <span className={cn(
@@ -3376,7 +3376,7 @@ export default function POSPage() {
             Shows everything: cart header, client info, part no input, cart items,
             totals, function buttons, and numeric keypad (0-9). */}
         <section className={cn(
-          "flex flex-col card-premium shadow-premium-lg",
+          "flex flex-col card-premium shadow-premium-lg transition-all duration-300",
           showSidebar ? "w-full lg:w-[42%] lg:min-w-[400px] lg:flex-none" : "w-0 min-w-0 max-h-0 overflow-hidden opacity-0 lg:w-0"
         )}>
           <AnimatePresence>
