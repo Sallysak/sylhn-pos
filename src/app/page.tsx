@@ -58,6 +58,7 @@ import { PrinterPairing } from "@/components/printer-pairing";
 import { AiAssistant } from "@/components/ai-assistant";
 import { AiAssistantDashboard } from "@/components/ai-assistant-dashboard";
 import { AiPredictionsDashboard } from "@/components/ai-predictions-dashboard";
+import { APP_VERSION, BUILD_ID } from "@/lib/version";
 import { SpeedDial } from "@/components/speed-dial";
 import { saveCart, loadCart, clearCart as clearPersistedCart } from "@/lib/cart-persistence";
 import { saveSessionToken, clearSessionToken, getSessionToken, authedFetch } from "@/lib/client-auth";
@@ -3216,6 +3217,8 @@ export default function POSPage() {
                   <span className="hidden md:inline text-amber-600 font-semibold">{products.filter(p => p.stock <= p.reorderLevel && p.active !== false).length} low stock</span>
                 </>
               )}
+              <span className="text-slate-300 hidden lg:inline">·</span>
+              <span className="hidden lg:inline text-slate-400 font-mono text-[10px]" title={BUILD_ID}>v{APP_VERSION}</span>
             </div>
           </div>
 

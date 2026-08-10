@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { COMPANY, formatGHS } from "@/lib/pos-data";
+import { APP_VERSION, BUILD_ID } from "@/lib/version";
 import { saveUserSession } from "@/lib/session-data";
 import {
   isBiometricSupported, isBiometricAvailable, getBiometricCredentials,
@@ -517,6 +518,11 @@ export function AdminLogin({ onSuccess, onCancel, adminOnly = false }: { onSucce
         </div>
 
         <button onClick={onCancel} className="w-full mt-5 text-xs text-slate-500 hover:text-slate-800 transition font-medium">{adminOnly ? '← Back to POS' : 'Login required to continue'}</button>
+
+        {/* Version footer */}
+        <div className="mt-3 text-center text-[10px] text-slate-400 font-mono">
+          SYLHN POS v{APP_VERSION} · {BUILD_ID}
+        </div>
       </motion.div>
 
       {/* ===== Reset Credentials Confirmation Dialog ===== */}
