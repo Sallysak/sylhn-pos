@@ -122,9 +122,14 @@
     overflow-x: hidden;
     /* Smooth scrolling on mobile */
     -webkit-overflow-scrolling: touch;
+    /* CRITICAL: Match app background to prevent white flash on page transitions */
+    background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 50%, #f0fdfa 100%);
     /* Prevent text size adjustment on orientation change */
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
+  }
+  html.dark body {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
   }
   /* Fix 100vh on mobile browsers (accounts for address bar) */
   html {

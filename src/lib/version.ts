@@ -19,10 +19,10 @@
  * Helps identify exact deploy when debugging
  */
 
-export const APP_VERSION = "1.3.0";
-export const BUILD_ID = "build-2026-08-10-v130-comprehensive-audit-fix";
+export const APP_VERSION = "1.3.1";
+export const BUILD_ID = "build-2026-08-10-v131-stacking-context-body-bg";
 export const RELEASE_DATE = "August 10, 2026";
-export const RELEASE_NAME = "Comprehensive Audit — White Flash + Bounce + Z-Index";
+export const RELEASE_NAME = "Stacking Context Fix + Body Background Match";
 
 // Full version string for display
 export const FULL_VERSION = `v${APP_VERSION} (${BUILD_ID})`;

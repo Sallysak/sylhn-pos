@@ -53,9 +53,9 @@ import { SpeedDial } from "@/components/speed-dial";
 
 // Loading fallback for lazy-loaded components (prevents white flash)
 const loadingFallback = () => (
-  <div className="h-screen flex flex-col items-center justify-center bg-slate-50 gap-3">
-    <div className="h-10 w-10 rounded-full border-4 border-slate-200 border-t-emerald-600 animate-spin" />
-    <div className="text-sm font-semibold text-slate-500">Loading…</div>
+  <div className="h-screen flex flex-col items-center justify-center gap-3" style={{ background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 50%, #f0fdfa 100%)' }}>
+    <div className="h-10 w-10 rounded-full border-4 border-emerald-100 border-t-emerald-600 animate-spin" />
+    <div className="text-sm font-semibold text-emerald-700">Loading…</div>
   </div>
 );
 
@@ -2564,7 +2564,7 @@ export default function POSPage() {
       {/* ===== Keyboard Shortcuts (F1-F10, /, ?, Esc, Ctrl+Enter) ===== */}
       <KeyboardShortcutsOverlay />
       {/* ===== Header Bar with Menu — Premium Glass (responsive) ===== */}
-      <header className="header-premium flex-shrink-0 text-white z-30 relative">
+      <header className="header-premium flex-shrink-0 text-white z-[100] relative">
         {/* Top row: Logo + Search + Stats (logo only on mobile, full on desktop) */}
         <div className="flex items-center px-3 sm:px-4 py-2 gap-3 sm:gap-4 relative">
           {/* Logo — always visible */}
@@ -3381,7 +3381,7 @@ export default function POSPage() {
             Shows everything: cart header, client info, part no input, cart items,
             totals, function buttons, and numeric keypad (0-9). */}
         <section className={cn(
-          "flex flex-col card-premium shadow-premium-lg transition-all duration-300",
+          "flex flex-col card-premium shadow-premium-lg transition-all duration-300 relative z-10",
           showSidebar ? "w-full lg:w-[42%] lg:min-w-[400px] lg:flex-none" : "w-0 min-w-0 max-h-0 overflow-hidden opacity-0 lg:w-0"
         )}>
           <AnimatePresence>
