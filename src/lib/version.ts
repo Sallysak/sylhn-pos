@@ -19,16 +19,29 @@
  * Helps identify exact deploy when debugging
  */
 
-export const APP_VERSION = "1.2.2";
-export const BUILD_ID = "build-2026-08-10-v122-remove-transform-transitions";
+export const APP_VERSION = "1.2.3";
+export const BUILD_ID = "build-2026-08-10-v123-zindex-fix-lazy-load";
 export const RELEASE_DATE = "August 10, 2026";
-export const RELEASE_NAME = "Remove translateY + scale Transforms (Real Bounce Fix)";
+export const RELEASE_NAME = "Z-Index Fix + Lazy Load Heavy Components";
 
 // Full version string for display
 export const FULL_VERSION = `v${APP_VERSION} (${BUILD_ID})`;
 
 // Changelog — keep last 5 versions
 export const CHANGELOG: { version: string; date: string; changes: string[] }[] = [
+  {
+    version: "1.2.3",
+    date: "August 10, 2026",
+    changes: [
+      "FIX: Header dropdown z-index z-50 → z-[120] (fixes floating search bar overlapping Maintenance menu)",
+      "FIX: All 3 header dropdowns (menu, live search, price check) now use z-[120]",
+      "PERF: Converted 10 heavy components from eager imports to lazy dynamic imports",
+      "PERF: LabelPrinter, ExpenseManager, StocktakeWizard, WhatsAppBroadcast now lazy-loaded",
+      "PERF: AIForecastDashboard, ExpiryManager, AdvancedReportsDashboard now lazy-loaded",
+      "PERF: VoiceSearch, RecurringPOManager, BulkProductImport now lazy-loaded",
+      "PERF: Initial bundle size reduced significantly — these only load when needed",
+    ],
+  },
   {
     version: "1.2.2",
     date: "August 10, 2026",

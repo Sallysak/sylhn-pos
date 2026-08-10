@@ -36,16 +36,6 @@ import {
 } from "@/components/ui/dialog";
 import { OfflineSyncIndicator } from "@/components/offline-sync-indicator";
 import { Label as UILabel } from "@/components/ui/label";
-import { LabelPrinter } from "@/components/label-printer";
-import { ExpenseManager } from "@/components/expense-manager";
-import { StocktakeWizard } from "@/components/stocktake-wizard";
-import { WhatsAppBroadcast } from "@/components/whatsapp-broadcast";
-import { AIForecastDashboard } from "@/components/ai-forecast-dashboard";
-import { ExpiryManager } from "@/components/expiry-manager";
-import { AdvancedReportsDashboard } from "@/components/advanced-reports-dashboard";
-import { VoiceSearch } from "@/components/voice-search";
-import { RecurringPOManager } from "@/components/recurring-po-manager";
-import { BulkProductImport } from "@/components/bulk-product-import";
 import { detectNetwork } from "@/lib/mobile-money";
 import { initializePaystackTransaction, isPaystackConfigured } from "@/lib/paystack";
 import { useToast } from "@/hooks/use-toast";
@@ -60,6 +50,18 @@ import { AiAssistantDashboard } from "@/components/ai-assistant-dashboard";
 import { AiPredictionsDashboard } from "@/components/ai-predictions-dashboard";
 import { APP_VERSION, BUILD_ID } from "@/lib/version";
 import { SpeedDial } from "@/components/speed-dial";
+
+// Heavy components — lazy loaded to reduce initial bundle size
+const LabelPrinter = dynamic(() => import("@/components/label-printer").then(m => ({ default: m.LabelPrinter })), { ssr: false });
+const ExpenseManager = dynamic(() => import("@/components/expense-manager").then(m => ({ default: m.ExpenseManager })), { ssr: false });
+const StocktakeWizard = dynamic(() => import("@/components/stocktake-wizard").then(m => ({ default: m.StocktakeWizard })), { ssr: false });
+const WhatsAppBroadcast = dynamic(() => import("@/components/whatsapp-broadcast").then(m => ({ default: m.WhatsAppBroadcast })), { ssr: false });
+const AIForecastDashboard = dynamic(() => import("@/components/ai-forecast-dashboard").then(m => ({ default: m.AIForecastDashboard })), { ssr: false });
+const ExpiryManager = dynamic(() => import("@/components/expiry-manager").then(m => ({ default: m.ExpiryManager })), { ssr: false });
+const AdvancedReportsDashboard = dynamic(() => import("@/components/advanced-reports-dashboard").then(m => ({ default: m.AdvancedReportsDashboard })), { ssr: false });
+const VoiceSearch = dynamic(() => import("@/components/voice-search").then(m => ({ default: m.VoiceSearch })), { ssr: false });
+const RecurringPOManager = dynamic(() => import("@/components/recurring-po-manager").then(m => ({ default: m.RecurringPOManager })), { ssr: false });
+const BulkProductImport = dynamic(() => import("@/components/bulk-product-import").then(m => ({ default: m.BulkProductImport })), { ssr: false });
 import { saveCart, loadCart, clearCart as clearPersistedCart } from "@/lib/cart-persistence";
 import { saveSessionToken, clearSessionToken, getSessionToken, authedFetch } from "@/lib/client-auth";
 import { clearAuthState, saveUserSession, getCachedUser, hasUnsavedBusinessData } from "@/lib/session-data";
@@ -2612,7 +2614,7 @@ export default function POSPage() {
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
                       transition={{ duration: 0.15 }}
-                      className="absolute top-full left-0 mt-1 w-64 bg-white rounded-xl shadow-2xl ring-1 ring-slate-200 overflow-hidden z-50 py-1 max-h-[70vh] overflow-y-auto"
+                      className="absolute top-full left-0 mt-1 w-64 bg-white rounded-xl shadow-2xl ring-1 ring-slate-200 overflow-hidden z-[120] py-1 max-h-[70vh] overflow-y-auto"
                     >
                       {menu.items.map((item, i) => {
                         if ('separator' in item) {
@@ -2677,7 +2679,7 @@ export default function POSPage() {
               </div>
               {/* Live search results dropdown — shows product name + price inline */}
               {searchQuery && !priceCheckMode && filteredProducts.length > 0 && (
-                <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-xl shadow-2xl ring-1 ring-slate-200 z-50 max-h-72 overflow-y-auto">
+                <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-xl shadow-2xl ring-1 ring-slate-200 z-[120] max-h-72 overflow-y-auto">
                   {filteredProducts.slice(0, 8).map((p) => (
                     <button key={p.id} onClick={() => { addToCart(p); setSearchQuery(""); searchInputRef.current?.focus(); }} className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-emerald-50 text-left transition border-b border-slate-50 last:border-0">
                       <span className="text-lg flex-shrink-0">{p.emoji}</span>
@@ -2693,7 +2695,7 @@ export default function POSPage() {
               )}
               {/* Price check result dropdown */}
               {searchQuery && priceCheckMode && filteredProducts.length > 0 && (
-                <div className="absolute top-full left-0 mt-1 w-full bg-amber-50 rounded-xl shadow-2xl ring-1 ring-amber-300 z-50 max-h-72 overflow-y-auto">
+                <div className="absolute top-full left-0 mt-1 w-full bg-amber-50 rounded-xl shadow-2xl ring-1 ring-amber-300 z-[120] max-h-72 overflow-y-auto">
                   <div className="px-3 py-1.5 text-[9px] font-bold uppercase tracking-wider text-amber-700 bg-amber-100">Price Check — click to add to cart</div>
                   {filteredProducts.slice(0, 8).map((p) => (
                     <div key={p.id} onClick={() => { addToCart(p); setSearchQuery(""); searchInputRef.current?.focus(); }} className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-amber-100 transition border-b border-amber-100 last:border-0 cursor-pointer">
