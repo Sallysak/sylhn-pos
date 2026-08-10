@@ -2555,7 +2555,7 @@ export default function POSPage() {
 
   // ===== Render POS =====
     return (
-    <div className="min-h-screen w-full gradient-premium-mesh flex flex-col font-sans pb-[72px] lg:pb-0 lg:h-screen lg:overflow-hidden">
+    <div className="h-screen w-full gradient-premium-mesh flex flex-col font-sans pb-[72px] lg:pb-0 lg:h-screen overflow-hidden">
       {/* ===== Keyboard Shortcuts (F1-F10, /, ?, Esc, Ctrl+Enter) ===== */}
       <KeyboardShortcutsOverlay />
       {/* ===== Header Bar with Menu — Premium Glass (responsive) ===== */}

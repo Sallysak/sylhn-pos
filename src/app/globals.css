@@ -129,9 +129,20 @@
   /* Fix 100vh on mobile browsers (accounts for address bar) */
   html {
     height: 100%;
+    /* CRITICAL: Prevent overscroll bounce on mobile Chrome/Safari
+       This stops the page from "bouncing" when tapping buttons */
+    overscroll-behavior: none;
+    /* Prevent the URL bar show/hide from causing layout shifts */
+    scroll-behavior: smooth;
   }
   body {
     min-height: 100%;
+    /* Lock body scrolling — only inner containers should scroll */
+    overflow: hidden;
+    /* Prevent pull-to-refresh (causes bounce on Android Chrome) */
+    overscroll-behavior-y: none;
+    /* Prevent rubber-band scrolling on iOS */
+    -webkit-overflow-scrolling: touch;
   }
   /* Use 100dvh (dynamic viewport height) where supported */
   @supports (height: 100dvh) {
@@ -140,6 +151,10 @@
     }
     .min-h-screen {
       min-height: 100dvh !important;
+    }
+    /* Fix for elements using 100vh directly */
+    [style*="100vh"], [style*="100vh"] {
+      height: 100dvh !important;
     }
   }
   /* Radix ScrollArea: ensure it works on mobile */

@@ -19,16 +19,28 @@
  * Helps identify exact deploy when debugging
  */
 
-export const APP_VERSION = "1.1.2";
-export const BUILD_ID = "build-2026-08-10-v112-bounce-dropdown-fix";
+export const APP_VERSION = "1.1.3";
+export const BUILD_ID = "build-2026-08-10-v113-mobile-viewport-bounce-fix";
 export const RELEASE_DATE = "August 10, 2026";
-export const RELEASE_NAME = "Dropdown Bounce Fix + Schema Sync (DIRECT_URL)";
+export const RELEASE_NAME = "Mobile Viewport Bounce Fix";
 
 // Full version string for display
 export const FULL_VERSION = `v${APP_VERSION} (${BUILD_ID})`;
 
 // Changelog — keep last 5 versions
 export const CHANGELOG: { version: string; date: string; changes: string[] }[] = [
+  {
+    version: "1.1.3",
+    date: "August 10, 2026",
+    changes: [
+      "FIX: Real mobile bounce cause — viewport resizing when URL bar shows/hides",
+      "FIX: Set body overflow:hidden + overscroll-behavior:none (prevents pull-to-refresh bounce)",
+      "FIX: Changed min-h-screen to h-screen + overflow-hidden on main POS container",
+      "FIX: Disabled user-scalable + maximumScale=1 (prevents iOS input-focus zoom bounce)",
+      "FIX: Removed sticky positioning from email system header (was causing jumps)",
+      "FIX: Email system container now uses h-screen + overflow-hidden",
+    ],
+  },
   {
     version: "1.1.2",
     date: "August 10, 2026",

@@ -39,8 +39,8 @@ export const viewport: Viewport = {
   themeColor: "#059669",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 5,
-  userScalable: true,
+  maximumScale: 1,        // Prevent zoom on input focus (iOS) — reduces bounce
+  userScalable: false,    // Disable pinch-zoom — prevents layout shifts on mobile
   viewportFit: "cover",
 };
 
