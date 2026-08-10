@@ -4759,7 +4759,7 @@ function PaymentModal({ total, subtotal, tax, discount, itemCount, invoiceNumber
               {/* Change Due — premium hero card (mobile-emphasized) */}
               {amountPaid > 0 && (
                 <div className={cn(
-                  "mt-3 p-4 rounded-xl flex justify-between items-center transition-all",
+                  "mt-3 p-4 rounded-xl flex justify-between items-center transition-colors",
                   change >= 0 ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white" : "bg-rose-600 text-white"
                 )}>
                   <div>

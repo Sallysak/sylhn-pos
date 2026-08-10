@@ -19,16 +19,26 @@
  * Helps identify exact deploy when debugging
  */
 
-export const APP_VERSION = "1.1.3";
-export const BUILD_ID = "build-2026-08-10-v113-mobile-viewport-bounce-fix";
+export const APP_VERSION = "1.1.4";
+export const BUILD_ID = "build-2026-08-10-v114-scrollbar-gutter-fix";
 export const RELEASE_DATE = "August 10, 2026";
-export const RELEASE_NAME = "Mobile Viewport Bounce Fix";
+export const RELEASE_NAME = "Scrollbar Gutter Fix (PC Bounce)";
 
 // Full version string for display
 export const FULL_VERSION = `v${APP_VERSION} (${BUILD_ID})`;
 
 // Changelog — keep last 5 versions
 export const CHANGELOG: { version: string; date: string; changes: string[] }[] = [
+  {
+    version: "1.1.4",
+    date: "August 10, 2026",
+    changes: [
+      "FIX: Removed 'scroll-behavior: smooth' from html (was causing bounce on tab switch — browser smoothly scrolled to new content position)",
+      "FIX: Added 'scrollbar-gutter: stable' to ALL scroll containers (prevents horizontal content shift when scrollbar appears/disappears on tab switch)",
+      "FIX: Replaced last 'transition-all' with 'transition-colors' in payment modal",
+      "FIX: Added 'scroll-behavior: auto' explicitly to html to override any inherited smooth scrolling",
+    ],
+  },
   {
     version: "1.1.3",
     date: "August 10, 2026",
