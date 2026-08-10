@@ -19,16 +19,31 @@
  * Helps identify exact deploy when debugging
  */
 
-export const APP_VERSION = "1.2.1";
-export const BUILD_ID = "build-2026-08-10-v121-revert-css-restore-original";
+export const APP_VERSION = "1.2.2";
+export const BUILD_ID = "build-2026-08-10-v122-remove-transform-transitions";
 export const RELEASE_DATE = "August 10, 2026";
-export const RELEASE_NAME = "Revert CSS Changes — Restore Original Behavior";
+export const RELEASE_NAME = "Remove translateY + scale Transforms (Real Bounce Fix)";
 
 // Full version string for display
 export const FULL_VERSION = `v${APP_VERSION} (${BUILD_ID})`;
 
 // Changelog — keep last 5 versions
 export const CHANGELOG: { version: string; date: string; changes: string[] }[] = [
+  {
+    version: "1.2.2",
+    date: "August 10, 2026",
+    changes: [
+      "FIX: Removed .btn-premium:hover { transform: translateY(-1px) } — THE main bounce cause",
+      "FIX: Removed .btn-premium:active { transform: translateY(0) } — companion bounce cause",
+      "FIX: Removed .mobile-tab:active { transform: scale(0.92) } — mobile tab bounce",
+      "FIX: Removed .product-card-premium:hover { transform: translateY(-2px) } — card hover bounce",
+      "FIX: Removed .product-card-premium:active { transform: scale(0.98) } — card click bounce",
+      "FIX: Changed .btn-premium transition: all → specific properties (bg, color, shadow, border)",
+      "FIX: Changed .cat-pill-premium transition: all → specific properties",
+      "FIX: Changed .mobile-tab transition: all 0.32s → specific properties 0.2s",
+      "REASON: translateY and scale transforms on hover/active shift element position → neighbors reflow → bounce",
+    ],
+  },
   {
     version: "1.2.1",
     date: "August 10, 2026",

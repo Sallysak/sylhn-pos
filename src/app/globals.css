@@ -331,7 +331,7 @@
     background: transparent;
     border: none;
     cursor: pointer;
-    transition: all 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+    transition: background-color 0.2s ease, color 0.2s ease;
     color: rgb(100 116 139);
     font-size: 10px;
     font-weight: 600;
@@ -343,7 +343,7 @@
 
   /* Pressed state — strong tactile feedback */
   .mobile-tab:active {
-    transform: scale(0.92);
+    /* REMOVED transform: scale(0.92) — was causing bounce */
     background: rgb(241 245 249 / 0.7);
   }
   html.dark .mobile-tab:active {
@@ -912,7 +912,7 @@
   .btn-premium {
     position: relative;
     overflow: hidden;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
     -webkit-tap-highlight-color: transparent;
     user-select: none;
   }
@@ -924,10 +924,10 @@
     pointer-events: none;
   }
   .btn-premium:hover {
-    transform: translateY(-1px);
+    /* REMOVED transform: translateY(-1px) — was causing the bounce */
   }
   .btn-premium:active {
-    transform: translateY(0);
+    /* REMOVED transform: translateY(0) — was causing the bounce */
     transition-duration: 0.05s;
   }
 
@@ -971,7 +971,7 @@
     pointer-events: none;
   }
   .product-card-premium:hover {
-    transform: translateY(-2px);
+    /* REMOVED transform: translateY(-2px) — was causing bounce on hover */
     border-color: #10b981;
     box-shadow:
       0 0 0 1px rgba(16, 185, 129, 0.10),
@@ -982,7 +982,7 @@
     background: linear-gradient(135deg, rgba(16, 185, 129, 0.04) 0%, rgba(16, 185, 129, 0) 100%);
   }
   .product-card-premium:active {
-    transform: translateY(0) scale(0.98);
+    /* REMOVED transform: translateY(0) scale(0.98) — was causing bounce */
     transition-duration: 0.08s;
   }
 
@@ -1002,7 +1002,7 @@
   /* Premium category pill — modern tab */
   .cat-pill-premium {
     position: relative;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
     -webkit-tap-highlight-color: transparent;
   }
   .cat-pill-premium.active {
