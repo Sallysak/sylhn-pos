@@ -3129,7 +3129,7 @@ export default function POSPage() {
       </header>
 
       {/* ===== Category Navigation — Premium Pills with icons + active glow ===== */}
-      <nav className="flex-shrink-0 bg-white/80 backdrop-blur-xl border-b border-slate-200/80 z-20 sticky top-0 shadow-sm">
+      <nav className="flex-shrink-0 bg-white/80 backdrop-blur-xl border-b border-slate-200/80 z-20 relative shadow-sm">
         <div className="flex items-center gap-1.5 px-3 sm:px-4 py-2 overflow-x-auto scrollbar-hide">
           {categories.map(cat => {
             const count = cat.id === "all" ? products.length : products.filter(p => p.category === cat.id).length;
@@ -3138,10 +3138,10 @@ export default function POSPage() {
                 key={cat.id}
                 onClick={() => setActiveCategory(cat.id)}
                 className={cn(
-                  "cat-pill-premium flex-shrink-0 flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-200",
+                  "cat-pill-premium flex-shrink-0 flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition duration-200",
                   activeCategory === cat.id
-                    ? `bg-gradient-to-r ${cat.gradient} text-white shadow-md scale-105`
-                    : "bg-slate-100/80 text-slate-600 hover:bg-slate-200/80 hover:scale-105"
+                    ? `bg-gradient-to-r ${cat.gradient} text-white shadow-md`
+                    : "bg-slate-100/80 text-slate-600 hover:bg-slate-200/80"
                 )}
               >
                 <span className={cn("text-base transition-transform", activeCategory === cat.id && "scale-125")}>{cat.icon}</span>
@@ -3258,11 +3258,10 @@ export default function POSPage() {
                 return (
                   <motion.button
                     key={product.id}
-                    layout
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ duration: 0.2, delay: Math.min(idx * 0.015, 0.3) }}
-                    whileHover={{ y: -4, scale: 1.03 }}
+                    whileHover={{ scale: 1.03 }}
                     whileTap={{ scale: 0.96 }}
                     onClick={() => addToCart(product)}
                     onDoubleClick={(e) => {
@@ -3377,7 +3376,7 @@ export default function POSPage() {
             Shows everything: cart header, client info, part no input, cart items,
             totals, function buttons, and numeric keypad (0-9). */}
         <section className={cn(
-          "flex flex-col card-premium shadow-premium-lg transition-all duration-300",
+          "flex flex-col card-premium shadow-premium-lg",
           showSidebar ? "w-full lg:w-[42%] lg:min-w-[400px] lg:flex-none" : "w-0 min-w-0 max-h-0 overflow-hidden opacity-0 lg:w-0"
         )}>
           <AnimatePresence>
@@ -3540,7 +3539,6 @@ export default function POSPage() {
                             return (
                               <motion.div
                                 key={item.id}
-                                layout
                                 initial={{ opacity: 0, x: 20 }}
                                 animate={{ opacity: 1, x: 0 }}
                                 exit={{ opacity: 0, x: -20 }}
@@ -5167,7 +5165,6 @@ function FindProductModal({ products, onAdd, onClose }: {
                   return (
                     <motion.div
                       key={product.id}
-                      layout
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1, backgroundColor: justAdded ? "#ecfdf5" : isSelected ? "#eff6ff" : "#ffffff" }}
                       transition={{ duration: 0.15, delay: Math.min(idx * 0.01, 0.2) }}
@@ -5698,7 +5695,6 @@ function CartPreviewModal({
                       return (
                         <motion.div
                           key={item.id}
-                          layout
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
                           exit={{ opacity: 0, height: 0 }}

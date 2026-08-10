@@ -19,16 +19,29 @@
  * Helps identify exact deploy when debugging
  */
 
-export const APP_VERSION = "1.1.0";
-export const BUILD_ID = "build-2026-08-10-v110-email-ai-pwa";
+export const APP_VERSION = "1.1.1";
+export const BUILD_ID = "build-2026-08-10-v111-bounce-fix-schema-sync";
 export const RELEASE_DATE = "August 10, 2026";
-export const RELEASE_NAME = "Email AI PWA Update";
+export const RELEASE_NAME = "Bounce Fix + Schema Sync Update";
 
 // Full version string for display
 export const FULL_VERSION = `v${APP_VERSION} (${BUILD_ID})`;
 
 // Changelog — keep last 5 versions
 export const CHANGELOG: { version: string; date: string; changes: string[] }[] = [
+  {
+    version: "1.1.1",
+    date: "August 10, 2026",
+    changes: [
+      "FIX: Removed framer-motion 'layout' prop from product cards, cart items, mobile lists (eliminates bouncing)",
+      "FIX: Removed 'y: -4' from product card hover animation (was triggering layout recalculation cascade)",
+      "FIX: Removed 'sticky top-0' from category nav (was causing visual jumps on scroll)",
+      "FIX: Removed 'transition-all' + 'scale-105' from category pills (was bouncing neighboring pills)",
+      "FIX: Removed 'transition-all duration-300' from cart sidebar (was animating width changes)",
+      "FIX: Deep schema health check (auto-syncs missing Product.imageUrl, Email table, EmailLog.cc)",
+      "FEAT: Version numbering system (v1.1.1) — matches FastMaint pattern",
+    ],
+  },
   {
     version: "1.1.0",
     date: "August 10, 2026",
