@@ -102,6 +102,15 @@ async function runSummary() {
       where: { active: true, quantity: { lte: 10 } },
       orderBy: { quantity: 'asc' },
       take: 5,
+      select: {
+        id: true,
+        name: true,
+        sku: true,
+        emoji: true,
+        quantity: true,
+        reorderLevel: true,
+        unit: true,
+      },
     })
 
     // === Build HTML email ===

@@ -356,7 +356,17 @@ export function EmailSystem({ onBack }: { onBack: () => void }) {
           </div>
         )}
 
-        {tab === "templates" && <EmailTemplates onUseTemplate={(t) => { setComposeSubject(t.subject); setComposeHtml(t.body); if (editorRef.current) editorRef.current.innerHTML = t.body; setTab("compose"); }} />}
+        {tab === "templates" && <EmailTemplates onUseTemplate={(t) => {
+          setComposeSubject(t.subject);
+          setComposeHtml(t.body);
+          setTab("compose");
+          // Wait for the compose tab to render, then set the editor content
+          setTimeout(() => {
+            if (editorRef.current) {
+              editorRef.current.innerHTML = t.body;
+            }
+          }, 100);
+        }} />}
 
         {tab === "settings" && (
           <div className="space-y-4">

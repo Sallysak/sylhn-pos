@@ -37,6 +37,16 @@ async function runAlert() {
       where: { active: true, quantity: { lte: 10 } },
       orderBy: [{ quantity: 'asc' }, { name: 'asc' }],
       take: 50,
+      select: {
+        id: true,
+        name: true,
+        sku: true,
+        emoji: true,
+        quantity: true,
+        reorderLevel: true,
+        unit: true,
+        price: true,
+      },
     })
 
     if (lowStockProducts.length === 0) {
