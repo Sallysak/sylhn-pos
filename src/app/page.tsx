@@ -3269,10 +3269,24 @@ export default function POSPage() {
                     }}
                     onContextMenu={(e) => {
                       e.preventDefault();
-                      toast({
-                        title: `${product.emoji} ${product.name}`,
-                        description: `Stock: ${product.stock ?? product.quantity ?? 0} ${product.unit} · Price: ${formatGHS(product.price)} · SKU: ${product.sku}`,
-                      });
+                      const stockNum = product.stock ?? product.quantity ?? 0;
+                      // Quick reorder option for low-stock products
+                      if (lowStock) {
+                        const reorder = window.confirm(
+                          `${product.emoji} ${product.name}\n\nStock: ${stockNum} ${product.unit}\nPrice: ${formatGHS(product.price)}\nSKU: ${product.sku}\n\nWould you like to create a purchase order for this product?`
+                        );
+                        if (reorder) {
+                          setView("purchase-form" as any);
+                          setTimeout(() => {
+                            toast({ title: "Create a PO", description: `Add ${product.name} to your purchase order` });
+                          }, 500);
+                        }
+                      } else {
+                        toast({
+                          title: `${product.emoji} ${product.name}`,
+                          description: `Stock: ${stockNum} ${product.unit} · Price: ${formatGHS(product.price)} · SKU: ${product.sku}`,
+                        });
+                      }
                     }}
                     className={cn(
                       "product-card-premium flex flex-col items-center text-center relative overflow-hidden",
@@ -4104,6 +4118,13 @@ export default function POSPage() {
               label: "Pair Printer",
               color: "from-blue-600 to-cyan-600",
               onClick: () => setShowPrinterPairing(true),
+            },
+            {
+              id: "customer-display",
+              icon: ExternalLink,
+              label: "Customer Display",
+              color: "from-violet-600 to-purple-600",
+              onClick: () => window.open("/customer-display?registerId=register-1", "_blank", "noopener,noreferrer"),
             },
             {
               id: "cash-calc",

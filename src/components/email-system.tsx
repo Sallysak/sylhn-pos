@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, Mail, Send, Inbox, Settings as SettingsIcon, Loader2,
   Check, AlertTriangle, X, Search, Trash2, RefreshCw, Save,
-  Paperclip, Reply, Forward, Star, Archive, FileText,
+  Paperclip, Reply, Forward, Star, Archive, FileText, BarChart3,
   Bold, Italic, Underline, List, ListOrdered, Link as LinkIcon,
   AlignLeft, AlignCenter, AlignRight, Smile, Image as ImageIcon,
   Mail as MailIcon, ChevronDown, Eye, Code,
@@ -71,6 +71,7 @@ export function EmailSystem({ onBack }: { onBack: () => void }) {
   const [testing, setTesting] = useState(false);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [sendingAlert, setSendingAlert] = useState(false);
+  const [sendingSummary, setSendingSummary] = useState(false);
 
   const loadEmails = useCallback(async () => {
     setLoading(true);
@@ -219,6 +220,19 @@ export function EmailSystem({ onBack }: { onBack: () => void }) {
         toast({ title: "Alert failed", description: data.error, variant: "destructive" });
       }
     } catch (e: any) { toast({ title: "Network error", description: e?.message, variant: "destructive" }); } finally { setSendingAlert(false); }
+  };
+
+  const handleSendDailySummary = async () => {
+    setSendingSummary(true);
+    try {
+      const res = await authedFetch("/api/email/daily-summary", { method: "POST" });
+      const data = await res.json();
+      if (data.success) {
+        toast({ title: "✅ Daily summary sent!", description: `Today: GHS ${data.today.total.toFixed(2)} (${data.today.count} sales) → ${data.sentTo}` });
+      } else {
+        toast({ title: "Summary failed", description: data.error, variant: "destructive" });
+      }
+    } catch (e: any) { toast({ title: "Network error", description: e?.message, variant: "destructive" }); } finally { setSendingSummary(false); }
   };
 
   return (
@@ -382,17 +396,27 @@ export function EmailSystem({ onBack }: { onBack: () => void }) {
             {/* Quick Actions — Automated Email Alerts */}
             <div className="card-premium p-4">
               <h3 className="text-sm font-bold text-slate-800 mb-1 flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-amber-500" /> Automated Email Alerts</h3>
-              <p className="text-[11px] text-slate-500 mb-3">Send yourself an instant alert about low-stock products. Can also be triggered automatically via cron.</p>
-              <button
-                onClick={handleSendLowStockAlert}
-                disabled={sendingAlert}
-                className="btn-premium w-full h-11 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 disabled:opacity-50 text-white text-sm font-bold flex items-center justify-center gap-2 transition active:scale-95"
-              >
-                {sendingAlert ? <Loader2 className="h-4 w-4 animate-spin" /> : <AlertTriangle className="h-4 w-4" />}
-                {sendingAlert ? "Sending..." : "Send Low-Stock Alert Now"}
-              </button>
+              <p className="text-[11px] text-slate-500 mb-3">Send yourself instant alerts or daily summaries. Can also be triggered automatically via cron-job.org.</p>
+              <div className="grid grid-cols-1 gap-2">
+                <button
+                  onClick={handleSendLowStockAlert}
+                  disabled={sendingAlert}
+                  className="btn-premium w-full h-11 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 disabled:opacity-50 text-white text-sm font-bold flex items-center justify-center gap-2 transition active:scale-95"
+                >
+                  {sendingAlert ? <Loader2 className="h-4 w-4 animate-spin" /> : <AlertTriangle className="h-4 w-4" />}
+                  {sendingAlert ? "Sending..." : "Send Low-Stock Alert Now"}
+                </button>
+                <button
+                  onClick={handleSendDailySummary}
+                  disabled={sendingSummary}
+                  className="btn-premium w-full h-11 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 disabled:opacity-50 text-white text-sm font-bold flex items-center justify-center gap-2 transition active:scale-95"
+                >
+                  {sendingSummary ? <Loader2 className="h-4 w-4 animate-spin" /> : <BarChart3 className="h-4 w-4" />}
+                  {sendingSummary ? "Sending..." : "Send Daily Summary Now"}
+                </button>
+              </div>
               <p className="text-[10px] text-slate-400 mt-2 text-center">
-                💡 The alert is sent to your configured "From Email" address. Auto-sends every 4 hours if stock is low (configure via cron-job.org).
+                💡 Daily summary auto-sends at 9 PM (configure via cron-job.org with schedule "0 21 * * *")
               </p>
             </div>
           </div>
