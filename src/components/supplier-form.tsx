@@ -1460,7 +1460,7 @@ function NewSupplierPopup({ onSave, onClose, editSupplier }: { onSave: (s: Suppl
             ["history", "History"],
             ["notes", "Notes"],
           ] as const).map(([id, label]) => (
-            <button key={id} onClick={() => setTab(id)} className={cn("px-3 py-1 text-[10px] font-bold text-white transition whitespace-nowrap", tab === id ? "bg-white/20" : "hover:bg-white/10")}>{label}</button>
+            <button key={id} onClick={() => setTab(id)} className={cn("px-3 py-1 text-[10px] font-bold text-white transition whitespace-nowrap", tab === id ? "bg-white/25 text-white" : "bg-white/10 text-white/70 hover:bg-white/20 hover:text-white")}>{label}</button>
           ))}
         </div>
         {/* Tab Content */}

@@ -895,7 +895,7 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
                 onClick={() => setTab(t.id)}
                 className={cn(
                   "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition whitespace-nowrap flex-shrink-0",
-                  tab === t.id ? "bg-emerald-500 text-white" : "bg-white/5 text-slate-300 hover:bg-white/10"
+                  tab === t.id ? "bg-emerald-500 text-white shadow-md" : "bg-slate-200/80 text-slate-700 hover:bg-slate-300/80 dark:bg-slate-700/80 dark:text-slate-200 dark:hover:bg-slate-600/80"
                 )}
               >
                 <Icon className="h-3.5 w-3.5" />

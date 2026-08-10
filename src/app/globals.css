@@ -784,6 +784,22 @@
     background-color: #1e293b !important;
     color: #cbd5e1 !important;
   }
+  html.dark tbody tr:nth-child(even) {
+    background-color: rgba(30, 41, 59, 0.5) !important;
+  }
+  /* Dark mode for badges/pills that use light backgrounds */
+  html.dark .badge-premium, html.dark [class*="bg-emerald-100"], html.dark [class*="bg-blue-100"],
+  html.dark [class*="bg-amber-100"], html.dark [class*="bg-rose-100"], html.dark [class*="bg-violet-100"],
+  html.dark [class*="bg-slate-100"], html.dark [class*="bg-gray-100"] {
+    background-color: rgba(51, 65, 85, 0.6) !important;
+    color: #e2e8f0 !important;
+  }
+  /* Dark mode for text on badges */
+  html.dark [class*="text-emerald-700"], html.dark [class*="text-blue-700"],
+  html.dark [class*="text-amber-700"], html.dark [class*="text-rose-700"],
+  html.dark [class*="text-violet-700"] {
+    color: #cbd5e1 !important;
+  }
   /* Dark mode for the product-card-premium */
   html.dark .product-card-premium {
     background: #1e293b !important;
