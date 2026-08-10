@@ -3,12 +3,10 @@ import { db } from '@/lib/db'
 import { hashPassword } from '@/lib/auth'
 
 // POST /api/seed-demo?secret=sylhn-seed-2026
-// Seeds the database with Ghana-specific demo data:
-// - 10 categories (Stock Groups)
-// - 50+ products (Ghana retail items with GHS prices)
-// - 5 suppliers (Ghana-based)
-// - 5 customers (with credit accounts)
-// - Default system settings
+// Seeds the database with Ghana-specific demo data
+
+export const runtime = 'nodejs'
+export const maxDuration = 300 // 5 minutes — seeding takes time
 
 export async function POST(req: NextRequest) {
   const secret = req.nextUrl.searchParams.get('secret')
@@ -216,4 +214,9 @@ export async function POST(req: NextRequest) {
     console.error('Seed demo error:', e)
     return NextResponse.json({ error: e.message || 'Seed failed' }, { status: 500 })
   }
+}
+
+// GET — same as POST for easy browser access
+export async function GET(req: NextRequest) {
+  return POST(req)
 }
