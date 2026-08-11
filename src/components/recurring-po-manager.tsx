@@ -61,7 +61,7 @@ export function RecurringPOManager({ open, onOpenChange, suppliers, products }: 
   const loadRules = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/recurring-pos", { credentials: "include" });
+      const res = await authedFetch("/api/recurring-pos");
       const data = await res.json();
       if (res.ok) setRules(data.rules || []);
     } catch {}
@@ -73,7 +73,7 @@ export function RecurringPOManager({ open, onOpenChange, suppliers, products }: 
     if (form.items.length === 0) { toast({ title: "Add at least one item", variant: "destructive" }); return; }
     setSubmitting(true);
     try {
-      const res = await fetch("/api/recurring-pos", {
+      const res = await authedFetch("/api/recurring-pos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -104,7 +104,7 @@ export function RecurringPOManager({ open, onOpenChange, suppliers, products }: 
   const handleDelete = async (id: string) => {
     if (!window.confirm("Delete this recurring PO rule?")) return;
     try {
-      await fetch(`/api/recurring-pos/${id}`, { method: "DELETE", credentials: "include" });
+      await authedFetch(`/api/recurring-pos/${id}`, { method: "DELETE", credentials: "include" });
       setRules(prev => prev.filter(r => r.id !== id));
       toast({ title: "Deleted" });
     } catch {}
@@ -112,7 +112,7 @@ export function RecurringPOManager({ open, onOpenChange, suppliers, products }: 
 
   const handleRunNow = async (id: string) => {
     try {
-      const res = await fetch("/api/recurring-pos/run-due", { method: "POST", credentials: "include" });
+      const res = await authedFetch("/api/recurring-pos/run-due", { method: "POST", credentials: "include" });
       const data = await res.json();
       if (res.ok) {
         toast({ title: "Recurring POs processed", description: `${data.processed || 0} PO(s) created` });

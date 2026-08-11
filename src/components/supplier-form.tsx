@@ -111,7 +111,7 @@ export function SupplierForm({ onBack, products }: SupplierFormProps) {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch('/api/suppliers', { credentials: 'include' });
+        const res = await authedFetch('/api/suppliers');
         if (!res.ok) return;
         const data = await res.json();
         if (cancelled) return;
@@ -224,7 +224,7 @@ export function SupplierForm({ onBack, products }: SupplierFormProps) {
     toast({ title: "Supplier selected", description: `${supplier.name} (${supplier.code})` });
 
     // Load this supplier's catalog so "Find Part no" searches the right products
-    fetch(`/api/suppliers/${supplier.id}/products`, { credentials: "include" })
+    authedFetch(`/api/suppliers/${supplier.id}/products`)
       .then(r => r.json())
       .then(data => {
         if (data.catalog) {
@@ -254,7 +254,7 @@ export function SupplierForm({ onBack, products }: SupplierFormProps) {
 
     // Persist to server (best-effort)
     try {
-      const res = await fetch('/api/suppliers', {
+      const res = await authedFetch('/api/suppliers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -376,7 +376,7 @@ export function SupplierForm({ onBack, products }: SupplierFormProps) {
     };
 
     try {
-      const res = await fetch("/api/purchases", {
+      const res = await authedFetch("/api/purchases", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -451,7 +451,7 @@ export function SupplierForm({ onBack, products }: SupplierFormProps) {
       const reason = window.prompt("Reason for cancelling this purchase? (required)") || "";
       if (!reason.trim()) return;
       try {
-        const res = await fetch(`/api/purchases/${savedPurchaseId}`, {
+        const res = await authedFetch(`/api/purchases/${savedPurchaseId}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
@@ -485,7 +485,7 @@ export function SupplierForm({ onBack, products }: SupplierFormProps) {
   // After payment recorded — refresh paid/due from server
   const handlePaymentSuccess = () => {
     if (savedPurchaseId) {
-      fetch(`/api/purchases/${savedPurchaseId}`, { credentials: "include" })
+      authedFetch(`/api/purchases/${savedPurchaseId}`)
         .then(r => r.json())
         .then(data => {
           if (data.purchase) setPaidAmount(Number(data.purchase.amountPaid) || 0);
@@ -502,7 +502,7 @@ export function SupplierForm({ onBack, products }: SupplierFormProps) {
     const reason = window.prompt(`Deactivate supplier "${selectedSupplier.name}"?\n\nReason (optional):`) ?? "";
     if (!window.confirm(`Are you sure? This will deactivate "${selectedSupplier.name}". Existing purchase + payment history is preserved. The supplier will no longer appear in dropdowns.`)) return;
     try {
-      const res = await fetch(`/api/suppliers/${selectedSupplier.id}`, {
+      const res = await authedFetch(`/api/suppliers/${selectedSupplier.id}`, {
         method: "DELETE",
         credentials: "include",
       });
@@ -532,7 +532,7 @@ export function SupplierForm({ onBack, products }: SupplierFormProps) {
     setShowNewSupplier(false);
     setEditSupplier(null);
     try {
-      const res = await fetch(`/api/suppliers/${editSupplier.id}`, {
+      const res = await authedFetch(`/api/suppliers/${editSupplier.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -757,7 +757,7 @@ export function SupplierForm({ onBack, products }: SupplierFormProps) {
               onDelete={async (s) => {
                 if (!window.confirm(`Deactivate supplier "${s.name}"?\n\nExisting purchase + payment history is preserved. The supplier will no longer appear in dropdowns.`)) return;
                 try {
-                  const res = await fetch(`/api/suppliers/${s.id}`, { method: "DELETE", credentials: "include" });
+                  const res = await authedFetch(`/api/suppliers/${s.id}`, { method: "DELETE", credentials: "include" });
                   const data = await res.json();
                   if (res.ok && data.success) {
                     toast({ title: "Supplier deactivated", description: `${s.name} (${s.code})` });
@@ -859,7 +859,7 @@ export function SupplierForm({ onBack, products }: SupplierFormProps) {
             onClose={() => setShowBulkEditDialog(false)}
             onSaved={() => {
               // Refresh the supplier list from the API
-              fetch('/api/suppliers', { credentials: 'include' })
+              authedFetch('/api/suppliers')
                 .then(r => r.json())
                 .then(data => {
                   if (data.suppliers) {
@@ -909,7 +909,7 @@ export function SupplierForm({ onBack, products }: SupplierFormProps) {
           onChanged={() => {
             // Reload the catalog state when dialog changes it
             if (selectedSupplier) {
-              fetch(`/api/suppliers/${selectedSupplier.id}/products`, { credentials: "include" })
+              authedFetch(`/api/suppliers/${selectedSupplier.id}/products`)
                 .then(r => r.json())
                 .then(data => {
                   if (data.catalog) setSupplierCatalog(data.catalog);

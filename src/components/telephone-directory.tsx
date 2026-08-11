@@ -129,7 +129,7 @@ export function TelephoneDirectory({
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch('/api/telephone-directory', { credentials: 'include' });
+        const res = await authedFetch('/api/telephone-directory');
         if (!res.ok) return;
         const data = await res.json();
         if (cancelled) return;
@@ -312,7 +312,7 @@ export function TelephoneDirectory({
         // otherwise re-create (delete + create) — but we don't have DELETE wired here.
         // For now, just re-POST (server treats duplicates by name).
         // TODO: full PUT support — see /api/telephone-directory/[id]
-        const res = await fetch(`/api/telephone-directory`, {
+        const res = await authedFetch(`/api/telephone-directory`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           credentials: 'include', body: JSON.stringify(payload),
         });
@@ -322,7 +322,7 @@ export function TelephoneDirectory({
           toast({ title: 'Saved locally (server sync failed)', description: entry.name, variant: 'destructive' });
         }
       } else {
-        const res = await fetch(`/api/telephone-directory`, {
+        const res = await authedFetch(`/api/telephone-directory`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           credentials: 'include', body: JSON.stringify(payload),
         });

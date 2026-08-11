@@ -101,7 +101,7 @@ export function PurchaseHub({ onBack, onNewPO, onOpenSuppliers }: PurchaseHubPro
   // ===== Data fetching =====
   const fetchPurchases = useCallback(async () => {
     try {
-      const res = await fetch("/api/purchases?limit=200");
+      const res = await authedFetch("/api/purchases?limit=200");
       if (!res.ok) throw new Error("Failed to fetch purchases");
       const data = await res.json();
       setPurchases(data.purchases || []);
@@ -113,7 +113,7 @@ export function PurchaseHub({ onBack, onNewPO, onOpenSuppliers }: PurchaseHubPro
 
   const fetchInvoices = useCallback(async () => {
     try {
-      const res = await fetch("/api/supplier-invoices?limit=200");
+      const res = await authedFetch("/api/supplier-invoices?limit=200");
       if (!res.ok) throw new Error("Failed to fetch invoices");
       const data = await res.json();
       setInvoices(data.invoices || []);
@@ -124,7 +124,7 @@ export function PurchaseHub({ onBack, onNewPO, onOpenSuppliers }: PurchaseHubPro
 
   const fetchReturns = useCallback(async () => {
     try {
-      const res = await fetch("/api/supplier-returns?limit=200");
+      const res = await authedFetch("/api/supplier-returns?limit=200");
       if (!res.ok) throw new Error("Failed to fetch returns");
       const data = await res.json();
       setReturns(data.returns || []);
@@ -135,7 +135,7 @@ export function PurchaseHub({ onBack, onNewPO, onOpenSuppliers }: PurchaseHubPro
 
   const fetchPayments = useCallback(async () => {
     try {
-      const res = await fetch("/api/supplier-payments?limit=200");
+      const res = await authedFetch("/api/supplier-payments?limit=200");
       if (!res.ok) throw new Error("Failed to fetch payments");
       const data = await res.json();
       setPayments(data.payments || []);
@@ -457,7 +457,7 @@ function OrdersTab({ purchases, search, setSearch, statusFilter, setStatusFilter
       const phone = purchase.supplier?.mobile || purchase.supplier?.phone || "";
       setWaPhone(phone);
       setShowWhatsApp(purchase);
-      const res = await fetch(`/api/purchases/${purchase.id}/whatsapp?phone=${encodeURIComponent(phone)}`);
+      const res = await authedFetch(`/api/purchases/${purchase.id}/whatsapp?phone=${encodeURIComponent(phone)}`);
       if (!res.ok) throw new Error("Failed");
       const data = await res.json();
       setWaLink(data.waLink);
@@ -574,7 +574,7 @@ function OrdersTab({ purchases, search, setSearch, statusFilter, setStatusFilter
             waText={waText}
             onClose={() => setShowWhatsApp(null)}
             onRegenerate={async (phone) => {
-              const res = await fetch(`/api/purchases/${showWhatsApp.id}/whatsapp?phone=${encodeURIComponent(phone)}`);
+              const res = await authedFetch(`/api/purchases/${showWhatsApp.id}/whatsapp?phone=${encodeURIComponent(phone)}`);
               const data = await res.json();
               setWaLink(data.waLink);
               setWaText(data.text);
@@ -598,7 +598,7 @@ function InvoicesTab({ invoices, onRefresh }: { invoices: SupplierInvoice[]; onR
 
   const resolveInvoice = async (id: string, action: "match" | "reject", notes?: string) => {
     try {
-      const res = await fetch(`/api/supplier-invoices/${id}/match`, {
+      const res = await authedFetch(`/api/supplier-invoices/${id}/match`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action, notes }),
@@ -794,7 +794,7 @@ function PerformanceTab({ purchases }: { purchases: Purchase[] }) {
     if (!selectedSupplierId) return;
     setLoading(true);
     setPerf(null);
-    fetch(`/api/suppliers/${selectedSupplierId}/performance?days=${days}`)
+    authedFetch(`/api/suppliers/${selectedSupplierId}/performance?days=${days}`)
       .then(r => r.json())
       .then(d => setPerf(d))
       .catch(e => console.error(e))
@@ -1190,8 +1190,8 @@ function CreateInvoiceModal({ onClose, onCreated }: { onClose: () => void; onCre
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    fetch("/api/suppliers?active=true&limit=500").then(r => r.json()).then(d => setSuppliers(d.suppliers || []));
-    fetch("/api/purchases?status=received&limit=100").then(r => r.json()).then(d => setPurchases(d.purchases || []));
+    authedFetch("/api/suppliers?active=true&limit=500").then(r => r.json()).then(d => setSuppliers(d.suppliers || []));
+    authedFetch("/api/purchases?status=received&limit=100").then(r => r.json()).then(d => setPurchases(d.purchases || []));
   }, []);
 
   const handleSubmit = async () => {
@@ -1201,7 +1201,7 @@ function CreateInvoiceModal({ onClose, onCreated }: { onClose: () => void; onCre
     }
     setSaving(true);
     try {
-      const res = await fetch("/api/supplier-invoices", {
+      const res = await authedFetch("/api/supplier-invoices", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1309,7 +1309,7 @@ function CreateReturnModal({ onClose, onCreated }: { onClose: () => void; onCrea
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    fetch("/api/suppliers?active=true&limit=500").then(r => r.json()).then(d => setSuppliers(d.suppliers || []));
+    authedFetch("/api/suppliers?active=true&limit=500").then(r => r.json()).then(d => setSuppliers(d.suppliers || []));
   }, []);
 
   const handleSubmit = async () => {
@@ -1319,7 +1319,7 @@ function CreateReturnModal({ onClose, onCreated }: { onClose: () => void; onCrea
     }
     setSaving(true);
     try {
-      const res = await fetch("/api/supplier-returns", {
+      const res = await authedFetch("/api/supplier-returns", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1447,7 +1447,7 @@ function RecordPaymentModal({ onClose, onRecorded }: { onClose: () => void; onRe
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    fetch("/api/suppliers?active=true&limit=500").then(r => r.json()).then(d => setSuppliers(d.suppliers || []));
+    authedFetch("/api/suppliers?active=true&limit=500").then(r => r.json()).then(d => setSuppliers(d.suppliers || []));
   }, []);
 
   // Fetch early-pay discount preview when supplier + amount change
@@ -1458,7 +1458,7 @@ function RecordPaymentModal({ onClose, onRecorded }: { onClose: () => void; onRe
     }
     const t = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/suppliers/${form.supplierId}/early-pay-discount?amount=${form.amount}`);
+        const res = await authedFetch(`/api/suppliers/${form.supplierId}/early-pay-discount?amount=${form.amount}`);
         if (res.ok) {
           const data = await res.json();
           setEarlyPayPreview(data);
@@ -1475,7 +1475,7 @@ function RecordPaymentModal({ onClose, onRecorded }: { onClose: () => void; onRe
     }
     setSaving(true);
     try {
-      const res = await fetch("/api/supplier-payments", {
+      const res = await authedFetch("/api/supplier-payments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

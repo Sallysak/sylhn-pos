@@ -287,7 +287,7 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
     setPurchaseStatus('received');
     // Refresh the purchase from server
     if (savedPurchaseId) {
-      fetch(`/api/purchases/${savedPurchaseId}`, { credentials: 'include' })
+      authedFetch(`/api/purchases/${savedPurchaseId}`)
         .then(r => r.json())
         .then(data => {
           if (data.purchase) {
@@ -633,7 +633,7 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
     };
 
     try {
-      const res = await fetch('/api/purchases', {
+      const res = await authedFetch('/api/purchases', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -768,7 +768,7 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
       const reason = window.prompt("Reason for cancelling this purchase? (required)") || "";
       if (!reason.trim()) return;
       try {
-        const res = await fetch(`/api/purchases/${savedPurchaseId}`, {
+        const res = await authedFetch(`/api/purchases/${savedPurchaseId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
@@ -813,7 +813,7 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
     setSaved(false); // allow re-save or refresh from server
     // Refresh the purchase from server to get the latest paidAmount
     if (savedPurchaseId) {
-      fetch(`/api/purchases/${savedPurchaseId}`, { credentials: 'include' })
+      authedFetch(`/api/purchases/${savedPurchaseId}`)
         .then(r => r.json())
         .then(data => {
           if (data.purchase) {
@@ -970,7 +970,7 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
                     if (typeof matched.creditLimit === 'number') setLimit(matched.creditLimit);
                     if (typeof matched.taxInclusive === 'boolean') setTaxInclusive(matched.taxInclusive);
                     // Load this supplier's catalog so Find Part No shows catalog items first
-                    fetch(`/api/suppliers/${matched.id}/products`, { credentials: "include" })
+                    authedFetch(`/api/suppliers/${matched.id}/products`)
                       .then(r => r.json())
                       .then(data => {
                         if (data.catalog) {

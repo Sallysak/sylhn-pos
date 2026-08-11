@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { authedFetch } from "@/lib/client-auth";
 import { motion } from "framer-motion";
+import { authedFetch } from "@/lib/client-auth";
 import {
   Wallet, Plus, Loader2, Trash2, Download, TrendingDown,
   Calendar, FileText, AlertTriangle, CheckCircle2,
@@ -10,13 +12,21 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { authedFetch } from "@/lib/client-auth";
 import { Label } from "@/components/ui/label";
+import { authedFetch } from "@/lib/client-auth";
 import { Textarea } from "@/components/ui/textarea";
+import { authedFetch } from "@/lib/client-auth";
 import { Button } from "@/components/ui/button";
+import { authedFetch } from "@/lib/client-auth";
 import { Badge } from "@/components/ui/badge";
+import { authedFetch } from "@/lib/client-auth";
 import { useToast } from "@/hooks/use-toast";
+import { authedFetch } from "@/lib/client-auth";
 import { cn } from "@/lib/utils";
+import { authedFetch } from "@/lib/client-auth";
 import { formatGHS } from "@/lib/pos-data";
+import { authedFetch } from "@/lib/client-auth";
 
 interface Expense {
   id: string;
@@ -92,7 +102,7 @@ export function ExpenseManager({ open, onOpenChange }: ExpenseManagerProps) {
       if (dateFrom) params.set("dateFrom", dateFrom);
       if (dateTo) params.set("dateTo", dateTo);
       params.set("limit", "200");
-      const res = await fetch(`/api/expenses?${params}`, { credentials: "include" });
+      const res = await authedFetch(`/api/expenses?${params}`, { credentials: "include" });
       const data = await res.json();
       if (res.ok) setExpenses(data.expenses || []);
     } catch {
@@ -128,7 +138,7 @@ export function ExpenseManager({ open, onOpenChange }: ExpenseManagerProps) {
 
     setSubmitting(true);
     try {
-      const res = await fetch("/api/expenses", {
+      const res = await authedFetch("/api/expenses", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -164,7 +174,7 @@ export function ExpenseManager({ open, onOpenChange }: ExpenseManagerProps) {
     if (!window.confirm("Delete this expense record?")) return;
     setDeleting(id);
     try {
-      const res = await fetch(`/api/expenses?id=${id}`, { method: "DELETE", credentials: "include" });
+      const res = await authedFetch(`/api/expenses?id=${id}`, { method: "DELETE", credentials: "include" });
       if (res.ok) {
         toast({ title: "Deleted" });
         setExpenses(prev => prev.filter(e => e.id !== id));

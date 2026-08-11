@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { authedFetch } from "@/lib/client-auth";
 import { motion, AnimatePresence } from "framer-motion";
+import { authedFetch } from "@/lib/client-auth";
 import {
   ArrowLeft, FileText, DollarSign, Users, X, Printer, Folder,
   BarChart3, TrendingUp, CreditCard, User, Package,
@@ -9,12 +11,19 @@ import {
   FileSpreadsheet, FileBarChart, Loader2, ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { authedFetch } from "@/lib/client-auth";
 import { Badge } from "@/components/ui/badge";
+import { authedFetch } from "@/lib/client-auth";
 import { Input } from "@/components/ui/input";
+import { authedFetch } from "@/lib/client-auth";
 import { useToast } from "@/hooks/use-toast";
+import { authedFetch } from "@/lib/client-auth";
 import { cn } from "@/lib/utils";
+import { authedFetch } from "@/lib/client-auth";
 import { COMPANY, CURRENCY, formatGHS } from "@/lib/pos-data";
+import { authedFetch } from "@/lib/client-auth";
 import { PopupWindow } from "@/components/popup-window";
+import { authedFetch } from "@/lib/client-auth";
 
 interface SalesMenuProps {
   onBack: () => void;
@@ -140,7 +149,7 @@ function QuickStatsBanner() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch("/api/dashboard", { credentials: "include" });
+        const res = await authedFetch("/api/dashboard", { credentials: "include" });
         if (res.ok) {
           const data = await res.json();
           setStats(data.salesSummary);
@@ -206,7 +215,7 @@ function ReportViewer({ reportType, onClose }: { reportType: ReportType; onClose
       if (dateFrom) params.set("dateFrom", dateFrom);
       if (dateTo) params.set("dateTo", dateTo);
       params.set("limit", "1000");
-      const res = await fetch(`/api/sales?${params}`, { credentials: "include" });
+      const res = await authedFetch(`/api/sales?${params}`, { credentials: "include" });
       if (!res.ok) return;
       const data = await res.json();
       setSales(data.sales || []);

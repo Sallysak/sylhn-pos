@@ -821,7 +821,7 @@ function ProductForm({ product, groups, onSave, onClose }: {
         setForm(prev => ({ ...prev, image: base64, imageUrl: base64 }));
         // Save to database (only if product already has an ID from the DB)
         if (product?.id && !product.id.startsWith('p-')) {
-          const res = await fetch(`/api/products/${product.id}/image`, {
+          const res = await authedFetch(`/api/products/${product.id}/image`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             credentials: "include",
@@ -849,7 +849,7 @@ function ProductForm({ product, groups, onSave, onClose }: {
     setForm(prev => ({ ...prev, image: undefined, imageUrl: "" }));
     if (product?.id && !product.id.startsWith('p-')) {
       try {
-        await fetch(`/api/products/${product.id}/image`, { method: "DELETE", credentials: "include" });
+        await authedFetch(`/api/products/${product.id}/image`, { method: "DELETE", credentials: "include" });
       } catch {}
     }
     toast({ title: "Image removed" });
@@ -2470,14 +2470,14 @@ function StockFileView({ products, setProducts, groups, history, setHistory }: {
               // Save to database via the new image API
               try {
                 if (imageData) {
-                  await fetch(`/api/products/${showPicture.id}/image`, {
+                  await authedFetch(`/api/products/${showPicture.id}/image`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     credentials: "include",
                     body: JSON.stringify({ image: imageData }),
                   });
                 } else {
-                  await fetch(`/api/products/${showPicture.id}/image`, {
+                  await authedFetch(`/api/products/${showPicture.id}/image`, {
                     method: "DELETE",
                     credentials: "include",
                   });

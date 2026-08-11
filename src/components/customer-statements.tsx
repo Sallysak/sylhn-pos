@@ -1,14 +1,19 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { authedFetch } from "@/lib/client-auth";
 import { motion } from "framer-motion";
+import { authedFetch } from "@/lib/client-auth";
 import {
   ArrowLeft, FileText, Loader2, Search, Printer, Mail, X,
   AlertCircle, User, Send,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { authedFetch } from "@/lib/client-auth";
 import { cn } from "@/lib/utils";
+import { authedFetch } from "@/lib/client-auth";
 import { COMPANY, formatGHS } from "@/lib/pos-data";
+import { authedFetch } from "@/lib/client-auth";
 
 interface Customer {
   id: string;
@@ -71,7 +76,7 @@ export function CustomerStatements({ onBack }: Props) {
 
   // Fetch customer list
   useEffect(() => {
-    fetch("/api/customers?limit=500", { credentials: "include" })
+    authedFetch("/api/customers?limit=500", { credentials: "include" })
       .then(r => r.json())
       .then(data => {
         setCustomers(data.customers || []);

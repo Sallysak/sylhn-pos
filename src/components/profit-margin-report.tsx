@@ -70,7 +70,7 @@ export function ProfitMarginReport({ onBack }: Props) {
       if (category) params.set("category", category);
       params.set("sortBy", sortBy);
       if (minMargin > 0) params.set("minMargin", String(minMargin));
-      const res = await fetch(`/api/reports/profit-margin?${params}`, { credentials: "include" });
+      const res = await authedFetch(`/api/reports/profit-margin?${params}`);
       if (!res.ok) throw new Error("Failed");
       const data = await res.json();
       setProducts(data.products || []);

@@ -76,7 +76,7 @@ export function StocktakeWizard({ open, onOpenChange, products }: StocktakeWizar
         reason: "",
       }));
 
-      const res = await fetch("/api/stocktakes", {
+      const res = await authedFetch("/api/stocktakes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -115,7 +115,7 @@ export function StocktakeWizard({ open, onOpenChange, products }: StocktakeWizar
     setScanInput("");
 
     try {
-      const res = await fetch("/api/stocktakes/scan", {
+      const res = await authedFetch("/api/stocktakes/scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -193,7 +193,7 @@ export function StocktakeWizard({ open, onOpenChange, products }: StocktakeWizar
     if (!stocktakeId) return;
     setCompleting(true);
     try {
-      const res = await fetch(`/api/stocktakes/${stocktakeId}/complete`, {
+      const res = await authedFetch(`/api/stocktakes/${stocktakeId}/complete`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

@@ -41,7 +41,7 @@ export function WhatsAppBroadcast({ open, onOpenChange }: WhatsAppBroadcastProps
     }
     setSending(true);
     try {
-      const res = await fetch("/api/whatsapp/broadcast", {
+      const res = await authedFetch("/api/whatsapp/broadcast", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

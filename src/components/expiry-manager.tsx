@@ -42,7 +42,7 @@ export function ExpiryManager({ open, onOpenChange }: ExpiryManagerProps) {
   const loadExpiry = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/expiry-dashboard", { credentials: "include" });
+      const res = await authedFetch("/api/expiry-dashboard");
       const data = await res.json();
       if (res.ok && data.products) {
         // Flatten the grouped structure into a single list

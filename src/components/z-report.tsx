@@ -36,7 +36,7 @@ export function ZReport({ onBack }: { onBack: () => void }) {
 
   useEffect(() => {
     setLoading(true);
-    fetch(`/api/z-report?date=${date}`, { credentials: "include" })
+    authedFetch(`/api/z-report?date=${date}`)
       .then(r => r.json())
       .then(d => { if (d.summary) setData(d); })
       .catch(() => toast({ title: "Failed to load Z-Report", variant: "destructive" }))

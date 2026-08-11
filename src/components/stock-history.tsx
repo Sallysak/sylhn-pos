@@ -1,19 +1,28 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { authedFetch } from "@/lib/client-auth";
 import { motion, AnimatePresence } from "framer-motion";
+import { authedFetch } from "@/lib/client-auth";
 import {
   ArrowLeft, History, Settings2, Download, RefreshCw,
   Package, TrendingUp, TrendingDown, AlertTriangle, Check, X,
   Loader2, Search, Calendar, User, Shield, Printer, SlidersHorizontal,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { authedFetch } from "@/lib/client-auth";
 import { Badge } from "@/components/ui/badge";
+import { authedFetch } from "@/lib/client-auth";
 import { Input } from "@/components/ui/input";
+import { authedFetch } from "@/lib/client-auth";
 import { useToast } from "@/hooks/use-toast";
+import { authedFetch } from "@/lib/client-auth";
 import { cn } from "@/lib/utils";
+import { authedFetch } from "@/lib/client-auth";
 import { CURRENCY, formatGHS } from "@/lib/pos-data";
+import { authedFetch } from "@/lib/client-auth";
 import { ManagerApproval } from "@/components/manager-approval";
+import { authedFetch } from "@/lib/client-auth";
 
 interface StockHistoryEntry {
   id: string;
@@ -70,7 +79,7 @@ export function StockHistory({ onBack }: StockHistoryProps) {
       if (search) params.set("search", search);
       params.set("limit", "500");
 
-      const res = await fetch(`/api/stock-history?${params}`, { credentials: "include" });
+      const res = await authedFetch(`/api/stock-history?${params}`, { credentials: "include" });
       if (!res.ok) { toast({ title: "Failed to load history", variant: "destructive" }); return; }
       const data = await res.json();
       setEntries(data.entries || []);
@@ -94,7 +103,7 @@ export function StockHistory({ onBack }: StockHistoryProps) {
 
   const handleAdjustment = async (productId: string, newQty: number, reason: string, type: string, approval?: any) => {
     try {
-      const res = await fetch("/api/stock-adjustments", {
+      const res = await authedFetch("/api/stock-adjustments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -331,7 +340,7 @@ function AdjustmentModal({ product, onClose, onSubmit }: {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch("/api/products?limit=500", { credentials: "include" });
+        const res = await authedFetch("/api/products?limit=500", { credentials: "include" });
         if (res.ok) {
           const data = await res.json();
           setProducts(data.products || []);

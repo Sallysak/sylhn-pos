@@ -54,7 +54,7 @@ export function SupplierHistoryDialog({
     if (!supplierId) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/suppliers/${supplierId}`, { credentials: "include" });
+      const res = await authedFetch(`/api/suppliers/${supplierId}`);
       const data = await res.json();
       if (res.ok && data.supplier) {
         const purchases: HistoryEntry[] = (data.supplier.purchases || []).map((p: any) => ({

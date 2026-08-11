@@ -84,7 +84,7 @@ function EmployeePerformanceReport() {
 
   useEffect(() => {
     setLoading(true);
-    fetch(`/api/reports/employee-performance?days=${days}`, { credentials: "include" })
+    authedFetch(`/api/reports/employee-performance?days=${days}`)
       .then(r => r.json())
       .then(d => setData(d))
       .catch(() => toast({ title: "Failed to load", variant: "destructive" }))
@@ -213,7 +213,7 @@ function CashFlowReport() {
 
   useEffect(() => {
     setLoading(true);
-    fetch(`/api/reports/cash-flow?days=${days}`, { credentials: "include" })
+    authedFetch(`/api/reports/cash-flow?days=${days}`)
       .then(r => r.json())
       .then(d => setData(d))
       .catch(() => toast({ title: "Failed to load", variant: "destructive" }))
@@ -401,7 +401,7 @@ function ProcurementBudgetReport() {
 
   const fetchData = () => {
     setLoading(true);
-    fetch(`/api/procurement-budget?month=${month}`, { credentials: "include" })
+    authedFetch(`/api/procurement-budget?month=${month}`)
       .then(r => r.json())
       .then(d => setData(d))
       .catch(() => toast({ title: "Failed to load", variant: "destructive" }))
@@ -411,7 +411,7 @@ function ProcurementBudgetReport() {
   useEffect(() => { fetchData(); }, [month]);
 
   useEffect(() => {
-    fetch("/api/suppliers?active=true&limit=500", { credentials: "include" })
+    authedFetch("/api/suppliers?active=true&limit=500")
       .then(r => r.json())
       .then(d => setSuppliers(d.suppliers || []))
       .catch(() => {});
@@ -423,7 +423,7 @@ function ProcurementBudgetReport() {
       return;
     }
     try {
-      const res = await fetch("/api/procurement-budget", {
+      const res = await authedFetch("/api/procurement-budget", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -449,7 +449,7 @@ function ProcurementBudgetReport() {
   const handleDelete = async (id: string) => {
     if (!confirm("Delete this budget?")) return;
     try {
-      await fetch(`/api/procurement-budget?id=${id}`, { method: "DELETE", credentials: "include" });
+      await authedFetch(`/api/procurement-budget?id=${id}`, { method: "DELETE", credentials: "include" });
       toast({ title: "Budget deleted" });
       fetchData();
     } catch {}
@@ -593,7 +593,7 @@ function LeadTimeReport() {
 
   useEffect(() => {
     setLoading(true);
-    fetch(`/api/reports/lead-time-accuracy?days=${days}`, { credentials: "include" })
+    authedFetch(`/api/reports/lead-time-accuracy?days=${days}`)
       .then(r => r.json())
       .then(d => setData(d))
       .catch(() => toast({ title: "Failed to load", variant: "destructive" }))
@@ -687,7 +687,7 @@ function ReorderEffectivenessReport() {
 
   useEffect(() => {
     setLoading(true);
-    fetch(`/api/reports/reorder-effectiveness?days=${days}`, { credentials: "include" })
+    authedFetch(`/api/reports/reorder-effectiveness?days=${days}`)
       .then(r => r.json())
       .then(d => setData(d))
       .catch(() => toast({ title: "Failed to load", variant: "destructive" }))

@@ -46,7 +46,7 @@ export function AIForecastDashboard({ open, onOpenChange }: AIForecastDashboardP
   const loadForecast = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/ai-forecast?days=${days}`, { credentials: "include" });
+      const res = await authedFetch(`/api/ai-forecast?days=${days}`);
       const data = await res.json();
       if (res.ok && data.forecasts) {
         setForecasts(data.forecasts);

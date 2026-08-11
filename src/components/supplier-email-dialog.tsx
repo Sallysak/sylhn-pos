@@ -54,7 +54,7 @@ export function SupplierEmailDialog({
 
     setSending(true);
     try {
-      const res = await fetch(`/api/suppliers/${supplierId}/email`, {
+      const res = await authedFetch(`/api/suppliers/${supplierId}/email`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

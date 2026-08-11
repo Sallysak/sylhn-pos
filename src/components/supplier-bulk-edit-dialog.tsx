@@ -61,7 +61,7 @@ export function SupplierBulkEditDialog({ suppliers, onClose, onSaved }: Props) {
     }
     setSaving(true);
     try {
-      const res = await fetch("/api/suppliers/bulk-update", {
+      const res = await authedFetch("/api/suppliers/bulk-update", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

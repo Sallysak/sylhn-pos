@@ -84,7 +84,7 @@ export function PurchaseReceiveDialog({
     setSubmitting(true);
     try {
       // Use the existing PUT /api/purchases/[id] with action="receive"
-      const res = await fetch(`/api/purchases/${purchaseId}`, {
+      const res = await authedFetch(`/api/purchases/${purchaseId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

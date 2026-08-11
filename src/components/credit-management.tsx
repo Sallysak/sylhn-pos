@@ -112,7 +112,7 @@ export function CreditManagement() {
       if (search) params.set("search", search);
       if (groupFilter !== "all") params.set("group", groupFilter);
       params.set("limit", "500");
-      const res = await fetch(`/api/customers?${params}`, { credentials: "include" });
+      const res = await authedFetch(`/api/customers?${params}`, { credentials: "include" });
       const data = await res.json();
       if (res.ok) {
         setCustomers(data.customers || []);
@@ -148,7 +148,7 @@ export function CreditManagement() {
     setView("detail");
     setAccountLoading(true);
     try {
-      const res = await fetch(`/api/customers/${c.id}/credit`, { credentials: "include" });
+      const res = await authedFetch(`/api/customers/${c.id}/credit`, { credentials: "include" });
       const data = await res.json();
       if (res.ok) setCreditAccount(data);
       else toast({ title: "Failed to load credit account", description: data.error, variant: "destructive" });
@@ -329,7 +329,7 @@ export function CreditManagement() {
     if (!selectedCustomer) return;
     setAccountLoading(true);
     try {
-      const res = await fetch(`/api/customers/${selectedCustomer.id}/credit`, { credentials: "include" });
+      const res = await authedFetch(`/api/customers/${selectedCustomer.id}/credit`, { credentials: "include" });
       const data = await res.json();
       if (res.ok) setCreditAccount(data);
     } catch {}
@@ -355,7 +355,7 @@ export function CreditManagement() {
     setVerifyingManager(true);
     setManagerError("");
     try {
-      const res = await fetch("/api/auth/approve", {
+      const res = await authedFetch("/api/auth/approve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -966,7 +966,7 @@ function SettleCreditDialog({
     try {
       const body: any = { amountPaid: amt };
       if (selectedSaleIds.length > 0) body.saleIds = selectedSaleIds;
-      const res = await fetch(`/api/customers/${customer.id}/credit`, {
+      const res = await authedFetch(`/api/customers/${customer.id}/credit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -1093,7 +1093,7 @@ function AddCustomerDialog({
     }
     setSubmitting(true);
     try {
-      const res = await fetch("/api/customers", {
+      const res = await authedFetch("/api/customers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

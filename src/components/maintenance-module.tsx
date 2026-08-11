@@ -513,7 +513,7 @@ function CashierShift({ cashier, dailyTotal, transactionCount }: { cashier: stri
     let cancelled = false;
     (async () => {
       try {
-        const listRes = await fetch('/api/shifts?status=open', { credentials: 'include' });
+        const listRes = await authedFetch('/api/shifts?status=open', { credentials: 'include' });
         if (!listRes.ok) return;
         const data = await listRes.json();
         const openShifts = data.shifts || [];
@@ -528,7 +528,7 @@ function CashierShift({ cashier, dailyTotal, transactionCount }: { cashier: stri
           setShiftActive(true);
         } else {
           // Open a new shift on the server with the default float
-          const openRes = await fetch('/api/shifts', {
+          const openRes = await authedFetch('/api/shifts', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
             body: JSON.stringify({ action: 'open', openingFloat: parseFloat(openingFloat) || 0 }),
@@ -610,7 +610,7 @@ function CashierShift({ cashier, dailyTotal, transactionCount }: { cashier: stri
     // Close on server
     if (serverShiftId) {
       try {
-        const res = await fetch('/api/shifts', {
+        const res = await authedFetch('/api/shifts', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
           body: JSON.stringify({ action: 'close', shiftId: serverShiftId, actualCash: actual, notes: '' }),
@@ -638,7 +638,7 @@ function CashierShift({ cashier, dailyTotal, transactionCount }: { cashier: stri
   const handleStartNewShift = async () => {
     // Premium fix: open a new server-side shift
     try {
-      const res = await fetch('/api/shifts', {
+      const res = await authedFetch('/api/shifts', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ action: 'open', openingFloat: parseFloat(openingFloat) || 0 }),
@@ -870,7 +870,7 @@ function WipeDataSection() {
   const handleDownloadBackup = async () => {
     setBackingUp(true);
     try {
-      const res = await fetch("/api/admin/backup", { credentials: "include" });
+      const res = await authedFetch("/api/admin/backup", { credentials: "include" });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || `HTTP ${res.status}`);
@@ -920,7 +920,7 @@ function WipeDataSection() {
     setWiping(true);
     setResult(null);
     try {
-      const res = await fetch("/api/admin/wipe-data", {
+      const res = await authedFetch("/api/admin/wipe-data", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ confirm: "WIPE_ALL_DATA" }),

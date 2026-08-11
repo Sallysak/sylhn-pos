@@ -32,9 +32,9 @@ export function AdvancedReportsDashboard({ open, onOpenChange }: AdvancedReports
     setLoading(true);
     try {
       const [profitRes, soldRes, salesRes] = await Promise.all([
-        fetch("/api/reports/profit?days=30", { credentials: "include" }).then(r => r.json()).catch(() => null),
-        fetch("/api/reports/sold-items?days=30&limit=100", { credentials: "include" }).then(r => r.json()).catch(() => null),
-        fetch("/api/reports/sales?days=30", { credentials: "include" }).then(r => r.json()).catch(() => null),
+        authedFetch("/api/reports/profit?days=30").then(r => r.json()).catch(() => null),
+        authedFetch("/api/reports/sold-items?days=30&limit=100").then(r => r.json()).catch(() => null),
+        authedFetch("/api/reports/sales?days=30").then(r => r.json()).catch(() => null),
       ]);
       if (profitRes) setProfitData(profitRes);
       if (soldRes?.items) setSoldItems(soldRes.items);

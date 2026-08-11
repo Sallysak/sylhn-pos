@@ -42,7 +42,7 @@ export function ManagerApproval({
     setError("");
 
     try {
-      const res = await fetch("/api/auth/approve", {
+      const res = await authedFetch("/api/auth/approve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

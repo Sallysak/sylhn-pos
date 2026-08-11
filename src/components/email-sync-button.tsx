@@ -20,7 +20,7 @@ export function EmailSyncButton({ onSynced }: { onSynced?: () => void }) {
     setError(null)
     setResult(null)
     try {
-      const res = await fetch('/api/email/sync', {
+      const res = await authedFetch('/api/email/sync', {
         method: 'POST',
       })
       const data = await res.json()

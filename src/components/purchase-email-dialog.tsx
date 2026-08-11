@@ -62,7 +62,7 @@ export function PurchaseEmailDialog({
 
     setSending(true);
     try {
-      const res = await fetch(`/api/purchases/${purchaseId}/email`, {
+      const res = await authedFetch(`/api/purchases/${purchaseId}/email`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

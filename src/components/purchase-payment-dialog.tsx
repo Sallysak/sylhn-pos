@@ -85,7 +85,7 @@ export function PurchasePaymentDialog({
     }
     setSubmitting(true);
     try {
-      const res = await fetch("/api/supplier-payments", {
+      const res = await authedFetch("/api/supplier-payments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

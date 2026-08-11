@@ -72,7 +72,7 @@ export function SupplierCatalogDialog({
     if (!supplierId) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/suppliers/${supplierId}/products`, { credentials: "include" });
+      const res = await authedFetch(`/api/suppliers/${supplierId}/products`);
       const data = await res.json();
       if (res.ok) {
         setCatalog(data.catalog || []);
@@ -103,7 +103,7 @@ export function SupplierCatalogDialog({
     if (!supplierId) return;
     setAdding(product.id);
     try {
-      const res = await fetch(`/api/suppliers/${supplierId}/products`, {
+      const res = await authedFetch(`/api/suppliers/${supplierId}/products`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -133,7 +133,7 @@ export function SupplierCatalogDialog({
   const handleUpdateEntry = async (entry: CatalogEntry, patch: Partial<CatalogEntry>) => {
     if (!supplierId) return;
     try {
-      const res = await fetch(`/api/suppliers/${supplierId}/products`, {
+      const res = await authedFetch(`/api/suppliers/${supplierId}/products`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -150,7 +150,7 @@ export function SupplierCatalogDialog({
         setCatalog(prev => prev.map(c => c.id === entry.id ? { ...c, ...patch } : c));
         // Tier 2 #14 — Record a price-history entry if the cost changed
         if (patch.supplierCost !== undefined && patch.supplierCost !== entry.supplierCost) {
-          fetch("/api/supplier-price-history", {
+          authedFetch("/api/supplier-price-history", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             credentials: "include",
@@ -172,7 +172,7 @@ export function SupplierCatalogDialog({
     if (!window.confirm(`Remove "${entry.product.name}" from ${supplierName}'s catalog?`)) return;
     setDeleting(entry.id);
     try {
-      const res = await fetch(`/api/suppliers/${supplierId}/products?productId=${entry.productId}`, {
+      const res = await authedFetch(`/api/suppliers/${supplierId}/products?productId=${entry.productId}`, {
         method: "DELETE",
         credentials: "include",
       });

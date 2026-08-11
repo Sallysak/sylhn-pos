@@ -58,7 +58,7 @@ export function PurchaseAttachmentsDialog({
   const loadAttachments = async () => {
     if (!purchaseId) return;
     try {
-      const res = await fetch(`/api/purchases/${purchaseId}/attachments`, { credentials: "include" });
+      const res = await authedFetch(`/api/purchases/${purchaseId}/attachments`);
       const data = await res.json();
       if (res.ok) {
         setAttachments(data.attachments || []);
@@ -82,7 +82,7 @@ export function PurchaseAttachmentsDialog({
       const formData = new FormData();
       formData.append("file", file);
       formData.append("category", category);
-      const res = await fetch(`/api/purchases/${purchaseId}/attachments`, {
+      const res = await authedFetch(`/api/purchases/${purchaseId}/attachments`, {
         method: "POST",
         credentials: "include",
         body: formData,

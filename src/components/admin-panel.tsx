@@ -222,7 +222,7 @@ export function AdminLogin({ onSuccess, onCancel, adminOnly = false }: { onSucce
     try {
       // Primary path: authenticate against the server (hashed passwords,
       // rate-limited, sets httpOnly session cookie).
-      const res = await fetch('/api/auth/login', {
+      const res = await authedFetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
@@ -354,7 +354,7 @@ export function AdminLogin({ onSuccess, onCancel, adminOnly = false }: { onSucce
       }
       const bioUsername = result.username;
       setUsername(bioUsername);
-      const res = await fetch('/api/auth/login', {
+      const res = await authedFetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: bioUsername, biometric: true }),
@@ -594,7 +594,7 @@ export function AdminPanel({ currentUser, onBack }: { currentUser: SystemUser; o
     // Premium fix: fetch audit logs from server (was localStorage-only)
     (async () => {
       try {
-        const res = await fetch('/api/audit-logs?limit=500', { credentials: 'include' });
+        const res = await authedFetch('/api/audit-logs?limit=500');
         if (!res.ok) return;
         const data = await res.json();
         const serverLogs: AuditLogEntry[] = (data.logs || []).map((l: any) => ({
@@ -617,7 +617,7 @@ export function AdminPanel({ currentUser, onBack }: { currentUser: SystemUser; o
     // Also fetch users + settings from server (best-effort)
     (async () => {
       try {
-        const res = await fetch('/api/users', { credentials: 'include' });
+        const res = await authedFetch('/api/users');
         if (!res.ok) return;
         const data = await res.json();
         const serverUsers: SystemUser[] = (data.users || []).map((u: any) => ({
@@ -681,7 +681,7 @@ export function AdminPanel({ currentUser, onBack }: { currentUser: SystemUser; o
 
     // Persist to server (password gets hashed server-side)
     try {
-      await fetch('/api/users', {
+      await authedFetch('/api/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

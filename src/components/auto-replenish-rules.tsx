@@ -1,17 +1,24 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { authedFetch } from "@/lib/client-auth";
 import { motion } from "framer-motion";
+import { authedFetch } from "@/lib/client-auth";
 import {
   RotateCcw, Plus, Trash2, Play, Settings, AlertTriangle,
   Package, Truck, Clock, TrendingUp, RefreshCw, Loader2, X,
   CheckCircle2, Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { authedFetch } from "@/lib/client-auth";
 import { Input } from "@/components/ui/input";
+import { authedFetch } from "@/lib/client-auth";
 import { Label } from "@/components/ui/label";
+import { authedFetch } from "@/lib/client-auth";
 import { Badge } from "@/components/ui/badge";
+import { authedFetch } from "@/lib/client-auth";
 import { Card } from "@/components/ui/card";
+import { authedFetch } from "@/lib/client-auth";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
@@ -19,7 +26,9 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { authedFetch } from "@/lib/client-auth";
 import { ArrowLeft } from "lucide-react";
+import { authedFetch } from "@/lib/client-auth";
 
 interface Rule {
   id: string;
@@ -53,9 +62,9 @@ export function AutoReplenishRules({ onBack }: { onBack: () => void }) {
     setLoading(true);
     try {
       const [rulesRes, prodRes, supRes] = await Promise.all([
-        fetch("/api/auto-replenish", { credentials: "include" }),
-        fetch("/api/products?limit=500", { credentials: "include" }),
-        fetch("/api/suppliers?limit=200", { credentials: "include" }),
+        authedFetch("/api/auto-replenish", { credentials: "include" }),
+        authedFetch("/api/products?limit=500", { credentials: "include" }),
+        authedFetch("/api/suppliers?limit=200", { credentials: "include" }),
       ]);
       const [rulesData, prodData, supData] = await Promise.all([rulesRes.json(), prodRes.json(), supRes.json()]);
       if (rulesRes.ok) {
@@ -77,7 +86,7 @@ export function AutoReplenishRules({ onBack }: { onBack: () => void }) {
     setScanning(true);
     setScanResult(null);
     try {
-      const res = await fetch("/api/auto-replenish", {
+      const res = await authedFetch("/api/auto-replenish", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "scan" }),
@@ -106,7 +115,7 @@ export function AutoReplenishRules({ onBack }: { onBack: () => void }) {
 
   const toggleRule = async (rule: Rule) => {
     try {
-      const res = await fetch("/api/auto-replenish", {
+      const res = await authedFetch("/api/auto-replenish", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: rule.id, isActive: !rule.isActive }),
@@ -126,7 +135,7 @@ export function AutoReplenishRules({ onBack }: { onBack: () => void }) {
   const deleteRule = async (rule: Rule) => {
     if (!confirm(`Delete rule for ${rule.product?.name}?`)) return;
     try {
-      const res = await fetch(`/api/auto-replenish?id=${rule.id}`, {
+      const res = await authedFetch(`/api/auto-replenish?id=${rule.id}`, {
         method: "DELETE",
         credentials: "include",
       });
@@ -352,7 +361,7 @@ function AddRuleDialog({
     }
     setSubmitting(true);
     try {
-      const res = await fetch("/api/auto-replenish", {
+      const res = await authedFetch("/api/auto-replenish", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

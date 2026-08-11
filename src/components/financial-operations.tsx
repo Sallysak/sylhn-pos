@@ -1,17 +1,24 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import { authedFetch } from "@/lib/client-auth";
 import { motion, AnimatePresence } from "framer-motion";
+import { authedFetch } from "@/lib/client-auth";
 import {
   ArrowLeft, TrendingUp, Wallet, Smartphone, Plus, Trash2, Edit2,
   DollarSign, Calendar, Receipt, AlertTriangle, CheckCircle2, X,
   Download, Printer, ArrowUpDown, Eye,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { authedFetch } from "@/lib/client-auth";
 import { Badge } from "@/components/ui/badge";
+import { authedFetch } from "@/lib/client-auth";
 import { useToast } from "@/hooks/use-toast";
+import { authedFetch } from "@/lib/client-auth";
 import { cn } from "@/lib/utils";
+import { authedFetch } from "@/lib/client-auth";
 import { COMPANY, formatGHS } from "@/lib/pos-data";
+import { authedFetch } from "@/lib/client-auth";
 
 type FinanceTab = "expenses" | "cash-recon" | "mobile-money";
 
@@ -136,7 +143,7 @@ export function FinancialOperations({ onBack, dailyTotal, initialTab = "expenses
     // Premium fix: fetch expenses from server (was localStorage-only)
     (async () => {
       try {
-        const res = await fetch('/api/expenses?limit=500', { credentials: 'include' });
+        const res = await authedFetch('/api/expenses?limit=500', { credentials: 'include' });
         if (!res.ok) return;
         const data = await res.json();
         const serverExpenses: Expense[] = (data.expenses || []).map((e: any) => ({
@@ -227,7 +234,7 @@ export function FinancialOperations({ onBack, dailyTotal, initialTab = "expenses
 
     // Persist to server (best-effort)
     try {
-      const res = await fetch('/api/expenses', {
+      const res = await authedFetch('/api/expenses', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

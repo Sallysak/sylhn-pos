@@ -40,7 +40,7 @@ export function SupplierNotesDialog({
     if (!supplierId) return;
     setSaving(true);
     try {
-      const res = await fetch(`/api/suppliers/${supplierId}`, {
+      const res = await authedFetch(`/api/suppliers/${supplierId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

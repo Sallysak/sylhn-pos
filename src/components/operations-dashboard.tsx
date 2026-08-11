@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useMemo, useEffect, useCallback } from "react";
+import { authedFetch } from "@/lib/client-auth";
 import { motion, AnimatePresence } from "framer-motion";
+import { authedFetch } from "@/lib/client-auth";
 import {
   ArrowLeft, TrendingUp, TrendingDown, DollarSign, ShoppingCart,
   Package, AlertTriangle, Clock, BarChart3, Activity, RefreshCw,
@@ -10,13 +12,21 @@ import {
   Plus, Download, FileBarChart, Filter, Zap, Mail, MessageCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { authedFetch } from "@/lib/client-auth";
 import { Badge } from "@/components/ui/badge";
+import { authedFetch } from "@/lib/client-auth";
 import { Input } from "@/components/ui/input";
+import { authedFetch } from "@/lib/client-auth";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { authedFetch } from "@/lib/client-auth";
 import { cn } from "@/lib/utils";
+import { authedFetch } from "@/lib/client-auth";
 import { COMPANY, formatGHS } from "@/lib/pos-data";
+import { authedFetch } from "@/lib/client-auth";
 import { exportReportToPDF, exportReportToExcel, exportReportToCSV, printReport } from "@/lib/report-utils";
+import { authedFetch } from "@/lib/client-auth";
 import type { ReportData } from "@/lib/pos-types";
+import { authedFetch } from "@/lib/client-auth";
 
 // Premium fix: the original component used `p.quantity` and `p.active` from
 // the Prisma Product shape, but received `Product` typed against pos-data.ts
@@ -49,6 +59,7 @@ function normalizeProduct(p: DashboardProduct): DashboardProduct & { quantity: n
   return { ...p, quantity: qty, active: p.active !== false, expiryDate: expiry };
 }
 import { useToast } from "@/hooks/use-toast";
+import { authedFetch } from "@/lib/client-auth";
 
 interface OperationsDashboardProps {
   products: DashboardProduct[];
@@ -172,7 +183,7 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
   const fetchDashboard = useCallback(async () => {
     setLoadingDashboard(true);
     try {
-      const res = await fetch("/api/dashboard", { credentials: "include" });
+      const res = await authedFetch("/api/dashboard", { credentials: "include" });
       if (res.ok) setDashboard(await res.json());
     } catch (e) {
       console.warn("Failed to fetch dashboard:", e);
@@ -186,7 +197,7 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
   const fetchSales = useCallback(async () => {
     setLoadingSales(true);
     try {
-      const res = await fetch("/api/sales?limit=200", { credentials: "include" });
+      const res = await authedFetch("/api/sales?limit=200", { credentials: "include" });
       if (res.ok) {
         const data = await res.json();
         setSales(data.sales || []);
@@ -612,7 +623,7 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
   const handleRefund = async (sale: SaleRecord) => {
     if (!confirm(`Refund sale ${sale.invoiceNumber}? This will restore stock and mark the sale as refunded.`)) return;
     try {
-      const res = await fetch(`/api/sales/${sale.id}`, {
+      const res = await authedFetch(`/api/sales/${sale.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -646,7 +657,7 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
     try {
       const cost = supplierCost || product.costPrice;
       const total = +(cost * suggestedQty).toFixed(2);
-      const res = await fetch('/api/purchases', {
+      const res = await authedFetch('/api/purchases', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -753,7 +764,7 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
       const groupTotal = items.reduce((s: number, i: any) => s + i.total, 0);
       totalCost += groupTotal;
       try {
-        const res = await fetch('/api/purchases', {
+        const res = await authedFetch('/api/purchases', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
@@ -980,7 +991,7 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
                           <button
                             onClick={async () => {
                               try {
-                                const res = await fetch(`/api/products/${p.id}/quick-reorder`, {
+                                const res = await authedFetch(`/api/products/${p.id}/quick-reorder`, {
                                   method: "POST",
                                   headers: { "Content-Type": "application/json" },
                                   credentials: "include",
@@ -1251,7 +1262,7 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
                       onClick={async () => {
                         try {
                           toast({ title: "Sending low-stock digest email…", description: "Sending to all managers/admins with email" });
-                          const res = await fetch("/api/alerts/low-stock-digest?sendEmail=true", { credentials: "include" });
+                          const res = await authedFetch("/api/alerts/low-stock-digest?sendEmail=true", { credentials: "include" });
                           const data = await res.json();
                           if (data.emailSent) {
                             toast({ title: "📧 Digest sent", description: `Emailed to ${data.emailRecipients} manager(s) — ${data.count} items` });
@@ -1270,7 +1281,7 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
                     <button
                       onClick={async () => {
                         try {
-                          const res = await fetch("/api/alerts/low-stock-digest?format=whatsapp", { credentials: "include" });
+                          const res = await authedFetch("/api/alerts/low-stock-digest?format=whatsapp", { credentials: "include" });
                           const data = await res.json();
                           if (data.waLink) {
                             window.open(data.waLink, "_blank");
