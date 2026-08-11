@@ -8,8 +8,9 @@ import {
   Package, AlertTriangle, Clock, BarChart3, Activity, RefreshCw,
   Search, Printer, RotateCcw, X, Calendar, AlertCircle, CheckCircle2,
   Star, Boxes, Percent, FileText, ChevronRight, ArrowUpRight, ArrowDownRight,
-  Plus, Download, FileBarChart, Filter, Zap, Mail, MessageCircle,
+  Plus, Download, FileBarChart, Filter, Zap, Mail, MessageCircle, Wallet,
 } from "lucide-react";
+import { LineChart, Line, BarChart, Bar, PieChart, Pie, AreaChart, Area, Cell, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -1034,8 +1035,115 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
                 <KpiCard label="Potential Profit" value={formatGHS(kpis.potentialProfit)} icon={<TrendingUp className="h-5 w-5" />} gradient="from-amber-500 to-orange-600" trend={kpis.potentialProfit > 0 ? "up" : undefined} />
               </div>
 
+              {/* ===== CHARTS SECTION ===== */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-                {/* Top Products */}
+                {/* Sales Trend (Line Chart) — last 14 days */}
+                <div className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 p-4 sm:p-6 dark:bg-slate-800 dark:ring-slate-700">
+                  <h2 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 mb-4">
+                    <TrendingUp className="h-4 w-4 text-emerald-500" /> Sales Trend (14 Days)
+                  </h2>
+                  {dashboard?.dailyTrend && dashboard.dailyTrend.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={220}>
+                      <LineChart data={dashboard.dailyTrend}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                        <XAxis dataKey="date" tick={{ fontSize: 10 }} stroke="#94a3b8" tickFormatter={(v) => v.split('-').slice(1).join('/')} />
+                        <YAxis tick={{ fontSize: 10 }} stroke="#94a3b8" tickFormatter={(v) => `₵${v}`} />
+                        <Tooltip
+                          contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '12px' }}
+                          formatter={(v: any) => [formatGHS(v), 'Revenue']}
+                          labelFormatter={(l) => `Date: ${l}`}
+                        />
+                        <Line type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={2.5} dot={{ fill: '#10b981', r: 3 }} activeDot={{ r: 5 }} name="Revenue" />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="h-[220px] flex items-center justify-center text-slate-400 text-sm">
+                      <TrendingUp className="h-8 w-8 mr-2 opacity-40" /> No trend data yet
+                    </div>
+                  )}
+                </div>
+
+                {/* Payment Methods (Pie Chart) */}
+                <div className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 p-4 sm:p-6 dark:bg-slate-800 dark:ring-slate-700">
+                  <h2 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 mb-4">
+                    <Wallet className="h-4 w-4 text-blue-500" /> Payment Methods (Today)
+                  </h2>
+                  {(() => {
+                    const todaySales = sales.filter(s => s.createdAt?.startsWith(new Date().toISOString().split('T')[0]) && s.status === 'completed');
+                    const methodTotals: Record<string, number> = {};
+                    todaySales.forEach(s => { methodTotals[s.paymentMethod || 'cash'] = (methodTotals[s.paymentMethod || 'cash'] || 0) + (s.total || 0); });
+                    const pieData = Object.entries(methodTotals).map(([name, value]) => ({ name: name.charAt(0).toUpperCase() + name.slice(1), value }));
+                    const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899'];
+                    return pieData.length > 0 ? (
+                      <ResponsiveContainer width="100%" height={220}>
+                        <PieChart>
+                          <Pie data={pieData} cx="50%" cy="50%" outerRadius={70} innerRadius={40} paddingAngle={3} dataKey="value" nameKey="name">
+                            {pieData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                          </Pie>
+                          <Tooltip formatter={(v: any) => formatGHS(v)} contentStyle={{ borderRadius: '12px', fontSize: '12px' }} />
+                          <Legend wrapperStyle={{ fontSize: '11px' }} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="h-[220px] flex items-center justify-center text-slate-400 text-sm">
+                        <Wallet className="h-8 w-8 mr-2 opacity-40" /> No sales today
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* Top Products (Bar Chart) */}
+                <div className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 p-4 sm:p-6 dark:bg-slate-800 dark:ring-slate-700">
+                  <h2 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 mb-4">
+                    <BarChart3 className="h-4 w-4 text-violet-500" /> Top Products by Revenue
+                  </h2>
+                  {topProducts.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={220}>
+                      <BarChart data={topProducts.slice(0, 8)} layout="vertical" margin={{ left: 10, right: 20 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
+                        <XAxis type="number" tick={{ fontSize: 10 }} stroke="#94a3b8" tickFormatter={(v) => `₵${v}`} />
+                        <YAxis type="category" dataKey="name" tick={{ fontSize: 9 }} stroke="#94a3b8" width={80} tickFormatter={(v) => v.length > 12 ? v.substring(0, 12) + '…' : v} />
+                        <Tooltip formatter={(v: any) => formatGHS(v)} contentStyle={{ borderRadius: '12px', fontSize: '12px' }} />
+                        <Bar dataKey="revenue" fill="#8b5cf6" radius={[0, 6, 6, 0]} name="Revenue" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="h-[220px] flex items-center justify-center text-slate-400 text-sm">
+                      <Package className="h-8 w-8 mr-2 opacity-40" /> No sales data yet
+                    </div>
+                  )}
+                </div>
+
+                {/* Hourly Sales (Area Chart) */}
+                <div className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 p-4 sm:p-6 dark:bg-slate-800 dark:ring-slate-700">
+                  <h2 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 mb-4">
+                    <Clock className="h-4 w-4 text-amber-500" /> Hourly Sales (Today)
+                  </h2>
+                  {dashboard?.hourly && dashboard.hourly.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={220}>
+                      <AreaChart data={dashboard.hourly}>
+                        <defs>
+                          <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.8} />
+                            <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.1} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                        <XAxis dataKey="hour" tick={{ fontSize: 10 }} stroke="#94a3b8" tickFormatter={(v) => `${v}:00`} />
+                        <YAxis tick={{ fontSize: 10 }} stroke="#94a3b8" tickFormatter={(v) => `₵${v}`} />
+                        <Tooltip formatter={(v: any) => formatGHS(v)} contentStyle={{ borderRadius: '12px', fontSize: '12px' }} labelFormatter={(l) => `${l}:00`} />
+                        <Area type="monotone" dataKey="revenue" stroke="#f59e0b" strokeWidth={2} fill="url(#colorRev)" name="Revenue" />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="h-[220px] flex items-center justify-center text-slate-400 text-sm">
+                      <Clock className="h-8 w-8 mr-2 opacity-40" /> No hourly data yet
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                 <div className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 p-4 sm:p-6">
                   <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-4">
                     <Star className="h-4 w-4 text-amber-500" /> Top 10 Products by Revenue

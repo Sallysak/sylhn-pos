@@ -19,8 +19,8 @@
  * Helps identify exact deploy when debugging
  */
 
-export const APP_VERSION = "1.6.3";
-export const BUILD_ID = "build-2026-08-12-v163-fix-dateTo-midnight-bug";
+export const APP_VERSION = "1.7.0";
+export const BUILD_ID = "build-2026-08-12-v170-charts-dashboard";
 export const RELEASE_DATE = "August 10, 2026";
 export const RELEASE_NAME = "Seed Demo Data + All Features Verified";
 
