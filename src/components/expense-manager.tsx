@@ -1,9 +1,8 @@
 "use client";
 
+import { authedFetch } from "@/lib/client-auth";
 import { useState, useEffect, useMemo } from "react";
-import { authedFetch } from "@/lib/client-auth";
 import { motion } from "framer-motion";
-import { authedFetch } from "@/lib/client-auth";
 import {
   Wallet, Plus, Loader2, Trash2, Download, TrendingDown,
   Calendar, FileText, AlertTriangle, CheckCircle2,
@@ -12,21 +11,13 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { authedFetch } from "@/lib/client-auth";
 import { Label } from "@/components/ui/label";
-import { authedFetch } from "@/lib/client-auth";
 import { Textarea } from "@/components/ui/textarea";
-import { authedFetch } from "@/lib/client-auth";
 import { Button } from "@/components/ui/button";
-import { authedFetch } from "@/lib/client-auth";
 import { Badge } from "@/components/ui/badge";
-import { authedFetch } from "@/lib/client-auth";
 import { useToast } from "@/hooks/use-toast";
-import { authedFetch } from "@/lib/client-auth";
 import { cn } from "@/lib/utils";
-import { authedFetch } from "@/lib/client-auth";
 import { formatGHS } from "@/lib/pos-data";
-import { authedFetch } from "@/lib/client-auth";
 
 interface Expense {
   id: string;

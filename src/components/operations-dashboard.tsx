@@ -1,9 +1,8 @@
 "use client";
 
+import { authedFetch } from "@/lib/client-auth";
 import { useState, useMemo, useEffect, useCallback } from "react";
-import { authedFetch } from "@/lib/client-auth";
 import { motion, AnimatePresence } from "framer-motion";
-import { authedFetch } from "@/lib/client-auth";
 import {
   ArrowLeft, TrendingUp, TrendingDown, DollarSign, ShoppingCart,
   Package, AlertTriangle, Clock, BarChart3, Activity, RefreshCw,
@@ -12,21 +11,13 @@ import {
   Plus, Download, FileBarChart, Filter, Zap, Mail, MessageCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { authedFetch } from "@/lib/client-auth";
 import { Badge } from "@/components/ui/badge";
-import { authedFetch } from "@/lib/client-auth";
 import { Input } from "@/components/ui/input";
-import { authedFetch } from "@/lib/client-auth";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { authedFetch } from "@/lib/client-auth";
 import { cn } from "@/lib/utils";
-import { authedFetch } from "@/lib/client-auth";
 import { COMPANY, formatGHS } from "@/lib/pos-data";
-import { authedFetch } from "@/lib/client-auth";
 import { exportReportToPDF, exportReportToExcel, exportReportToCSV, printReport } from "@/lib/report-utils";
-import { authedFetch } from "@/lib/client-auth";
 import type { ReportData } from "@/lib/pos-types";
-import { authedFetch } from "@/lib/client-auth";
 
 // Premium fix: the original component used `p.quantity` and `p.active` from
 // the Prisma Product shape, but received `Product` typed against pos-data.ts
@@ -59,7 +50,6 @@ function normalizeProduct(p: DashboardProduct): DashboardProduct & { quantity: n
   return { ...p, quantity: qty, active: p.active !== false, expiryDate: expiry };
 }
 import { useToast } from "@/hooks/use-toast";
-import { authedFetch } from "@/lib/client-auth";
 
 interface OperationsDashboardProps {
   products: DashboardProduct[];

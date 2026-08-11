@@ -1,9 +1,8 @@
 "use client";
 
+import { authedFetch } from "@/lib/client-auth";
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { authedFetch } from "@/lib/client-auth";
 import { motion, AnimatePresence } from "framer-motion";
-import { authedFetch } from "@/lib/client-auth";
 import {
   ArrowLeft, FileText, DollarSign, Users, X, Printer, Folder,
   BarChart3, TrendingUp, CreditCard, User, Package,
@@ -11,19 +10,12 @@ import {
   FileSpreadsheet, FileBarChart, Loader2, ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { authedFetch } from "@/lib/client-auth";
 import { Badge } from "@/components/ui/badge";
-import { authedFetch } from "@/lib/client-auth";
 import { Input } from "@/components/ui/input";
-import { authedFetch } from "@/lib/client-auth";
 import { useToast } from "@/hooks/use-toast";
-import { authedFetch } from "@/lib/client-auth";
 import { cn } from "@/lib/utils";
-import { authedFetch } from "@/lib/client-auth";
 import { COMPANY, CURRENCY, formatGHS } from "@/lib/pos-data";
-import { authedFetch } from "@/lib/client-auth";
 import { PopupWindow } from "@/components/popup-window";
-import { authedFetch } from "@/lib/client-auth";
 
 interface SalesMenuProps {
   onBack: () => void;

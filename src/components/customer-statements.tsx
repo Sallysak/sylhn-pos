@@ -1,19 +1,15 @@
 "use client";
 
+import { authedFetch } from "@/lib/client-auth";
 import { useState, useEffect, useMemo } from "react";
-import { authedFetch } from "@/lib/client-auth";
 import { motion } from "framer-motion";
-import { authedFetch } from "@/lib/client-auth";
 import {
   ArrowLeft, FileText, Loader2, Search, Printer, Mail, X,
   AlertCircle, User, Send,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { authedFetch } from "@/lib/client-auth";
 import { cn } from "@/lib/utils";
-import { authedFetch } from "@/lib/client-auth";
 import { COMPANY, formatGHS } from "@/lib/pos-data";
-import { authedFetch } from "@/lib/client-auth";
 
 interface Customer {
   id: string;

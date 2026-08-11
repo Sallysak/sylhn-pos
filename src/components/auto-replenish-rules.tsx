@@ -1,24 +1,18 @@
 "use client";
 
+import { authedFetch } from "@/lib/client-auth";
 import { useState, useEffect, useCallback } from "react";
-import { authedFetch } from "@/lib/client-auth";
 import { motion } from "framer-motion";
-import { authedFetch } from "@/lib/client-auth";
 import {
   RotateCcw, Plus, Trash2, Play, Settings, AlertTriangle,
   Package, Truck, Clock, TrendingUp, RefreshCw, Loader2, X,
   CheckCircle2, Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { authedFetch } from "@/lib/client-auth";
 import { Input } from "@/components/ui/input";
-import { authedFetch } from "@/lib/client-auth";
 import { Label } from "@/components/ui/label";
-import { authedFetch } from "@/lib/client-auth";
 import { Badge } from "@/components/ui/badge";
-import { authedFetch } from "@/lib/client-auth";
 import { Card } from "@/components/ui/card";
-import { authedFetch } from "@/lib/client-auth";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
@@ -26,9 +20,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { authedFetch } from "@/lib/client-auth";
 import { ArrowLeft } from "lucide-react";
-import { authedFetch } from "@/lib/client-auth";
 
 interface Rule {
   id: string;

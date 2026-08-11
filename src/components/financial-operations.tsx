@@ -1,24 +1,18 @@
 "use client";
 
+import { authedFetch } from "@/lib/client-auth";
 import { useState, useMemo, useEffect } from "react";
-import { authedFetch } from "@/lib/client-auth";
 import { motion, AnimatePresence } from "framer-motion";
-import { authedFetch } from "@/lib/client-auth";
 import {
   ArrowLeft, TrendingUp, Wallet, Smartphone, Plus, Trash2, Edit2,
   DollarSign, Calendar, Receipt, AlertTriangle, CheckCircle2, X,
   Download, Printer, ArrowUpDown, Eye,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { authedFetch } from "@/lib/client-auth";
 import { Badge } from "@/components/ui/badge";
-import { authedFetch } from "@/lib/client-auth";
 import { useToast } from "@/hooks/use-toast";
-import { authedFetch } from "@/lib/client-auth";
 import { cn } from "@/lib/utils";
-import { authedFetch } from "@/lib/client-auth";
 import { COMPANY, formatGHS } from "@/lib/pos-data";
-import { authedFetch } from "@/lib/client-auth";
 
 type FinanceTab = "expenses" | "cash-recon" | "mobile-money";
 

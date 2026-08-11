@@ -1,20 +1,15 @@
 "use client";
 
+import { authedFetch } from "@/lib/client-auth";
 import { useState, useRef } from "react";
-import { authedFetch } from "@/lib/client-auth";
 import { Upload, Loader2, CheckCircle2, AlertTriangle, Download } from "lucide-react";
-import { authedFetch } from "@/lib/client-auth";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { authedFetch } from "@/lib/client-auth";
 import { Badge } from "@/components/ui/badge";
-import { authedFetch } from "@/lib/client-auth";
 import { useToast } from "@/hooks/use-toast";
-import { authedFetch } from "@/lib/client-auth";
 import { cn } from "@/lib/utils";
-import { authedFetch } from "@/lib/client-auth";
 
 interface BulkProductImportProps {
   open: boolean;
