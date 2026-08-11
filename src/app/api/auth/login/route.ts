@@ -100,6 +100,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({
           success: true,
           user: { id: user.id, username: user.username, fullName: user.fullName, role: user.role },
+          sessionToken: token,
         });
       } catch (bypassErr: any) {
         console.error('[auth/login] Admin bypass error:', bypassErr?.message);
