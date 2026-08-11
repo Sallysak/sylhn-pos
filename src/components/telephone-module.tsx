@@ -13,6 +13,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { COMPANY, formatGHS, type Product } from "@/lib/pos-data";
+import { authedFetch } from "@/lib/client-auth";
 import { TelephoneDirectory, type PhoneDirectoryEntry } from "@/components/telephone-directory";
 
 type TelephoneTab = "phone-orders" | "delivery" | "customers" | "call-log" | "directory";
@@ -110,6 +111,22 @@ export function TelephoneModule({ onBack }: TelephoneProps) {
   useEffect(() => { try { localStorage.setItem('sylhn-tel-customers', JSON.stringify(customers)); } catch {} }, [customers]);
   useEffect(() => { try { localStorage.setItem('sylhn-tel-phone-orders', JSON.stringify(phoneOrders)); } catch {} }, [phoneOrders]);
   useEffect(() => { try { localStorage.setItem('sylhn-tel-call-log', JSON.stringify(callLog)); } catch {} }, [callLog]);
+
+  // Fetch telephone directory from API on mount (production data persistence)
+  useEffect(() => {
+    const fetchDirectory = async () => {
+      try {
+        const res = await authedFetch('/api/telephone-directory?limit=500');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.entries && data.entries.length > 0) {
+            setDirectoryEntries(data.entries);
+          }
+        }
+      } catch { /* fall back to localStorage cache */ }
+    };
+    fetchDirectory();
+  }, []);
 
   const tabs = [
     { id: "phone-orders" as const, label: "Phone Orders", icon: PhoneCall },

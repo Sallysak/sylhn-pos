@@ -19,8 +19,8 @@
  * Helps identify exact deploy when debugging
  */
 
-export const APP_VERSION = "1.6.0";
-export const BUILD_ID = "build-2026-08-11-v160-fix-all-fetch-calls";
+export const APP_VERSION = "1.6.1";
+export const BUILD_ID = "build-2026-08-12-v161-production-data-persistence";
 export const RELEASE_DATE = "August 10, 2026";
 export const RELEASE_NAME = "Seed Demo Data + All Features Verified";
 

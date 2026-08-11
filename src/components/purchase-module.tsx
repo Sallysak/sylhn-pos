@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { authedFetch } from "@/lib/client-auth";
 import { COMPANY, CURRENCY, formatGHS, type Product } from "@/lib/pos-data";
 
 type PurchaseTab = "orders" | "receive" | "suppliers" | "history" | "payments" | "report";
@@ -142,10 +143,31 @@ export function PurchaseModule({ onBack, products }: PurchaseProps) {
   const [showNewSupplier, setShowNewSupplier] = useState(false);
   const [viewOrder, setViewOrder] = useState<PurchaseOrder | null>(null);
 
-  // Persist purchase data
+  // Persist purchase data to localStorage (cache) + fetch from API (source of truth)
   useEffect(() => { try { localStorage.setItem('sylhn-purchase-suppliers', JSON.stringify(suppliers)); } catch {} }, [suppliers]);
   useEffect(() => { try { localStorage.setItem('sylhn-purchase-orders', JSON.stringify(orders)); } catch {} }, [orders]);
   useEffect(() => { try { localStorage.setItem('sylhn-purchase-transactions', JSON.stringify(transactions)); } catch {} }, [transactions]);
+
+  // Fetch suppliers + orders from API on mount (production data persistence)
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [supRes, poRes] = await Promise.all([
+          authedFetch('/api/suppliers?active=true&limit=500'),
+          authedFetch('/api/purchases?limit=200'),
+        ]);
+        if (supRes.ok) {
+          const supData = await supRes.json();
+          if (supData.suppliers && supData.suppliers.length > 0) setSuppliers(supData.suppliers);
+        }
+        if (poRes.ok) {
+          const poData = await poRes.json();
+          if (poData.purchases && poData.purchases.length > 0) setOrders(poData.purchases);
+        }
+      } catch { /* fall back to localStorage cache */ }
+    };
+    fetchData();
+  }, []);
 
   const tabs = [
     { id: "orders" as const, label: "Purchase Orders", icon: Archive },
