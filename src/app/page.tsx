@@ -4117,6 +4117,13 @@ export default function POSPage() {
               onClick: () => setShowAiAssistant(true),
             },
             {
+              id: "dashboard",
+              icon: TrendingUp,
+              label: "Dashboard",
+              color: "from-emerald-600 to-green-600",
+              onClick: () => setView("dashboard"),
+            },
+            {
               id: "scan",
               icon: ScanLine,
               label: "Scan Barcode",
