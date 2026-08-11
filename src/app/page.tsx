@@ -431,17 +431,24 @@ export default function POSPage() {
     (async () => {
       try {
         const today = new Date().toISOString().split('T')[0];
-        const res = await authedFetch(`/api/sales?dateFrom=${today}&dateTo=${today}&limit=1000`);
+        // CRITICAL: dateTo must include end-of-day time (T23:59:59.999Z)
+        // Without it, new Date("2026-08-12") = midnight = excludes ALL sales made during the day
+        const res = await authedFetch(`/api/sales?dateFrom=${today}T00:00:00.000Z&dateTo=${today}T23:59:59.999Z&limit=1000`);
         if (!res.ok) return;
         const data = await res.json();
         if (data.sales) {
           const total = data.sales.reduce((s: number, sale: any) => s + (Number(sale.total) || 0), 0);
-          setDailyTotal(total);
-          setTransactionCount(data.sales.length);
-          try {
-            localStorage.setItem('sylhn-daily-total', String(total));
-            localStorage.setItem('sylhn-txn-count', String(data.sales.length));
-          } catch {}
+          // Only overwrite if API returned data OR we have no cached value
+          // This prevents wiping cached data if API returns empty due to timezone mismatch
+          const cachedDaily = localStorage.getItem('sylhn-daily-total');
+          if (data.sales.length > 0 || !cachedDaily) {
+            setDailyTotal(total);
+            setTransactionCount(data.sales.length);
+            try {
+              localStorage.setItem('sylhn-daily-total', String(total));
+              localStorage.setItem('sylhn-txn-count', String(data.sales.length));
+            } catch {}
+          }
         }
       } catch {}
     })();
