@@ -1,5 +1,6 @@
 'use client'
 
+import { authedFetch } from "@/lib/client-auth";
 import { useState } from 'react'
 import { RefreshCw, CheckCircle2, AlertCircle } from 'lucide-react'
 

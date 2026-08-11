@@ -1,5 +1,6 @@
 "use client";
 
+import { authedFetch } from "@/lib/client-auth";
 import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import { CreditCard, Loader2, CheckCircle2, AlertTriangle, Calendar } from "lucide-react";

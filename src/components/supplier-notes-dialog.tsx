@@ -1,5 +1,6 @@
 "use client";
 
+import { authedFetch } from "@/lib/client-auth";
 import { useState, useEffect } from "react";
 import { StickyNote, Loader2, Save } from "lucide-react";
 import {

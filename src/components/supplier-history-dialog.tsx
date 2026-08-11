@@ -1,5 +1,6 @@
 "use client";
 
+import { authedFetch } from "@/lib/client-auth";
 import { useState, useEffect } from "react";
 import { History, Loader2, Package, CreditCard } from "lucide-react";
 import {

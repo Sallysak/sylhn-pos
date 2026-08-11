@@ -1,5 +1,6 @@
 "use client";
 
+import { authedFetch } from "@/lib/client-auth";
 import { useState, useEffect, useMemo } from "react";
 import { Package, Loader2, Plus, Search, Trash2, Star, X } from "lucide-react";
 import {

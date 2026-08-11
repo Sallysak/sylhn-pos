@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { COMPANY, formatGHS } from "@/lib/pos-data";
 import { APP_VERSION, BUILD_ID } from "@/lib/version";
 import { saveUserSession } from "@/lib/session-data";
+import { authedFetch } from "@/lib/client-auth";
 import {
   isBiometricSupported, isBiometricAvailable, getBiometricCredentials,
   registerBiometric, authenticateWithBiometric, removeBiometricCredential,

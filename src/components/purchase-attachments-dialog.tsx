@@ -1,5 +1,6 @@
 "use client";
 
+import { authedFetch } from "@/lib/client-auth";
 import { useState, useRef, useEffect } from "react";
 import { Paperclip, Loader2, FileText, Image as ImageIcon, Upload, Trash2, Download } from "lucide-react";
 import {

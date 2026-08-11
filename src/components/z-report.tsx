@@ -1,5 +1,6 @@
 "use client";
 
+import { authedFetch } from "@/lib/client-auth";
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {

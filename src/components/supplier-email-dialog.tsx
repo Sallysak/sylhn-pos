@@ -1,5 +1,6 @@
 "use client";
 
+import { authedFetch } from "@/lib/client-auth";
 import { useState, useEffect } from "react";
 import { Mail, Loader2, Send, AlertTriangle } from "lucide-react";
 import {

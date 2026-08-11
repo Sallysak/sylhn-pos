@@ -1,5 +1,6 @@
 "use client";
 
+import { authedFetch } from "@/lib/client-auth";
 import { useState, useEffect } from "react";
 import { Brain, Loader2, TrendingUp, TrendingDown, Package, Sparkles, ShoppingCart } from "lucide-react";
 import {

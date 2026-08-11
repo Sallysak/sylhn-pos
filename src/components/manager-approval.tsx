@@ -1,5 +1,6 @@
 "use client";
 
+import { authedFetch } from "@/lib/client-auth";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Shield, X, AlertTriangle, Loader2, Lock } from "lucide-react";
