@@ -431,7 +431,7 @@ export default function POSPage() {
     (async () => {
       try {
         const today = new Date().toISOString().split('T')[0];
-        const res = await fetch(`/api/sales?dateFrom=${today}&dateTo=${today}&limit=1000`, { credentials: 'include' });
+        const res = await authedFetch(`/api/sales?dateFrom=${today}&dateTo=${today}&limit=1000`);
         if (!res.ok) return;
         const data = await res.json();
         if (data.sales) {
@@ -453,7 +453,7 @@ export default function POSPage() {
     if (!loggedInUser) return;
     (async () => {
       try {
-        const res = await fetch('/api/locations', { credentials: 'include' });
+        const res = await authedFetch('/api/locations');
         if (!res.ok) return;
         const data = await res.json();
         if (data.locations && data.locations.length > 0) setLocations(data.locations);
@@ -4490,7 +4490,7 @@ function PaymentModal({ total, subtotal, tax, discount, itemCount, invoiceNumber
   // Fetch customer's loyalty points when customer changes
   useEffect(() => {
     if (customerId) {
-      fetch(`/api/customers/${customerId}`, { credentials: "include" })
+      authedFetch(`/api/customers/${customerId}`)
         .then(r => r.json())
         .then(data => {
           if (data.customer) {
@@ -6728,7 +6728,7 @@ function CustomerHistoryInline({ customerId, customerName }: { customerId: strin
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`/api/sales?customerId=${customerId}&limit=10`, { credentials: "include" })
+    authedFetch(`/api/sales?customerId=${customerId}&limit=10`)
       .then(r => r.json())
       .then(data => { setSales(data.sales || []); })
       .catch(() => {})

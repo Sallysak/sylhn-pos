@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { COMPANY, CURRENCY, formatGHS } from "@/lib/pos-data";
+import { authedFetch } from "@/lib/client-auth";
 
 // ============= Types =============
 interface SaleRow {
@@ -81,7 +82,7 @@ function useSales(fromDate: string, toDate: string) {
     try {
       // Add end-of-day to toDate so the entire day is included
       const url = `/api/sales?dateFrom=${fromDate}T00:00:00.000Z&dateTo=${toDate}T23:59:59.999Z&limit=1000`;
-      const res = await fetch(url, { credentials: "include" });
+      const res = await authedFetch(url);
       const data = await res.json();
       if (res.ok) {
         setSales(data.sales || data || []);

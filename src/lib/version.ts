@@ -19,8 +19,8 @@
  * Helps identify exact deploy when debugging
  */
 
-export const APP_VERSION = "1.5.5";
-export const BUILD_ID = "build-2026-08-11-v155-fix-white-text-tables";
+export const APP_VERSION = "1.5.6";
+export const BUILD_ID = "build-2026-08-11-v156-fix-auth-fetch-sales-persistence";
 export const RELEASE_DATE = "August 10, 2026";
 export const RELEASE_NAME = "Seed Demo Data + All Features Verified";
 
