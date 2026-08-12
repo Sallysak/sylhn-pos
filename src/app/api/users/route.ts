@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
 
     const result = validate(UserSchema, body);
     if (!result.success) return validationError(result.error);
-    const u = result.data;
+    const u = result.data as any;
 
     // Hash the password before storing
     const hashedPassword = await hashPassword(u.password);

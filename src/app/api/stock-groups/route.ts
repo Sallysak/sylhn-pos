@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
 
     const result = validate(StockGroupSchema, body);
     if (!result.success) return validationError(result.error);
-    const g = result.data;
+    const g = result.data as any;
 
     const group = await db.stockGroup.create({
       data: {

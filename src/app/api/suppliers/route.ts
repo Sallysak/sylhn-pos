@@ -106,7 +106,7 @@ export async function POST(req: NextRequest) {
 
     const result = validate(SupplierSchema, body);
     if (!result.success) return validationError(result.error);
-    const s = result.data;
+    const s = result.data as any;
 
     // Premium fix: accept the full supplier schema (was only saving 5 fields)
     const code = s.code || await generateSupplierCode();
