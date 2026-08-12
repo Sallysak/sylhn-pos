@@ -140,11 +140,11 @@ export async function POST(req: NextRequest) {
   try {
     // Bulk upsert (sync from client localStorage)
     if (Array.isArray((body as any)?.products)) {
-      const result = validate(ProductBulkSchema, body);
-      if (!result.success) return validationError(result.error);
+      const result = validate(ProductBulkSchema, body as any);
+  if (!result.success) return validationError(result.error);
 
       const results: any[] = [];
-      for (const p of result.data.products) {
+      for (const p of (result.data as any).products) {
         const data = {
           sku: p.sku,
           barcode: p.barcode || "",
@@ -175,9 +175,9 @@ export async function POST(req: NextRequest) {
     }
 
     // Single create
-    const result = validate(ProductSchema, body);
+    const result = validate(ProductSchema, body as any);
     if (!result.success) return validationError(result.error);
-    const p = result.data;
+    const p = result.data as any;
 
     // ===== Validate groupId exists before creating (foreign key constraint) =====
     // The form sometimes sends a stale groupId (e.g. "g1" from localStorage

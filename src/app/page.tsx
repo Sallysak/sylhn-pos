@@ -42,12 +42,12 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { InstallButton } from "@/components/install-button";
 import { MobileNav } from "@/components/mobile-nav";
-import { BarcodeScanner } from "@/components/barcode-scanner";
-import { ManagerApproval } from "@/components/manager-approval";
-import { PrinterPairing } from "@/components/printer-pairing";
-import { AiAssistant } from "@/components/ai-assistant";
-import { AiAssistantDashboard } from "@/components/ai-assistant-dashboard";
-import { AiPredictionsDashboard } from "@/components/ai-predictions-dashboard";
+const BarcodeScanner = dynamic(() => import("@/components/barcode-scanner").then(m => ({ default: m.BarcodeScanner })), { ssr: false, loading: loadingFallback });
+const ManagerApproval = dynamic(() => import("@/components/manager-approval").then(m => ({ default: m.ManagerApproval })), { ssr: false, loading: loadingFallback });
+const PrinterPairing = dynamic(() => import("@/components/printer-pairing").then(m => ({ default: m.PrinterPairing })), { ssr: false, loading: loadingFallback });
+const AiAssistant = dynamic(() => import("@/components/ai-assistant").then(m => ({ default: m.AiAssistant })), { ssr: false, loading: loadingFallback });
+const AiAssistantDashboard = dynamic(() => import("@/components/ai-assistant-dashboard").then(m => ({ default: m.AiAssistantDashboard })), { ssr: false, loading: loadingFallback });
+const AiPredictionsDashboard = dynamic(() => import("@/components/ai-predictions-dashboard").then(m => ({ default: m.AiPredictionsDashboard })), { ssr: false, loading: loadingFallback });
 import { APP_VERSION, BUILD_ID } from "@/lib/version";
 import { SpeedDial } from "@/components/speed-dial";
 import { LiveClock } from "@/components/live-clock";
@@ -240,7 +240,7 @@ export default function POSPage() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch('/api/suppliers', { credentials: 'include' });
+        const res = await authedFetch('/api/suppliers');
         if (!res.ok) return;
         const data = await res.json();
         if (cancelled) return;
@@ -266,7 +266,7 @@ export default function POSPage() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch('/api/stock-groups', { credentials: 'include' });
+        const res = await authedFetch('/api/stock-groups');
         if (!res.ok) return;
         const data = await res.json();
         if (cancelled) return;
@@ -403,7 +403,7 @@ export default function POSPage() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch('/api/held-orders', { credentials: 'include' });
+        const res = await authedFetch('/api/held-orders');
         if (!res.ok) return;
         const data = await res.json();
         if (cancelled) return;
@@ -1047,7 +1047,7 @@ export default function POSPage() {
     if (!loggedInUser) return;
     (async () => {
       try {
-        const res = await fetch("/api/quick-keys?limit=20", { credentials: "include" });
+        const res = await authedFetch("/api/quick-keys?limit=20");
         if (res.ok) {
           const data = await res.json();
           setQuickKeys(data.quickKeys || []);
@@ -4270,7 +4270,7 @@ export default function POSPage() {
                 if (newPwd !== confirm) { toast({ title: "Passwords don't match", variant: "destructive" }); return; }
                 if (newPwd.length < 8) { toast({ title: "Password too short", description: "Min 8 characters", variant: "destructive" }); return; }
                 try {
-                  const res = await fetch("/api/auth/change-password", {
+                  const res = await authedFetch("/api/auth/change-password", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     credentials: "include",
@@ -4542,7 +4542,7 @@ function PaymentModal({ total, subtotal, tax, discount, itemCount, invoiceNumber
       // This is a simplification — in production, the sale is created in the
       // completePayment function, and MoMo is initiated after.
       // For now, let's just simulate the MoMo flow and call onComplete.
-      const res = await fetch("/api/payments/momo/initiate", {
+      const res = await authedFetch("/api/payments/momo/initiate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -4590,7 +4590,7 @@ function PaymentModal({ total, subtotal, tax, discount, itemCount, invoiceNumber
         return;
       }
       try {
-        const res = await fetch(`/api/payments/momo/status?referenceId=${refId}`);
+        const res = await authedFetch(`/api/payments/momo/status?referenceId=${refId}`);
         if (res.ok) {
           const data = await res.json();
           if (data.status === "completed") {

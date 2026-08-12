@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
 
   const result = validate(PurchaseSchema, body);
   if (!result.success) return validationError(result.error);
-  const p = result.data;
+  const p = result.data as any;
 
   // Pull expectedAt separately (not in schema to keep it loose)
   const expectedAt = (body as any).expectedAt ? new Date((body as any).expectedAt) : null;

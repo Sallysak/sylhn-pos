@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
 
   const result = validate(LoginSchema, body);
   if (!result.success) return validationError(result.error);
-  const { username, password, biometric } = result.data;
+  const { username, password, biometric } = result.data as { username: string; password: string; biometric?: boolean };
   const safeUsername = sanitizeString(username, 64);
 
   // ===== Per-account lockout check (brute force protection) =====

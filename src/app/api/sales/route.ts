@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
 
   const result = validate(SaleSchema, body);
   if (!result.success) return validationError(result.error);
-  const s = result.data;
+  const s = result.data as any;
   const bodyAny = body as any;
 
   try {

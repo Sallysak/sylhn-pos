@@ -7,7 +7,7 @@ import { auditLog } from "@/lib/audit";
 
 // GET /api/expenses — list expenses (with optional date filter)
 export async function GET(req: NextRequest) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
     }
 
     return NextResponse.json({ expenses, summary: { total, byCategory, count: expenses.length } });
-  } catch (e) {
+  } catch (e: any) {
     console.error("GET /api/expenses error:", e);
     return NextResponse.json({ error: "Failed to fetch expenses" }, { status: 500 });
   }
@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
   try {
     user = await requireAuth();
     requirePermission(user.role, "financeOps");
-  } catch (e) { return e as Response; }
+  } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);
@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
 
   const result = validate(ExpenseSchema, body);
   if (!result.success) return validationError(result.error);
-  const e = result.data;
+  const e = result.data as any;
 
   try {
     const expense = await db.expense.create({

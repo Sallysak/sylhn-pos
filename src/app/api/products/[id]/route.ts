@@ -59,7 +59,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
   try {
     const { id } = await params;
-    const updates = result.data;
+    const updates = result.data as Record<string, any>;
 
     // Capture previous quantity for stock history if quantity changed
     const previous = await db.product.findUnique({ where: { id }, select: { quantity: true, name: true, sku: true } });

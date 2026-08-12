@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
   try { body = await req.json(); } catch { return validationError("Invalid JSON body"); }
   const result = validate(PasswordChangeSchema, body);
   if (!result.success) return validationError(result.error);
-  const { currentPassword, newPassword } = result.data;
+  const { currentPassword, newPassword } = result.data as { currentPassword: string; newPassword: string };
 
   try {
     const user = await db.systemUser.findUnique({ where: { id: session.uid } });
