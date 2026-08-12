@@ -36,7 +36,7 @@ export async function POST(req: Request) {
   }
 
   let user;
-  try { user = await requireRole("admin"); } catch (e) { return e as Response; }
+  try { user = await requireRole("admin"); } catch (e: any) { return e as Response; }
 
   // Rate limit
   const h = await headers();
@@ -414,7 +414,7 @@ export async function POST(req: Request) {
       },
       warning: "SAVE THESE CREDENTIALS NOW. They will not be shown again. Consider changing them immediately after first login.",
     });
-  } catch (e) {
+  } catch (e: any) {
     console.error("POST /api/seed error:", e);
     return NextResponse.json({ error: `Seed failed: ${(e as Error).message}` }, { status: 500 });
   }

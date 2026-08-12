@@ -17,7 +17,7 @@ import { auditLog } from "@/lib/audit";
 //   offset: pagination offset
 //   export: if "csv", returns CSV instead of JSON
 export async function GET(req: NextRequest) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
@@ -110,7 +110,7 @@ export async function GET(req: NextRequest) {
       summary,
       pagination: { total, limit, offset, hasMore: offset + limit < total },
     });
-  } catch (e) {
+  } catch (e: any) {
     console.error("GET /api/stock-history error:", e);
     return NextResponse.json({ error: "Failed to fetch stock history" }, { status: 500 });
   }

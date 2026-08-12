@@ -13,7 +13,7 @@ import { encryptField } from "@/lib/data-protection";
 // Body: { code?: string }  // if code is provided, this is the verify step
 export async function POST(req: NextRequest) {
   let user;
-  try { user = await requireAuth(); } catch (e) { return e as Response; }
+  try { user = await requireAuth(); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);
@@ -118,7 +118,7 @@ export async function POST(req: NextRequest) {
 // DELETE /api/auth/2fa-setup — disable 2FA (requires password confirmation in body)
 export async function DELETE(req: NextRequest) {
   let user;
-  try { user = await requireAuth(); } catch (e) { return e as Response; }
+  try { user = await requireAuth(); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);

@@ -22,7 +22,7 @@ import { formatGHS } from "@/lib/pos-data";
 //   3. By a manager wanting to send via WhatsApp — ?format=whatsapp
 export async function GET(req: NextRequest) {
   let user;
-  try { user = await requireAuth(); } catch (e) { return e as Response; }
+  try { user = await requireAuth(); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
@@ -234,7 +234,7 @@ export async function GET(req: NextRequest) {
       totalEstimatedCost,
       text,
     });
-  } catch (e) {
+  } catch (e: any) {
     console.error("GET /api/alerts/low-stock-digest error:", e);
     return NextResponse.json({ error: "Failed to generate low-stock digest" }, { status: 500 });
   }

@@ -8,7 +8,7 @@ import { getMomoPaymentStatus } from "@/lib/mtn-momo";
 // Returns the current status of a MoMo payment request. Use this to poll for
 // updates when the webhook hasn't fired yet (or to verify webhook delivery).
 export async function GET(req: NextRequest) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
   if (!rl.allowed) return rateLimitResponse(rl);

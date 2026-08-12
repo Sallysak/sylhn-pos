@@ -5,7 +5,7 @@ import { rateLimitApiRead, rateLimitResponse, getClientIp } from "@/lib/rate-lim
 
 // GET /api/quick-keys — top N most-sold products for quick-add buttons
 export async function GET(req: NextRequest) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
   if (!rl.allowed) return rateLimitResponse(rl);
@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
     }
 
     return NextResponse.json({ quickKeys: topProducts });
-  } catch (e) {
+  } catch (e: any) {
     return NextResponse.json({ error: "Failed to fetch quick keys" }, { status: 500 });
   }
 }

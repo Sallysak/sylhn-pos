@@ -9,7 +9,7 @@ import { auditLog } from "@/lib/audit";
 // Body: { steps: [{ id, label, completed, value? }], notes?: string, cashCounted?: number }
 export async function POST(req: NextRequest) {
   let user;
-  try { user = await requireAuth(); } catch (e) { return e as Response; }
+  try { user = await requireAuth(); } catch (e: any) { return e as Response; }
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);
   if (!rl.allowed) return rateLimitResponse(rl);
@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
 
 // GET /api/shift-close/checklist — get today's checklist if it exists
 export async function GET(req: NextRequest) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);
   if (!rl.allowed) return rateLimitResponse(rl);

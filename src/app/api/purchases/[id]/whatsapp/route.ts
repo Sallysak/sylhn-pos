@@ -11,7 +11,7 @@ import { CURRENCY } from "@/lib/pos-data";
 // Ghanaian suppliers overwhelmingly prefer WhatsApp over email.
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   let user;
-  try { user = await requireAuth(); } catch (e) { return e as Response; }
+  try { user = await requireAuth(); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
@@ -112,7 +112,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       text,
       refNo: purchase.refNo,
     });
-  } catch (e) {
+  } catch (e: any) {
     console.error("GET /api/purchases/[id]/whatsapp error:", e);
     return NextResponse.json({ error: "Failed to generate WhatsApp PO link" }, { status: 500 });
   }

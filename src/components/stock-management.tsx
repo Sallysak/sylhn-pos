@@ -732,9 +732,9 @@ function AddModifyStock({ products, setProducts, groups, setHistory }: {
 }
 
 function ProductForm({ product, groups, onSave, onClose }: {
-  product: Product | null;
+  product: any;
   groups: StockGroup[];
-  onSave: (p: Product) => void;
+  onSave: (p: Product) => any;
   onClose: () => void;
 }) {
   const { toast } = useToast();
@@ -2482,7 +2482,7 @@ function StockFileView({ products, setProducts, groups, history, setHistory }: {
                     credentials: "include",
                   });
                 }
-              } catch (e) {
+              } catch (e: any) {
                 console.warn("Failed to save image to server:", e);
               }
 

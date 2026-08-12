@@ -5,7 +5,7 @@ import { rateLimitApiRead, rateLimitResponse, getClientIp } from "@/lib/rate-lim
 
 // GET /api/price-tags — generate printable price tags
 export async function GET(req: NextRequest) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
   if (!rl.allowed) return rateLimitResponse(rl);
@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
     });
 
     return NextResponse.json({ products, count: products.length });
-  } catch (e) {
+  } catch (e: any) {
     return NextResponse.json({ error: "Failed to fetch price tags" }, { status: 500 });
   }
 }

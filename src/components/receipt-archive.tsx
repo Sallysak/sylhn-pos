@@ -68,7 +68,7 @@ export function ReceiptArchive({ onBack }: ReceiptArchiveProps) {
         const data = await res.json();
         setReceipts(data.sales || []);
       }
-    } catch (e) {
+    } catch (e: any) {
       console.warn("Failed to fetch receipts:", e);
     } finally {
       setLoading(false);

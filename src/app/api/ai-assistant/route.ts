@@ -21,7 +21,7 @@ export const maxDuration = 60;
 // Returns: { response: string, context: { ...dataUsed }, source: "llm" | "rules" }
 export async function POST(req: NextRequest) {
   let user;
-  try { user = await requireAuth(); } catch (e) { return e as Response; }
+  try { user = await requireAuth(); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);

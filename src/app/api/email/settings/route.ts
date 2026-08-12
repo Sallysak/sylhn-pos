@@ -5,7 +5,7 @@ import { rateLimitApiRead, rateLimitApiWrite, rateLimitResponse, getClientIp } f
 
 // GET /api/email/settings — get SMTP settings (password masked)
 export async function GET(req: NextRequest) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
   if (!rl.allowed) return rateLimitResponse(rl);
@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
       }
     }
     return NextResponse.json({ settings: result });
-  } catch (e) {
+  } catch (e: any) {
     return NextResponse.json({ error: "Failed to fetch email settings" }, { status: 500 });
   }
 }
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
   try {
     user = await requireAuth();
     requirePermission(user.role, "maintenance");
-  } catch (e) { return e as Response; }
+  } catch (e: any) { return e as Response; }
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);
   if (!rl.allowed) return rateLimitResponse(rl);

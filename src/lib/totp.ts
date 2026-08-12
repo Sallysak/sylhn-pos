@@ -158,7 +158,7 @@ export function generateBackupCodes(): string[] {
   const codes: string[] = [];
   for (let i = 0; i < 10; i++) {
     const bytes = crypto.randomBytes(4);
-    const code = Array.from(bytes, b => (b % 36).toString(36)).join("").toUpperCase().padStart(8, "0").slice(-8);
+    const code = Array.from(bytes, (b: any) => (b % 36).toString(36)).join("").toUpperCase().padStart(8, "0").slice(-8);
     codes.push(code);
   }
   return codes;

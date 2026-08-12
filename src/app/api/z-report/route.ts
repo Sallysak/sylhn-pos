@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
   try {
     user = await requireAuth();
     requirePermission(user.role, "accounts");
-  } catch (e) { return e as Response; }
+  } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
@@ -221,7 +221,7 @@ export async function GET(req: NextRequest) {
         contact: "+233592766044",
       },
     });
-  } catch (e) {
+  } catch (e: any) {
     console.error("GET /api/z-report error:", e);
     return NextResponse.json({ error: "Failed to generate Z-Report" }, { status: 500 });
   }

@@ -14,7 +14,7 @@ export function EmailNotificationBadge({ variant = "absolute", onClick }: { vari
         const data = await res.json();
         setCount(data.count || 0);
       }
-    } catch (e) {
+    } catch (e: any) {
       // Silent fail
     }
   };

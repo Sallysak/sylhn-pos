@@ -4,7 +4,7 @@ import { requireAuth } from "@/lib/auth";
 
 // GET /api/admin/backup/history — list all backup records
 export async function GET(req: NextRequest) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
 
   try {
     const backups = await db.backupRecord.findMany({
@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
         totalSizeFormatted: totalSize < 1024 * 1024 ? `${(totalSize / 1024).toFixed(1)} KB` : `${(totalSize / 1024 / 1024).toFixed(2)} MB`,
       },
     });
-  } catch (e) {
+  } catch (e: any) {
     console.error("GET /api/admin/backup/history error:", e);
     return NextResponse.json({ error: "Failed to fetch backup history" }, { status: 500 });
   }

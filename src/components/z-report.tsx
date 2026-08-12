@@ -121,7 +121,7 @@ export function ZReport({ onBack }: { onBack: () => void }) {
             <div className="bg-white rounded-xl ring-1 ring-slate-200 p-4 mb-4">
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Payment Method Breakdown</h3>
               <div className="space-y-2">
-                {Object.entries(payments).map(([method, info]) => {
+                {Object.entries(payments).map(([method, info]: [string, any]) => {
                   const Icon = paymentIcons[method] || DollarSign;
                   return (
                     <div key={method} className="flex items-center justify-between p-2 rounded-lg bg-slate-50">

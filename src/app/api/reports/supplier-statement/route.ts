@@ -8,7 +8,7 @@ import { auditLog } from "@/lib/audit";
 // Returns a full supplier statement: opening balance, all purchases + payments
 // in the date range, and closing balance. Used for PDF generation.
 export async function GET(req: NextRequest) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
@@ -170,7 +170,7 @@ export async function GET(req: NextRequest) {
       ledger,
       generatedAt: new Date().toISOString(),
     });
-  } catch (e) {
+  } catch (e: any) {
     console.error("GET /api/reports/supplier-statement error:", e);
     return NextResponse.json({ error: "Failed to generate supplier statement" }, { status: 500 });
   }

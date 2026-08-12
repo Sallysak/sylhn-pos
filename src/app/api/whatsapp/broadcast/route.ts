@@ -18,7 +18,7 @@ import { auditLog } from "@/lib/audit";
 // Returns an array of { customer, waLink } objects.
 export async function POST(req: NextRequest) {
   let user;
-  try { user = await requireAuth(); requirePermission(user.role, "financeOps"); } catch (e) { return e as Response; }
+  try { user = await requireAuth(); requirePermission(user.role, "financeOps"); } catch (e: any) { return e as Response; }
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);
   if (!rl.allowed) return rateLimitResponse(rl);

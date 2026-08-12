@@ -7,7 +7,7 @@ import { auditLogTx } from "@/lib/audit";
 // GET /api/customers/[id]/credit — full credit account statement
 // Shows: credit limit, current balance, all credit sales (unpaid), payment history
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
@@ -68,7 +68,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         overdueCount: outstandingSales.filter(s => s.creditDueDate && new Date(s.creditDueDate) < new Date()).length,
       },
     });
-  } catch (e) {
+  } catch (e: any) {
     console.error("GET /api/customers/[id]/credit error:", e);
     return NextResponse.json({ error: "Failed to fetch credit account" }, { status: 500 });
   }
@@ -78,7 +78,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 // Body: { saleId, amountPaid } or { saleIds: [...], amountPaid } (split across multiple)
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   let user;
-  try { user = await requireAuth(); requirePermission(user.role, "financeOps"); } catch (e) { return e as Response; }
+  try { user = await requireAuth(); requirePermission(user.role, "financeOps"); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);

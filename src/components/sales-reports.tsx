@@ -89,7 +89,7 @@ function useSales(fromDate: string, toDate: string) {
       } else {
         setError(data.error || "Failed to fetch sales");
       }
-    } catch (e) {
+    } catch (e: any) {
       setError("Network error");
     } finally {
       setLoading(false);

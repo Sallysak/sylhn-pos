@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({ success: true, expense });
-  } catch (err) {
+  } catch (err: any) {
     console.error("POST /api/expenses error:", err);
     return NextResponse.json({ error: "Failed to create expense" }, { status: 500 });
   }

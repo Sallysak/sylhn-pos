@@ -7,7 +7,7 @@ import { auditLog } from "@/lib/audit";
 import { generateSupplierCode } from "@/lib/identifiers";
 
 export async function GET(req: NextRequest) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
       take: limit,
     });
     return NextResponse.json({ suppliers });
-  } catch (e) {
+  } catch (e: any) {
     console.error("GET /api/suppliers error:", e);
     return NextResponse.json({ error: "Failed to fetch suppliers" }, { status: 500 });
   }
@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
   try {
     user = await requireAuth();
     requirePermission(user.role, "purchase");
-  } catch (e) { return e as Response; }
+  } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
       const arr = (body as any).suppliers;
       const results: any[] = [];
       for (const s of arr.slice(0, 500)) {
-        const r = validate(SupplierSchema, s);
+        const r = validate(SupplierSchema, s) as any;
         if (!r.success) continue;
         const data = {
           name: r.data.name,
@@ -164,7 +164,7 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({ success: true, supplier });
-  } catch (e) {
+  } catch (e: any) {
     console.error("POST /api/suppliers error:", e);
     return NextResponse.json({ error: "Failed to create supplier" }, { status: 500 });
   }

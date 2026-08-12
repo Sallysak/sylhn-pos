@@ -6,7 +6,7 @@ import { rateLimitApiRead, rateLimitApiWrite, rateLimitResponse, getClientIp } f
 // GET /api/held-orders/[id] — fetch a single held order (for recall)
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   let user;
-  try { user = await requireAuth(); } catch (e) { return e as Response; }
+  try { user = await requireAuth(); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
@@ -22,7 +22,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
     return NextResponse.json({ heldOrder: held });
-  } catch (e) {
+  } catch (e: any) {
     console.error("GET /api/held-orders/[id] error:", e);
     return NextResponse.json({ error: "Failed to fetch held order" }, { status: 500 });
   }
@@ -31,7 +31,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 // DELETE /api/held-orders/[id] — recall (mark as recalled) or hard delete
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   let user;
-  try { user = await requireAuth(); requirePermission(user.role, "pos"); } catch (e) { return e as Response; }
+  try { user = await requireAuth(); requirePermission(user.role, "pos"); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);
@@ -64,7 +64,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     });
 
     return NextResponse.json({ success: true, heldOrder: updated });
-  } catch (e) {
+  } catch (e: any) {
     console.error("DELETE /api/held-orders/[id] error:", e);
     return NextResponse.json({ error: "Failed to recall held order" }, { status: 500 });
   }

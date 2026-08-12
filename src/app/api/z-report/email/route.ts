@@ -15,7 +15,7 @@ import nodemailer from "nodemailer";
 // Body (optional): { date?: "YYYY-MM-DD", recipients?: ["email1", ...] }
 export async function POST(req: NextRequest) {
   let user;
-  try { user = await requireAuth(); requirePermission(user.role, "accounts"); } catch (e) { return e as Response; }
+  try { user = await requireAuth(); requirePermission(user.role, "accounts"); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);

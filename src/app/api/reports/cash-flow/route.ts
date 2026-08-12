@@ -22,7 +22,7 @@ import { db } from "@/lib/db";
 // Useful for: cash flow management, predicting shortfalls, bank deposit
 // planning, and answering "do we have enough cash to pay suppliers?"
 export async function GET(req: NextRequest) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
@@ -148,7 +148,7 @@ export async function GET(req: NextRequest) {
       cashInBySource,
       cashOutByCategory,
     });
-  } catch (e) {
+  } catch (e: any) {
     console.error("GET /api/reports/cash-flow error:", e);
     return NextResponse.json({ error: "Failed to generate cash flow report" }, { status: 500 });
   }

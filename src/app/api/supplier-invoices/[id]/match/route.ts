@@ -13,7 +13,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   try {
     user = await requireAuth();
     requirePermission(user.role, "financeOps");
-  } catch (e) { return e as Response; }
+  } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);

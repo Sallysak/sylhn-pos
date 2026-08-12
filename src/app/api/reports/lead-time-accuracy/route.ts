@@ -8,7 +8,7 @@ import { db } from "@/lib/db";
 // (receivedAt - createdAt) per supplier. Shows which suppliers deliver on
 // time vs late, and by how many days.
 export async function GET(req: NextRequest) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
   if (!rl.allowed) return rateLimitResponse(rl);
@@ -101,7 +101,7 @@ export async function GET(req: NextRequest) {
     };
 
     return NextResponse.json({ summary, suppliers });
-  } catch (e) {
+  } catch (e: any) {
     console.error("GET /api/reports/lead-time-accuracy error:", e);
     return NextResponse.json({ error: "Failed to generate lead-time report" }, { status: 500 });
   }

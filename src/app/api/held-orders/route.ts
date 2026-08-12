@@ -6,7 +6,7 @@ import { rateLimitApiRead, rateLimitApiWrite, rateLimitResponse, getClientIp } f
 // GET /api/held-orders — list held orders for the current cashier (or all if manager+)
 export async function GET(req: NextRequest) {
   let user;
-  try { user = await requireAuth(); } catch (e) { return e as Response; }
+  try { user = await requireAuth(); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
       take: 100,
     });
     return NextResponse.json({ heldOrders: orders });
-  } catch (e) {
+  } catch (e: any) {
     console.error("GET /api/held-orders error:", e);
     return NextResponse.json({ error: "Failed to fetch held orders" }, { status: 500 });
   }
@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
 // POST /api/held-orders — park a cart for later recall
 export async function POST(req: NextRequest) {
   let user;
-  try { user = await requireAuth(); requirePermission(user.role, "pos"); } catch (e) { return e as Response; }
+  try { user = await requireAuth(); requirePermission(user.role, "pos"); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);
@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({ success: true, heldOrder: held });
-  } catch (e) {
+  } catch (e: any) {
     console.error("POST /api/held-orders error:", e);
     return NextResponse.json({ error: "Failed to create held order" }, { status: 500 });
   }

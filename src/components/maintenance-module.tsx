@@ -543,7 +543,7 @@ function CashierShift({ cashier, dailyTotal, transactionCount }: { cashier: stri
             }
           }
         }
-      } catch (e) {
+      } catch (e: any) {
         console.warn('Failed to sync shift with server:', e);
       }
     })();

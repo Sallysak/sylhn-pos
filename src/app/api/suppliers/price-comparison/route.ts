@@ -6,7 +6,7 @@ import { requireAuth } from '@/lib/auth'
 // Compares prices for the same product across multiple suppliers
 
 export async function GET(req: NextRequest) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
 
   const productId = req.nextUrl.searchParams.get('productId')
 

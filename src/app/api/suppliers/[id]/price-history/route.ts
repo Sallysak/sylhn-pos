@@ -10,7 +10,7 @@ import { rateLimitApiRead, rateLimitResponse, getClientIp } from "@/lib/rate-lim
 //
 // Powers the price-trend chart in the Supplier form.
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
@@ -70,7 +70,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         trend: totalChangePct > 5 ? "increasing" : totalChangePct < -5 ? "decreasing" : "stable",
       },
     });
-  } catch (e) {
+  } catch (e: any) {
     console.error("GET /api/suppliers/[id]/price-history error:", e);
     return NextResponse.json({ error: "Failed to fetch price history" }, { status: 500 });
   }

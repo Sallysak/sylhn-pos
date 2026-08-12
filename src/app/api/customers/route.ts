@@ -6,7 +6,7 @@ import { auditLog } from "@/lib/audit";
 
 // GET /api/customers — list customers
 export async function GET(req: NextRequest) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
   await waitForDb();
 
   const ip = getClientIp(req);
@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
       take: limit,
     });
     return NextResponse.json({ customers });
-  } catch (e) {
+  } catch (e: any) {
     console.error("GET /api/customers error:", e);
     return NextResponse.json({ error: "Failed to fetch customers" }, { status: 500 });
   }
@@ -51,7 +51,7 @@ export async function GET(req: NextRequest) {
 // POST /api/customers — create a new customer
 export async function POST(req: NextRequest) {
   let user;
-  try { user = await requireAuth(); } catch (e) { return e as Response; }
+  try { user = await requireAuth(); } catch (e: any) { return e as Response; }
   await waitForDb();
 
   const ip = getClientIp(req);
@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({ success: true, customer });
-  } catch (e) {
+  } catch (e: any) {
     console.error("POST /api/customers error:", e);
     return NextResponse.json({ error: "Failed to create customer" }, { status: 500 });
   }

@@ -11,7 +11,7 @@ import { rateLimitApiRead, rateLimitResponse, getClientIp } from "@/lib/rate-lim
 // Also flags "dead stock" (no sales in 90+ days) and identifies products
 // at risk of expiry.
 export async function GET(req: NextRequest) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
@@ -130,7 +130,7 @@ export async function GET(req: NextRequest) {
       products: sorted,
       generatedAt: new Date().toISOString(),
     });
-  } catch (e) {
+  } catch (e: any) {
     console.error("GET /api/reports/inventory-aging error:", e);
     return NextResponse.json({ error: "Failed to generate aging report" }, { status: 500 });
   }

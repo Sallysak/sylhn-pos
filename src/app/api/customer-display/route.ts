@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
 // POST /api/customer-display — update the display state (cashier side, auth required)
 export async function POST(req: NextRequest) {
   let user;
-  try { user = await requireAuth(); } catch (e) { return e as Response; }
+  try { user = await requireAuth(); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);
@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
 
 // DELETE /api/customer-display?registerId=register-1 — clear the display
 export async function DELETE(req: NextRequest) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
   const { searchParams } = new URL(req.url);
   const registerId = searchParams.get("registerId") || "register-1";
   displays.delete(registerId);

@@ -7,7 +7,7 @@ import { generatePurchaseRefNo } from "@/lib/identifiers";
 
 // GET /api/auto-replenish — list all rules (with current stock vs trigger level)
 export async function GET(req: NextRequest) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
         pendingTrigger: annotated.filter(r => r.shouldTrigger).length,
       },
     });
-  } catch (e) {
+  } catch (e: any) {
     console.error("GET /api/auto-replenish error:", e);
     return NextResponse.json({ error: "Failed to fetch rules" }, { status: 500 });
   }
@@ -57,7 +57,7 @@ export async function GET(req: NextRequest) {
 // Body for scan: { action: "scan" } — scans all rules and creates POs for triggered ones
 export async function POST(req: NextRequest) {
   let user;
-  try { user = await requireAuth(); requirePermission(user.role, "purchase"); } catch (e) { return e as Response; }
+  try { user = await requireAuth(); requirePermission(user.role, "purchase"); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);
@@ -243,7 +243,7 @@ export async function POST(req: NextRequest) {
 // Body: { id, ...updates }
 export async function PUT(req: NextRequest) {
   let user;
-  try { user = await requireAuth(); requirePermission(user.role, "purchase"); } catch (e) { return e as Response; }
+  try { user = await requireAuth(); requirePermission(user.role, "purchase"); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);
@@ -281,7 +281,7 @@ export async function PUT(req: NextRequest) {
     });
 
     return NextResponse.json({ success: true, rule });
-  } catch (e) {
+  } catch (e: any) {
     console.error("PUT /api/auto-replenish error:", e);
     return NextResponse.json({ error: "Failed to update rule" }, { status: 500 });
   }
@@ -290,7 +290,7 @@ export async function PUT(req: NextRequest) {
 // DELETE /api/auto-replenish?id=... — delete a rule
 export async function DELETE(req: NextRequest) {
   let user;
-  try { user = await requireAuth(); requirePermission(user.role, "purchase"); } catch (e) { return e as Response; }
+  try { user = await requireAuth(); requirePermission(user.role, "purchase"); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);

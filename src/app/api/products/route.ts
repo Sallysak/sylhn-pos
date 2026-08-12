@@ -24,7 +24,7 @@ import crypto from "crypto";
 //   nothing changed, the server returns 304 Not Modified (empty body).
 //   This is most useful for non-incremental calls (no `since` param).
 export async function GET(req: NextRequest) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
   await waitForDb();
 
   const ip = getClientIp(req);
@@ -110,7 +110,7 @@ export async function GET(req: NextRequest) {
         "X-Total-Products": String(filtered.length),
       },
     });
-  } catch (e) {
+  } catch (e: any) {
     console.error("GET /api/products error:", e);
     return NextResponse.json({ error: "Failed to fetch products" }, { status: 500 });
   }
@@ -122,7 +122,7 @@ export async function POST(req: NextRequest) {
   try {
     user = await requireAuth();
     requirePermission(user.role, "stock");
-  } catch (e) {
+  } catch (e: any) {
     return e as Response;
   }
 
@@ -195,7 +195,7 @@ export async function POST(req: NextRequest) {
           // to a group later via the UI.
           console.warn(`[POST /api/products] groupId "${p.groupId}" not found — creating product without group`);
         }
-      } catch (e) {
+      } catch (e: any) {
         console.warn(`[POST /api/products] could not look up groupId "${p.groupId}":`, e);
       }
     }
@@ -251,7 +251,7 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({ success: true, product });
-  } catch (e) {
+  } catch (e: any) {
     console.error("POST /api/products error:", e);
     return NextResponse.json({ error: "Failed to create product" }, { status: 500 });
   }

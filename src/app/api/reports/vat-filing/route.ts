@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
   try {
     user = await requireAuth();
     requirePermission(user.role, "accounts");
-  } catch (e) { return e as Response; }
+  } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
@@ -190,7 +190,7 @@ export async function GET(req: NextRequest) {
       },
       generatedAt: new Date().toISOString(),
     });
-  } catch (e) {
+  } catch (e: any) {
     console.error("GET /api/reports/vat-filing error:", e);
     return NextResponse.json({ error: "Failed to generate VAT filing report" }, { status: 500 });
   }

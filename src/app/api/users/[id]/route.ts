@@ -9,7 +9,7 @@ import { auditLog } from "@/lib/audit";
 // username (change username), newPassword (reset password)
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   let adminUser;
-  try { adminUser = await requireRole("admin"); } catch (e) { return e as Response; }
+  try { adminUser = await requireRole("admin"); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);
@@ -90,7 +90,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 // DELETE /api/users/[id] — deactivate (soft delete) or hard delete with ?force=true
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   let adminUser;
-  try { adminUser = await requireRole("admin"); } catch (e) { return e as Response; }
+  try { adminUser = await requireRole("admin"); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);

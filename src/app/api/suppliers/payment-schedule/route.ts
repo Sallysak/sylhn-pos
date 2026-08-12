@@ -6,7 +6,7 @@ import { requireAuth } from '@/lib/auth'
 // Shows upcoming supplier payments based on trading terms (Net 15/30/60) and balance
 
 export async function GET(req: NextRequest) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
 
   const suppliers = await db.supplier.findMany({
     where: { active: true, balance: { gt: 0 } },

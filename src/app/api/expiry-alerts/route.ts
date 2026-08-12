@@ -6,7 +6,7 @@ import { auditLog } from "@/lib/audit";
 
 // GET /api/expiry-alerts — products expiring within N days
 export async function GET(req: NextRequest) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
   if (!rl.allowed) return rateLimitResponse(rl);
@@ -49,7 +49,7 @@ export async function GET(req: NextRequest) {
         totalValueAtRisk: alerts.reduce((s, a) => s + a.stockValueAtRisk, 0),
       },
     });
-  } catch (e) {
+  } catch (e: any) {
     return NextResponse.json({ error: "Failed to fetch expiry alerts" }, { status: 500 });
   }
 }

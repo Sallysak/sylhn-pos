@@ -11,7 +11,7 @@ import { requireAuth } from "@/lib/auth";
 // Sales: DR Cash/MoMo | CR Revenue + CR VAT Payable
 // Expenses: DR Expense Category | CR Cash/Bank
 export async function GET(req: NextRequest) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
 
   const { searchParams } = new URL(req.url);
   const from = searchParams.get("from");

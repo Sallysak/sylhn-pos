@@ -5,7 +5,7 @@ import { rateLimitApiRead, rateLimitResponse, getClientIp } from "@/lib/rate-lim
 
 // GET /api/system-health — admin/manager only dashboard
 export async function GET(req: NextRequest) {
-  try { await requireRole("admin", "manager"); } catch (e) { return e as Response; }
+  try { await requireRole("admin", "manager"); } catch (e: any) { return e as Response; }
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
   if (!rl.allowed) return rateLimitResponse(rl);
@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
       memory: process.memoryUsage ? { rss: Math.round(process.memoryUsage().rss / 1024 / 1024) + " MB" } : null,
       generatedAt: new Date().toISOString(),
     });
-  } catch (e) {
+  } catch (e: any) {
     return NextResponse.json({ error: "Failed to get system health" }, { status: 500 });
   }
 }

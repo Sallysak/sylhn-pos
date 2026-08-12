@@ -7,7 +7,7 @@ import { logger } from "@/lib/logger";
 
 // GET /api/email — list sent emails
 export async function GET(req: NextRequest) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
   if (!rl.allowed) return rateLimitResponse(rl);
@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
       take: limit,
     });
     return NextResponse.json({ emails, count: emails.length });
-  } catch (e) {
+  } catch (e: any) {
     return NextResponse.json({ error: "Failed to fetch emails" }, { status: 500 });
   }
 }
@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
 // Body: { to, cc?, bcc?, subject, body, html?, attachments? }
 export async function POST(req: NextRequest) {
   let user;
-  try { user = await requireAuth(); } catch (e) { return e as Response; }
+  try { user = await requireAuth(); } catch (e: any) { return e as Response; }
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);
   if (!rl.allowed) return rateLimitResponse(rl);

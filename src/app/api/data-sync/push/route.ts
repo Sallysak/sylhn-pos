@@ -10,7 +10,7 @@ import { auditLog } from "@/lib/audit";
 // Returns: { pushed: { products, history, heldOrders, expenses }, errors: [] }
 export async function POST(req: NextRequest) {
   let user;
-  try { user = await requireAuth(); requirePermission(user.role, "canAdjustStock"); } catch (e) { return e as Response; }
+  try { user = await requireAuth(); requirePermission(user.role, "canAdjustStock"); } catch (e: any) { return e as Response; }
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);
   if (!rl.allowed) return rateLimitResponse(rl);

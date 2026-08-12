@@ -8,7 +8,7 @@ import path from "path";
 
 // GET /api/backups — list all backups
 export async function GET(req: NextRequest) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
   if (!rl.allowed) return rateLimitResponse(rl);
@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
 
     const dbRecords = await db.backupRecord.findMany({ orderBy: { createdAt: "desc" }, take: 50 });
     return NextResponse.json({ backups: files, dbRecords, total: files.length });
-  } catch (e) {
+  } catch (e: any) {
     return NextResponse.json({ error: "Failed to list backups" }, { status: 500 });
   }
 }
@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
 // POST /api/backups — create a manual backup
 export async function POST(req: NextRequest) {
   let user;
-  try { user = await requireAuth(); requirePermission(user.role, "maintenance"); } catch (e) { return e as Response; }
+  try { user = await requireAuth(); requirePermission(user.role, "maintenance"); } catch (e: any) { return e as Response; }
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);
   if (!rl.allowed) return rateLimitResponse(rl);
@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
 // attacks (e.g. filename=../../etc/passwd) from deleting arbitrary files.
 export async function DELETE(req: NextRequest) {
   let user;
-  try { user = await requireAuth(); requirePermission(user.role, "maintenance"); } catch (e) { return e as Response; }
+  try { user = await requireAuth(); requirePermission(user.role, "maintenance"); } catch (e: any) { return e as Response; }
   const { searchParams } = new URL(req.url);
   const rawFilename = searchParams.get("filename");
   if (!rawFilename) return NextResponse.json({ error: "filename required" }, { status: 400 });

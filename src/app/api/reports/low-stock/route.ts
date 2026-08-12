@@ -5,7 +5,7 @@ import { getLowStockReorder } from "@/lib/reports";
 
 // GET /api/reports/low-stock — low-stock reorder report with preferred supplier
 export async function GET(req: NextRequest) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
       bySupplier: Object.values(bySupplier),
       generatedAt: new Date().toISOString(),
     });
-  } catch (e) {
+  } catch (e: any) {
     console.error("GET /api/reports/low-stock error:", e);
     return NextResponse.json({ error: "Failed to generate low-stock report" }, { status: 500 });
   }

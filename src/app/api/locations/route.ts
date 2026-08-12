@@ -6,7 +6,7 @@ import { auditLog } from "@/lib/audit";
 
 // GET /api/locations — list all locations
 export async function GET(req: NextRequest) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
       orderBy: { name: "asc" },
     });
     return NextResponse.json({ locations });
-  } catch (e) {
+  } catch (e: any) {
     console.error("GET /api/locations error:", e);
     return NextResponse.json({ error: "Failed to fetch locations" }, { status: 500 });
   }
@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
 // POST /api/locations — create a new location
 export async function POST(req: NextRequest) {
   let user;
-  try { user = await requireAuth(); requirePermission(user.role, "maintenance"); } catch (e) { return e as Response; }
+  try { user = await requireAuth(); requirePermission(user.role, "maintenance"); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);

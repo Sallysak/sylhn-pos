@@ -7,7 +7,7 @@ import { getExchangeRates, clearRatesCache, SUPPORTED_CURRENCIES, DEFAULT_RATES 
 
 // GET /api/currency — list supported currencies + current exchange rates
 export async function GET(req: NextRequest) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
 // PUT /api/currency — update exchange rates (admin only)
 export async function PUT(req: NextRequest) {
   let user;
-  try { user = await requireAuth(); requirePermission(user.role, "maintenance"); } catch (e) { return e as Response; }
+  try { user = await requireAuth(); requirePermission(user.role, "maintenance"); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);
@@ -72,7 +72,7 @@ export async function PUT(req: NextRequest) {
     });
 
     return NextResponse.json({ success: true, rates: newRates });
-  } catch (e) {
+  } catch (e: any) {
     console.error("PUT /api/currency error:", e);
     return NextResponse.json({ error: "Failed to update rates" }, { status: 500 });
   }

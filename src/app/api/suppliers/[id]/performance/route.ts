@@ -16,7 +16,7 @@ import { rateLimitApiRead, rateLimitResponse, getClientIp } from "@/lib/rate-lim
 //   totalSpend  = Σ purchase.total for received POs in the window
 //   star rating = weighted score (40% on-time + 30% fill + 30% quality)
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
@@ -143,7 +143,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       computedStarRating,
       recentPurchases,
     });
-  } catch (e) {
+  } catch (e: any) {
     console.error("GET /api/suppliers/[id]/performance error:", e);
     return NextResponse.json({ error: "Failed to compute performance" }, { status: 500 });
   }

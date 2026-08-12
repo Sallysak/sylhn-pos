@@ -279,7 +279,7 @@ export async function POST(req: NextRequest) {
       // Session token for bearer auth fallback (when cookies don't work in iframe)
       sessionToken: token,
     });
-  } catch (e) {
+  } catch (e: any) {
     console.error("Login error:", e);
     return NextResponse.json({ error: "Login failed" }, { status: 500 });
   }

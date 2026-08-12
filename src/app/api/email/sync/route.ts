@@ -31,7 +31,7 @@ async function syncFolder(imap: Imap, folder: string, isReceived: boolean) {
               try {
                 const parsed = await simpleParser(buf)
                 messages.push(parsed)
-              } catch (e) {
+              } catch (e: any) {
                 console.error('parse error', e)
               }
             })
@@ -60,7 +60,7 @@ async function syncFolder(imap: Imap, folder: string, isReceived: boolean) {
                 },
               })
               imported++
-            } catch (e) {
+            } catch (e: any) {
               console.error('save error', e)
               try {
                 await prisma.email.create({

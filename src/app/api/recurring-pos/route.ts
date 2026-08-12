@@ -7,7 +7,7 @@ import { generatePurchaseRefNo } from "@/lib/identifiers";
 
 // GET /api/recurring-pos — list all recurring PO schedules
 export async function GET(req: NextRequest) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
   if (!rl.allowed) return rateLimitResponse(rl);
@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
       orderBy: { createdAt: "desc" },
     });
     return NextResponse.json({ recurringPOs, count: recurringPOs.length });
-  } catch (e) {
+  } catch (e: any) {
     return NextResponse.json({ error: "Failed to fetch recurring POs" }, { status: 500 });
   }
 }
@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
 // POST /api/recurring-pos — create a recurring PO schedule
 export async function POST(req: NextRequest) {
   let user;
-  try { user = await requireAuth(); requirePermission(user.role, "purchase"); } catch (e) { return e as Response; }
+  try { user = await requireAuth(); requirePermission(user.role, "purchase"); } catch (e: any) { return e as Response; }
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);
   if (!rl.allowed) return rateLimitResponse(rl);
@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
 // PUT /api/recurring-pos — toggle active or run now
 export async function PUT(req: NextRequest) {
   let user;
-  try { user = await requireAuth(); requirePermission(user.role, "purchase"); } catch (e) { return e as Response; }
+  try { user = await requireAuth(); requirePermission(user.role, "purchase"); } catch (e: any) { return e as Response; }
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);
   if (!rl.allowed) return rateLimitResponse(rl);

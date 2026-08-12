@@ -28,7 +28,7 @@ const DAY_ABBR = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 // 6. Save snapshot for accuracy tracking (if save=true)
 // 7. Call LLM for natural-language summary
 export async function GET(req: NextRequest) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
@@ -300,7 +300,7 @@ export async function GET(req: NextRequest) {
             seasonality: JSON.stringify(f.seasonality.multipliers),
           })),
         });
-      } catch (e) {
+      } catch (e: any) {
         console.warn("Failed to save forecast snapshots:", e);
       }
     }
@@ -435,7 +435,7 @@ ${JSON.stringify(trendingDown.map(f => ({ name: f.name, trendPct: f.trendPct, ve
           `_${avgAccuracy !== null ? `Forecast accuracy: ${avgAccuracy}% (based on ${evaluatedForecasts.length} past evaluations).` : "Forecast accuracy will be computed once we have past data to compare against."}_`,
         ].join("\n");
       }
-    } catch (e) {
+    } catch (e: any) {
       console.warn("LLM summary failed:", e);
       // Generate rule-based summary as fallback
       aiSummary = [

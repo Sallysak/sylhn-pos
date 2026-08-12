@@ -9,7 +9,7 @@ import { auditLog } from "@/lib/audit";
 // Body: { image: string } (base64 data URL, max ~500KB)
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   let user;
-  try { user = await requireAuth(); requirePermission(user.role, "stock"); } catch (e) { return e as Response; }
+  try { user = await requireAuth(); requirePermission(user.role, "stock"); } catch (e: any) { return e as Response; }
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);
   if (!rl.allowed) return rateLimitResponse(rl);
@@ -50,7 +50,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 // DELETE — remove the product image
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   let user;
-  try { user = await requireAuth(); requirePermission(user.role, "stock"); } catch (e) { return e as Response; }
+  try { user = await requireAuth(); requirePermission(user.role, "stock"); } catch (e: any) { return e as Response; }
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);
   if (!rl.allowed) return rateLimitResponse(rl);

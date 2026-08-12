@@ -17,7 +17,7 @@ import { db, waitForDb } from "@/lib/db";
 // Premium feature: one round-trip gets the operations dashboard everything
 // it needs (sales, top products, low stock, expiry, hourly, trend, inventory).
 export async function GET(req: NextRequest) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
   await waitForDb();
 
   const ip = getClientIp(req);
@@ -69,7 +69,7 @@ export async function GET(req: NextRequest) {
       recentAlerts,
       generatedAt: new Date().toISOString(),
     });
-  } catch (e) {
+  } catch (e: any) {
     console.error("GET /api/dashboard error:", e);
     return NextResponse.json({ error: "Failed to fetch dashboard data" }, { status: 500 });
   }

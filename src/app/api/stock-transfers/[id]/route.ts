@@ -6,7 +6,7 @@ import { auditLogTx, auditLog } from "@/lib/audit";
 
 // GET /api/stock-transfers/[id] — fetch a single transfer
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
@@ -40,7 +40,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       return NextResponse.json({ transfer: byRef });
     }
     return NextResponse.json({ transfer });
-  } catch (e) {
+  } catch (e: any) {
     console.error("GET /api/stock-transfers/[id] error:", e);
     return NextResponse.json({ error: "Failed to fetch transfer" }, { status: 500 });
   }
@@ -50,7 +50,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 // Body: { action: "receive" | "cancel" }
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   let user;
-  try { user = await requireAuth(); requirePermission(user.role, "canAdjustStock"); } catch (e) { return e as Response; }
+  try { user = await requireAuth(); requirePermission(user.role, "canAdjustStock"); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);

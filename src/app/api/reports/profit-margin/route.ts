@@ -25,7 +25,7 @@ import { db } from "@/lib/db";
 // Sortable by: profit desc (default), margin %, revenue, units sold.
 // Filterable by: category, days, low-margin threshold.
 export async function GET(req: NextRequest) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
@@ -217,7 +217,7 @@ export async function GET(req: NextRequest) {
       },
       products,
     });
-  } catch (e) {
+  } catch (e: any) {
     console.error("GET /api/reports/profit-margin error:", e);
     return NextResponse.json({ error: "Failed to generate profit margin report" }, { status: 500 });
   }

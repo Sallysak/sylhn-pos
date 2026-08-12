@@ -19,7 +19,7 @@ import { auditLog } from "@/lib/audit";
 // approval just confirms it (audit-logged, no status change).
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   let user;
-  try { user = await requireAuth(); requirePermission(user.role, "purchase"); } catch (e) { return e as Response; }
+  try { user = await requireAuth(); requirePermission(user.role, "purchase"); } catch (e: any) { return e as Response; }
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);
   if (!rl.allowed) return rateLimitResponse(rl);

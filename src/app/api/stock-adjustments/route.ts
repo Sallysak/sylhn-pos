@@ -7,7 +7,7 @@ import { auditLogTx, auditLog } from "@/lib/audit";
 // GET /api/stock-adjustments
 // List all stock adjustments with filters
 export async function GET(req: NextRequest) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
     });
 
     return NextResponse.json({ adjustments, count: adjustments.length });
-  } catch (e) {
+  } catch (e: any) {
     console.error("GET /api/stock-adjustments error:", e);
     return NextResponse.json({ error: "Failed to fetch adjustments" }, { status: 500 });
   }
@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
   try {
     user = await requireAuth();
     requirePermission(user.role, "canAdjustStock");
-  } catch (e) { return e as Response; }
+  } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);

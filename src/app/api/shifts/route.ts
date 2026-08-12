@@ -6,7 +6,7 @@ import { auditLogTx } from "@/lib/audit";
 
 // GET /api/shifts — list cashier shifts
 export async function GET(req: NextRequest) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
       take: limit,
     });
     return NextResponse.json({ shifts });
-  } catch (e) {
+  } catch (e: any) {
     console.error("GET /api/shifts error:", e);
     return NextResponse.json({ error: "Failed to fetch shifts" }, { status: 500 });
   }
@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
 // POST /api/shifts — open/close a cashier shift (transactional + audited)
 export async function POST(req: NextRequest) {
   let user;
-  try { user = await requireAuth(); } catch (e) { return e as Response; }
+  try { user = await requireAuth(); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);

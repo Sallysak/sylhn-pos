@@ -10,7 +10,7 @@ import { auditLog } from "@/lib/audit";
 // Returns: { approved: true, approver: { id, username, role } } or 401 / 403
 export async function POST(req: NextRequest) {
   let requestingUser;
-  try { requestingUser = await requireAuth(); } catch (e) { return e as Response; }
+  try { requestingUser = await requireAuth(); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);

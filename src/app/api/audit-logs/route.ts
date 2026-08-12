@@ -5,7 +5,7 @@ import { rateLimitApiRead, rateLimitResponse, getClientIp } from "@/lib/rate-lim
 
 // GET /api/audit-logs — list audit logs (admin/manager only)
 export async function GET(req: NextRequest) {
-  try { await requireRole("admin", "manager"); } catch (e) { return e as Response; }
+  try { await requireRole("admin", "manager"); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
       take: limit,
     });
     return NextResponse.json({ logs });
-  } catch (e) {
+  } catch (e: any) {
     console.error("GET /api/audit-logs error:", e);
     return NextResponse.json({ error: "Failed to fetch audit logs" }, { status: 500 });
   }

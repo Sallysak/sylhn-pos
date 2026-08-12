@@ -42,23 +42,26 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { InstallButton } from "@/components/install-button";
 import { MobileNav } from "@/components/mobile-nav";
-const BarcodeScanner = dynamic(() => import("@/components/barcode-scanner").then(m => ({ default: m.BarcodeScanner })), { ssr: false, loading: loadingFallback });
-const ManagerApproval = dynamic(() => import("@/components/manager-approval").then(m => ({ default: m.ManagerApproval })), { ssr: false, loading: loadingFallback });
-const PrinterPairing = dynamic(() => import("@/components/printer-pairing").then(m => ({ default: m.PrinterPairing })), { ssr: false, loading: loadingFallback });
-const AiAssistant = dynamic(() => import("@/components/ai-assistant").then(m => ({ default: m.AiAssistant })), { ssr: false, loading: loadingFallback });
-const AiAssistantDashboard = dynamic(() => import("@/components/ai-assistant-dashboard").then(m => ({ default: m.AiAssistantDashboard })), { ssr: false, loading: loadingFallback });
-const AiPredictionsDashboard = dynamic(() => import("@/components/ai-predictions-dashboard").then(m => ({ default: m.AiPredictionsDashboard })), { ssr: false, loading: loadingFallback });
 import { APP_VERSION, BUILD_ID } from "@/lib/version";
 import { SpeedDial } from "@/components/speed-dial";
 import { LiveClock } from "@/components/live-clock";
 
 // Loading fallback for lazy-loaded components (prevents white flash)
+// MUST be defined BEFORE any dynamic() calls that use it
 const loadingFallback = () => (
   <div className="h-screen flex flex-col items-center justify-center gap-3" style={{ background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 50%, #f0fdfa 100%)' }}>
     <div className="h-10 w-10 rounded-full border-4 border-emerald-100 border-t-emerald-600 animate-spin" />
     <div className="text-sm font-semibold text-emerald-700">Loading…</div>
   </div>
 );
+
+// Lazy-loaded components — reduces initial bundle size
+const BarcodeScanner = dynamic(() => import("@/components/barcode-scanner").then(m => ({ default: m.BarcodeScanner })), { ssr: false, loading: loadingFallback });
+const ManagerApproval = dynamic(() => import("@/components/manager-approval").then(m => ({ default: m.ManagerApproval })), { ssr: false, loading: loadingFallback });
+const PrinterPairing = dynamic(() => import("@/components/printer-pairing").then(m => ({ default: m.PrinterPairing })), { ssr: false, loading: loadingFallback });
+const AiAssistant = dynamic(() => import("@/components/ai-assistant").then(m => ({ default: m.AiAssistant })), { ssr: false, loading: loadingFallback });
+const AiAssistantDashboard = dynamic(() => import("@/components/ai-assistant-dashboard").then(m => ({ default: m.AiAssistantDashboard })), { ssr: false, loading: loadingFallback });
+const AiPredictionsDashboard = dynamic(() => import("@/components/ai-predictions-dashboard").then(m => ({ default: m.AiPredictionsDashboard })), { ssr: false, loading: loadingFallback });
 
 // Heavy components — lazy loaded to reduce initial bundle size
 const LabelPrinter = dynamic(() => import("@/components/label-printer").then(m => ({ default: m.LabelPrinter })), { ssr: false, loading: loadingFallback });
@@ -1831,7 +1834,7 @@ export default function POSPage() {
         // Other errors (400, 403, etc.) — don't queue, just log
         console.warn('Sale recording failed:', res.status);
       }
-    } catch (e) {
+    } catch (e: any) {
       // Network error — the sale couldn't be saved. Don't queue it
       // (the offline queue caused more problems than it solved — duplicate
       // sales, "sync failed" errors, etc.). The sale is still in React

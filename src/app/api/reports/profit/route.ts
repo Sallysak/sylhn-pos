@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 
 // GET /api/reports/profit — profit analytics (daily profit trend, margin by product, profit by category)
 export async function GET(req: NextRequest) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
@@ -101,7 +101,7 @@ export async function GET(req: NextRequest) {
       profitByCategory: Object.entries(catAgg).map(([category, v]) => ({ category, ...v, margin: v.revenue > 0 ? (v.profit / v.revenue) * 100 : 0 })),
       generatedAt: new Date().toISOString(),
     });
-  } catch (e) {
+  } catch (e: any) {
     console.error("GET /api/reports/profit error:", e);
     return NextResponse.json({ error: "Failed to generate profit report" }, { status: 500 });
   }

@@ -119,7 +119,7 @@ export function CreditManagement() {
       } else {
         toast({ title: "Failed to load customers", description: data.error, variant: "destructive" });
       }
-    } catch (e) {
+    } catch (e: any) {
       toast({ title: "Network error", description: "Could not reach server", variant: "destructive" });
     } finally {
       setLoading(false);

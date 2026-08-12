@@ -222,12 +222,12 @@ async function gatherBusinessContext(options: any): Promise<string> {
           parts.push(`SUPPLIERS (${suppliers.length} total):
  ${suppliers.slice(0, 10).map(s => `- ${s.name || 'Unknown'}: ${s.email || 'no email'}, Balance: GHS ${(s.balance || 0).toFixed(2)}`).join('\n')}`)
         }
-      } catch (e) {
+      } catch (e: any) {
         // Supplier model might not exist
       }
     }
 
-  } catch (e) {
+  } catch (e: any) {
     console.error('Error gathering business context:', e)
   }
 

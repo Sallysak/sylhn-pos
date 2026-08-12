@@ -167,7 +167,7 @@ async function gatherBusinessContext(options: any): Promise<string> {
  ${top5.map((p, i) => `${i + 1}. ${p.name} — ${p.qty} sold, GHS ${p.revenue.toFixed(2)} revenue`).join('\n')}`)
       }
     }
-  } catch (e) {
+  } catch (e: any) {
     console.error('Error gathering context:', e)
   }
 

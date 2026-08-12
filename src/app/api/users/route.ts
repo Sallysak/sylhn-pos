@@ -6,7 +6,7 @@ import { rateLimitApiRead, rateLimitApiWrite, rateLimitResponse, getClientIp } f
 
 export async function GET(req: NextRequest) {
   // Only admin/manager can list users
-  try { await requireRole("admin", "manager"); } catch (e) { return e as Response; }
+  try { await requireRole("admin", "manager"); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
     // Strip passwords
     const safe = users.map(u => ({ ...u, password: undefined }));
     return NextResponse.json({ users: safe });
-  } catch (e) {
+  } catch (e: any) {
     console.error("GET /api/users error:", e);
     return NextResponse.json({ error: "Failed to fetch users" }, { status: 500 });
   }
@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   // Only admin can create/modify users
   let user;
-  try { user = await requireRole("admin"); } catch (e) { return e as Response; }
+  try { user = await requireRole("admin"); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
       const arr = (body as any).users;
       const results: any[] = [];
       for (const u of arr.slice(0, 100)) {
-        const r = validate(UserSchema, u);
+        const r = validate(UserSchema, u) as any;
         if (!r.success) continue;
         const hashed = await hashPassword(r.data.password);
         const data = {
@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({ success: true, user: { ...newUser, password: undefined } });
-  } catch (e) {
+  } catch (e: any) {
     console.error("POST /api/users error:", e);
     return NextResponse.json({ error: "Failed to create user" }, { status: 500 });
   }

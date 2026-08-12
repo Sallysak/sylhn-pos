@@ -45,6 +45,6 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
         </div>
       );
     }
-    return this.props.children;
+    return (this.props as { children: ReactNode }).children;
   }
 }

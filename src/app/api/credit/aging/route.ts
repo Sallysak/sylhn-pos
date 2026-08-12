@@ -7,7 +7,7 @@ import { requireAuth } from '@/lib/auth'
 // Also calculates auto late fees based on configurable rate
 
 export async function GET(req: NextRequest) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
 
   const now = new Date()
   const buckets = { current: 0, days30: 0, days60: 0, days90: 0, over90: 0 }

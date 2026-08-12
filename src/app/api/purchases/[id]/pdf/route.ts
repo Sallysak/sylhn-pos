@@ -10,7 +10,7 @@ import { COMPANY } from "@/lib/pos-data";
 // This avoids the need for a server-side PDF library like @react-pdf/renderer
 // or puppeteer — the user's browser does the rendering.
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
 
   const { id } = await params;
 

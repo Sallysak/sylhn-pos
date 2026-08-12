@@ -7,7 +7,7 @@ import { generateVATReturn } from "@/lib/gra-compliance";
 // Generates a GRA-compliant VAT return export for the given period.
 // Used for monthly/quarterly/annual filings.
 export async function GET(req: NextRequest) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
 
   const { searchParams } = new URL(req.url);
   const from = searchParams.get("from");

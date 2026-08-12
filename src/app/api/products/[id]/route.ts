@@ -6,7 +6,7 @@ import { rateLimitApiRead, rateLimitApiWrite, rateLimitResponse, getClientIp } f
 
 // GET /api/products/[id] — get one product with full relations
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
@@ -33,7 +33,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     });
     if (!product) return NextResponse.json({ error: "Product not found" }, { status: 404 });
     return NextResponse.json({ product });
-  } catch (e) {
+  } catch (e: any) {
     console.error("GET /api/products/[id] error:", e);
     return NextResponse.json({ error: "Failed to fetch product" }, { status: 500 });
   }
@@ -45,7 +45,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   try {
     user = await requireAuth();
     requirePermission(user.role, "stock");
-  } catch (e) { return e as Response; }
+  } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);
@@ -79,7 +79,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
             console.warn(`[PUT /api/products/${id}] groupId "${updates.groupId}" not found — setting to null`);
             validGroupId = null;
           }
-        } catch (e) {
+        } catch (e: any) {
           console.warn(`[PUT /api/products/${id}] could not look up groupId:`, e);
           validGroupId = null;
         }
@@ -153,7 +153,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     });
 
     return NextResponse.json({ success: true, product });
-  } catch (e) {
+  } catch (e: any) {
     console.error("PUT /api/products/[id] error:", e);
     return NextResponse.json({ error: "Failed to update product" }, { status: 500 });
   }
@@ -165,7 +165,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   try {
     user = await requireAuth();
     requirePermission(user.role, "canDeleteProducts");
-  } catch (e) { return e as Response; }
+  } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);
@@ -196,7 +196,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     });
 
     return NextResponse.json({ success: true });
-  } catch (e) {
+  } catch (e: any) {
     console.error("DELETE /api/products/[id] error:", e);
     return NextResponse.json({ error: "Failed to delete product" }, { status: 500 });
   }

@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
     if (user.role !== "admin") {
       return NextResponse.json({ error: "Admin access required" }, { status: 403 });
     }
-  } catch (e) { return e as Response; }
+  } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);

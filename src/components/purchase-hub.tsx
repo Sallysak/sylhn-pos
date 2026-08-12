@@ -106,7 +106,7 @@ export function PurchaseHub({ onBack, onNewPO, onOpenSuppliers }: PurchaseHubPro
       if (!res.ok) throw new Error("Failed to fetch purchases");
       const data = await res.json();
       setPurchases(data.purchases || []);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
       toast({ title: "Failed to load purchases", variant: "destructive" });
     }
@@ -118,7 +118,7 @@ export function PurchaseHub({ onBack, onNewPO, onOpenSuppliers }: PurchaseHubPro
       if (!res.ok) throw new Error("Failed to fetch invoices");
       const data = await res.json();
       setInvoices(data.invoices || []);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
     }
   }, []);
@@ -129,7 +129,7 @@ export function PurchaseHub({ onBack, onNewPO, onOpenSuppliers }: PurchaseHubPro
       if (!res.ok) throw new Error("Failed to fetch returns");
       const data = await res.json();
       setReturns(data.returns || []);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
     }
   }, []);
@@ -140,7 +140,7 @@ export function PurchaseHub({ onBack, onNewPO, onOpenSuppliers }: PurchaseHubPro
       if (!res.ok) throw new Error("Failed to fetch payments");
       const data = await res.json();
       setPayments(data.payments || []);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
     }
   }, []);
@@ -463,7 +463,7 @@ function OrdersTab({ purchases, search, setSearch, statusFilter, setStatusFilter
       const data = await res.json();
       setWaLink(data.waLink);
       setWaText(data.text);
-    } catch (e) {
+    } catch (e: any) {
       toast({ title: "Failed to generate WhatsApp link", variant: "destructive" });
     }
   };
@@ -607,7 +607,7 @@ function InvoicesTab({ invoices, onRefresh }: { invoices: SupplierInvoice[]; onR
       if (!res.ok) throw new Error("Failed");
       toast({ title: `Invoice ${action === "match" ? "matched" : "rejected"}`, variant: action === "match" ? "default" : "destructive" });
       await onRefresh();
-    } catch (e) {
+    } catch (e: any) {
       toast({ title: "Failed to resolve invoice", variant: "destructive" });
     }
   };

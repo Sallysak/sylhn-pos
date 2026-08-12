@@ -176,7 +176,7 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
     try {
       const res = await authedFetch("/api/dashboard", { credentials: "include" });
       if (res.ok) setDashboard(await res.json());
-    } catch (e) {
+    } catch (e: any) {
       console.warn("Failed to fetch dashboard:", e);
     } finally {
       setLoadingDashboard(false);
@@ -193,7 +193,7 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
         const data = await res.json();
         setSales(data.sales || []);
       }
-    } catch (e) {
+    } catch (e: any) {
       console.warn("Failed to fetch sales:", e);
     } finally {
       setLoadingSales(false);
@@ -629,7 +629,7 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
         const data = await res.json();
         toast({ title: "Refund failed", description: data.error || "Unknown error", variant: "destructive" });
       }
-    } catch (e) {
+    } catch (e: any) {
       toast({ title: "Refund failed", description: "Network error", variant: "destructive" });
     }
   };
@@ -786,7 +786,7 @@ export function OperationsDashboard({ products: rawProducts, onBack, dailyTotal 
             createdAt: new Date().toISOString(),
           });
         }
-      } catch (e) {
+      } catch (e: any) {
         console.error('PO creation failed:', e);
       }
     }

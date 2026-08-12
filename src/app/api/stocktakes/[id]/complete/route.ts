@@ -10,7 +10,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   try {
     user = await requireAuth();
     requirePermission(user.role, "canAdjustStock");
-  } catch (e) { return e as Response; }
+  } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);
@@ -105,7 +105,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       stocktake: updated,
       summary: { itemsApplied, totalVariance },
     });
-  } catch (e) {
+  } catch (e: any) {
     console.error("POST /api/stocktakes/[id]/complete error:", e);
     return NextResponse.json({ error: "Failed to complete stocktake" }, { status: 500 });
   }

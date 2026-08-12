@@ -136,7 +136,7 @@ export function EmailSystem({ onBack }: { onBack: () => void }) {
   const insertEmoji = (emoji: string) => { execCmd("insertText", emoji); };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
+    const files: File[] = Array.from(e.target.files || []);
     for (const file of files) {
       if (file.size > 5 * 1024 * 1024) { toast({ title: "File too large", description: `${file.name} is over 5MB`, variant: "destructive" }); continue; }
       const base64 = await fileToBase64(file);
@@ -436,7 +436,7 @@ export function EmailSystem({ onBack }: { onBack: () => void }) {
   );
 }
 
-function ToolbarButton({ onClick, title, children }: { onClick: () => void; title: string; children: React.ReactNode }) {
+function ToolbarButton({ onClick, title, children }: { onClick: () => void; title: string; children: React.ReactNode; key?: string }) {
   return <button type="button" onClick={onClick} title={title} className="h-8 w-8 rounded-lg hover:bg-white text-slate-600 hover:text-emerald-600 flex items-center justify-center transition text-xs font-bold">{children}</button>;
 }
 function Divider() { return <div className="w-px h-5 bg-slate-300 mx-0.5" />; }
@@ -495,7 +495,7 @@ function EmailTemplates({ onUseTemplate }: { onUseTemplate: (t: any) => void }) 
               filter === cat ? "bg-emerald-600 text-white shadow-md" : "bg-white text-slate-600 hover:bg-slate-100 ring-1 ring-slate-200"
             )}
           >
-            {cat.charAt(0).toUpperCase() + cat.slice(1)}
+            {String(cat).charAt(0).toUpperCase() + String(cat).slice(1)}
           </button>
         ))}
       </div>

@@ -21,7 +21,7 @@ import { rateLimitApiRead, rateLimitResponse, getClientIp } from "@/lib/rate-lim
 //   netDueDate       = invoiceDate + netDays
 //   daysRemaining    = discountDeadline - today (negative = expired)
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
@@ -87,7 +87,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         ? `Pay GHS ${netPayable.toFixed(2)} today (save GHS ${discountAmount.toFixed(2)}) — discount expires in ${daysRemaining} day${daysRemaining === 1 ? "" : "s"}`
         : `Early-pay discount expired ${Math.abs(daysRemaining)} day${Math.abs(daysRemaining) === 1 ? "" : "s"} ago. Full GHS ${amount.toFixed(2)} due by ${netDueDate.toLocaleDateString("en-GB")}`,
     });
-  } catch (e) {
+  } catch (e: any) {
     console.error("GET /api/suppliers/[id]/early-pay-discount error:", e);
     return NextResponse.json({ error: "Failed to compute early-pay discount" }, { status: 500 });
   }

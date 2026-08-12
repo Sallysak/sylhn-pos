@@ -10,7 +10,7 @@ let groupsCache: { data: any; expiry: number } | null = null;
 const CACHE_TTL = 60 * 1000; // 60 seconds
 
 export async function GET(req: NextRequest) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
     // Update cache
     groupsCache = { data: groups, expiry: Date.now() + CACHE_TTL };
     return NextResponse.json({ groups });
-  } catch (e) {
+  } catch (e: any) {
     console.error("GET /api/stock-groups error:", e);
     return NextResponse.json({ error: "Failed to fetch stock groups" }, { status: 500 });
   }
@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
   try {
     user = await requireAuth();
     requirePermission(user.role, "stock");
-  } catch (e) { return e as Response; }
+  } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);
@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
       const arr = (body as any).groups;
       const results: any[] = [];
       for (const g of arr.slice(0, 200)) {
-        const r = validate(StockGroupSchema, g);
+        const r = validate(StockGroupSchema, g) as any;
         if (!r.success) continue;
         const data = {
           name: r.data.name,
@@ -104,7 +104,7 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({ success: true, group });
-  } catch (e) {
+  } catch (e: any) {
     console.error("POST /api/stock-groups error:", e);
     return NextResponse.json({ error: "Failed to create stock group" }, { status: 500 });
   }

@@ -6,7 +6,7 @@ import { auditLogTx } from "@/lib/audit";
 
 // GET /api/purchases/[id] — fetch a single purchase with all relations
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
@@ -38,7 +38,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     }
     if (!purchase) return NextResponse.json({ error: "Purchase not found" }, { status: 404 });
     return NextResponse.json({ purchase });
-  } catch (e) {
+  } catch (e: any) {
     console.error("GET /api/purchases/[id] error:", e);
     return NextResponse.json({ error: "Failed to fetch purchase" }, { status: 500 });
   }
@@ -48,7 +48,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 // Body: { action: "receive" | "cancel", receivedItems?: [{id, receivedQty}] }
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   let user;
-  try { user = await requireAuth(); requirePermission(user.role, "purchase"); } catch (e) { return e as Response; }
+  try { user = await requireAuth(); requirePermission(user.role, "purchase"); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);

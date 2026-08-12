@@ -7,7 +7,7 @@ import { rateLimitApiRead, rateLimitResponse, getClientIp } from "@/lib/rate-lim
 // Returns: line-by-line sold items within the date range, joined with sale +
 // product info. Used by the Sold Items Report component.
 export async function GET(req: NextRequest) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
@@ -97,7 +97,7 @@ export async function GET(req: NextRequest) {
         .map(([key, v]) => ({ key, ...v }))
         .sort((a, b) => b.qty - a.qty),
     });
-  } catch (e) {
+  } catch (e: any) {
     console.error("GET /api/reports/sold-items error:", e);
     return NextResponse.json({ error: "Failed to fetch sold items" }, { status: 500 });
   }

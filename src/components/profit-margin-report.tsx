@@ -76,7 +76,7 @@ export function ProfitMarginReport({ onBack }: Props) {
       const data = await res.json();
       setProducts(data.products || []);
       setSummary(data.summary || null);
-    } catch (e) {
+    } catch (e: any) {
       toast({ title: "Failed to load report", variant: "destructive" });
     } finally {
       setLoading(false);

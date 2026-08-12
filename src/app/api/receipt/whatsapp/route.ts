@@ -11,7 +11,7 @@ import { CURRENCY } from "@/lib/pos-data";
 // Premium feature for Ghana — WhatsApp is more common than email for receipts.
 export async function GET(req: NextRequest) {
   let user;
-  try { user = await requireAuth(); } catch (e) { return e as Response; }
+  try { user = await requireAuth(); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
@@ -117,7 +117,7 @@ export async function GET(req: NextRequest) {
       text,
       invoiceNumber: sale.invoiceNumber,
     });
-  } catch (e) {
+  } catch (e: any) {
     console.error("GET /api/receipt/whatsapp error:", e);
     return NextResponse.json({ error: "Failed to generate WhatsApp receipt" }, { status: 500 });
   }

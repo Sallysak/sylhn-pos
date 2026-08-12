@@ -5,7 +5,7 @@ import { rateLimitApiRead, rateLimitApiWrite, rateLimitResponse, getClientIp } f
 
 // GET /api/stocktakes — list stocktakes
 export async function GET(req: NextRequest) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
       orderBy: { scheduledFor: "desc" },
     });
     return NextResponse.json({ stocktakes });
-  } catch (e) {
+  } catch (e: any) {
     console.error("GET /api/stocktakes error:", e);
     return NextResponse.json({ error: "Failed to fetch stocktakes" }, { status: 500 });
   }
@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
   try {
     user = await requireAuth();
     requirePermission(user.role, "canAdjustStock");
-  } catch (e) { return e as Response; }
+  } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);
@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({ success: true, stocktake });
-  } catch (e) {
+  } catch (e: any) {
     console.error("POST /api/stocktakes error:", e);
     return NextResponse.json({ error: "Failed to create stocktake" }, { status: 500 });
   }

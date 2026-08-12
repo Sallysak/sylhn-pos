@@ -9,7 +9,7 @@ import { auditLog } from "@/lib/audit";
 // Body: { to: string } — recipient email address
 export async function POST(req: NextRequest) {
   let user;
-  try { user = await requireAuth(); } catch (e) { return e as Response; }
+  try { user = await requireAuth(); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);

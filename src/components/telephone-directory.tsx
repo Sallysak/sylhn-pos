@@ -155,7 +155,7 @@ export function TelephoneDirectory({
         if (serverEntries.length > 0) {
           setDirectory(serverEntries);
         }
-      } catch (e) {
+      } catch (e: any) {
         console.warn('Failed to fetch telephone directory from server:', e);
       }
     })();

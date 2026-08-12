@@ -7,7 +7,7 @@ import { clearLoyaltyConfigCache } from "@/lib/loyalty";
 
 // GET /api/system-settings — list all settings
 export async function GET(req: NextRequest) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
     const map: Record<string, string> = {};
     for (const s of settings) map[s.key] = s.value;
     return NextResponse.json({ settings: map });
-  } catch (e) {
+  } catch (e: any) {
     console.error("GET /api/system-settings error:", e);
     return NextResponse.json({ error: "Failed to fetch settings" }, { status: 500 });
   }
@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
 // PUT /api/system-settings — bulk update (admin only)
 export async function PUT(req: NextRequest) {
   let user;
-  try { user = await requireAuth(); requirePermission(user.role, "maintenance"); } catch (e) { return e as Response; }
+  try { user = await requireAuth(); requirePermission(user.role, "maintenance"); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);
@@ -68,7 +68,7 @@ export async function PUT(req: NextRequest) {
     });
 
     return NextResponse.json({ success: true, count: entries.length });
-  } catch (e) {
+  } catch (e: any) {
     console.error("PUT /api/system-settings error:", e);
     return NextResponse.json({ error: "Failed to update settings" }, { status: 500 });
   }

@@ -13,7 +13,7 @@ import { initiateMomoPayment } from "@/lib/mtn-momo";
 // /api/payments/momo/callback will be called by MTN when the payment completes.
 export async function POST(req: NextRequest) {
   let user;
-  try { user = await requireAuth(); } catch (e) { return e as Response; }
+  try { user = await requireAuth(); } catch (e: any) { return e as Response; }
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);
   if (!rl.allowed) return rateLimitResponse(rl);

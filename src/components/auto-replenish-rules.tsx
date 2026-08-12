@@ -65,7 +65,7 @@ export function AutoReplenishRules({ onBack }: { onBack: () => void }) {
       }
       if (prodRes.ok) setProducts(prodData.products || []);
       if (supRes.ok) setSuppliers(supData.suppliers || []);
-    } catch (e) {
+    } catch (e: any) {
       toast({ title: "Failed to load", variant: "destructive" });
     } finally {
       setLoading(false);

@@ -11,7 +11,7 @@ export const runtime = 'nodejs'
 export const maxDuration = 30
 
 export async function POST(req: NextRequest) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
 
   const now = new Date()
   const creditSales = await db.sale.findMany({
@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
     try {
       await transporter.sendMail({ from: cfg['smtp.from'] || cfg['smtp.user'], to: c.email, subject: `Payment Reminder — GHS ${c.total.toFixed(2)} Outstanding`, html })
       sent++
-    } catch (e) { /* skip failed */ }
+    } catch (e: any) { /* skip failed */ }
   }
 
   return NextResponse.json({ success: true, sent, totalOverdue: overdue.length })

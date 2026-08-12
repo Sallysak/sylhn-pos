@@ -11,7 +11,7 @@ import { qrSvg } from "@/lib/qr";
 // start a return. The QR encodes a compact text like "SYLHN|INV-1784297887297-0000|GHS 85.10".
 export async function GET(req: NextRequest) {
   let user;
-  try { user = await requireAuth(); } catch (e) { return e as Response; }
+  try { user = await requireAuth(); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
@@ -68,7 +68,7 @@ export async function GET(req: NextRequest) {
       svg,
       invoiceNumber: sale.invoiceNumber,
     });
-  } catch (e) {
+  } catch (e: any) {
     console.error("GET /api/receipt/qr error:", e);
     return NextResponse.json({ error: "Failed to generate QR code" }, { status: 500 });
   }

@@ -155,7 +155,7 @@ export function FinancialOperations({ onBack, dailyTotal, initialTab = "expenses
           setExpenses(serverExpenses);
           try { localStorage.setItem(EXPENSE_STORAGE_KEY, JSON.stringify(serverExpenses)); } catch {}
         }
-      } catch (e) {
+      } catch (e: any) {
         console.warn('Failed to fetch expenses from server:', e);
       }
     })();

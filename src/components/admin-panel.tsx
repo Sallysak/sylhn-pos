@@ -273,7 +273,7 @@ export function AdminLogin({ onSuccess, onCancel, adminOnly = false }: { onSucce
         return;
       }
       failAttempt(data.error || 'Invalid credentials');
-    } catch (err) {
+    } catch (err: any) {
       // fetch() throws TypeError when the server is unreachable (network error).
       // This is the ONLY case where we fall back to offline mode.
       const msg = (err as Error).message || '';
@@ -611,7 +611,7 @@ export function AdminPanel({ currentUser, onBack }: { currentUser: SystemUser; o
           setAuditLog(serverLogs);
           try { localStorage.setItem(AUDIT_KEY, JSON.stringify(serverLogs)); } catch {}
         }
-      } catch (e) {
+      } catch (e: any) {
         console.warn('Failed to fetch audit logs from server:', e);
       }
     })();
@@ -637,7 +637,7 @@ export function AdminPanel({ currentUser, onBack }: { currentUser: SystemUser; o
           setUsers(serverUsers);
           try { localStorage.setItem(USERS_KEY, JSON.stringify(serverUsers)); } catch {}
         }
-      } catch (e) {
+      } catch (e: any) {
         console.warn('Failed to fetch users from server:', e);
       }
     })();
@@ -697,7 +697,7 @@ export function AdminPanel({ currentUser, onBack }: { currentUser: SystemUser; o
           active: user.active,
         }),
       });
-    } catch (e) {
+    } catch (e: any) {
       console.warn('Server user save failed (offline?):', e);
     }
 

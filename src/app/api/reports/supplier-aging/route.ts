@@ -5,7 +5,7 @@ import { getSupplierAging } from "@/lib/reports";
 
 // GET /api/reports/supplier-aging — supplier balance aging report (0-30, 31-60, 60+ days)
 export async function GET(req: NextRequest) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
       },
       generatedAt: new Date().toISOString(),
     });
-  } catch (e) {
+  } catch (e: any) {
     console.error("GET /api/reports/supplier-aging error:", e);
     return NextResponse.json({ error: "Failed to generate supplier aging report" }, { status: 500 });
   }

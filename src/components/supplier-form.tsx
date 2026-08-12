@@ -153,7 +153,7 @@ export function SupplierForm({ onBack, products }: SupplierFormProps) {
         if (serverSuppliers.length > 0) {
           setSuppliers(serverSuppliers);
         }
-      } catch (e) {
+      } catch (e: any) {
         console.warn('Failed to fetch suppliers from server:', e);
       }
     })();

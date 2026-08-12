@@ -6,7 +6,7 @@ import { auditLog } from "@/lib/audit";
 
 // GET /api/registers — list all registers with current cashier + shift
 export async function GET(req: NextRequest) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
       orderBy: { code: "asc" },
     });
     return NextResponse.json({ registers });
-  } catch (e) {
+  } catch (e: any) {
     console.error("GET /api/registers error:", e);
     return NextResponse.json({ error: "Failed to fetch registers" }, { status: 500 });
   }
@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
 // POST /api/registers — create a new register
 export async function POST(req: NextRequest) {
   let user;
-  try { user = await requireAuth(); requirePermission(user.role, "maintenance"); } catch (e) { return e as Response; }
+  try { user = await requireAuth(); requirePermission(user.role, "maintenance"); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);
@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
 // Body: { action: "claim" | "release", registerId }
 export async function PUT(req: NextRequest) {
   let user;
-  try { user = await requireAuth(); } catch (e) { return e as Response; }
+  try { user = await requireAuth(); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);
@@ -148,7 +148,7 @@ export async function PUT(req: NextRequest) {
     }
 
     return NextResponse.json({ error: "Invalid action (use 'claim' or 'release')" }, { status: 400 });
-  } catch (e) {
+  } catch (e: any) {
     console.error("PUT /api/registers error:", e);
     return NextResponse.json({ error: "Failed to update register" }, { status: 500 });
   }

@@ -14,7 +14,7 @@ import { db } from "@/lib/db";
 // Helps managers decide whether to adjust trigger levels or remove
 // rules that aren't working.
 export async function GET(req: NextRequest) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
   if (!rl.allowed) return rateLimitResponse(rl);
@@ -96,7 +96,7 @@ export async function GET(req: NextRequest) {
     };
 
     return NextResponse.json({ summary, rules: ruleReports });
-  } catch (e) {
+  } catch (e: any) {
     console.error("GET /api/reports/reorder-effectiveness error:", e);
     return NextResponse.json({ error: "Failed to generate reorder effectiveness report" }, { status: 500 });
   }

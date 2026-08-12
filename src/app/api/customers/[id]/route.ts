@@ -7,7 +7,7 @@ import { tierFromSpend } from "@/lib/loyalty";
 
 // GET /api/customers/[id] — full customer profile (sales, loyalty history, stats)
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
@@ -33,7 +33,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     });
     if (!customer) return NextResponse.json({ error: "Customer not found" }, { status: 404 });
     return NextResponse.json({ customer });
-  } catch (e) {
+  } catch (e: any) {
     console.error("GET /api/customers/[id] error:", e);
     return NextResponse.json({ error: "Failed to fetch customer" }, { status: 500 });
   }
@@ -42,7 +42,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 // PUT /api/customers/[id] — update customer details
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   let user;
-  try { user = await requireAuth(); } catch (e) { return e as Response; }
+  try { user = await requireAuth(); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);
@@ -86,7 +86,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     });
 
     return NextResponse.json({ success: true, customer: updated });
-  } catch (e) {
+  } catch (e: any) {
     console.error("PUT /api/customers/[id] error:", e);
     return NextResponse.json({ error: "Failed to update customer" }, { status: 500 });
   }
@@ -95,7 +95,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 // DELETE /api/customers/[id] — soft-delete (set active=false)
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   let user;
-  try { user = await requireAuth(); } catch (e) { return e as Response; }
+  try { user = await requireAuth(); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);
@@ -124,7 +124,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     });
 
     return NextResponse.json({ success: true, customer: updated });
-  } catch (e) {
+  } catch (e: any) {
     console.error("DELETE /api/customers/[id] error:", e);
     return NextResponse.json({ error: "Failed to deactivate customer" }, { status: 500 });
   }

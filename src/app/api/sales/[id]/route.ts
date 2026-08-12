@@ -8,7 +8,7 @@ import { publishRealtimeEvent } from "@/lib/realtime";
 
 // GET /api/sales/[id] — get one sale by ID or invoice number
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
@@ -42,7 +42,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     }
     if (!sale) return NextResponse.json({ error: "Sale not found" }, { status: 404 });
     return NextResponse.json({ sale });
-  } catch (e) {
+  } catch (e: any) {
     console.error("GET /api/sales/[id] error:", e);
     return NextResponse.json({ error: "Failed to fetch sale" }, { status: 500 });
   }
@@ -52,7 +52,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 // Transactional: stock restoration + loyalty reversal + audit log all atomic.
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   let user;
-  try { user = await requireAuth(); } catch (e) { return e as Response; }
+  try { user = await requireAuth(); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);
@@ -66,7 +66,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
     if (body.status === "voided" || body.status === "refunded") {
       // Void/refund requires canVoid permission
-      try { requirePermission(user.role, "canVoid"); } catch (e) { return e as Response; }
+      try { requirePermission(user.role, "canVoid"); } catch (e: any) { return e as Response; }
 
       const action = body.status === "voided" ? "VOID" : "REFUND";
       const severity = body.status === "voided" ? "warning" : "critical";
@@ -205,7 +205,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 // DELETE /api/sales/[id] — hard delete (admin only) + audit log
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   let user;
-  try { user = await requirePermission((await requireAuth()).role, "canVoid"); } catch (e) { return e as Response; }
+  try { user = await requirePermission((await requireAuth()).role, "canVoid"); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);
@@ -233,7 +233,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     });
 
     return NextResponse.json({ success: true });
-  } catch (e) {
+  } catch (e: any) {
     console.error("DELETE /api/sales/[id] error:", e);
     return NextResponse.json({ error: "Failed to delete sale" }, { status: 500 });
   }

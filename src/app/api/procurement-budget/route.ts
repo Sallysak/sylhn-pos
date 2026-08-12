@@ -8,7 +8,7 @@ import { auditLog } from "@/lib/audit";
 // List all budgets for a given month. Returns each budget with actual
 // spend (from received POs in that month) + variance.
 export async function GET(req: NextRequest) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
   if (!rl.allowed) return rateLimitResponse(rl);
@@ -90,7 +90,7 @@ export async function GET(req: NextRequest) {
     };
 
     return NextResponse.json({ budgets: enriched, summary });
-  } catch (e) {
+  } catch (e: any) {
     console.error("GET /api/procurement-budget error:", e);
     return NextResponse.json({ error: "Failed to fetch budgets" }, { status: 500 });
   }
@@ -104,7 +104,7 @@ export async function POST(req: NextRequest) {
   try {
     user = await requireAuth();
     requirePermission(user.role, "financeOps");
-  } catch (e) { return e as Response; }
+  } catch (e: any) { return e as Response; }
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);
   if (!rl.allowed) return rateLimitResponse(rl);
@@ -170,7 +170,7 @@ export async function DELETE(req: NextRequest) {
   try {
     user = await requireAuth();
     requirePermission(user.role, "financeOps");
-  } catch (e) { return e as Response; }
+  } catch (e: any) { return e as Response; }
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);
   if (!rl.allowed) return rateLimitResponse(rl);

@@ -6,7 +6,7 @@ import { requireAuth } from '@/lib/auth'
 // Tracks expected delivery dates for open POs, flags late deliveries
 
 export async function GET(req: NextRequest) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
 
   const now = new Date()
   const purchases = await db.purchase.findMany({

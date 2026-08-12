@@ -15,7 +15,7 @@ import { db } from "@/lib/db";
 // emailed. Helps with collections — customers can see exactly what they
 // owe and from which invoices.
 export async function GET(req: NextRequest) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
@@ -181,7 +181,7 @@ export async function GET(req: NextRequest) {
         days60plus: Math.round(aging.days60plus * 100) / 100,
       },
     });
-  } catch (e) {
+  } catch (e: any) {
     console.error("GET /api/reports/customer-statement error:", e);
     return NextResponse.json({ error: "Failed to generate customer statement" }, { status: 500 });
   }

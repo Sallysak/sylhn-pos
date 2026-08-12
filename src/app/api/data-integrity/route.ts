@@ -6,7 +6,7 @@ import { rateLimitApiRead, rateLimitResponse, getClientIp } from "@/lib/rate-lim
 // GET /api/data-integrity — checks stock quantities against history
 export async function GET(req: NextRequest) {
   let user;
-  try { user = await requireAuth(); requirePermission(user.role, "canAdjustStock"); } catch (e) { return e as Response; }
+  try { user = await requireAuth(); requirePermission(user.role, "canAdjustStock"); } catch (e: any) { return e as Response; }
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
   if (!rl.allowed) return rateLimitResponse(rl);
@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
       discrepancies,
       checkedAt: new Date().toISOString(),
     });
-  } catch (e) {
+  } catch (e: any) {
     return NextResponse.json({ error: "Integrity check failed" }, { status: 500 });
   }
 }

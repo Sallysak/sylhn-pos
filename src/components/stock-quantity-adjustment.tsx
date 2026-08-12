@@ -336,6 +336,7 @@ export function StockQuantityAdjustment({
       if (h.reference === adjNumber) return;
       const existing = groups.get(h.reference);
       if (existing) {
+          const existingAny = existing as any;
         existing.entries.push(h);
         if (h.timestamp > existing.timestamp) existing.timestamp = h.timestamp;
       } else {
@@ -503,12 +504,13 @@ export function StockQuantityAdjustment({
     setLines(prev => {
       // Build a map of existing lines by productId (to preserve counted values)
       const existingMap = new Map(prev.map(l => [l.productId, l]));
-      const newLines: AdjustmentLine[] = matched.map(product => {
+      const newLines: any[] = matched.map(product => {
         const existing = existingMap.get(product.id);
         if (existing) {
+          const existingAny = existing as any;
           // Preserve the user's counted value but update onHand
-          const qty = existing.counted - product.stock;
-          return { ...existing, onHand: product.stock, qty, total: qty * existing.cost };
+          const qty = existingAny.counted - product.stock;
+          return { ...existingAny, onHand: product.stock, qty, total: qty * existingAny.cost };
         }
         // New line — default counted = onHand
         return {
@@ -578,7 +580,7 @@ export function StockQuantityAdjustment({
       return;
     }
     // Add all matched products (skipping duplicates)
-    const newLines: AdjustmentLine[] = [];
+    const newLines: any[] = [];
     matched.forEach(p => {
       if (lines.some(l => l.productId === p.id)) return;
       newLines.push({
@@ -802,7 +804,7 @@ export function StockQuantityAdjustment({
               added++;
             });
             toast({ title: `Imported ${added} rows`, description: file.name });
-          } catch (err) {
+          } catch (err: any) {
             toast({ title: 'Import failed', description: 'Invalid file format', variant: 'destructive' });
           }
         };

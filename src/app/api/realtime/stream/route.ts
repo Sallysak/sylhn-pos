@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
   let user;
   try {
     user = await requireAuth();
-  } catch (e) {
+  } catch (e: any) {
     return new Response("Authentication required", { status: 401 });
   }
 
@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
           const eventTypeName = event.type;
           const payload = `event: ${eventTypeName}\ndata: ${JSON.stringify(event)}\n\n`;
           controller.enqueue(encoder.encode(payload));
-        } catch (e) {
+        } catch (e: any) {
           // Connection probably closed — unsubscribe will happen in cancel()
           logger.warn("SSE send failed", { error: e instanceof Error ? e.message : String(e) });
         }

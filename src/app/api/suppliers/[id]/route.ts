@@ -6,7 +6,7 @@ import { auditLog } from "@/lib/audit";
 
 // GET /api/suppliers/[id] — full supplier profile (purchases, payments, balance aging)
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  try { await requireAuth(); } catch (e) { return e as Response; }
+  try { await requireAuth(); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
@@ -32,7 +32,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     });
     if (!supplier) return NextResponse.json({ error: "Supplier not found" }, { status: 404 });
     return NextResponse.json({ supplier });
-  } catch (e) {
+  } catch (e: any) {
     console.error("GET /api/suppliers/[id] error:", e);
     return NextResponse.json({ error: "Failed to fetch supplier" }, { status: 500 });
   }
@@ -41,7 +41,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 // PUT /api/suppliers/[id] — update supplier details
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   let user;
-  try { user = await requireAuth(); requirePermission(user.role, "purchase"); } catch (e) { return e as Response; }
+  try { user = await requireAuth(); requirePermission(user.role, "purchase"); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);
@@ -110,7 +110,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     });
 
     return NextResponse.json({ success: true, supplier: updated });
-  } catch (e) {
+  } catch (e: any) {
     console.error("PUT /api/suppliers/[id] error:", e);
     return NextResponse.json({ error: "Failed to update supplier" }, { status: 500 });
   }
@@ -119,7 +119,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 // DELETE /api/suppliers/[id] — soft-delete (set active=false)
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   let user;
-  try { user = await requireAuth(); requirePermission(user.role, "purchase"); } catch (e) { return e as Response; }
+  try { user = await requireAuth(); requirePermission(user.role, "purchase"); } catch (e: any) { return e as Response; }
 
   const ip = getClientIp(req);
   const rl = rateLimitApiWrite(ip);
@@ -147,7 +147,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     });
 
     return NextResponse.json({ success: true });
-  } catch (e) {
+  } catch (e: any) {
     console.error("DELETE /api/suppliers/[id] error:", e);
     return NextResponse.json({ error: "Failed to deactivate supplier" }, { status: 500 });
   }

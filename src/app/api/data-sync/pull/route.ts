@@ -9,7 +9,7 @@ import { auditLog } from "@/lib/audit";
 // Returns: { products, groups, suppliers, customers, expenses, heldOrders, sales, settings }
 export async function GET(req: NextRequest) {
   let user;
-  try { user = await requireAuth(); requirePermission(user.role, "canAdjustStock"); } catch (e) { return e as Response; }
+  try { user = await requireAuth(); requirePermission(user.role, "canAdjustStock"); } catch (e: any) { return e as Response; }
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
   if (!rl.allowed) return rateLimitResponse(rl);
