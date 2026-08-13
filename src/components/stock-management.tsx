@@ -1,3 +1,4 @@
+// File: stock-management.tsx — v2.4.2 — cache bust
 "use client";
 import { StockTransferDialog } from "./stock-transfer-dialog";
 
