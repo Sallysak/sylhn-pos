@@ -585,6 +585,12 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
   const handleSave = async () => {
     if (lines.length === 0) { toast({ title: "No items to save", variant: "destructive" }); return; }
     if (!supplier) { toast({ title: "Select a supplier first", variant: "destructive" }); return; }
+    // Validate line items — prevent saving with invalid quantities or prices
+    const invalidLines = lines.filter(l => !l.partNo || l.quantity <= 0 || l.cost < 0);
+    if (invalidLines.length > 0) {
+      toast({ title: "Invalid line items", description: `${invalidLines.length} item(s) have missing part number, zero quantity, or negative cost.`, variant: "destructive" });
+      return;
+    }
 
     // Premium fix: actually POST the purchase to the server so it's persisted.
     // Previously this was a stub that only showed a toast — the purchase was

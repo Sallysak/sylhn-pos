@@ -31,6 +31,21 @@ export function AccountsReports({ onBack, products, groups, history, dailyTotal,
   const [fromDate, setFromDate] = useState(new Date().toISOString().split('T')[0]);
   const [toDate, setToDate] = useState(new Date().toISOString().split('T')[0]);
 
+  // Date range validation — prevent invalid ranges
+  const validateDateRange = (): boolean => {
+    if (new Date(fromDate) > new Date(toDate)) {
+      toast({ title: "Invalid Date Range", description: "From date cannot be after To date.", variant: "destructive" });
+      return false;
+    }
+    // Prevent ranges > 1 year (performance protection)
+    const daysDiff = Math.abs(new Date(toDate).getTime() - new Date(fromDate).getTime()) / 86400000;
+    if (daysDiff > 365) {
+      toast({ title: "Date Range Too Large", description: "Maximum range is 365 days. Please narrow your selection.", variant: "destructive" });
+      return false;
+    }
+    return true;
+  };
+
   const reports: { id: ReportType; label: string; icon: any; color: string }[] = [
     { id: "daily-sales", label: "Daily Sales Summary", icon: TrendingUp, color: "emerald" },
     { id: "daily-sales-detail", label: "Daily Sales Detail", icon: FileText, color: "emerald" },
@@ -283,6 +298,7 @@ export function AccountsReports({ onBack, products, groups, history, dailyTotal,
 
   // ===== Print handler =====
   const handlePrint = () => {
+    if (!validateDateRange()) return;
     const printWin = window.open('', '_blank', 'width=900,height=600');
     if (!printWin) { toast({ title: 'Popup blocked', variant: 'destructive' }); return; }
     const reportLabel = reports.find(r => r.id === activeReport)?.label || 'Report';
@@ -387,6 +403,7 @@ export function AccountsReports({ onBack, products, groups, history, dailyTotal,
   };
 
   const handleExport = () => {
+    if (!validateDateRange()) return;
     import('xlsx').then((XLSX) => {
       const data: any[] = [];
       if (activeReport === 'daily-sales') {

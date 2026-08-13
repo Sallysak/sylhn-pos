@@ -19,8 +19,8 @@
  * Helps identify exact deploy when debugging
  */
 
-export const APP_VERSION = "2.2.0";
-export const BUILD_ID = "build-2026-08-13-v220-100-percent-production-ready";
+export const APP_VERSION = "2.3.0";
+export const BUILD_ID = "build-2026-08-13-v230-module-by-module-deep-audit";
 export const RELEASE_DATE = "August 10, 2026";
 export const RELEASE_NAME = "Seed Demo Data + All Features Verified";
 

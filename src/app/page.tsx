@@ -1687,6 +1687,21 @@ export default function POSPage() {
       toast({ title: "Cart is empty", variant: "destructive" });
       return;
     }
+    // Validate cart items — prevent checkout with invalid items
+    const invalidItems = cart.filter(item => !item.productId || !item.name || item.price < 0 || item.quantity <= 0);
+    if (invalidItems.length > 0) {
+      toast({ title: "Cart has invalid items", description: `${invalidItems.length} item(s) have missing data. Please remove and re-add them.`, variant: "destructive" });
+      return;
+    }
+    // Check for out-of-stock items
+    const outOfStockItems = cart.filter(item => {
+      const product = products.find(p => p.id === item.productId);
+      return product && (product.stock ?? product.quantity ?? 0) < item.quantity;
+    });
+    if (outOfStockItems.length > 0) {
+      toast({ title: "Insufficient stock", description: `${outOfStockItems[0].name} has insufficient stock. Please adjust quantity.`, variant: "destructive" });
+      return;
+    }
     setShowPayment(true);
   };
 
@@ -3333,7 +3348,7 @@ export default function POSPage() {
                     {/* Product image or emoji */}
                     <div className="h-20 w-20 sm:h-24 sm:w-24 rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center text-5xl mb-2 group-hover:scale-110 transition-transform duration-200 ring-1 ring-slate-100 overflow-hidden">
                       {product.imageUrl || product.image ? (
-                        <img
+                        <img loading="lazy"
                           src={product.imageUrl || product.image}
                           alt={product.name}
                           className="h-full w-full object-cover rounded-2xl"
