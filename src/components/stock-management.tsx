@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { Truck, cn } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import {
   COMPANY, CURRENCY, formatGHS, stockGroups, products as ALL_PRODUCTS,
   initialStockHistory, type Product, type StockGroup, type StockHistoryEntry,
