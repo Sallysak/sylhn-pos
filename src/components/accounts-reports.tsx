@@ -434,6 +434,92 @@ export function AccountsReports({ onBack, products, groups, history, dailyTotal,
     });
   };
 
+  // PDF Export — professional PDF using jsPDF + autotable
+  const handlePDFExport = () => {
+    if (!validateDateRange()) return;
+    import('jspdf').then((jsPDFModule) => {
+      const jsPDF = jsPDFModule.default || jsPDFModule.jsPDF;
+      import('jspdf-autotable').then((autoTableModule) => {
+        const autoTable = autoTableModule.default || autoTableModule;
+        const doc = new jsPDF();
+        const reportLabel = reports.find(r => r.id === activeReport)?.label || 'Report';
+
+        // Header
+        doc.setFontSize(18);
+        doc.setTextColor(30, 90, 142);
+        doc.text(COMPANY.name, 105, 15, { align: 'center' });
+        doc.setFontSize(10);
+        doc.setTextColor(100);
+        doc.text(`${COMPANY.address} · ${COMPANY.contact}`, 105, 22, { align: 'center' });
+        doc.setFontSize(14);
+        doc.setTextColor(30, 90, 142);
+        doc.text(reportLabel, 105, 32, { align: 'center' });
+        doc.setFontSize(9);
+        doc.setTextColor(100);
+        doc.text(`Period: ${fromDate} to ${toDate} · Generated: ${new Date().toLocaleString('en-GB')}`, 105, 38, { align: 'center' });
+
+        // Data
+        let head: any[] = [];
+        let body: any[] = [];
+
+        if (activeReport === 'daily-sales') {
+          head = [['Metric', 'Amount (GHS)']];
+          body = [
+            ['Gross Revenue', dailySalesData.totalRevenue?.toFixed(2) || '0.00'],
+            ['Cost of Goods Sold', dailySalesData.totalCost?.toFixed(2) || '0.00'],
+            ['Gross Profit', dailySalesData.grossProfit?.toFixed(2) || '0.00'],
+            ['VAT Collected (15%)', dailySalesData.vatCollected?.toFixed(2) || '0.00'],
+            ['Transactions', String(dailySalesData.transactionCount || 0)],
+          ];
+        } else if (activeReport === 'daily-sales-detail') {
+          head = [['Date', 'Time', 'Part No', 'Description', 'Qty', 'Price', 'Amount']];
+          body = dailySalesDetail.map(d => [d.date, d.time, d.partNo, d.description, String(d.qty), d.price?.toFixed(2), d.amount?.toFixed(2)]);
+        } else if (activeReport === 'monthly-summary') {
+          head = [['Month', 'Transactions', 'Items', 'Revenue', 'Cost', 'Profit', 'VAT']];
+          body = monthlySummary.map(m => [m.label, String(m.transactions), String(m.items), m.revenue?.toFixed(2), m.cost?.toFixed(2), m.profit?.toFixed(2), m.vat?.toFixed(2)]);
+        } else if (activeReport === 'stock-value') {
+          head = [['SKU', 'Product', 'Stock', 'Cost', 'Price', 'Stock Value']];
+          body = products.map(p => [p.sku, p.name, String(p.stock), p.costPrice?.toFixed(2), p.price?.toFixed(2), (p.price * p.stock)?.toFixed(2)]);
+        } else if (activeReport === 'vat-tax') {
+          head = [['Category', 'Items', 'Revenue', 'VAT Rate', 'VAT Amount']];
+          body = [
+            ['Taxable', String(vatData.taxableCount), vatData.taxableRevenue?.toFixed(2), '15%', vatData.vatCollected?.toFixed(2)],
+            ['Non-Taxable', String(vatData.nonTaxableCount), vatData.nonTaxableRevenue?.toFixed(2), '0%', '0.00'],
+            ['TOTAL', String(vatData.taxableCount + vatData.nonTaxableCount), (vatData.taxableRevenue + vatData.nonTaxableRevenue)?.toFixed(2), '', vatData.vatCollected?.toFixed(2)],
+          ];
+        } else if (activeReport === 'trial-balance') {
+          head = [['Account', 'Debit', 'Credit']];
+          body = trialBalance.rows.map(r => [r.account, r.debit?.toFixed(2) || '—', r.credit?.toFixed(2) || '—']);
+          body.push(['TOTAL', trialBalance.totalDebit?.toFixed(2), trialBalance.totalCredit?.toFixed(2)]);
+        }
+
+        if (body.length > 0) {
+          autoTable(doc, {
+            head: head,
+            body: body,
+            startY: 45,
+            styles: { fontSize: 8, cellPadding: 2 },
+            headStyles: { fillColor: [30, 90, 142], textColor: 255, fontSize: 8 },
+            alternateRowStyles: { fillColor: [245, 248, 250] },
+            margin: { top: 45, left: 14, right: 14 },
+          });
+        }
+
+        // Footer
+        const pageCount = doc.getNumberOfPages();
+        for (let i = 1; i <= pageCount; i++) {
+          doc.setPage(i);
+          doc.setFontSize(7);
+          doc.setTextColor(150);
+          doc.text(`SYLHN POS · ${COMPANY.name} · Page ${i} of ${pageCount}`, 105, doc.internal.pageSize.height - 10, { align: 'center' });
+        }
+
+        doc.save(`${activeReport}-${new Date().toISOString().split('T')[0]}.pdf`);
+        toast({ title: 'PDF exported successfully' });
+      });
+    });
+  };
+
   const colorClasses: Record<string, { bg: string; text: string; border: string; gradient: string }> = {
     emerald: { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-300', gradient: 'from-emerald-500 to-teal-500' },
     blue: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-300', gradient: 'from-blue-500 to-indigo-500' },
@@ -472,7 +558,8 @@ export function AccountsReports({ onBack, products, groups, history, dailyTotal,
               <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="h-7 px-2 rounded-md bg-white/10 text-white text-xs border border-white/20 outline-none" />
             </div>
             <button onClick={handlePrint} className="h-8 px-3 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-semibold flex items-center gap-1.5 transition"><Printer className="h-3.5 w-3.5" /> Print</button>
-            <button onClick={handleExport} className="h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 transition"><Download className="h-3.5 w-3.5" /> Export</button>
+            <button onClick={handlePDFExport} className="h-8 px-3 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold flex items-center gap-1.5 transition"><FileText className="h-3.5 w-3.5" /> PDF</button>
+            <button onClick={handleExport} className="h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 transition"><Download className="h-3.5 w-3.5" /> Excel</button>
           </div>
         </div>
       </header>
