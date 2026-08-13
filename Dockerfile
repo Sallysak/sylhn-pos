@@ -1,5 +1,6 @@
 # SYLHN POS — Dockerfile for Railway (multi-stage production build)
 # Uses Node.js 22 (Railway native)
+# Cache bust: v2.4.1
 
 # ===== Stage 1: Install deps =====
 FROM node:22-slim AS deps
@@ -27,6 +28,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends openssl \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=deps /app/node_modules ./node_modules
+# Cache bust — forces Docker to pick up new code
+ARG CACHE_BUST=v2.4.1
+RUN echo $CACHE_BUST
 COPY . .
 
 # Generate Prisma client using LOCAL binary
