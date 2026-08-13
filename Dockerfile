@@ -28,10 +28,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends openssl \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=deps /app/node_modules ./node_modules
-# Cache bust — forces Docker to pick up new code
-ARG CACHE_BUST=v2.4.1
-RUN echo $CACHE_BUST
 COPY . .
+
+# Force no cache for the build step
+RUN rm -f /app/.next/cache -rf 2>/dev/null; true
 
 # Generate Prisma client using LOCAL binary
 RUN ./node_modules/.bin/prisma generate
