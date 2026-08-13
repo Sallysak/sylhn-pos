@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { rateLimitApiRead, rateLimitResponse, getClientIp } from "@/lib/rate-limit";
 import { db } from "@/lib/db";
 
 // GET /api/receipt/verify?invoice=XXX&saleId=XXX
@@ -11,6 +12,9 @@ import { db } from "@/lib/db";
 // stylesheets, or images). It uses inline SVG for icons so they render
 // correctly on every device, including those without emoji support.
 export async function GET(req: NextRequest) {
+  const ip = getClientIp(req);
+  const rl = rateLimitApiRead(ip);
+  if (!rl.allowed) return rateLimitResponse(rl);
   const { searchParams } = new URL(req.url);
   const invoiceRaw = searchParams.get("invoice") || "";
   const saleId = searchParams.get("saleId") || "";

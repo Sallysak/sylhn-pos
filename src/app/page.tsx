@@ -96,7 +96,7 @@ const TelephoneModule = dynamic(() => import("@/components/telephone-module").th
 const TelephoneDirectory = dynamic(() => import("@/components/telephone-directory").then(m => ({ default: m.TelephoneDirectory })), { ssr: false, loading: loadingFallback });
 const MaintenanceModule = dynamic(() => import("@/components/maintenance-module").then(m => ({ default: m.MaintenanceModule })), { ssr: false, loading: loadingFallback });
 const EmailSystem = dynamic(() => import("@/components/email-system").then(m => ({ default: m.EmailSystem })), { ssr: false, loading: loadingFallback });
-import { EmailNotificationBadge } from "@/components/email-notification-badge";
+const EmailNotificationBadge = dynamic(() => import("@/components/email-notification-badge").then(m => ({ default: m.EmailNotificationBadge })), { ssr: false });
 const SoldItemsReport = dynamic(() => import("@/components/sold-items-report").then(m => ({ default: m.SoldItemsReport })), { ssr: false, loading: loadingFallback });
 const PurchaseForm = dynamic(() => import("@/components/purchase-form").then(m => ({ default: m.PurchaseForm })), { ssr: false, loading: loadingFallback });
 const SalesMenu = dynamic(() => import("@/components/sales-menu").then(m => ({ default: m.SalesMenu })), { ssr: false, loading: loadingFallback });
@@ -2604,7 +2604,7 @@ export default function POSPage() {
           <div ref={menuRef} className="hidden lg:flex items-center gap-0.5 flex-shrink-0">
             {menus.map(menu => (
               <div key={menu.id} className="relative">
-                <button title="Action"
+                <button title="Button"
                   onClick={() => setOpenMenu(openMenu === menu.id ? null : menu.id)}
                   onMouseEnter={() => setOpenMenu(menu.id)}
                   className={cn(
@@ -2632,7 +2632,7 @@ export default function POSPage() {
                           return <div key={i} className="px-3 py-1 text-[9px] font-bold uppercase tracking-wider text-slate-400 bg-slate-50/50">{item.header}</div>;
                         }
                         return (
-                          <button title="Action"
+                          <button title="Button"
                             key={i}
                             onClick={() => { item.action(); setOpenMenu(null); }}
                             className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-emerald-50 text-slate-700 hover:text-emerald-700 text-xs font-medium transition text-left group"
@@ -2681,7 +2681,7 @@ export default function POSPage() {
               />
               <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
                 <VoiceSearch onResult={(text) => { setSearchQuery(text); toast({ title: "Voice search", description: text }); }} />
-                <button title="Action" onClick={() => setShowBarcodeScanner(true)} className="h-7 w-7 rounded-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 flex items-center justify-center transition" title="Open barcode scanner (camera)">
+                <button title="Button" onClick={() => setShowBarcodeScanner(true)} className="h-7 w-7 rounded-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 flex items-center justify-center transition" title="Open barcode scanner (camera)">
                   <ScanLine className="h-3.5 w-3.5" />
                 </button>
               </div>
@@ -2689,7 +2689,7 @@ export default function POSPage() {
               {searchQuery && !priceCheckMode && filteredProducts.length > 0 && (
                 <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-xl shadow-2xl ring-1 ring-slate-200 z-[120] max-h-72 overflow-y-auto">
                   {filteredProducts.slice(0, 8).map((p) => (
-                    <button title="Action" key={p.id} onClick={() => { addToCart(p); setSearchQuery(""); searchInputRef.current?.focus(); }} className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-emerald-50 text-left transition border-b border-slate-50 last:border-0">
+                    <button title="Button" key={p.id} onClick={() => { addToCart(p); setSearchQuery(""); searchInputRef.current?.focus(); }} className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-emerald-50 text-left transition border-b border-slate-50 last:border-0">
                       <span className="text-lg flex-shrink-0">{p.emoji}</span>
                       <div className="flex-1 min-w-0">
                         <div className="text-xs font-semibold text-slate-800 truncate">{p.name}</div>
@@ -2743,7 +2743,7 @@ export default function POSPage() {
                   This replaces the previous layout where these buttons were crammed at the
                   right edge of the header and got pushed off-screen on smaller windows. */}
             <div ref={userMenuRef} className="relative flex-shrink-0">
-              <button title="Action"
+              <button title="Button"
                 onClick={() => setShowUserMenu(s => !s)}
                 className={cn(
                   "flex items-center gap-2 px-2.5 py-1.5 rounded-lg gradient-premium-glass ring-1 ring-white/25 backdrop-blur-md transition",
@@ -2805,7 +2805,7 @@ export default function POSPage() {
                     </div>
 
                     {/* Action: AI Assistant */}
-                    <button title="Action"
+                    <button title="Button"
                       onClick={() => { setShowAiAssistant(true); setShowUserMenu(false); }}
                       className="w-full flex items-center gap-3 px-3.5 py-2.5 hover:bg-violet-50 text-slate-700 hover:text-violet-700 text-sm font-semibold transition group"
                       role="menuitem"
@@ -2820,7 +2820,7 @@ export default function POSPage() {
                     </button>
 
                     {/* Action: Keyboard Shortcuts */}
-                    <button title="Action"
+                    <button title="Button"
                       onClick={() => {
                         window.dispatchEvent(new KeyboardEvent('keydown', { key: '?' }));
                         setShowUserMenu(false);
@@ -2838,7 +2838,7 @@ export default function POSPage() {
                     </button>
 
                     {/* Action: Dark Mode Toggle */}
-                    <button title="Action"
+                    <button title="Button"
                       onClick={() => { toggleDarkMode(); }}
                       className="w-full flex items-center gap-3 px-3.5 py-2.5 hover:bg-slate-100 text-slate-700 text-sm font-semibold transition group"
                       role="menuitem"
@@ -2854,7 +2854,7 @@ export default function POSPage() {
 
                     {/* Action: Features Map — admin/manager only */}
                     {(loggedInUser?.role === 'admin' || loggedInUser?.role === 'manager') && (
-                      <button title="Action"
+                      <button title="Button"
                         onClick={() => { setView("features-map"); setShowUserMenu(false); }}
                         className="w-full flex items-center gap-3 px-3.5 py-2.5 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 text-sm font-semibold transition group"
                         role="menuitem"
@@ -2876,7 +2876,7 @@ export default function POSPage() {
                     <div className="h-px bg-slate-100 my-1.5" />
 
                     {/* Action: Logout */}
-                    <button title="Action"
+                    <button title="Button"
                       onClick={() => { setShowUserMenu(false); handleLogout(); }}
                       className="w-full flex items-center gap-3 px-3.5 py-2.5 hover:bg-rose-50 text-slate-700 hover:text-rose-700 text-sm font-semibold transition group"
                       role="menuitem"
@@ -2902,7 +2902,7 @@ export default function POSPage() {
         <div className="border-t border-white/10 bg-gradient-to-r from-black/20 via-black/15 to-black/20 backdrop-blur-md">
           <div className="flex items-center gap-1 px-3 py-1.5 overflow-x-auto scrollbar-hide max-w-full">
             {/* Dashboard — always visible quick access (was only in POS menu / mobile bottom nav) */}
-            <button title="Action"
+            <button title="Button"
               onClick={() => setView("dashboard")}
               className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition flex-shrink-0 bg-emerald-500/20 hover:bg-emerald-500/40 ring-1 ring-emerald-400/30 hover:ring-emerald-400/50 backdrop-blur-sm"
               title="Operations Dashboard — KPIs, low-stock alerts, reorder suggestions, expiry alerts"
@@ -2910,21 +2910,21 @@ export default function POSPage() {
               <TrendingUp className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Dashboard
             </button>
             <div className="w-px h-5 bg-white/10 flex-shrink-0 mx-0.5" />
-            <button title="Action"
+            <button title="Button"
               onClick={() => setShowCashCalc(true)}
               className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition flex-shrink-0 bg-white/5 hover:bg-white/15 ring-1 ring-white/10 hover:ring-white/20 backdrop-blur-sm"
               title="Cash Denomination Calculator"
             >
               <DollarSign className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Cash Calc
             </button>
-            <button title="Action"
+            <button title="Button"
               onClick={() => setShowPriceTags(true)}
               className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition flex-shrink-0 bg-white/5 hover:bg-white/15 ring-1 ring-white/10 hover:ring-white/20 backdrop-blur-sm"
               title="Print Price Tags (simple)"
             >
               <Printer className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Tags
             </button>
-            <button title="Action"
+            <button title="Button"
               onClick={() => setShowLabelPrinter(true)}
               className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition flex-shrink-0 bg-white/5 hover:bg-white/15 ring-1 ring-white/10 hover:ring-white/20 backdrop-blur-sm"
               title="Print Labels (multi-size + barcode)"
@@ -2933,14 +2933,14 @@ export default function POSPage() {
             </button>
             {/* Divider */}
             <div className="w-px h-5 bg-white/10 flex-shrink-0 mx-0.5" />
-            <button title="Action"
+            <button title="Button"
               onClick={() => setShowExpenseManager(true)}
               className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition flex-shrink-0 bg-rose-500/15 hover:bg-rose-500/25 ring-1 ring-rose-400/20 hover:ring-rose-400/40 backdrop-blur-sm"
               title="Record expenses (rent, utilities, salaries, etc.)"
             >
               <Wallet className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Expenses
             </button>
-            <button title="Action"
+            <button title="Button"
               onClick={() => setShowStocktakeWizard(true)}
               disabled={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager"}
               title={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" ? "Admin/Manager only" : "Run a stocktake (physical count → variance → update stock)"}
@@ -2950,7 +2950,7 @@ export default function POSPage() {
             </button>
             {/* Divider */}
             <div className="w-px h-5 bg-white/10 flex-shrink-0 mx-0.5" />
-            <button title="Action"
+            <button title="Button"
               onClick={() => setShowWhatsAppBroadcast(true)}
               disabled={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager"}
               title={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" ? "Admin/Manager only" : "Send WhatsApp broadcast to customers"}
@@ -2958,7 +2958,7 @@ export default function POSPage() {
             >
               <MessageCircle className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Broadcast
             </button>
-            <button title="Action"
+            <button title="Button"
               onClick={() => setShowAIForecast(true)}
               disabled={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager"}
               title={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" ? "Admin/Manager only" : "AI demand forecasting + reorder suggestions"}
@@ -2966,7 +2966,7 @@ export default function POSPage() {
             >
               <Brain className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> AI Forecast
             </button>
-            <button title="Action"
+            <button title="Button"
               onClick={() => setShowExpiryManager(true)}
               className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition flex-shrink-0 bg-orange-500/15 hover:bg-orange-500/30 ring-1 ring-orange-400/20 hover:ring-orange-400/40 backdrop-blur-sm"
               title="Expiry date management (FEFO) + alerts"
@@ -2974,7 +2974,7 @@ export default function POSPage() {
               <AlertTriangle className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Expiry
             </button>
             {/* Phase 4: Advanced Reports — Admin/Manager only */}
-            <button title="Action"
+            <button title="Button"
               onClick={() => setShowAdvancedReports(true)}
               disabled={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager"}
               title={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" ? "Admin/Manager only" : "Advanced reports: ABC analysis, profit margins, hourly traffic, staff performance"}
@@ -2983,7 +2983,7 @@ export default function POSPage() {
               <BarChart3 className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Reports
             </button>
             {/* Recurring POs */}
-            <button title="Action"
+            <button title="Button"
               onClick={() => setShowRecurringPO(true)}
               disabled={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager"}
               title={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" ? "Admin/Manager only" : "Set up recurring purchase orders (auto-generate weekly/monthly)"}
@@ -2992,7 +2992,7 @@ export default function POSPage() {
               <RefreshCw className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Recurring
             </button>
             {/* Bulk Import — Admin/Manager only */}
-            <button title="Action"
+            <button title="Button"
               onClick={() => setShowBulkImport(true)}
               disabled={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager"}
               title={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" ? "Admin/Manager only" : "Bulk import products from CSV"}
@@ -3004,7 +3004,7 @@ export default function POSPage() {
             <div className="w-px h-5 bg-white/10 flex-shrink-0 mx-0.5" />
             {/* #1 Quick Re-add Last Sale */}
             {lastSaleCart && lastSaleCart.length > 0 && (
-              <button title="Action"
+              <button title="Button"
                 onClick={() => {
                   setCart(lastSaleCart.map(item => ({ ...item, id: `item-${Date.now()}-${Math.random()}` })));
                   toast({ title: `⚡ Re-added ${lastSaleCart.length} item(s) from last sale` });
@@ -3017,7 +3017,7 @@ export default function POSPage() {
               </button>
             )}
             {/* #2 Price Check Mode */}
-            <button title="Action"
+            <button title="Button"
               onClick={() => { setPriceCheckMode(!priceCheckMode); toast({ title: priceCheckMode ? "Price check OFF" : "Price check ON — scan/search to check prices without adding to cart", duration: 3000 }); if (!priceCheckMode) searchInputRef.current?.focus(); }}
               className={cn("group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition flex-shrink-0", priceCheckMode ? "bg-amber-500/40 ring-1 ring-amber-400/50" : "bg-white/5 hover:bg-white/15 ring-1 ring-white/10 hover:ring-white/20 backdrop-blur-sm")}
               title="Price check mode — scan barcode to see price without adding to cart"
@@ -3026,7 +3026,7 @@ export default function POSPage() {
             </button>
             {/* #6 Customer History */}
             {customerId && (
-              <button title="Action"
+              <button title="Button"
                 onClick={() => setShowCustomerHistory(true)}
                 className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition flex-shrink-0 bg-violet-500/20 hover:bg-violet-500/40 ring-1 ring-violet-400/30 hover:ring-violet-400/50 backdrop-blur-sm"
                 title="View this customer's purchase history"
@@ -3037,7 +3037,7 @@ export default function POSPage() {
             {/* Divider — manager tools */}
             <div className="w-px h-5 bg-white/10 flex-shrink-0 mx-0.5" />
             {/* #15 Shift Handover Notes */}
-            <button title="Action"
+            <button title="Button"
               onClick={() => setShowShiftNotes(true)}
               className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold whitespace-nowrap transition flex-shrink-0 bg-indigo-500/15 hover:bg-indigo-500/30 ring-1 ring-indigo-400/20 hover:ring-indigo-400/40 backdrop-blur-sm"
               title="Shift handover notes — leave messages for the next cashier"
@@ -3045,7 +3045,7 @@ export default function POSPage() {
               <Clock className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Shift Notes
             </button>
             {/* #16 Float Management */}
-            <button title="Action"
+            <button title="Button"
               onClick={() => setShowFloatManager(true)}
               disabled={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager"}
               title={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" ? "Admin/Manager only" : "Float management — opening/closing cash reconciliation"}
@@ -3054,7 +3054,7 @@ export default function POSPage() {
               <Wallet className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100" /> Float
             </button>
             {/* #20 Combo Deals */}
-            <button title="Action"
+            <button title="Button"
               onClick={() => setShowComboDeals(true)}
               disabled={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager"}
               title={loggedInUser?.role !== "admin" && loggedInUser?.role !== "manager" ? "Admin/Manager only" : "Combo deals — Buy 2 Get 1 Free, Meal Deals, etc."}
@@ -3074,7 +3074,7 @@ export default function POSPage() {
               {menus.filter(m => m.items.length > 0).map(menu => {
                 const isOpen = openMenu === menu.id;
                 return (
-                  <button title="Action"
+                  <button title="Button"
                     key={menu.id}
                     onClick={() => setOpenMenu(isOpen ? null : menu.id)}
                     className={cn(
@@ -3112,7 +3112,7 @@ export default function POSPage() {
                       return <div key={i} className="px-4 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 bg-slate-50">{item.header}</div>;
                     }
                     return (
-                      <button title="Action"
+                      <button title="Button"
                         key={i}
                         onClick={() => { item.action(); setOpenMenu(null); }}
                         className="w-full flex items-center gap-3 px-4 py-3 hover:bg-emerald-50 active:bg-emerald-100 text-slate-700 text-sm font-semibold transition text-left group"
@@ -3143,7 +3143,7 @@ export default function POSPage() {
           {categories.map(cat => {
             const count = cat.id === "all" ? products.length : products.filter(p => p.category === cat.id).length;
             return (
-              <button title="Action"
+              <button title="Button"
                 key={cat.id}
                 onClick={() => setActiveCategory(cat.id)}
                 className={cn(
@@ -3172,7 +3172,7 @@ export default function POSPage() {
       {view === "pos" && quickKeys.length > 0 && (
         <div className="quick-keys-bar flex-shrink-0">
           {quickKeys.map((qk, i) => (
-            <button title="Action" key={i} className="quick-key" onClick={() => {
+            <button title="Button" key={i} className="quick-key" onClick={() => {
               const product = products.find(p => p.id === qk.productId || p.sku === qk.sku);
               if (product) addToCart(product);
               else toast({ title: "Product not found", variant: "destructive" });
@@ -3242,7 +3242,7 @@ export default function POSPage() {
                 className="input-premium w-full h-9 pl-10 pr-9 text-sm"
               />
               {productSearch && (
-                <button title="Action"
+                <button title="Button"
                   onClick={() => setProductSearch("")}
                   className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 rounded-full bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition"
                 >
@@ -3410,7 +3410,7 @@ export default function POSPage() {
                       </span>
                     )}
                   </div>
-                  <button title="Action" onClick={() => setShowSidebar(false)} className="h-7 w-7 rounded-lg hover:bg-white/20 flex items-center justify-center transition">
+                  <button title="Close cart" className="h-7 w-7 rounded-lg hover:bg-white/20 flex items-center justify-center transition">
                     <X className="h-3.5 w-3.5" />
                   </button>
                 </div>
@@ -3478,7 +3478,7 @@ export default function POSPage() {
                     <span className="font-mono text-slate-700">0</span>
                   </div>
                   {heldOrders.length > 0 && (
-                    <button title="Action" className="ml-auto px-2 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-semibold flex items-center gap-1 hover:bg-amber-200 transition">
+                    <button title="Button" className="ml-auto px-2 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-semibold flex items-center gap-1 hover:bg-amber-200 transition">
                       <Pause className="h-2.5 w-2.5" />
                       {heldOrders.length} Held
                     </button>
@@ -3513,7 +3513,7 @@ export default function POSPage() {
                     placeholder="Type part number or scan barcode..."
                     className="flex-1 h-7 px-2 text-xs font-mono border border-slate-400 rounded outline-none focus:ring-2 focus:ring-blue-400 bg-white"
                   />
-                  <button title="Action"
+                  <button title="Button"
                     onClick={() => setShowStockList(true)}
                     className="h-7 px-2 rounded bg-blue-100 hover:bg-blue-200 text-blue-700 text-[10px] font-semibold flex items-center gap-1"
                   >
@@ -3573,11 +3573,11 @@ export default function POSPage() {
                                   </div>
                                   {/* Col 2: Qty with compact +/- buttons */}
                                   <div className="flex items-center gap-0.5 justify-center flex-shrink-0">
-                                    <button title="Action" onClick={(e) => { e.stopPropagation(); updateQuantity(index, -1); }} className="h-4 w-4 rounded bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition">
+                                    <button title="Button" onClick={(e) => { e.stopPropagation(); updateQuantity(index, -1); }} className="h-4 w-4 rounded bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition">
                                       <Minus className="h-2 w-2" />
                                     </button>
                                     <span className="w-6 text-center font-mono font-bold text-[10px]">{item.quantity.toFixed(item.unit === 'kg' ? 2 : 0)}</span>
-                                    <button title="Action" onClick={(e) => { e.stopPropagation(); updateQuantity(index, 1); }} className="h-4 w-4 rounded bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition">
+                                    <button title="Button" onClick={(e) => { e.stopPropagation(); updateQuantity(index, 1); }} className="h-4 w-4 rounded bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition">
                                       <Plus className="h-2 w-2" />
                                     </button>
                                   </div>
@@ -3597,7 +3597,7 @@ export default function POSPage() {
                                     <span className="font-mono font-bold text-[11px]">{formatGHS(lineFinal)}</span>
                                   </div>
                                   {/* Col 5: Delete button (separate column, doesn't affect Total alignment) */}
-                                  <button title="Action" onClick={(e) => { e.stopPropagation(); removeLine(index); }} className="h-4 w-4 rounded bg-rose-50 text-rose-400 hover:bg-rose-100 hover:text-rose-600 flex items-center justify-center transition flex-shrink-0">
+                                  <button title="Button" onClick={(e) => { e.stopPropagation(); removeLine(index); }} className="h-4 w-4 rounded bg-rose-50 text-rose-400 hover:bg-rose-100 hover:text-rose-600 flex items-center justify-center transition flex-shrink-0">
                                     <Trash2 className="h-2.5 w-2.5" />
                                   </button>
                                 </div>
@@ -3655,7 +3655,7 @@ export default function POSPage() {
                         <div className="text-[10px] font-bold text-amber-800 mb-1">HELD ORDERS (click to recall)</div>
                         <div className="flex flex-wrap gap-1">
                           {heldOrders.map((order, i) => (
-                            <button title="Action" key={i} onClick={() => recallOrder(i)} className="px-2 py-1 rounded-md bg-white ring-1 ring-amber-300 text-[10px] text-amber-700 hover:bg-amber-100 transition">
+                            <button title="Button" key={i} onClick={() => recallOrder(i)} className="px-2 py-1 rounded-md bg-white ring-1 ring-amber-300 text-[10px] text-amber-700 hover:bg-amber-100 transition">
                               #{order.invoice} · {order.items.length} items
                             </button>
                           ))}
@@ -3675,7 +3675,7 @@ export default function POSPage() {
                           <div className="flex items-center gap-1 py-1">
                             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mr-1">Quick:</span>
                             {[5, 10, 15, 20].map(pct => (
-                              <button title="Action"
+                              <button title="Button"
                                 key={pct}
                                 onClick={() => applyGlobalDiscount(pct)}
                                 className={`flex-1 h-7 rounded-lg text-[10px] font-bold transition ${
@@ -3687,7 +3687,7 @@ export default function POSPage() {
                                 {pct}%
                               </button>
                             ))}
-                            <button title="Action"
+                            <button title="Button"
                               onClick={() => {
                                 const custom = prompt("Enter discount percentage (0-100):", String(globalDiscount || ''));
                                 if (custom !== null) {
@@ -3704,7 +3704,7 @@ export default function POSPage() {
                               Custom
                             </button>
                             {globalDiscount > 0 && (
-                              <button title="Action"
+                              <button title="Button"
                                 onClick={() => applyGlobalDiscount(0)}
                                 className="h-7 px-2 rounded-lg text-[10px] font-bold bg-rose-50 text-rose-600 hover:bg-rose-100 ring-1 ring-rose-200 transition"
                                 title="Remove discount"
@@ -3743,7 +3743,7 @@ export default function POSPage() {
 
                     {/* Function Buttons — Premium grid with prominent PAY NOW */}
                     <div className="flex-shrink-0 grid grid-cols-4 gap-1.5 p-2 bg-slate-100/60">
-                      <button title="Action"
+                      <button title="Button"
                         onClick={() => setShowFindProduct(true)}
                         className="btn-premium col-span-4 h-10 rounded-xl gradient-premium-violet hover:shadow-glow-violet text-white font-bold text-xs flex items-center justify-center gap-1.5 transition"
                       >
@@ -3757,7 +3757,7 @@ export default function POSPage() {
                       <FuncBtn icon={<DollarSign className="h-3 w-3" />} label="Cash" sub="" onClick={handleOpenCash} variant="slate" />
                       <FuncBtn icon={<Trash2 className="h-3 w-3" />} label="Del Line" sub="Del" onClick={() => selectedCartIndex !== null ? removeLine(selectedCartIndex) : toast({ title: "Select a line first", variant: "destructive" })} variant="slate" />
                       <FuncBtn icon={<Check className="h-3 w-3" />} label="Enter" sub="↵" onClick={handleKeypadEnter} variant="emerald" />
-                      <button title="Action"
+                      <button title="Button"
                         onClick={() => setShowCartPreview(true)}
                         className="btn-premium col-span-1 h-10 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white font-bold text-[10px] flex items-center justify-center gap-0.5 transition"
                       >
@@ -3766,7 +3766,7 @@ export default function POSPage() {
                         <kbd className="ml-0.5 px-0.5 py-0.5 rounded bg-white/20 text-[8px] font-mono hidden lg:inline">F6</kbd>
                       </button>
                       {/* PAY NOW — prominent, spans 3 cols, larger, glowing */}
-                      <button title="Action"
+                      <button title="Button"
                         onClick={handlePay}
                         disabled={cart.length === 0}
                         className="btn-premium col-span-3 h-12 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-600 hover:via-teal-600 hover:to-emerald-700 text-white font-bold text-sm flex items-center justify-center gap-2 transition shadow-lg hover:shadow-xl disabled:opacity-40 disabled:cursor-not-allowed"
@@ -3783,7 +3783,7 @@ export default function POSPage() {
                 <div className="flex-shrink-0 p-1.5 bg-slate-800">
                   <div className="flex gap-1 mb-1">
                     {(["qty", "price", "barcode"] as const).map(mode => (
-                      <button title="Action"
+                      <button title="Button"
                         key={mode}
                         onClick={() => setActiveKeypadMode(mode)}
                         className={cn(
@@ -3827,7 +3827,7 @@ export default function POSPage() {
 
 
         {!showSidebar && (
-          <button title="Action"
+          <button title="Button"
             onClick={() => setShowSidebar(true)}
             className="absolute right-3 top-32 z-20 h-12 w-12 rounded-full bg-emerald-600 text-white shadow-lg flex items-center justify-center hover:bg-emerald-700 transition"
             style={{ boxShadow: '0 4px 20px -2px rgba(5, 150, 105, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1) inset' }}
@@ -4328,13 +4328,13 @@ export default function POSPage() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="px-5 py-3 bg-gradient-to-r from-indigo-600 to-blue-600 text-white flex items-center justify-between">
               <h3 className="font-bold text-sm flex items-center gap-2"><Clock className="h-4 w-4" /> Shift Handover Notes</h3>
-              <button title="Action" onClick={() => setShowShiftNotes(false)} className="h-7 w-7 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center"><X className="h-4 w-4" /></button>
+              <button title="Button" onClick={() => setShowShiftNotes(false)} className="h-7 w-7 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center"><X className="h-4 w-4" /></button>
             </div>
             <div className="p-5 space-y-3">
               <textarea id="shift-notes-input" rows={6} placeholder="Leave notes for the next cashier..." className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-indigo-400 resize-none" />
               <div className="flex gap-2">
-                <button title="Action" onClick={() => setShowShiftNotes(false)} className="flex-1 h-10 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold">Cancel</button>
-                <button title="Action" onClick={() => {
+                <button title="Button" onClick={() => setShowShiftNotes(false)} className="flex-1 h-10 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold">Cancel</button>
+                <button title="Button" onClick={() => {
                   const notes = (document.getElementById('shift-notes-input') as HTMLTextAreaElement)?.value;
                   if (notes?.trim()) {
                     try { localStorage.setItem('sylhn-shift-notes', JSON.stringify({ notes: notes.trim(), cashier: loggedInUser?.fullName || cashier, time: new Date().toISOString() })); } catch {}
@@ -4361,7 +4361,7 @@ export default function POSPage() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="px-5 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white flex items-center justify-between">
               <h3 className="font-bold text-sm flex items-center gap-2"><Wallet className="h-4 w-4" /> Float Management</h3>
-              <button title="Action" onClick={() => setShowFloatManager(false)} className="h-7 w-7 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center"><X className="h-4 w-4" /></button>
+              <button title="Button" onClick={() => setShowFloatManager(false)} className="h-7 w-7 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center"><X className="h-4 w-4" /></button>
             </div>
             <div className="p-5 space-y-3">
               <div className="grid grid-cols-2 gap-3">
@@ -4372,8 +4372,8 @@ export default function POSPage() {
                 <div className="flex justify-between text-xs"><span className="text-slate-600">Expected Cash (Float + Cash Sales):</span><span className="font-mono font-bold text-slate-800">{formatGHS(dailyTotal)}</span></div>
               </div>
               <div className="flex gap-2">
-                <button title="Action" onClick={() => setShowFloatManager(false)} className="flex-1 h-10 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold">Cancel</button>
-                <button title="Action" onClick={() => {
+                <button title="Button" onClick={() => setShowFloatManager(false)} className="flex-1 h-10 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold">Cancel</button>
+                <button title="Button" onClick={() => {
                   const opening = parseFloat((document.getElementById('float-opening') as HTMLInputElement)?.value || '0') || 0;
                   const closing = parseFloat((document.getElementById('float-closing') as HTMLInputElement)?.value || '0') || 0;
                   const expected = opening + dailyTotal; const variance = closing - expected;
@@ -4393,7 +4393,7 @@ export default function POSPage() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="px-5 py-3 bg-gradient-to-r from-violet-600 to-indigo-600 text-white flex items-center justify-between">
               <h3 className="font-bold text-sm flex items-center gap-2"><History className="h-4 w-4" /> {customerName} - History</h3>
-              <button title="Action" onClick={() => setShowCustomerHistory(false)} className="h-7 w-7 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center"><X className="h-4 w-4" /></button>
+              <button title="Button" onClick={() => setShowCustomerHistory(false)} className="h-7 w-7 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center"><X className="h-4 w-4" /></button>
             </div>
             <div className="flex-1 overflow-y-auto p-5">
               <CustomerHistoryInline customerId={customerId} customerName={customerName} />
@@ -4408,11 +4408,11 @@ export default function POSPage() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="px-5 py-3 bg-gradient-to-r from-rose-600 to-pink-600 text-white flex items-center justify-between">
               <h3 className="font-bold text-sm flex items-center gap-2"><Tag className="h-4 w-4" /> Combo Deals</h3>
-              <button title="Action" onClick={() => setShowComboDeals(false)} className="h-7 w-7 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center"><X className="h-4 w-4" /></button>
+              <button title="Button" onClick={() => setShowComboDeals(false)} className="h-7 w-7 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center"><X className="h-4 w-4" /></button>
             </div>
             <div className="p-5 space-y-3">
               <div className="text-xs text-slate-500 bg-amber-50 ring-1 ring-amber-200 rounded-lg p-2.5">Combo Deals let you create bundle pricing (e.g. "Coke + Chips = 15" instead of 18). Set up combos here, then apply at checkout.</div>
-              <button title="Action" onClick={() => { toast({ title: "Coming soon", description: "Combo deal builder is being developed" }); }} className="w-full p-3 rounded-xl border-2 border-dashed border-rose-200 hover:border-rose-400 hover:bg-rose-50 text-left transition">
+              <button title="Button" onClick={() => { toast({ title: "Coming soon", description: "Combo deal builder is being developed" }); }} className="w-full p-3 rounded-xl border-2 border-dashed border-rose-200 hover:border-rose-400 hover:bg-rose-50 text-left transition">
                 <div className="text-sm font-bold text-rose-700">+ Create Combo Deal</div>
                 <div className="text-[10px] text-slate-500 mt-0.5">Examples: "Buy 2 Get 1 Free", "Meal Deal: Coke + Chips = 15"</div>
               </button>
@@ -4442,7 +4442,7 @@ function FuncBtn({ icon, label, sub, onClick, variant }: {
     slate: "bg-white text-slate-700 hover:bg-slate-50 hover:shadow-premium-sm ring-slate-200/70",
   };
   return (
-    <button title="Action"
+    <button title="Button"
       onClick={onClick}
       className={cn("btn-premium h-10 rounded-lg flex flex-col items-center justify-center gap-0.5 ring-1 transition", variants[variant])}
     >
@@ -4467,7 +4467,7 @@ function KeypadBtn({ label, onClick, variant, wide, rowSpan }: {
   };
   const defaultClass = "bg-slate-700 text-white hover:bg-slate-600";
   return (
-    <button title="Action"
+    <button title="Button"
       onClick={onClick}
       className={cn(
         "h-8 rounded-lg font-bold text-sm flex items-center justify-center transition",
@@ -4707,7 +4707,7 @@ function PaymentModal({ total, subtotal, tax, discount, itemCount, invoiceNumber
             <div className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Payment Method</div>
             <div className="grid grid-cols-4 gap-2">
               {paymentMethods.map(pm => (
-                <button title="Action"
+                <button title="Button"
                   key={pm.id}
                   onClick={() => { setMethod(pm.id); setMomoStatus("idle"); setMomoError(null); }}
                   className={cn(
@@ -4720,7 +4720,7 @@ function PaymentModal({ total, subtotal, tax, discount, itemCount, invoiceNumber
                 </button>
               ))}
               {/* Credit payment option */}
-              <button title="Action"
+              <button title="Button"
                 onClick={() => { setMethod("credit"); setMomoStatus("idle"); setMomoError(null); }}
                 className={cn(
                   "flex flex-col items-center gap-1 py-3 rounded-xl ring-2 transition",
@@ -4749,7 +4749,7 @@ function PaymentModal({ total, subtotal, tax, discount, itemCount, invoiceNumber
               {/* #4 Premium quick-cash grid — 3 cols on mobile (bigger tap targets) + Exact + Round */}
               <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5 mt-2">
                 {quickCashAmounts.map(amt => (
-                  <button title="Action"
+                  <button title="Button"
                     key={amt}
                     onClick={() => setAmountInput(amt.toString())}
                     className={cn(
@@ -4763,13 +4763,13 @@ function PaymentModal({ total, subtotal, tax, discount, itemCount, invoiceNumber
               </div>
               {/* #4 Exact Amount + Round Up — always visible, larger */}
               <div className="grid grid-cols-2 gap-1.5 mt-1.5">
-                <button title="Action"
+                <button title="Button"
                   onClick={() => setAmountInput(total.toFixed(2))}
                   className="btn-premium py-3 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-xs font-bold text-emerald-700 transition"
                 >
                   Exact {formatGHS(total)}
                 </button>
-                <button title="Action"
+                <button title="Button"
                   onClick={() => setAmountInput(Math.ceil(total).toFixed(2))}
                   className="btn-premium py-3 rounded-lg bg-blue-100 hover:bg-blue-200 text-xs font-bold text-blue-700 transition"
                 >
@@ -4827,7 +4827,7 @@ function PaymentModal({ total, subtotal, tax, discount, itemCount, invoiceNumber
                       Enter the customer's phone number (e.g. 233241234567). Network is auto-detected. They'll receive a prompt to approve the payment.
                     </div>
                   </div>
-                  <button title="Action"
+                  <button title="Button"
                     onClick={initiateMomo}
                     disabled={momoPhone.length < 10}
                     className="btn-premium w-full h-12 rounded-xl gradient-premium-amber hover:shadow-glow-emerald disabled:opacity-50 text-white text-sm font-bold flex items-center justify-center gap-2 transition"
@@ -4861,7 +4861,7 @@ function PaymentModal({ total, subtotal, tax, discount, itemCount, invoiceNumber
                     Polling for confirmation...
                   </div>
                   {momoRef && momoRef.startsWith("manual-") && (
-                    <button title="Action"
+                    <button title="Button"
                       onClick={() => setMomoStatus("confirmed")}
                       className="btn-premium mt-4 w-full h-11 rounded-lg gradient-premium-emerald hover:shadow-glow-emerald text-white text-xs font-bold transition"
                     >
@@ -4886,7 +4886,7 @@ function PaymentModal({ total, subtotal, tax, discount, itemCount, invoiceNumber
                   <AlertTriangle className="h-8 w-8 text-rose-600 mx-auto mb-3" />
                   <div className="text-sm font-bold text-rose-800">Payment failed</div>
                   <div className="text-xs text-rose-600 mt-1">{momoError || "The customer rejected or the payment timed out"}</div>
-                  <button title="Action"
+                  <button title="Button"
                     onClick={() => { setMomoStatus("idle"); setMomoError(null); }}
                     className="btn-premium mt-3 w-full h-11 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-700 text-xs font-bold transition"
                   >
@@ -4906,7 +4906,7 @@ function PaymentModal({ total, subtotal, tax, discount, itemCount, invoiceNumber
                     <div className="text-sm font-semibold text-slate-700">Pay with Card via Paystack</div>
                     <div className="text-xs text-slate-500 mt-1">Visa, Mastercard, Verve — secure payment via Paystack</div>
                   </div>
-                  <button title="Action"
+                  <button title="Button"
                     onClick={async () => {
                       try {
                         const result = await initializePaystackTransaction({
@@ -4938,7 +4938,7 @@ function PaymentModal({ total, subtotal, tax, discount, itemCount, invoiceNumber
                     Set <code className="bg-slate-100 px-1 rounded">PAYSTACK_SECRET_KEY</code> in your environment variables to enable card payments.
                     For now, use an external card terminal and confirm manually.
                   </div>
-                  <button title="Action"
+                  <button title="Button"
                     onClick={() => { onComplete("card", total); }}
                     className="mt-3 w-full h-10 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm font-bold transition"
                   >
@@ -4988,7 +4988,7 @@ function PaymentModal({ total, subtotal, tax, discount, itemCount, invoiceNumber
 
         {/* Sticky CTA — always visible (premium mobile pattern) */}
         <div className="px-5 pb-5 pt-3 border-t border-slate-200 bg-white flex-shrink-0">
-          <button title="Action"
+          <button title="Button"
             onClick={handleComplete}
             disabled={!canComplete}
             className={cn(
@@ -5134,7 +5134,7 @@ function FindProductModal({ products, onAdd, onClose }: {
               className="input-premium w-full h-11 sm:h-12 pl-10 sm:pl-11 pr-10 text-sm sm:text-base"
             />
             {query && (
-              <button title="Action"
+              <button title="Button"
                 onClick={() => { setQuery(""); inputRef.current?.focus(); }}
                 className="absolute right-3 top-1/2 -translate-y-1/2 h-6 w-6 rounded-full bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition"
               >
@@ -5145,7 +5145,7 @@ function FindProductModal({ products, onAdd, onClose }: {
           {/* Group filters — horizontal scroll on mobile */}
           <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
             {stockGroups.map(g => (
-              <button title="Action"
+              <button title="Button"
                 key={g.id}
                 onClick={() => setGroupFilter(g.id)}
                 className={cn(
@@ -5235,7 +5235,7 @@ function FindProductModal({ products, onAdd, onClose }: {
                         <div className="text-[9px] sm:text-[10px] text-slate-400 whitespace-nowrap">/{product.unit} · {product.stock}</div>
                       </div>
                       {/* Quick Add Button */}
-                      <button title="Action"
+                      <button title="Button"
                         onClick={(e) => { e.stopPropagation(); handleQuickAdd(product); }}
                         className="h-8 w-8 rounded-lg bg-emerald-100 text-emerald-600 hover:bg-emerald-200 flex items-center justify-center transition flex-shrink-0"
                         title="Quick add (1 unit)"
@@ -5317,7 +5317,7 @@ function FindProductModal({ products, onAdd, onClose }: {
                 <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm ring-1 ring-slate-200">
                   <div className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Quantity to Add</div>
                   <div className="flex items-center gap-2">
-                    <button title="Action"
+                    <button title="Button"
                       onClick={() => setQuantity(q => Math.max(1, q - 1))}
                       className="h-10 w-10 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition flex-shrink-0"
                     >
@@ -5331,7 +5331,7 @@ function FindProductModal({ products, onAdd, onClose }: {
                       max={selectedProduct.stock}
                       className="flex-1 h-10 text-center text-base sm:text-lg font-bold font-mono border-2 border-slate-200 focus:border-blue-400 rounded-lg outline-none min-w-0"
                     />
-                    <button title="Action"
+                    <button title="Button"
                       onClick={() => setQuantity(q => Math.min(selectedProduct.stock, q + 1))}
                       className="h-10 w-10 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition flex-shrink-0"
                     >
@@ -5340,7 +5340,7 @@ function FindProductModal({ products, onAdd, onClose }: {
                   </div>
                   <div className="grid grid-cols-4 gap-1 mt-2">
                     {[1, 5, 10, 20].map(n => (
-                      <button title="Action"
+                      <button title="Button"
                         key={n}
                         onClick={() => setQuantity(n)}
                         className="py-1 rounded-md bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-700 transition"
@@ -5356,7 +5356,7 @@ function FindProductModal({ products, onAdd, onClose }: {
                 </div>
 
                 {/* Add to Cart Button */}
-                <button title="Action"
+                <button title="Button"
                   onClick={handleAddToCart}
                   disabled={selectedProduct.stock === 0}
                   className={cn(
@@ -5485,7 +5485,7 @@ function StockListPopup({ products, searchText, onSelect, onClose, onNew }: {
             placeholder="Type to search..."
             className="flex-1 h-7 px-2 text-xs border border-slate-400 rounded outline-none focus:ring-2 focus:ring-blue-400"
           />
-          <button title="Action"
+          <button title="Button"
             onClick={() => setSelectedIndex(0)}
             className="h-7 px-3 rounded border border-slate-400 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold"
           >
@@ -5554,23 +5554,23 @@ function StockListPopup({ products, searchText, onSelect, onClose, onNew }: {
 
         {/* Action Buttons */}
         <div className="flex-shrink-0 px-3 py-1.5 flex items-center gap-1.5 border-t border-slate-300" style={{ backgroundColor: '#E0F0E8' }}>
-          <button title="Action" onClick={handleSelect} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1" style={{ backgroundColor: '#4CAF50' }}>
+          <button title="Button" onClick={handleSelect} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1" style={{ backgroundColor: '#4CAF50' }}>
             <Check className="h-3 w-3" /> Select (Enter)
           </button>
-          <button title="Action" onClick={onNew} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1" style={{ backgroundColor: '#2196F3' }}>
+          <button title="Button" onClick={onNew} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1" style={{ backgroundColor: '#2196F3' }}>
             <Plus className="h-3 w-3" /> New
           </button>
-          <button title="Action" onClick={() => { if (!filtered[selectedIndex]) { toast({ title: "Select a product first", variant: "destructive" }); return; } toast({ title: "Product Picture", description: `${filtered[selectedIndex].emoji} ${filtered[selectedIndex].name}` }); }} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1" style={{ backgroundColor: '#9E9E9E' }}>
+          <button title="Button" onClick={() => { if (!filtered[selectedIndex]) { toast({ title: "Select a product first", variant: "destructive" }); return; } toast({ title: "Product Picture", description: `${filtered[selectedIndex].emoji} ${filtered[selectedIndex].name}` }); }} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1" style={{ backgroundColor: '#9E9E9E' }}>
             <ImageIcon className="h-3 w-3" /> Picture
           </button>
-          <button title="Action" onClick={() => { if (!filtered[selectedIndex]) { toast({ title: "Select a product first", variant: "destructive" }); return; } toast({ title: "Product History", description: `${filtered[selectedIndex].name} (${filtered[selectedIndex].sku})` }); }} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1" style={{ backgroundColor: '#FF9800' }}>
+          <button title="Button" onClick={() => { if (!filtered[selectedIndex]) { toast({ title: "Select a product first", variant: "destructive" }); return; } toast({ title: "Product History", description: `${filtered[selectedIndex].name} (${filtered[selectedIndex].sku})` }); }} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1" style={{ backgroundColor: '#FF9800' }}>
             <History className="h-3 w-3" /> History
           </button>
-          <button title="Action" onClick={() => { if (!filtered[selectedIndex]) { toast({ title: "Select a product first", variant: "destructive" }); return; } toast({ title: "Printing (F3)", description: `Printing label for ${filtered[selectedIndex].name}` }); }} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1" style={{ backgroundColor: '#9C27B0' }}>
+          <button title="Button" onClick={() => { if (!filtered[selectedIndex]) { toast({ title: "Select a product first", variant: "destructive" }); return; } toast({ title: "Printing (F3)", description: `Printing label for ${filtered[selectedIndex].name}` }); }} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1" style={{ backgroundColor: '#9C27B0' }}>
             <Printer className="h-3 w-3" /> Print (F3)
           </button>
           <div className="flex-1" />
-          <button title="Action" onClick={onClose} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1" style={{ backgroundColor: '#F44336' }}>
+          <button title="Close dialog" className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1" style={{ backgroundColor: '#F44336' }}>
             <X className="h-3 w-3" /> Close (Esc)
           </button>
         </div>
@@ -5740,11 +5740,11 @@ function CartPreviewModal({
                             <div className="flex items-center gap-2 mt-1 pl-7">
                               <span className="text-[8px] text-slate-400 font-mono flex-shrink-0">{formatGHS(item.price)}/{item.unit}</span>
                               <div className="flex items-center gap-0.5 flex-shrink-0">
-                                <button title="Action" onClick={() => onUpdateQuantity(index, item.quantity - 1)} className="h-5 w-5 rounded bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition">
+                                <button title="Button" onClick={() => onUpdateQuantity(index, item.quantity - 1)} className="h-5 w-5 rounded bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition">
                                   <Minus className="h-2.5 w-2.5" />
                                 </button>
                                 <span className="w-6 text-center font-mono font-semibold text-slate-700 text-[10px]">{item.quantity.toFixed(item.unit === 'kg' ? 2 : 0)}</span>
-                                <button title="Action" onClick={() => onUpdateQuantity(index, item.quantity + 1)} className="h-5 w-5 rounded bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition">
+                                <button title="Button" onClick={() => onUpdateQuantity(index, item.quantity + 1)} className="h-5 w-5 rounded bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition">
                                   <Plus className="h-2.5 w-2.5" />
                                 </button>
                               </div>
@@ -5758,7 +5758,7 @@ function CartPreviewModal({
                                 title="Line discount %"
                               />
                               <span className="text-[8px] text-violet-500 font-bold flex-shrink-0">%</span>
-                              <button title="Action" onClick={() => onRemoveLine(index)} className="ml-auto h-5 w-5 rounded-md bg-rose-100 text-rose-600 hover:bg-rose-200 flex items-center justify-center transition flex-shrink-0">
+                              <button title="Button" onClick={() => onRemoveLine(index)} className="ml-auto h-5 w-5 rounded-md bg-rose-100 text-rose-600 hover:bg-rose-200 flex items-center justify-center transition flex-shrink-0">
                                 <Trash2 className="h-2.5 w-2.5" />
                               </button>
                             </div>
@@ -5780,11 +5780,11 @@ function CartPreviewModal({
                           </div>
                           {/* Qty */}
                           <div className="hidden sm:flex items-center justify-center gap-1">
-                            <button title="Action" onClick={() => onUpdateQuantity(index, item.quantity - 1)} className="h-6 w-6 rounded bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition">
+                            <button title="Button" onClick={() => onUpdateQuantity(index, item.quantity - 1)} className="h-6 w-6 rounded bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition">
                               <Minus className="h-3 w-3" />
                             </button>
                             <span className="w-8 text-center font-mono font-semibold text-slate-700 text-xs">{item.quantity.toFixed(item.unit === 'kg' ? 2 : 0)}</span>
-                            <button title="Action" onClick={() => onUpdateQuantity(index, item.quantity + 1)} className="h-6 w-6 rounded bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition">
+                            <button title="Button" onClick={() => onUpdateQuantity(index, item.quantity + 1)} className="h-6 w-6 rounded bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition">
                               <Plus className="h-3 w-3" />
                             </button>
                           </div>
@@ -5797,7 +5797,7 @@ function CartPreviewModal({
                           {/* Line Total */}
                           <div className="hidden sm:block text-right font-mono font-semibold text-slate-900">{formatGHS(lineFinal)}</div>
                           {/* Remove */}
-                          <button title="Action" onClick={() => onRemoveLine(index)} className="hidden sm:flex h-7 w-7 rounded-md bg-rose-100 text-rose-600 hover:bg-rose-200 items-center justify-center transition mx-auto" title="Remove line">
+                          <button title="Button" onClick={() => onRemoveLine(index)} className="hidden sm:flex h-7 w-7 rounded-md bg-rose-100 text-rose-600 hover:bg-rose-200 items-center justify-center transition mx-auto" title="Remove line">
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
                         </motion.div>
@@ -5828,7 +5828,7 @@ function CartPreviewModal({
                   />
                   <span className="text-sm font-bold text-violet-600">%</span>
                   {globalDiscount > 0 && (
-                    <button title="Action" onClick={onClearDiscount} className="ml-auto px-2 py-1 rounded-md bg-rose-100 text-rose-600 hover:bg-rose-200 text-[9px] sm:text-[10px] font-semibold transition">Clear</button>
+                    <button title="Button" onClick={onClearDiscount} className="ml-auto px-2 py-1 rounded-md bg-rose-100 text-rose-600 hover:bg-rose-200 text-[9px] sm:text-[10px] font-semibold transition">Clear</button>
                   )}
                 </div>
                 <div className="mt-1.5 text-[9px] sm:text-[10px] text-slate-500">Applies to entire cart subtotal</div>
@@ -5858,22 +5858,22 @@ function CartPreviewModal({
 
             {/* Action Buttons — 2x2 grid on mobile, 4-col on desktop */}
             <div className="px-3 sm:px-4 py-2 sm:py-3 bg-white border-t border-slate-200 grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2">
-              <button title="Action" onClick={onContinueShopping} className="h-10 sm:h-12 rounded-lg sm:rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-[11px] sm:text-sm flex items-center justify-center gap-1 sm:gap-2 transition">
+              <button title="Button" onClick={onContinueShopping} className="h-10 sm:h-12 rounded-lg sm:rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-[11px] sm:text-sm flex items-center justify-center gap-1 sm:gap-2 transition">
                 <ArrowLeft className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 <span className="hidden sm:inline">Continue</span>
                 <span className="sm:hidden">Shop</span>
               </button>
-              <button title="Action" onClick={() => setConfirmClear(true)} className="h-10 sm:h-12 rounded-lg sm:rounded-xl bg-rose-100 hover:bg-rose-200 text-rose-700 font-semibold text-[11px] sm:text-sm flex items-center justify-center gap-1 sm:gap-2 transition">
+              <button title="Button" onClick={() => setConfirmClear(true)} className="h-10 sm:h-12 rounded-lg sm:rounded-xl bg-rose-100 hover:bg-rose-200 text-rose-700 font-semibold text-[11px] sm:text-sm flex items-center justify-center gap-1 sm:gap-2 transition">
                 <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 <span className="hidden sm:inline">Clear Cart</span>
                 <span className="sm:hidden">Clear</span>
               </button>
-              <button title="Action" onClick={() => window.print()} className="h-10 sm:h-12 rounded-lg sm:rounded-xl bg-white ring-1 ring-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-[11px] sm:text-sm flex items-center justify-center gap-1 sm:gap-2 transition">
+              <button title="Button" onClick={() => window.print()} className="h-10 sm:h-12 rounded-lg sm:rounded-xl bg-white ring-1 ring-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-[11px] sm:text-sm flex items-center justify-center gap-1 sm:gap-2 transition">
                 <Printer className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 <span className="hidden sm:inline">Print Quote</span>
                 <span className="sm:hidden">Print</span>
               </button>
-              <button title="Action" onClick={onProceedToPayment} className="h-10 sm:h-12 rounded-lg sm:rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-[11px] sm:text-sm flex items-center justify-center gap-1 sm:gap-2 transition shadow-md">
+              <button title="Button" onClick={onProceedToPayment} className="h-10 sm:h-12 rounded-lg sm:rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-[11px] sm:text-sm flex items-center justify-center gap-1 sm:gap-2 transition shadow-md">
                 <CreditCard className="h-4 w-4 sm:h-5 sm:w-5" />
                 <span className="hidden sm:inline">PROCEED TO PAYMENT</span>
                 <span className="sm:hidden">PAY</span>
@@ -5918,7 +5918,7 @@ function CartPreviewModal({
                 </div>
                 <div className="flex gap-2 mt-4">
                   <Button variant="outline" className="flex-1" onClick={() => setConfirmClear(false)}>Cancel</Button>
-                  <button title="Action"
+                  <button title="Button"
                     onClick={() => { onClearCart(); setConfirmClear(false); }}
                     className="flex-1 h-10 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-semibold text-sm transition"
                   >
@@ -6241,31 +6241,31 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
           <div className="flex-shrink-0 px-4 py-3 border-t border-slate-200 bg-slate-50 space-y-2">
             {/* Row 1: Print, CSV, PDF, WhatsApp */}
             <div className="grid grid-cols-4 gap-2">
-              <button title="Action" onClick={() => setPrintMode(true)} className="h-10 rounded-xl bg-white ring-1 ring-slate-200 hover:bg-slate-100 text-slate-700 font-semibold text-xs flex items-center justify-center gap-1">
+              <button title="Button" onClick={() => setPrintMode(true)} className="h-10 rounded-xl bg-white ring-1 ring-slate-200 hover:bg-slate-100 text-slate-700 font-semibold text-xs flex items-center justify-center gap-1">
                 <Printer className="h-4 w-4" /> Print
               </button>
-              <button title="Action" onClick={() => downloadFile(csvContent, `receipt-${payment.invoiceNumber}.csv`, 'text/csv')} className="h-10 rounded-xl bg-white ring-1 ring-slate-200 hover:bg-slate-100 text-slate-700 font-semibold text-xs flex items-center justify-center gap-1">
+              <button title="Button" onClick={() => downloadFile(csvContent, `receipt-${payment.invoiceNumber}.csv`, 'text/csv')} className="h-10 rounded-xl bg-white ring-1 ring-slate-200 hover:bg-slate-100 text-slate-700 font-semibold text-xs flex items-center justify-center gap-1">
                 <FileText className="h-4 w-4" /> CSV
               </button>
-              <button title="Action" onClick={() => { setPrintMode(true); toast({ title: "Select 'Save as PDF' in print dialog" }); }} className="h-10 rounded-xl bg-white ring-1 ring-slate-200 hover:bg-slate-100 text-slate-700 font-semibold text-xs flex items-center justify-center gap-1">
+              <button title="Button" onClick={() => { setPrintMode(true); toast({ title: "Select 'Save as PDF' in print dialog" }); }} className="h-10 rounded-xl bg-white ring-1 ring-slate-200 hover:bg-slate-100 text-slate-700 font-semibold text-xs flex items-center justify-center gap-1">
                 <FileText className="h-4 w-4" /> PDF
               </button>
-              <button title="Action" onClick={() => setShowWhatsApp(true)} className="h-10 rounded-xl bg-[#25D366] hover:bg-[#1ebe57] text-white font-semibold text-xs flex items-center justify-center gap-1">
+              <button title="Button" onClick={() => setShowWhatsApp(true)} className="h-10 rounded-xl bg-[#25D366] hover:bg-[#1ebe57] text-white font-semibold text-xs flex items-center justify-center gap-1">
                 <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/></svg>
                 WhatsApp
               </button>
             </div>
             {/* Row 2: Email Receipt (new!) + Show QR */}
             <div className="grid grid-cols-2 gap-2">
-              <button title="Action" onClick={() => setShowEmail(true)} className="h-10 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs flex items-center justify-center gap-1">
+              <button title="Button" onClick={() => setShowEmail(true)} className="h-10 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs flex items-center justify-center gap-1">
                 <Mail className="h-4 w-4" /> Email Receipt
               </button>
-              <button title="Action" onClick={() => setShowQR(s => !s)} className={`h-10 rounded-xl ring-1 ring-slate-200 text-slate-700 font-semibold text-xs flex items-center justify-center gap-1 ${showQR ? 'bg-emerald-100 ring-emerald-300 text-emerald-700' : 'bg-white hover:bg-slate-100'}`}>
+              <button title="Button" onClick={() => setShowQR(s => !s)} className={`h-10 rounded-xl ring-1 ring-slate-200 text-slate-700 font-semibold text-xs flex items-center justify-center gap-1 ${showQR ? 'bg-emerald-100 ring-emerald-300 text-emerald-700' : 'bg-white hover:bg-slate-100'}`}>
                 {showQR ? 'Hide QR' : 'Show QR'}
               </button>
             </div>
             {/* Row 3: New Sale */}
-            <button title="Action" onClick={onClose} className="w-full h-10 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold text-xs flex items-center justify-center gap-1 hover:shadow-lg">
+            <button title="Close dialog" className="w-full h-10 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold text-xs flex items-center justify-center gap-1 hover:shadow-lg">
               <Check className="h-4 w-4" /> New Sale
             </button>
           </div>
@@ -6281,7 +6281,7 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
                 <Mail className="h-5 w-5" />
                 <span className="font-bold text-sm">Email Receipt</span>
               </div>
-              <button title="Action" onClick={() => setShowEmail(false)} className="h-7 w-7 rounded-lg bg-white/20 hover:bg-white/30 flex items-center justify-center">
+              <button title="Button" onClick={() => setShowEmail(false)} className="h-7 w-7 rounded-lg bg-white/20 hover:bg-white/30 flex items-center justify-center">
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -6305,7 +6305,7 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
               </div>
             </div>
             <div className="flex-shrink-0 p-4 border-t border-slate-200">
-              <button title="Action"
+              <button title="Button"
                 onClick={handleSendEmailReceipt}
                 disabled={sendingEmail || !emailAddr}
                 className="w-full h-11 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold text-sm flex items-center justify-center gap-2"
@@ -6323,10 +6323,10 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
           <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 bg-slate-800 text-white print:hidden">
             <span className="text-sm font-bold">Receipt Preview — {payment.invoiceNumber}</span>
             <div className="flex gap-2">
-              <button title="Action" onClick={() => window.print()} className="h-9 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5">
+              <button title="Button" onClick={() => window.print()} className="h-9 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5">
                 <Printer className="h-4 w-4" /> Print / Save as PDF
               </button>
-              <button title="Action" onClick={() => setPrintMode(false)} className="h-9 px-4 rounded-lg bg-slate-600 hover:bg-slate-700 text-white text-xs font-bold flex items-center gap-1.5">
+              <button title="Button" onClick={() => setPrintMode(false)} className="h-9 px-4 rounded-lg bg-slate-600 hover:bg-slate-700 text-white text-xs font-bold flex items-center gap-1.5">
                 <X className="h-4 w-4" /> Close
               </button>
             </div>
@@ -6344,7 +6344,7 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
                 <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/></svg>
                 <span className="font-bold text-sm">Send via WhatsApp</span>
               </div>
-              <button title="Action" onClick={() => setShowWhatsApp(false)} className="h-7 w-7 rounded-lg bg-white/20 hover:bg-white/30 flex items-center justify-center">
+              <button title="Button" onClick={() => setShowWhatsApp(false)} className="h-7 w-7 rounded-lg bg-white/20 hover:bg-white/30 flex items-center justify-center">
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -6365,10 +6365,10 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
             </div>
             <div className="flex-shrink-0 p-4 border-t border-slate-200 space-y-2">
               <div className="flex gap-2">
-                <button title="Action" onClick={() => copyToClipboard(waLink)} className="btn-premium flex-1 h-10 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold flex items-center justify-center gap-1.5">
+                <button title="Button" onClick={() => copyToClipboard(waLink)} className="btn-premium flex-1 h-10 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold flex items-center justify-center gap-1.5">
                   {copied ? <><Check className="h-3.5 w-3.5" /> Copied!</> : <><FileText className="h-3.5 w-3.5" /> Copy Link</>}
                 </button>
-                <button title="Action" onClick={() => copyToClipboard(waText)} className="btn-premium flex-1 h-10 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold flex items-center justify-center gap-1.5">
+                <button title="Button" onClick={() => copyToClipboard(waText)} className="btn-premium flex-1 h-10 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold flex items-center justify-center gap-1.5">
                   <FileText className="h-3.5 w-3.5" /> Copy Message
                 </button>
                 <a href={waLink} target="_blank" rel="noopener noreferrer" className="btn-premium flex-1 h-10 rounded-xl bg-[#25D366] hover:bg-[#1ebe57] text-white text-xs font-bold flex items-center justify-center gap-1.5 no-underline">
@@ -6376,7 +6376,7 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
                 </a>
               </div>
               <div className="flex gap-2">
-                <button title="Action" onClick={() => copyToClipboard(verifyUrl)} className="btn-premium flex-1 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold flex items-center justify-center gap-1.5 ring-1 ring-slate-200">
+                <button title="Button" onClick={() => copyToClipboard(verifyUrl)} className="btn-premium flex-1 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold flex items-center justify-center gap-1.5 ring-1 ring-slate-200">
                   <FileText className="h-3.5 w-3.5" /> Copy Receipt URL
                 </button>
                 <a href={verifyUrl} target="_blank" rel="noopener noreferrer" className="btn-premium flex-1 h-10 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 no-underline">
@@ -6510,7 +6510,7 @@ function StandardCalculator({ onClose }: { onClose: () => void }) {
       onClick();
     };
     return (
-      <button title="Action"
+      <button title="Button"
         onPointerDown={handlePress}
         style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
         className={cn(
@@ -6710,7 +6710,7 @@ function PriceTagsPrinter({ onClose }: { onClose: () => void }) {
             <h2 className="text-base font-bold tracking-tight">Price Tags / Shelf Labels</h2>
           </div>
           <div className="flex items-center gap-2 relative z-10">
-            <button title="Action" onClick={printTags} disabled={selected.size === 0} className="btn-premium h-9 px-3 rounded-lg gradient-premium-emerald hover:shadow-glow-emerald disabled:opacity-40 text-white text-xs font-bold flex items-center gap-1.5 transition">
+            <button title="Button" onClick={printTags} disabled={selected.size === 0} className="btn-premium h-9 px-3 rounded-lg gradient-premium-emerald hover:shadow-glow-emerald disabled:opacity-40 text-white text-xs font-bold flex items-center gap-1.5 transition">
               <Printer className="h-3.5 w-3.5" /> Print ({selected.size})
             </button>
             <button aria-label="x" onClick={onClose} className="h-9 w-9 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center transition">
@@ -6722,7 +6722,7 @@ function PriceTagsPrinter({ onClose }: { onClose: () => void }) {
           {loading ? <div className="flex justify-center py-10"><Loader2 className="h-8 w-8 animate-spin text-violet-500" /></div> :
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
               {products.map(p => (
-                <button title="Action" key={p.id} onClick={() => { const next = new Set(selected); next.has(p.id) ? next.delete(p.id) : next.add(p.id); setSelected(next); }}
+                <button title="Button" key={p.id} onClick={() => { const next = new Set(selected); next.has(p.id) ? next.delete(p.id) : next.add(p.id); setSelected(next); }}
                   className={cn("product-card-premium !p-3 text-center transition", selected.has(p.id) ? "!border-emerald-400 !bg-emerald-50/40 ring-2 ring-emerald-400/30" : "")}>
                   <div className="text-2xl">{p.emoji}</div>
                   <div className="text-xs font-semibold text-slate-700 truncate mt-1">{p.name}</div>
