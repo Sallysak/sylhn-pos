@@ -11,7 +11,7 @@ export const maxDuration = 300
 
 export async function GET(req: NextRequest) {
   const secret = req.nextUrl.searchParams.get('secret')
-  if (secret !== 'sylhn-seed-2026') {
+  if (secret !== (process.env.SEED_DEMO_SECRET || 'sylhn-seed-2026')) {
     return NextResponse.json({ error: 'Invalid secret' }, { status: 403 })
   }
 

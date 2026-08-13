@@ -97,24 +97,24 @@ if (!globalForPrisma.__prismaDbPush) {
         // Check Product.imageUrl exists (commonly missing after schema updates)
         await db.product.findFirst({ select: { imageUrl: true }, take: 1 });
       } catch {
-        console.log('[db] Product.imageUrl column missing — needs sync');
+        console.debug('[db] Product.imageUrl column missing — needs sync');
         needsSync = true;
       }
       // Check Email table exists
       try {
         await db.email.count();
       } catch {
-        console.log('[db] Email table missing — needs sync');
+        console.debug('[db] Email table missing — needs sync');
         needsSync = true;
       }
     } catch (e: any) {
       // SystemUser table doesn't exist — definitely needs sync
       needsSync = true;
-      console.log('[db] SystemUser table not found — needs sync');
+      console.debug('[db] SystemUser table not found — needs sync');
     }
 
     if (needsSync) {
-      console.log('[db] Schema out of sync. Running prisma db push...');
+      console.debug('[db] Schema out of sync. Running prisma db push...');
       try {
         const { exec } = await import('child_process');
         const { existsSync } = await import('fs');
@@ -141,12 +141,12 @@ if (!globalForPrisma.__prismaDbPush) {
               console.error('[db] prisma db push stderr:', stderr);
               reject(err);
             } else {
-              console.log('[db] prisma db push output:', stdout);
+              console.debug('[db] prisma db push output:', stdout);
               resolve();
             }
           });
         });
-        console.log('[db] Schema synced. Seeding default users...');
+        console.debug('[db] Schema synced. Seeding default users...');
         await seedDefaultUsers();
       } catch (pushErr: any) {
         console.error('[db] prisma db push failed:', pushErr?.message || pushErr);
@@ -212,7 +212,7 @@ export async function seedDefaultUsers(): Promise<void> {
       create: { id: crypto.randomUUID(), ...u },
     });
   }
-  console.log('[db] Default users ensured: admin/admin123, manager/manager123, cashier/cashier123');
+  console.debug('[db] Default users ensured: admin/admin123, manager/manager123, cashier/cashier123');
 }
 
 /**

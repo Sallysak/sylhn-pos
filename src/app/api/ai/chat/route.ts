@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
+import { db } from '@/lib/db'
+import { requireAuth } from '@/lib/auth'
+import { rateLimitApiRead, rateLimitResponse, getClientIp } from '@/lib/rate-limit'
 
-const prisma = new PrismaClient()
+export const runtime = 'nodejs'
+export const maxDuration = 30
 
-// System prompt — defines the AI's role
 const SYSTEM_PROMPT = `You are SYLHN AI, an intelligent assistant for the SYLHN POS retail system in Ghana.
 
 Your role:
@@ -36,6 +38,12 @@ You have access to real-time business data when the user asks questions about:
 Always be helpful, professional, and focused on helping the business succeed.`
 
 export async function POST(req: NextRequest) {
+  try { await requireAuth(); } catch (e) { return e as Response; }
+  
+  const ip = getClientIp(req);
+  const rl = rateLimitApiRead(ip);
+  if (!rl.allowed) return rateLimitResponse(rl);
+
   try {
     const { messages, context } = await req.json()
 
@@ -46,19 +54,16 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Get business context if requested
     let businessContext = ''
     if (context?.includeBusinessData) {
       businessContext = await gatherBusinessContext(context)
     }
 
-    // Build the full message list
     const fullMessages = [
       { role: 'system', content: SYSTEM_PROMPT + (businessContext ? `\n\n--- CURRENT BUSINESS DATA ---\n${businessContext}` : '') },
       ...messages,
     ]
 
-    // Call Groq API (OpenAI-compatible)
     const response = await fetch(`${process.env.AI_BASE_URL}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -100,16 +105,14 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// Gather real-time business data for context
 async function gatherBusinessContext(options: any): Promise<string> {
   const parts: string[] = []
   const now = new Date()
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
 
   try {
-    // Today's sales summary
     if (options.includeSales !== false) {
-      const todaySales = await prisma.sale.findMany({
+      const todaySales = await db.sale.findMany({
         where: { createdAt: { gte: todayStart } },
         include: { items: true },
       })
@@ -123,28 +126,26 @@ async function gatherBusinessContext(options: any): Promise<string> {
 - Items Sold: ${itemsSold}`)
     }
 
-    // Low stock alerts
     if (options.includeStock !== false) {
-      const lowStock = await prisma.product.findMany({
+      const lowStock = await db.product.findMany({
         where: { quantity: { lte: 10 } },
         take: 10,
         orderBy: { quantity: 'asc' },
+        select: { id: true, name: true, sku: true, emoji: true, quantity: true, reorderLevel: true, unit: true, price: true },
       })
       if (lowStock.length > 0) {
         parts.push(`LOW STOCK ALERT (${lowStock.length} items):
- ${lowStock.map(p => `- ${p.name}: ${p.quantity} ${p.unit || 'pcs'} remaining (reorder at ${p.reorderLevel || 10})`).join('\n')}`)
+${lowStock.map(p => `- ${p.name}: ${p.quantity} ${p.unit || 'pcs'} remaining (reorder at ${p.reorderLevel || 10})`).join('\n')}`)
       }
 
-      // Total stock value
-      const allProducts = await prisma.product.findMany()
+      const allProducts = await db.product.findMany()
       const stockValue = allProducts.reduce((sum, p) => sum + (p.quantity || 0) * (p.costPrice || p.price || 0), 0)
       parts.push(`TOTAL STOCK VALUE: GHS ${stockValue.toFixed(2)} (${allProducts.length} products)`)
     }
 
-    // Top selling products (last 30 days)
     if (options.includeTopProducts !== false) {
       const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-      const recentSales = await prisma.sale.findMany({
+      const recentSales = await db.sale.findMany({
         where: { createdAt: { gte: thirtyDaysAgo } },
         include: { items: true },
       })
@@ -164,11 +165,11 @@ async function gatherBusinessContext(options: any): Promise<string> {
         .slice(0, 5)
       if (top5.length > 0) {
         parts.push(`TOP 5 PRODUCTS (last 30 days):
- ${top5.map((p, i) => `${i + 1}. ${p.name} — ${p.qty} sold, GHS ${p.revenue.toFixed(2)} revenue`).join('\n')}`)
+${top5.map((p, i) => `${i + 1}. ${p.name} — ${p.qty} sold, GHS ${p.revenue.toFixed(2)} revenue`).join('\n')}`)
       }
     }
-  } catch (e: any) {
-    console.error('Error gathering context:', e)
+  } catch (e) {
+    console.debug('Error gathering context:', e)
   }
 
   return parts.join('\n\n')

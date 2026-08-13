@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}))
     const secret = body.secret || req.nextUrl.searchParams.get('secret')
 
-    if (secret !== 'sylhn-sync-2026') {
+    if (secret !== (process.env.ADMIN_SYNC_SECRET || 'sylhn-sync-2026')) {
       return NextResponse.json({ error: 'Invalid sync secret' }, { status: 403 })
     }
 
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
       dbUrl += (dbUrl.includes('?') ? '&' : '?') + 'sslmode=require'
     }
 
-    console.log('[sync-schema] Running prisma db push with DIRECT_URL...')
+    console.debug('[sync-schema] Running prisma db push with DIRECT_URL...')
 
     const output = await new Promise<string>((resolve, reject) => {
       const timeout = setTimeout(() => {
@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
             console.error('[sync-schema] stderr:', stderr)
             reject(new Error(stderr || err.message))
           } else {
-            console.log('[sync-schema] stdout:', stdout)
+            console.debug('[sync-schema] stdout:', stdout)
             resolve(stdout)
           }
         }

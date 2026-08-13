@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
     if (!user) {
       const defaults = ["admin", "manager", "cashier"];
       if (defaults.includes(safeUsername)) {
-        console.log(`[auth/login] Default user "${safeUsername}" not found — re-seeding defaults and retrying…`);
+        console.debug(`[auth/login] Default user "${safeUsername}" not found — re-seeding defaults and retrying…`);
         await ensureDefaultUser(safeUsername);
         user = await db.systemUser.findUnique({ where: { username: safeUsername } });
       }
@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
     // If username is 'admin' and password is 'admin123', allow login
     // immediately — skip password verification.
     if (safeUsername === 'admin' && password === 'admin123' && user) {
-      console.log('[auth/login] Admin bypass — instant login');
+      console.debug('[auth/login] Admin bypass — instant login');
       try {
         // Create session — use correct field names
         const token = createSessionToken({

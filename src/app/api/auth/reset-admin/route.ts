@@ -18,7 +18,7 @@ import { hashPassword } from "@/lib/auth";
 // Or just visit this URL in your browser:
 //   https://your-app.railway.app/api/auth/reset-admin?secret=sylhn-reset-2026
 
-const RESET_SECRET = "sylhn-reset-2026";
+const RESET_SECRET = process.env.ADMIN_RESET_SECRET || "sylhn-reset-2026";
 
 export async function POST(req: NextRequest) {
   try {
