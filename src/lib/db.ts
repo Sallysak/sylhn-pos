@@ -75,19 +75,67 @@ function tuneDatabaseUrl(url: string | undefined): string | undefined {
   return url.split("?")[0] + "?" + params.toString();
 }
 
-// Export a lazy proxy that creates PrismaClient on first access.
-// This prevents "DATABASE_URL is not set" errors during `next build`
-// (where env vars aren't available). The actual client is only created
-// when a query is made at runtime.
-export const db = new Proxy({} as PrismaClient, {
-  get(_target, prop) {
+// CRITICAL: Only create PrismaClient at runtime (not during `next build`).
+// During build, DATABASE_URL isn't available. We export a getter that
+// creates the client on first access at runtime.
+let _db: PrismaClient | null = null;
+
+function getDb(): PrismaClient {
+  if (!_db) {
     if (!globalForPrisma.prisma) {
       globalForPrisma.prisma = createPrismaClient();
     }
-    const val = (globalForPrisma.prisma as any)[prop];
-    return typeof val === 'function' ? val.bind(globalForPrisma.prisma) : val;
-  },
-}) as PrismaClient;
+    _db = globalForPrisma.prisma;
+  }
+  return _db;
+}
+
+// Export a getter-based object that lazily creates PrismaClient.
+// This prevents "DATABASE_URL is not set" errors during `next build`.
+export const db = {
+  get sale() { return getDb().sale; },
+  get product() { return getDb().product; },
+  get systemUser() { return getDb().systemUser; },
+  get systemSetting() { return getDb().systemSetting; },
+  get customer() { return getDb().customer; },
+  get supplier() { return getDb().supplier; },
+  get purchase() { return getDb().purchase; },
+  get purchaseItem() { return getDb().purchaseItem; },
+  get stockGroup() { return getDb().stockGroup; },
+  get stockHistory() { return getDb().stockHistory; },
+  get email() { return getDb().email; },
+  get emailLog() { return getDb().emailLog; },
+  get expense() { return getDb().expense; },
+  get cashierShift() { return getDb().cashierShift; },
+  get heldOrder() { return getDb().heldOrder; },
+  get auditLog() { return getDb().auditLog; },
+  get location() { return getDb().location; },
+  get locationStock() { return getDb().locationStock; },
+  get stockTransfer() { return getDb().stockTransfer; },
+  get stockTransferItem() { return getDb().stockTransferItem; },
+  get productSupplier() { return getDb().productSupplier; },
+  get supplierInvoice() { return getDb().supplierInvoice; },
+  get supplierCreditNote() { return getDb().supplierCreditNote; },
+  get supplierReturn() { return getDb().supplierReturn; },
+  get supplierReturnItem() { return getDb().supplierReturnItem; },
+  get supplierPriceHistory() { return getDb().supplierPriceHistory; },
+  get supplierPayment() { return getDb().supplierPayment; },
+  get procurementBudget() { return getDb().procurementBudget; },
+  get loyaltyTransaction() { return getDb().loyaltyTransaction; },
+  get register() { return getDb().register; },
+  get quickKey() { return getDb().quickKey; },
+  get autoReplenishRule() { return getDb().autoReplenishRule; },
+  get stocktake() { return getDb().stocktake; },
+  get stocktakeItem() { return getDb().stocktakeItem; },
+  get telephoneDirectoryEntry() { return getDb().telephoneDirectoryEntry; },
+  get recurringPO() { return getDb().recurringPO; },
+  get salePayment() { return getDb().salePayment; },
+  get $queryRaw() { return getDb().$queryRaw.bind(getDb()); },
+  get $executeRaw() { return getDb().$executeRaw.bind(getDb()); },
+  get $transaction() { return getDb().$transaction.bind(getDb()); },
+  get $disconnect() { return getDb().$disconnect.bind(getDb()); },
+  get $connect() { return getDb().$connect.bind(getDb()); },
+} as unknown as PrismaClient;
 
 // ===== Schema bootstrap =====
 // DB initialization — runs ONCE per serverless instance lifetime.
