@@ -37,21 +37,15 @@ const globalForPrisma = globalThis as unknown as {
   __prismaDbPush?: Promise<void>
 }
 
-export const db =
-  globalForPrisma.prisma ??
-  new PrismaClient({
+// CRITICAL: Only create PrismaClient if DATABASE_URL is set.
+// During `next build`, env vars aren't available, so we use a lazy proxy
+// that defers PrismaClient creation until the first actual query at runtime.
+function createPrismaClient(): PrismaClient {
+  return new PrismaClient({
     log: process.env.LOG_QUERIES === '1' ? ['query', 'error', 'warn'] : ['error', 'warn'],
-    // Connection pool tuning for serverless (Neon Postgres / Vercel Postgres).
-    // Neon's free tier allows ~20 concurrent connections; without tuning,
-    // each serverless instance would open num_cpus * 2 + 1 connections and
-    // quickly exhaust the pool across cold starts.
-    //
-    // We append connection_limit=5 + pool_timeout=10s to the URL if the user
-    // hasn't already set them. This keeps each serverless instance to ≤5
-    // connections, so 4 concurrent instances = 20 connections (the Neon limit).
     datasources: {
       db: {
-        url: tuneDatabaseUrl(process.env.DATABASE_URL),
+        url: tuneDatabaseUrl(process.env.DATABASE_URL || ''),
       },
     },
   })
@@ -79,6 +73,20 @@ function tuneDatabaseUrl(url: string | undefined): string | undefined {
   }
   return url.split("?")[0] + "?" + params.toString();
 }
+
+// Export a lazy proxy that creates PrismaClient on first access.
+// This prevents "DATABASE_URL is not set" errors during `next build`
+// (where env vars aren't available). The actual client is only created
+// when a query is made at runtime.
+export const db = new Proxy({} as PrismaClient, {
+  get(_target, prop) {
+    if (!globalForPrisma.prisma) {
+      globalForPrisma.prisma = createPrismaClient();
+    }
+    const val = (globalForPrisma.prisma as any)[prop];
+    return typeof val === 'function' ? val.bind(globalForPrisma.prisma) : val;
+  },
+}) as PrismaClient;
 
 // ===== Schema bootstrap =====
 // DB initialization — runs ONCE per serverless instance lifetime.
