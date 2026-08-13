@@ -49,6 +49,7 @@ function createPrismaClient(): PrismaClient {
       },
     },
   })
+}
 
 /**
  * Append serverless-friendly connection pool params to a Postgres URL.
