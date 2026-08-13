@@ -22,13 +22,13 @@ import {
   COMPANY, CURRENCY, formatGHS, stockGroups, products as ALL_PRODUCTS,
   initialStockHistory, type Product, type StockGroup, type StockHistoryEntry,
 } from "@/lib/pos-data";
-import { Truck, generateReport, exportReportToPDF, exportReportToExcel, exportReportToCSV, printReport } from "@/lib/report-utils";
+import { generateReport, exportReportToPDF, exportReportToExcel, exportReportToCSV, printReport } from "@/lib/report-utils";
 import type { StockView, ReportData } from "@/lib/pos-types";
-import { Truck, LabelPrinter } from "@/components/label-printer";
-import { Truck, PopupWindow } from "@/components/popup-window";
+import { LabelPrinter } from "@/components/label-printer";
+import { PopupWindow } from "@/components/popup-window";
 import { StockQuantityAdjustment } from "@/components/stock-quantity-adjustment";
-import { Truck, ProductScanner, type ScannedProduct } from "@/components/product-scanner";
-import { Truck, authedFetch } from "@/lib/client-auth";
+import { ProductScanner, type ScannedProduct } from "@/components/product-scanner";
+import { authedFetch } from "@/lib/client-auth";
 
 interface StockManagementProps {
   onBack: () => void;
