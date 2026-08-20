@@ -94,6 +94,7 @@ function getDb(): PrismaClient {
 // This prevents "DATABASE_URL is not set" errors during `next build`.
 export const db = {
   get sale() { return getDb().sale; },
+  get saleItem() { return getDb().saleItem; },
   get product() { return getDb().product; },
   get systemUser() { return getDb().systemUser; },
   get systemSetting() { return getDb().systemSetting; },

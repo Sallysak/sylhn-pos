@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
-
-const prisma = new PrismaClient()
-
+import { db } from '@/lib/db'
 // Default templates that ship with the system
 const DEFAULT_TEMPLATES = [
   {
@@ -90,7 +87,7 @@ const DEFAULT_TEMPLATES = [
 export async function GET() {
   try {
     // Get custom templates from database
-    const customTemplates = await prisma.systemSetting.findMany({
+    const customTemplates = await db.systemSetting.findMany({
       where: { key: { startsWith: 'email_template_' } }
     })
 
@@ -125,7 +122,7 @@ export async function POST(req: NextRequest) {
     const id = `custom_${Date.now()}`
     const template = { id, name, subject, body, category: category || 'custom' }
 
-    await prisma.systemSetting.create({
+    await db.systemSetting.create({
       data: {
         key: `email_template_${id}`,
         value: JSON.stringify(template),

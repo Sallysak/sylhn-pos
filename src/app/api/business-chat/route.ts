@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
-
-const prisma = new PrismaClient()
-
+import { db } from '@/lib/db'
 const SYSTEM_PROMPT = `You are SYLHN Business AI, an advanced analytics assistant for the SYLHN POS retail business in Ghana.
 
 Your role is to help MANAGERS and OWNERS make data-driven decisions:
@@ -112,26 +109,26 @@ async function gatherBusinessContext(options: any): Promise<string> {
     // === SALES SUMMARY ===
     if (options.includeSales !== false) {
       // Today
-      const todaySales = await prisma.sale.findMany({
+      const todaySales = await db.sale.findMany({
         where: { createdAt: { gte: todayStart } },
         include: { items: true },
       })
       const todayTotal = todaySales.reduce((sum, s) => sum + (s.total || 0), 0)
 
       // This week
-      const weekSales = await prisma.sale.findMany({
+      const weekSales = await db.sale.findMany({
         where: { createdAt: { gte: weekAgo } },
       })
       const weekTotal = weekSales.reduce((sum, s) => sum + (s.total || 0), 0)
 
       // This month
-      const monthSales = await prisma.sale.findMany({
+      const monthSales = await db.sale.findMany({
         where: { createdAt: { gte: thisMonthStart } },
       })
       const monthTotal = monthSales.reduce((sum, s) => sum + (s.total || 0), 0)
 
       // Last month (for comparison)
-      const lastMonthSales = await prisma.sale.findMany({
+      const lastMonthSales = await db.sale.findMany({
         where: {
           createdAt: {
             gte: lastMonthStart,
@@ -155,7 +152,7 @@ async function gatherBusinessContext(options: any): Promise<string> {
 
     // === TOP PRODUCTS (30 days) ===
     if (options.includeTopProducts !== false) {
-      const recentSales = await prisma.sale.findMany({
+      const recentSales = await db.sale.findMany({
         where: { createdAt: { gte: monthAgo } },
         include: { items: true },
       })
@@ -180,7 +177,7 @@ async function gatherBusinessContext(options: any): Promise<string> {
       }
 
       // Slow movers (products with no sales in 30 days)
-      const allProducts = await prisma.product.findMany({ where: { active: true } })
+      const allProducts = await db.product.findMany({ where: { active: true } })
       const soldProductIds = new Set(Object.keys(productSales))
       const slowMovers = allProducts.filter(p => !soldProductIds.has(p.id) && p.quantity > 0).slice(0, 10)
       if (slowMovers.length > 0) {
@@ -191,7 +188,7 @@ async function gatherBusinessContext(options: any): Promise<string> {
 
     // === STOCK STATUS ===
     if (options.includeStock !== false) {
-      const lowStock = await prisma.product.findMany({
+      const lowStock = await db.product.findMany({
         where: { quantity: { lte: 10 } },
         take: 15,
         orderBy: { quantity: 'asc' },
@@ -201,7 +198,7 @@ async function gatherBusinessContext(options: any): Promise<string> {
  ${lowStock.map(p => `- ${p.name}: ${p.quantity} ${p.unit || 'pcs'} remaining (reorder at ${p.reorderLevel || 10})`).join('\n')}`)
       }
 
-      const allProducts = await prisma.product.findMany()
+      const allProducts = await db.product.findMany()
       const stockValue = allProducts.reduce((sum, p) => sum + (p.quantity || 0) * (p.costPrice || p.price || 0), 0)
       const retailValue = allProducts.reduce((sum, p) => sum + (p.quantity || 0) * (p.price || 0), 0)
       parts.push(`STOCK VALUATION:
@@ -214,7 +211,7 @@ async function gatherBusinessContext(options: any): Promise<string> {
     // === SUPPLIER INFO ===
     if (options.includeSuppliers !== false) {
       try {
-        const suppliers = await (prisma as any).supplier.findMany({
+        const suppliers = await (db as any).supplier.findMany({
           take: 20,
           orderBy: { createdAt: 'desc' },
         })

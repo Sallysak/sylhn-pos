@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
+import { db } from '@/lib/db'
 import nodemailer from 'nodemailer'
-
-const prisma = new PrismaClient()
 
 // GET /api/email/low-stock-alert?secret=CRON_SECRET
 // OR POST /api/email/low-stock-alert (manual trigger from UI)
@@ -33,7 +31,7 @@ export async function POST(req: NextRequest) {
 async function runAlert() {
   try {
     // === Find all low-stock products ===
-    const lowStockProducts = await prisma.product.findMany({
+    const lowStockProducts = await db.product.findMany({
       where: { active: true, quantity: { lte: 10 } },
       orderBy: [{ quantity: 'asc' }, { name: 'asc' }],
       take: 50,
@@ -58,7 +56,7 @@ async function runAlert() {
     }
 
     // === Get SMTP settings ===
-    const settings = await prisma.systemSetting.findMany({
+    const settings = await db.systemSetting.findMany({
       where: {
         key: {
           in: ['smtp.host', 'smtp.port', 'smtp.user', 'smtp.password', 'smtp.from'],
@@ -77,7 +75,7 @@ async function runAlert() {
 
     // === Check if we already sent an alert in the last 4 hours (avoid spam) ===
     const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000)
-    const recentAlert = await prisma.email.findFirst({
+    const recentAlert = await db.email.findFirst({
       where: {
         direction: 'sent',
         subject: { startsWith: '⚠️ Low Stock Alert' },
@@ -180,7 +178,7 @@ async function runAlert() {
     })
 
     // === Log the email ===
-    await prisma.email.create({
+    await db.email.create({
       data: {
         direction: 'sent',
         fromAddress: cfg['smtp.from'] || cfg['smtp.user'],

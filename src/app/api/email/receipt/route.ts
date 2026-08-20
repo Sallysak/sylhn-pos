@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
+import { db } from '@/lib/db'
 import nodemailer from 'nodemailer'
-
-const prisma = new PrismaClient()
 
 export async function POST(req: NextRequest) {
   try {
@@ -16,7 +14,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Fetch the sale with items
-    const sale = await prisma.sale.findUnique({
+    const sale = await db.sale.findUnique({
       where: { id: saleId },
       include: { items: true },
     })
@@ -26,7 +24,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Get SMTP settings
-    const settings = await prisma.systemSetting.findMany({
+    const settings = await db.systemSetting.findMany({
       where: {
         key: {
           in: ['smtp.host', 'smtp.port', 'smtp.user', 'smtp.password', 'smtp.from']
@@ -111,7 +109,7 @@ export async function POST(req: NextRequest) {
     })
 
     // Log the sent email
-    await prisma.email.create({
+    await db.email.create({
       data: {
         direction: 'sent',
         fromAddress: cfg['smtp.from'] || cfg['smtp.user'],

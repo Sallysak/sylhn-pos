@@ -1,13 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
-
-const prisma = new PrismaClient()
-
+import { db } from '@/lib/db'
 export async function GET(req: NextRequest) {
   try {
     const limit = parseInt(req.nextUrl.searchParams.get('limit') || '100', 10)
     
-    const emails = await prisma.email.findMany({
+    const emails = await db.email.findMany({
       where: { direction: 'received' },
       orderBy: { createdAt: 'desc' },
       take: limit,

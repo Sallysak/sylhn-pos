@@ -13,12 +13,15 @@ generator client {
 }
 
 datasource db {
+  // PostgreSQL — Railway Postgres. Provider must stay "postgresql" for prod.
+  // If running locally with SQLite, change this to "sqlite" and remove the
+  // `directUrl` line below (SQLite doesn't support it).
   provider = "postgresql"
   url      = env("DATABASE_URL")
-  // PostgreSQL handles concurrency natively (MVCC) — no WAL pragma needed
-  // (that was a SQLite-specific optimization). Direct connection string OR
-  // pooled URL both work; for Vercel serverless prefer the pooled URL
-  // (e.g. ?pgbouncer=true) to avoid exhausting connection slots.
+  // Direct (non-pooled) connection for migrations. Prisma needs this because
+  // PgBouncer/transaction-mode pooling can't run DDL. If DIRECT_URL is unset,
+  // Prisma falls back to DATABASE_URL (works on Railway where there's no pooler).
+  directUrl = env("DIRECT_URL")
 }
 
 // ============================================================

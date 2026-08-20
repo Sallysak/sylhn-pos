@@ -139,7 +139,10 @@ export async function setSessionCookie(token: string): Promise<void> {
   // Production (same-origin): sameSite=lax (more secure)
   store.set(SESSION_COOKIE, token, {
     httpOnly: true,
-    secure: false, // the preview runs on HTTP, not HTTPS
+    // In production, the cookie requires HTTPS. Without `secure: true`,
+    // any non-TLS hop (corporate proxy, public WiFi, the preview iframe
+    // when accessed via HTTP) can sniff the JWT.
+    secure: process.env.NODE_ENV === "production" && !isPreview,
     sameSite: isPreview ? "none" : "lax",
     path: "/",
     maxAge: SESSION_MAX_AGE_SECONDS,

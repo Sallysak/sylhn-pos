@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
+import { db } from '@/lib/db'
 import nodemailer from 'nodemailer'
-
-const prisma = new PrismaClient()
 
 // GET /api/email/daily-summary?secret=CRON_SECRET
 // OR POST /api/email/daily-summary (manual trigger from UI)
@@ -40,7 +38,7 @@ async function runSummary() {
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
 
     // === Get SMTP settings ===
-    const settings = await prisma.systemSetting.findMany({
+    const settings = await db.systemSetting.findMany({
       where: { key: { in: ['smtp.host', 'smtp.port', 'smtp.user', 'smtp.password', 'smtp.from', 'companyName'] } },
     })
     const cfg: Record<string, string> = {}
@@ -54,7 +52,7 @@ async function runSummary() {
     }
 
     // === Today's sales ===
-    const todaySales = await prisma.sale.findMany({
+    const todaySales = await db.sale.findMany({
       where: { createdAt: { gte: todayStart }, status: 'completed' },
       include: { items: true },
     })
@@ -62,14 +60,14 @@ async function runSummary() {
     const todayItems = todaySales.reduce((s, x) => s + x.items.length, 0)
 
     // === Yesterday's sales (for comparison) ===
-    const yesterdaySales = await prisma.sale.findMany({
+    const yesterdaySales = await db.sale.findMany({
       where: { createdAt: { gte: yesterdayStart, lt: todayStart }, status: 'completed' },
     })
     const yesterdayTotal = yesterdaySales.reduce((s, x) => s + (x.total || 0), 0)
     const dayOverDay = yesterdayTotal > 0 ? ((todayTotal - yesterdayTotal) / yesterdayTotal * 100) : 0
 
     // === 7-day average ===
-    const last7Sales = await prisma.sale.findMany({
+    const last7Sales = await db.sale.findMany({
       where: { createdAt: { gte: sevenDaysAgo }, status: 'completed' },
     })
     const last7Total = last7Sales.reduce((s, x) => s + (x.total || 0), 0)
@@ -98,7 +96,7 @@ async function runSummary() {
     const top5 = Object.values(productStats).sort((a, b) => b.revenue - a.revenue).slice(0, 5)
 
     // === Low stock ===
-    const lowStock = await prisma.product.findMany({
+    const lowStock = await db.product.findMany({
       where: { active: true, quantity: { lte: 10 } },
       orderBy: { quantity: 'asc' },
       take: 5,
@@ -205,7 +203,7 @@ async function runSummary() {
       html,
     })
 
-    await prisma.email.create({
+    await db.email.create({
       data: {
         direction: 'sent',
         fromAddress: cfg['smtp.from'] || cfg['smtp.user'],

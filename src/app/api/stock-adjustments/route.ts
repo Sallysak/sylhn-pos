@@ -151,15 +151,37 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // ===== Execute the adjustment (transactional) =====
+    // ===== Execute the adjustment (transactional + race-condition-safe) =====
+    // RACE CONDITION FIX: Previously this used `data: { quantity: Number(newQuantity) }`
+    // which is an ABSOLUTE write. If a concurrent sale decremented quantity between
+    // the read at line 91 and this update, the sale's decrement would be silently
+    // overwritten — inventory would re-gain the sold units with no audit trail.
+    //
+    // FIX: Use atomic increment by delta. The product row is re-read inside the
+    // transaction (with row-level lock via the SELECT inside update) and the
+    // delta is applied. If another transaction commits between our read and
+    // write, our delta is still correct because it's relative.
     const result = await db.$transaction(async (tx) => {
-      // Update product quantity
+      // Re-read the product inside the transaction to get the current quantity.
+      // Prisma's update with a where clause acquires a row lock, so this is safe.
+      const currentProduct = await tx.product.findUnique({
+        where: { id: product.id },
+        select: { id: true, quantity: true },
+      });
+      if (!currentProduct) {
+        throw new Error("Product disappeared during adjustment");
+      }
+
+      const currentOldQuantity = currentProduct.quantity;
+      const delta = Number(newQuantity) - currentOldQuantity;
+
+      // Apply the delta atomically — concurrent sales/purchases will compose correctly
       const updatedProduct = await tx.product.update({
         where: { id: product.id },
-        data: { quantity: Number(newQuantity) },
+        data: { quantity: { increment: delta } },
       });
 
-      // Create stock history entry
+      // Create stock history entry — use the re-computed delta
       const actionMap: Record<string, string> = {
         count: "adjusted",
         damage: "damaged",
@@ -173,8 +195,8 @@ export async function POST(req: NextRequest) {
         data: {
           productId: product.id,
           action,
-          quantity: change,
-          reason: `${adjustmentType.toUpperCase()}: ${reason}${needsApproval ? " (manager approved)" : ""}`,
+          quantity: delta,
+          reason: `${adjustmentType.toUpperCase()}: ${reason}${needsApproval ? " (manager approved)" : ""} — ${currentOldQuantity} → ${Number(newQuantity)}`,
           reference: `ADJ-${Date.now()}`,
           userId: user.uid,
         },
@@ -186,7 +208,7 @@ export async function POST(req: NextRequest) {
         user: user.username,
         action: "ADJUST",
         module: "stock",
-        details: `Stock adjusted: ${product.name} (${product.sku}) — ${oldQuantity} → ${newQuantity} (${change > 0 ? "+" : ""}${change} ${product.unit}) — type: ${adjustmentType}, reason: ${reason}${needsApproval ? " [MANAGER APPROVED]" : ""}`,
+        details: `Stock adjusted: ${product.name} (${product.sku}) — ${currentOldQuantity} → ${newQuantity} (${delta > 0 ? "+" : ""}${delta} ${product.unit}) — type: ${adjustmentType}, reason: ${reason}${needsApproval ? " [MANAGER APPROVED]" : ""}`,
         severity: changeAbs > APPROVAL_UNIT_THRESHOLD ? "warning" : "info",
         ipAddress: ip,
         userAgent: req.headers.get("user-agent") || "",

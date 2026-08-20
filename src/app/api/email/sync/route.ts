@@ -2,11 +2,9 @@
 // IMAP sync — fetches new emails from Gmail into POS.
 
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
+import { db } from '@/lib/db'
 import Imap from 'imap'
 import { simpleParser } from 'mailparser'
-
-const prisma = new PrismaClient()
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -44,12 +42,12 @@ async function syncFolder(imap: Imap, folder: string, isReceived: boolean) {
           for (const msg of messages) {
             const messageId = msg.messageId || null
             if (messageId) {
-              const exists = await prisma.email.findFirst({ where: { messageId: messageId as any } }).catch(() => null)
+              const exists = await db.email.findFirst({ where: { messageId: messageId as any } }).catch(() => null)
               if (exists) continue
             }
 
             try {
-              await prisma.email.create({
+              await db.email.create({
                 data: {
                   fromAddress: msg.from?.text || '',
                   toAddress: msg.to?.text || '',
@@ -63,7 +61,7 @@ async function syncFolder(imap: Imap, folder: string, isReceived: boolean) {
             } catch (e: any) {
               console.error('save error', e)
               try {
-                await prisma.email.create({
+                await db.email.create({
                   data: {
                     fromAddress: msg.from?.text || '',
                     toAddress: msg.to?.text || '',

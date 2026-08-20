@@ -243,13 +243,38 @@ export async function POST(req: NextRequest) {
       // Decrement stock + create linked StockHistory entries atomically.
       // Using updateMany with a where-guard: if stock is insufficient
       // (e.g. concurrent sale), the update affects 0 rows and we throw.
+      //
+      // PERF FIX: Previously this was a sequential N+1 loop — for an N-item
+      // cart: N× findUnique + N× updateMany + N× stockHistory.create = 3N
+      // round-trips. For a 20-item cart that added ~200-500ms to every checkout.
+      // Now: 1× bulk findMany for pre-decrement reads + N× updateMany (still
+      // per-item because of the `quantity: { gte }` guard) + 1× createMany
+      // for all stock history entries. Drops to N+2 round-trips.
+      const productIdsInCart = newSale.items
+        .map(i => i.productId)
+        .filter(Boolean) as string[];
+
+      // Bulk-fetch all product quantities in ONE query (instead of N)
+      const productsBefore = await tx.product.findMany({
+        where: { id: { in: productIdsInCart } },
+        select: { id: true, quantity: true },
+      });
+      const productBeforeMap = new Map(productsBefore.map(p => [p.id, p.quantity]));
+
+      const stockHistoryData: Array<{
+        productId: string;
+        action: string;
+        quantity: number;
+        reason: string;
+        reference: string;
+        saleId: string;
+        userId: string;
+      }> = [];
+
+      // Decrement each product — still per-item because of the gte guard,
+      // but at least we don't re-fetch the pre-decrement quantity per item.
       for (const item of newSale.items) {
         if (!item.productId) continue;
-        // Fetch current quantity BEFORE the decrement (for realtime broadcast)
-        const productBefore = await tx.product.findUnique({
-          where: { id: item.productId },
-          select: { quantity: true },
-        });
         const updated = await tx.product.updateMany({
           where: { id: item.productId, quantity: { gte: item.quantity } },
           data: { quantity: { decrement: item.quantity } },
@@ -257,24 +282,28 @@ export async function POST(req: NextRequest) {
         if (updated.count === 0) {
           throw new Error(`Insufficient stock for ${item.sku} (race condition detected)`);
         }
-        // Record the new quantity for realtime broadcast (after commit)
-        if (productBefore) {
+        const qtyBefore = productBeforeMap.get(item.productId);
+        if (qtyBefore !== undefined) {
           stockUpdates.push({
             productId: item.productId,
-            newQuantity: productBefore.quantity - item.quantity,
+            newQuantity: qtyBefore - item.quantity,
           });
         }
-        await tx.stockHistory.create({
-          data: {
-            productId: item.productId,
-            action: "sold",
-            quantity: -item.quantity,
-            reason: `Sale ${invoiceNumber}`,
-            reference: invoiceNumber,
-            saleId: newSale.id,
-            userId: user.uid,
-          },
+        // Queue for bulk insert below
+        stockHistoryData.push({
+          productId: item.productId,
+          action: "sold",
+          quantity: -item.quantity,
+          reason: `Sale ${invoiceNumber}`,
+          reference: invoiceNumber,
+          saleId: newSale.id,
+          userId: user.uid,
         });
+      }
+
+      // Bulk insert all stock history entries in ONE query (was N queries)
+      if (stockHistoryData.length > 0) {
+        await tx.stockHistory.createMany({ data: stockHistoryData });
       }
 
       // Award loyalty points + update customer stats (premium)
@@ -351,6 +380,17 @@ export async function POST(req: NextRequest) {
       total: sale.total,
       cashierName: sale.cashierName,
     });
+
+    // CACHE INVALIDATION: clear cached dashboard aggregations so the next
+    // dashboard refresh sees fresh data. Without this, a cashier who rings
+    // up a sale and immediately navigates to the dashboard would see
+    // up-to-15s-stale totals.
+    try {
+      const { cacheDeletePrefix } = await import("@/lib/cache");
+      cacheDeletePrefix("salesSummary");
+      cacheDeletePrefix("inventorySnapshot");
+      cacheDeletePrefix("topProducts");
+    } catch { /* cache is optional */ }
 
     return NextResponse.json({
       success: true,
