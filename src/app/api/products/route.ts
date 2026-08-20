@@ -3,6 +3,7 @@ import { db, waitForDb } from "@/lib/db";
 import { requireAuth, requirePermission } from "@/lib/auth";
 import { ProductSchema, ProductBulkSchema, validate, validationError } from "@/lib/validation";
 import { rateLimitApiRead, rateLimitApiWrite, rateLimitResponse, getClientIp } from "@/lib/rate-limit";
+import { auditLog } from "@/lib/audit";
 import crypto from "crypto";
 
 // GET /api/products — list all products (requires auth)
@@ -255,16 +256,14 @@ export async function POST(req: NextRequest) {
       }, { status: 500 });
     }
 
-    // Log audit
-    await db.auditLog.create({
-      data: {
-        userId: user.uid,
-        user: user.username,
-        action: "CREATE",
-        module: "stock",
-        details: `Product ${product.sku} (${product.name}) created`,
-        severity: "info",
-      },
+    // Log audit — fire-and-forget (don't block the save response)
+    auditLog({
+      userId: user.uid,
+      user: user.username,
+      action: "CREATE",
+      module: "stock",
+      details: `Product ${product.sku} (${product.name}) created`,
+      severity: "info",
     });
 
     return NextResponse.json({ success: true, product });

@@ -190,6 +190,13 @@ function serverProductToClientProduct(sp: any): Product {
     costPrice: Number(sp.costPrice) || 0,
     category: sp.category || "other",
     groupId: sp.groupId || "",
+    // Map denormalized group info — populated by /api/products GET's
+    // `include: { group: { select: { id, name, icon, color } } }`.
+    // Without this, the product card had no group name/icon to show even
+    // though the data was returned by the API.
+    groupName: sp.group?.name || "",
+    groupIcon: sp.group?.icon || "📦",
+    groupColor: sp.group?.color || "#10b981",
     unit: sp.unit || "each",
     stock: Number(sp.quantity) || 0,  // Prisma uses `quantity`, UI uses `stock`
     quantity: Number(sp.quantity) || 0,
@@ -963,6 +970,18 @@ export default function POSPage() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
+  // PERFORMANCE: debounce productSearch too — previously every keystroke
+  // triggered a full re-filter of all products + re-render of 100 cards.
+  // Now the input updates instantly (UI feedback) but the filter waits 200ms
+  // after the user stops typing.
+  const [debouncedProductSearch, setDebouncedProductSearch] = useState("");
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedProductSearch(productSearch);
+    }, 200); // 200ms debounce
+    return () => clearTimeout(timer);
+  }, [productSearch]);
+
   const filteredProducts = useMemo(() => {
     let result = products;
     if (activeCategory !== "all") {
@@ -976,20 +995,21 @@ export default function POSPage() {
         p.barcode.includes(q)
       );
     }
-    if (productSearch.trim()) {
-      const q = productSearch.toLowerCase();
+    if (debouncedProductSearch.trim()) {
+      const q = debouncedProductSearch.toLowerCase();
       result = result.filter(p =>
         p.name.toLowerCase().includes(q) ||
         p.sku.toLowerCase().includes(q) ||
         p.barcode.includes(q) ||
-        (p.supplier || '').toLowerCase().includes(q)
+        (p.supplier || '').toLowerCase().includes(q) ||
+        (p.groupName || '').toLowerCase().includes(q)
       );
     }
     // Performance: cap at 100 visible products to avoid rendering thousands of DOM nodes.
     // The user can scroll/search to see more. This keeps the UI fast even with
     // thousands of products in the catalog.
     return result.slice(0, 100);
-  }, [activeCategory, debouncedSearch, productSearch, products]);
+  }, [activeCategory, debouncedSearch, debouncedProductSearch, products]);
 
   const subtotal = useMemo(() =>
     cart.reduce((sum, item) => {
@@ -3294,13 +3314,8 @@ export default function POSPage() {
                 const lowStock = (product.stock ?? product.quantity ?? 0) <= product.reorderLevel;
                 const outOfStock = (product.stock ?? product.quantity ?? 0) <= 0;
                 return (
-                  <motion.button
+                  <button
                     key={product.id}
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ duration: 0.2, delay: Math.min(idx * 0.015, 0.3) }}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 1 }}
                     onClick={() => addToCart(product)}
                     onDoubleClick={(e) => {
                       e.preventDefault();
@@ -3380,8 +3395,24 @@ export default function POSPage() {
                       <div className="text-xs font-semibold text-slate-800 leading-tight line-clamp-2 min-h-[2rem]">
                         {product.name}
                       </div>
-                      <div className="text-[10px] text-slate-400 font-mono mt-0.5 tabular truncate">
-                        {product.sku}
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <div className="text-[10px] text-slate-400 font-mono tabular truncate flex-1">
+                          {product.sku}
+                        </div>
+                        {/* Group badge — shows the stock group this product belongs to */}
+                        {product.groupName && (
+                          <div
+                            className="text-[9px] font-medium px-1.5 py-0.5 rounded-md truncate max-w-[60%] flex items-center gap-0.5"
+                            style={{
+                              backgroundColor: (product.groupColor || '#10b981') + '20',
+                              color: product.groupColor || '#10b981',
+                            }}
+                            title={product.groupName}
+                          >
+                            <span className="text-[10px]">{product.groupIcon || '📦'}</span>
+                            <span className="truncate">{product.groupName}</span>
+                          </div>
+                        )}
                       </div>
                       {/* Price + stock row */}
                       <div className="flex items-center justify-between mt-1.5">
@@ -3396,7 +3427,7 @@ export default function POSPage() {
                         </div>
                       </div>
                     </div>
-                  </motion.button>
+                  </button>
                 );
               })}
             </div>

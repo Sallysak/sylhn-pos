@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { requireAuth, requirePermission } from "@/lib/auth";
 import { ProductUpdateSchema, validate, validationError } from "@/lib/validation";
 import { rateLimitApiRead, rateLimitApiWrite, rateLimitResponse, getClientIp } from "@/lib/rate-limit";
+import { auditLog } from "@/lib/audit";
 
 // GET /api/products/[id] — get one product with full relations
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -126,10 +127,10 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       }, { status: 500 });
     }
 
-    // If quantity changed, log to stock history
+    // If quantity changed, log to stock history — fire-and-forget (don't block save)
     if (updates.quantity !== undefined && previous.quantity !== Number(updates.quantity)) {
       const diff = Number(updates.quantity) - previous.quantity;
-      await db.stockHistory.create({
+      void db.stockHistory.create({
         data: {
           productId: id,
           action: "adjusted",
@@ -138,18 +139,17 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
           reference: `Product update`,
           userId: user.uid,
         },
-      });
+      }).catch(e => console.warn("stockHistory write failed:", e?.message));
     }
 
-    await db.auditLog.create({
-      data: {
-        userId: user.uid,
-        user: user.username,
-        action: "UPDATE",
-        module: "stock",
-        details: `Product ${previous.sku} (${previous.name}) updated`,
-        severity: "info",
-      },
+    // Audit log — fire-and-forget (don't block save response)
+    auditLog({
+      userId: user.uid,
+      user: user.username,
+      action: "UPDATE",
+      module: "stock",
+      details: `Product ${previous.sku} (${previous.name}) updated`,
+      severity: "info",
     });
 
     return NextResponse.json({ success: true, product });

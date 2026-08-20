@@ -9,6 +9,12 @@ export interface Product {
   costPrice: number;      // Cost price (GHS)
   category: string;
   groupId: string;
+  // Denormalized group info — populated from API response so the UI can show
+  // the group name/icon without a second fetch. Without these, the product
+  // card had nowhere to put the group data even when it was returned by /api/products.
+  groupName?: string;
+  groupIcon?: string;
+  groupColor?: string;
   unit: string;
   stock: number;
   // Premium fix: alias for stock so components can use either `p.stock` (legacy)
