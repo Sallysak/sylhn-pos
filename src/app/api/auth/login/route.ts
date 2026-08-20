@@ -109,6 +109,38 @@ export async function POST(req: NextRequest) {
     }
 
     if (!user) {
+      // LAST RESORT: If admin/admin123 and user doesn't exist, create it.
+      // This handles the case where sync-schema created tables but
+      // reset-admin failed to create the user.
+      if (safeUsername === 'admin' && password === 'admin123') {
+        console.debug('[auth/login] Admin user not found — creating on-the-fly');
+        try {
+          const hashedPwd = await hashPassword('admin123');
+          user = await db.systemUser.create({
+            data: {
+              username: 'admin',
+              password: hashedPwd,
+              fullName: 'System Administrator',
+              role: 'admin',
+              email: 'admin@sylhn.com',
+              phone: '+233592766044',
+              active: true,
+              permissions: JSON.stringify({
+                pos: true, sales: true, stock: true, purchase: true,
+                accounts: true, telephone: true, maintenance: true,
+                financeOps: true, canVoid: true, canDiscount: true,
+                canAdjustStock: true, canDeleteProducts: true, canExport: true,
+              }),
+            },
+          });
+          // Now fall through to admin bypass below
+        } catch (createErr: any) {
+          console.error('[auth/login] Failed to create admin user:', createErr?.message);
+        }
+      }
+
+      // If still no user, return error
+      if (!user) {
       // Record failed attempt for lockout tracking (even for unknown users —
       // prevents username enumeration via lockout behavior)
       const failState = recordFailedLogin(safeUsername);
@@ -133,6 +165,7 @@ export async function POST(req: NextRequest) {
         setupNeeded: userCount === 0,
         remainingAttempts: failState.remainingAttempts,
       }, { status: 401 });
+      }
     }
     if (!user.active) {
       await auditLog({
