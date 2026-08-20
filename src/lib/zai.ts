@@ -1,9 +1,10 @@
 /**
  * ZAI API wrapper — production-grade AI integration with graceful fallback.
  *
- * Primary path: z-ai-web-dev-sdk (handles config discovery automatically).
- *   - In dev sandbox: reads /etc/.z-ai-config
- *   - In Vercel prod: reads ZAI_API_KEY + ZAI_TOKEN env vars (if set)
+ * Config discovery (in priority order):
+ *   1. ENV VARS: ZAI_API_KEY + ZAI_BASE_URL + ZAI_TOKEN (Railway/production)
+ *   2. CONFIG FILE: .z-ai-config in CWD/home/etc (dev sandbox)
+ *   3. Returns null if neither is available (caller uses fallback)
  *
  * Fallback: if AI isn't configured, callers should use a rule-based response
  * generator (see `generateRuleBasedResponse` in ai-rules.ts) so the assistant
@@ -16,16 +17,49 @@ let cachedClient: any = null;
 let cachedConfigured: boolean | null = null;
 
 /**
- * Initialize the ZAI client. Reads from env vars or .z-ai-config file.
- * Returns null if not configured (caller should use fallback).
+ * Initialize the ZAI client. Tries env vars first (production), then
+ * the SDK's built-in config file discovery (dev sandbox).
+ * Returns null if neither is configured.
  */
 async function getClient(): Promise<any | null> {
   if (cachedClient) return cachedClient;
+
+  // ===== PATH 1: Build client from env vars (Railway/production) =====
+  // The Z.AI SDK's built-in ZAI.create() only reads from a config FILE,
+  // which doesn't exist on Railway. So we build the client manually from
+  // env vars using the SDK's constructor directly.
+  const envApiKey = process.env.ZAI_API_KEY;
+  const envBaseUrl = process.env.ZAI_BASE_URL || "https://internal-api.z.ai/v1";
+  const envToken = process.env.ZAI_TOKEN;
+  const envChatId = process.env.ZAI_CHAT_ID;
+  const envUserId = process.env.ZAI_USER_ID;
+
+  if (envApiKey) {
+    try {
+      // The ZAI constructor takes a config object — we build it from env vars
+      // instead of relying on the config file discovery.
+      cachedClient = new (ZAI as any)({
+        apiKey: envApiKey,
+        baseUrl: envBaseUrl,
+        ...(envToken && { token: envToken }),
+        ...(envChatId && { chatId: envChatId }),
+        ...(envUserId && { userId: envUserId }),
+      });
+      return cachedClient;
+    } catch (e: any) {
+      console.warn("[zai] Failed to build client from env vars:", e?.message);
+      // Fall through to config file path
+    }
+  }
+
+  // ===== PATH 2: SDK's built-in config file discovery (dev sandbox) =====
+  // In the dev sandbox, /etc/.z-ai-config exists with valid credentials.
+  // On Railway, this file doesn't exist — ZAI.create() will throw.
   try {
     cachedClient = await ZAI.create();
     return cachedClient;
   } catch (e) {
-    // Not configured
+    // Not configured — this is expected on Railway if env vars aren't set
     return null;
   }
 }
@@ -69,7 +103,7 @@ export async function createChatCompletion(opts: ChatCompletionOptions): Promise
 }> {
   const client = await getClient();
   if (!client) {
-    throw new Error("ZAI not configured. Set ZAI_API_KEY + ZAI_TOKEN env vars, or create .z-ai-config.");
+    throw new Error("ZAI not configured. Set ZAI_API_KEY env var in Railway.");
   }
   return await client.chat.completions.create({
     messages: opts.messages,
