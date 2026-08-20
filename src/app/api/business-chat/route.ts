@@ -55,37 +55,11 @@ export async function POST(req: NextRequest) {
       ...messages,
     ]
 
-    const response = await fetch(`${process.env.AI_BASE_URL}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.AI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: process.env.AI_MODEL || 'llama-3.3-70b-versatile',
-        messages: fullMessages,
-        temperature: 0.4, // Lower temperature for more analytical responses
-        max_tokens: 1500,
-        stream: false,
-      }),
-    })
-
-    if (!response.ok) {
-      const errText = await response.text()
-      console.error('Groq API error:', errText)
-      return NextResponse.json(
-        { error: `AI service error: ${response.status}` },
-        { status: 500 }
-      )
-    }
-
-    const data = await response.json()
-    const reply = data.choices?.[0]?.message?.content || 'I could not generate a response.'
+    const reply = await getBusinessAiReply(fullMessages)
 
     return NextResponse.json({
       success: true,
       reply,
-      usage: data.usage,
     })
   } catch (e: any) {
     console.error('Business AI chat error:', e)
@@ -94,6 +68,65 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     )
   }
+}
+
+/**
+ * Get an AI reply for business chat. Same fallback chain as /api/ai/chat:
+ *   1. Z.AI SDK (zero-config on Railway)
+ *   2. External OpenAI-compatible API (if AI_BASE_URL + AI_API_KEY set)
+ *   3. Rule-based fallback message
+ */
+async function getBusinessAiReply(messages: Array<{ role: string; content: string }>): Promise<string> {
+  // PRIMARY PATH: Z.AI SDK
+  try {
+    const { chat: zaiChat, isZaiConfigured } = await import('@/lib/zai');
+    const configured = await isZaiConfigured();
+    if (configured) {
+      const text = await zaiChat({
+        messages: messages as any,
+        thinking: { type: 'disabled' },
+        temperature: 0.4,  // Lower temp for analytical responses
+        maxTokens: 1500,
+      });
+      if (text && text.trim()) return text.trim();
+    }
+  } catch (e: any) {
+    console.warn('[business-chat] Z.AI SDK failed, trying external API:', e?.message);
+  }
+
+  // FALLBACK: External API
+  const baseUrl = process.env.AI_BASE_URL;
+  const apiKey = process.env.AI_API_KEY;
+  if (baseUrl && apiKey) {
+    const response = await fetch(`${baseUrl.replace(/\/$/, '')}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: process.env.AI_MODEL || 'llama-3.3-70b-versatile',
+        messages,
+        temperature: 0.4,
+        max_tokens: 1500,
+        stream: false,
+      }),
+    })
+
+    if (!response.ok) {
+      const errText = await response.text()
+      console.error('External AI API error:', errText)
+      throw new Error(`AI service error: ${response.status}`)
+    }
+
+    const data = await response.json()
+    const reply = data.choices?.[0]?.message?.content
+    if (reply && reply.trim()) return reply.trim()
+  }
+
+  // LAST RESORT
+  return "I'm currently unable to connect to the AI service. " +
+    "Please review the dashboard data directly or try again in a moment.";
 }
 
 async function gatherBusinessContext(options: any): Promise<string> {
@@ -211,7 +244,7 @@ async function gatherBusinessContext(options: any): Promise<string> {
     // === SUPPLIER INFO ===
     if (options.includeSuppliers !== false) {
       try {
-        const suppliers = await (db as any).supplier.findMany({
+        const suppliers = await (prisma as any).supplier.findMany({
           take: 20,
           orderBy: { createdAt: 'desc' },
         })

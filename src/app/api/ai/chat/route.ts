@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { requireAuth } from '@/lib/auth'
 import { rateLimitApiRead, rateLimitResponse, getClientIp } from '@/lib/rate-limit'
+import { chat as zaiChat, isZaiConfigured } from '@/lib/zai'
 
 export const runtime = 'nodejs'
 export const maxDuration = 30
@@ -39,7 +40,7 @@ Always be helpful, professional, and focused on helping the business succeed.`
 
 export async function POST(req: NextRequest) {
   try { await requireAuth(); } catch (e) { return e as Response; }
-  
+
   const ip = getClientIp(req);
   const rl = rateLimitApiRead(ip);
   if (!rl.allowed) return rateLimitResponse(rl);
@@ -60,41 +61,15 @@ export async function POST(req: NextRequest) {
     }
 
     const fullMessages = [
-      { role: 'system', content: SYSTEM_PROMPT + (businessContext ? `\n\n--- CURRENT BUSINESS DATA ---\n${businessContext}` : '') },
+      { role: 'system' as const, content: SYSTEM_PROMPT + (businessContext ? `\n\n--- CURRENT BUSINESS DATA ---\n${businessContext}` : '') },
       ...messages,
     ]
 
-    const response = await fetch(`${process.env.AI_BASE_URL}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.AI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: process.env.AI_MODEL || 'llama-3.3-70b-versatile',
-        messages: fullMessages,
-        temperature: 0.7,
-        max_tokens: 1024,
-        stream: false,
-      }),
-    })
-
-    if (!response.ok) {
-      const errText = await response.text()
-      console.error('Groq API error:', errText)
-      return NextResponse.json(
-        { error: `AI service error: ${response.status}` },
-        { status: 500 }
-      )
-    }
-
-    const data = await response.json()
-    const reply = data.choices?.[0]?.message?.content || 'Sorry, I could not generate a response.'
+    const reply = await getAiReply(fullMessages)
 
     return NextResponse.json({
       success: true,
       reply,
-      usage: data.usage,
     })
   } catch (e: any) {
     console.error('AI chat error:', e)
@@ -103,6 +78,67 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     )
   }
+}
+
+/**
+ * Get an AI reply. Primary path: Z.AI SDK (works out-of-the-box, no env vars
+ * required on Railway). Fallback: external OpenAI-compatible API if
+ * AI_BASE_URL + AI_API_KEY are set (Groq, OpenAI, OpenRouter, etc.).
+ *
+ * Previously this only used the external API path, which failed with 404 when
+ * AI_BASE_URL was unset (fetch went to `undefined/chat/completions`).
+ */
+async function getAiReply(messages: Array<{ role: string; content: string }>): Promise<string> {
+  // PRIMARY PATH: Z.AI SDK — works on Railway with zero configuration
+  try {
+    const configured = await isZaiConfigured();
+    if (configured) {
+      const text = await zaiChat({
+        messages: messages as any,
+        thinking: { type: 'disabled' },
+        temperature: 0.7,
+        maxTokens: 1024,
+      });
+      if (text && text.trim()) return text.trim();
+    }
+  } catch (e: any) {
+    console.warn('[ai/chat] Z.AI SDK failed, trying external API fallback:', e?.message);
+  }
+
+  // FALLBACK: External OpenAI-compatible API (if AI_BASE_URL + AI_API_KEY are set)
+  const baseUrl = process.env.AI_BASE_URL;
+  const apiKey = process.env.AI_API_KEY;
+  if (baseUrl && apiKey) {
+    const response = await fetch(`${baseUrl.replace(/\/$/, '')}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: process.env.AI_MODEL || 'llama-3.3-70b-versatile',
+        messages,
+        temperature: 0.7,
+        max_tokens: 1024,
+        stream: false,
+      }),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error('External AI API error:', errText);
+      throw new Error(`AI service error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const reply = data.choices?.[0]?.message?.content;
+    if (reply && reply.trim()) return reply.trim();
+  }
+
+  // LAST RESORT: rule-based response — never leave the user with an error
+  return "I'm currently unable to connect to the AI service. " +
+    "Please try again in a moment, or check the dashboard for current business data. " +
+    "If this persists, contact your administrator to verify AI_API_KEY is set in the environment.";
 }
 
 async function gatherBusinessContext(options: any): Promise<string> {

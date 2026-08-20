@@ -53,68 +53,110 @@ export async function POST(req: NextRequest) {
   try {
     const counts: Record<string, number> = {};
 
-    // Helper to count + delete
-    const wipe = async (model: any, name: string) => {
+    // Helper to count (we count outside the tx — counting inside is fine but
+    // we want the pre-wipe numbers, not the post-wipe zeros).
+    const countOnly = async (model: any, name: string) => {
       try {
-        const start = await model.count();
-        await model.deleteMany({});
-        counts[name] = start;
+        counts[name] = await model.count();
       } catch (e: any) {
-        console.warn(`[wipe-data] failed to wipe ${name}:`, e?.message);
+        console.warn(`[wipe-data] failed to count ${name}:`, e?.message);
         counts[name] = -1;
       }
     };
 
-    // ===== Wipe in dependency order =====
-    // 1. Child tables (foreign keys to others)
-    await wipe(db.salePayment, "salePayments");
-    await wipe(db.saleItem, "saleItems");
-    await wipe(db.sale, "sales");
-    await wipe(db.heldOrder, "heldOrders");
-    await wipe(db.loyaltyTransaction, "loyaltyTransactions");
+    // Count everything FIRST (so we have accurate pre-wipe numbers even if
+    // the transaction rolls back).
+    await countOnly(db.salePayment, "salePayments");
+    await countOnly(db.saleItem, "saleItems");
+    await countOnly(db.sale, "sales");
+    await countOnly(db.heldOrder, "heldOrders");
+    await countOnly(db.loyaltyTransaction, "loyaltyTransactions");
+    await countOnly(db.stockHistory, "stockHistory");
+    await countOnly(db.stocktakeItem, "stocktakeItems");
+    await countOnly(db.stocktake, "stocktakes");
+    await countOnly(db.stockTransferItem, "stockTransferItems");
+    await countOnly(db.stockTransfer, "stockTransfers");
+    await countOnly(db.locationStock, "locationStocks");
+    await countOnly(db.purchaseItem, "purchaseItems");
+    await countOnly(db.supplierPayment, "supplierPayments");
+    await countOnly(db.purchase, "purchases");
+    await countOnly(db.autoReplenishRule, "autoReplenishRules");
+    await countOnly(db.recurringPO, "recurringPOs");
+    await countOnly(db.forecastSnapshot, "forecastSnapshots");
+    await countOnly(db.expense, "expenses");
+    await countOnly(db.emailLog, "emailLogs");
+    await countOnly(db.backupRecord, "backupRecords");
+    await countOnly(db.productSupplier, "productSuppliers");
+    await countOnly(db.product, "products");
+    await countOnly(db.supplier, "suppliers");
+    await countOnly(db.customer, "customers");
+    await countOnly(db.telephoneDirectoryEntry, "telephoneDirectoryEntries");
+    await countOnly(db.stockGroup, "stockGroups");
+    await countOnly(db.cashierShift, "cashierShifts");
+    await countOnly(db.auditLog, "auditLogs");
+    await countOnly(db.systemSetting, "systemSettings");
 
-    await wipe(db.stockHistory, "stockHistory");
-    await wipe(db.stocktakeItem, "stocktakeItems");
-    await wipe(db.stocktake, "stocktakes");
-    await wipe(db.stockTransferItem, "stockTransferItems");
-    await wipe(db.stockTransfer, "stockTransfers");
-    await wipe(db.locationStock, "locationStocks");
+    // Wrap all deletes in a SINGLE transaction so partial failure can't
+    // leave the DB in a half-wiped corrupt state. Previously each deleteMany
+    // was its own implicit transaction — a crash after step 15 of 28 would
+    // leave sales gone but products still present with broken references.
+    await db.$transaction([
+      db.salePayment.deleteMany({}),
+      db.saleItem.deleteMany({}),
+      db.sale.deleteMany({}),
+      db.heldOrder.deleteMany({}),
+      db.loyaltyTransaction.deleteMany({}),
+      db.stockHistory.deleteMany({}),
+      db.stocktakeItem.deleteMany({}),
+      db.stocktake.deleteMany({}),
+      db.stockTransferItem.deleteMany({}),
+      db.stockTransfer.deleteMany({}),
+      db.locationStock.deleteMany({}),
+      db.purchaseItem.deleteMany({}),
+      db.supplierPayment.deleteMany({}),
+      db.purchase.deleteMany({}),
+      db.autoReplenishRule.deleteMany({}),
+      db.recurringPO.deleteMany({}),
+      db.forecastSnapshot.deleteMany({}),
+      db.expense.deleteMany({}),
+      db.emailLog.deleteMany({}),
+      db.backupRecord.deleteMany({}),
+      db.productSupplier.deleteMany({}),
+      db.product.deleteMany({}),
+      db.supplier.deleteMany({}),
+      db.customer.deleteMany({}),
+      db.telephoneDirectoryEntry.deleteMany({}),
+      db.stockGroup.deleteMany({}),
+      db.cashierShift.deleteMany({}),
+      db.auditLog.deleteMany({}),
+      db.systemSetting.deleteMany({}),
+    ]);
 
-    await wipe(db.purchaseItem, "purchaseItems");
-    await wipe(db.supplierPayment, "supplierPayments");
-    await wipe(db.purchase, "purchases");
-
-    await wipe(db.autoReplenishRule, "autoReplenishRules");
-    await wipe(db.recurringPO, "recurringPOs");
-    await wipe(db.forecastSnapshot, "forecastSnapshots");
-
-    await wipe(db.expense, "expenses");
-    await wipe(db.emailLog, "emailLogs");
-    await wipe(db.backupRecord, "backupRecords");
-
-    // 2. Top-level business entities
-    await wipe(db.productSupplier, "productSuppliers");
-    await wipe(db.product, "products");
-    await wipe(db.supplier, "suppliers");
-    await wipe(db.customer, "customers");
-    await wipe(db.telephoneDirectoryEntry, "telephoneDirectoryEntries");
-    await wipe(db.stockGroup, "stockGroups");
-
-    // 3. Shifts and registers (keep Location for store layout)
-    await wipe(db.cashierShift, "cashierShifts");
-    // Note: Register table kept — it represents physical hardware
-    // (clear currentCashierId / currentShiftId instead)
+    // Reset register state (preserve the rows themselves — they represent
+    // physical hardware — but clear the cashier/shift references).
     try {
       await db.register.updateMany({
         data: { currentCashierId: null, currentShiftId: null, lastActivityAt: null },
       });
     } catch {}
 
-    // 4. Audit logs (wipe so the only remaining entry is the wipe itself)
-    await wipe(db.auditLog, "auditLogs");
-
-    // 5. System settings (reset to defaults — SystemUser preserved)
-    await wipe(db.systemSetting, "systemSettings");
+    // Re-seed default system settings (so the app doesn't break after wipe)
+    try {
+      const settings = [
+        { key: "companyName", value: "SYLHN COMPANY LTD" },
+        { key: "taxRate", value: "0.15" },
+        { key: "taxName", value: "VAT" },
+        { key: "currency", value: "GHC" },
+        { key: "loyalty.pointsPerCedi", value: "1" },
+        { key: "loyalty.redeemRate", value: "0.05" },
+        { key: "loyalty.minRedeem", value: "100" },
+      ];
+      for (const s of settings) {
+        await db.systemSetting.upsert({ where: { key: s.key }, update: {}, create: s });
+      }
+    } catch (e: any) {
+      console.warn("[wipe-data] failed to re-seed system settings:", e?.message);
+    }
 
     // Record this momentous event in the audit log (re-created after wipe)
     try {
@@ -134,14 +176,15 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: "All business data wiped. User accounts preserved.",
+      message: "All business data wiped in a single transaction. User accounts, registers, and locations preserved. Default system settings re-seeded.",
       counts,
       preserved: ["SystemUser", "Register", "Location"],
+      reseeded: ["SystemSetting"],
     });
   } catch (e: any) {
     console.error("POST /api/admin/wipe-data error:", e);
     return NextResponse.json({
-      error: "Failed to wipe data",
+      error: "Failed to wipe data — transaction rolled back, DB is unchanged",
       detail: e?.message || String(e),
     }, { status: 500 });
   }

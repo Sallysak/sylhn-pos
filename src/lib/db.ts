@@ -131,6 +131,8 @@ export const db = {
   get telephoneDirectoryEntry() { return getDb().telephoneDirectoryEntry; },
   get recurringPO() { return getDb().recurringPO; },
   get salePayment() { return getDb().salePayment; },
+  get backupRecord() { return getDb().backupRecord; },
+  get forecastSnapshot() { return getDb().forecastSnapshot; },
   get $queryRaw() { return getDb().$queryRaw.bind(getDb()); },
   get $executeRaw() { return getDb().$executeRaw.bind(getDb()); },
   get $transaction() { return getDb().$transaction.bind(getDb()); },
