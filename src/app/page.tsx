@@ -985,7 +985,10 @@ export default function POSPage() {
   const filteredProducts = useMemo(() => {
     let result = products;
     if (activeCategory !== "all") {
-      result = result.filter(p => p.category === activeCategory);
+      // Filter by groupId OR category — the product form sets both to the
+      // stock group ID. Using || handles products created before the form
+      // synced category=groupId (legacy products might have category="other").
+      result = result.filter(p => p.groupId === activeCategory || p.category === activeCategory);
     }
     if (debouncedSearch.trim()) {
       const q = debouncedSearch.toLowerCase();
@@ -3189,31 +3192,53 @@ export default function POSPage() {
       {/* ===== Category Navigation — Premium Pills with icons + active glow ===== */}
       <nav className="flex-shrink-0 bg-white/80 backdrop-blur-xl border-b border-slate-200/80 z-20 sticky top-0 shadow-sm">
         <div className="flex items-center gap-1.5 px-3 sm:px-4 py-2 overflow-x-auto scrollbar-hide">
-          {categories.map(cat => {
-            const count = cat.id === "all" ? products.length : products.filter(p => p.category === cat.id).length;
-            return (
-              <button title="Button"
-                key={cat.id}
-                onClick={() => setActiveCategory(cat.id)}
-                className={cn(
-                  "cat-pill-premium flex-shrink-0 flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-200",
-                  activeCategory === cat.id
-                    ? `bg-gradient-to-r ${cat.gradient} text-white shadow-md scale-105`
-                    : "bg-slate-100/80 text-slate-600 hover:bg-slate-200/80 hover:scale-105"
-                )}
-              >
-                <span className={cn("text-base transition-transform", activeCategory === cat.id && "scale-125")}>{cat.icon}</span>
-                <span className="sm:hidden">{cat.id === 'confectionery' ? 'Confect.' : cat.id === 'soft-drinks' ? 'Drinks' : cat.id === 'hard-liquor' ? 'Liquor' : cat.id === 'households' ? 'Home' : cat.id === 'groceries' ? 'Grocery' : cat.name}</span>
-                <span className="hidden sm:inline">{cat.name}</span>
-                <span className={cn(
-                  "ml-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold transition-colors",
-                  activeCategory === cat.id ? "bg-white/25 text-white" : "bg-slate-200 text-slate-500"
-                )}>
-                  {count}
-                </span>
-              </button>
-            );
-          })}
+          {/* DYNAMIC CATEGORY PILLS — built from DB stock groups, not hardcoded array.
+              Previously used the hardcoded `categories` from pos-data.ts which had
+              fixed IDs like 'groceries', 'confectionery'. After a DB wipe, the stock
+              groups get cuid() IDs (e.g. 'cmr...') that don't match the hardcoded
+              strings — so products never appeared under any category pill. */}
+          {(() => {
+            // Build category pills from DB stock groups + an "All" pill at the start
+            const dynamicCats: Array<{id: string; name: string; icon: string; color: string}> = [
+              { id: "all", name: "All Items", icon: "🛒", color: "slate" },
+              ...groups.map(g => ({
+                id: g.id,
+                name: g.name,
+                icon: g.icon || "📦",
+                color: g.color || "slate",
+              })),
+            ];
+            return dynamicCats.map(cat => {
+              // Filter by groupId (FK to StockGroup) instead of category (string).
+              // The product form sets both groupId and category to the stock group ID,
+              // but groupId is the canonical FK reference.
+              const count = cat.id === "all"
+                ? products.length
+                : products.filter(p => (p.groupId || p.category) === cat.id).length;
+              return (
+                <button title="Button"
+                  key={cat.id}
+                  onClick={() => setActiveCategory(cat.id)}
+                  className={cn(
+                    "cat-pill-premium flex-shrink-0 flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-200",
+                    activeCategory === cat.id
+                      ? "bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-md scale-105"
+                      : "bg-slate-100/80 text-slate-600 hover:bg-slate-200/80 hover:scale-105"
+                  )}
+                >
+                  <span className={cn("text-base transition-transform", activeCategory === cat.id && "scale-125")}>{cat.icon}</span>
+                  <span className="sm:hidden">{cat.name.length > 8 ? cat.name.slice(0, 7) + '…' : cat.name}</span>
+                  <span className="hidden sm:inline">{cat.name}</span>
+                  <span className={cn(
+                    "ml-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold transition-colors",
+                    activeCategory === cat.id ? "bg-white/25 text-white" : "bg-slate-200 text-slate-500"
+                  )}>
+                    {count}
+                  </span>
+                </button>
+              );
+            });
+          })()}
         </div>
       </nav>
 

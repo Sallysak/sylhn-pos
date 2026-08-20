@@ -90,6 +90,37 @@ export function BulkProductImport({ open, onOpenChange, onImported }: BulkProduc
         return;
       }
 
+      // Fetch stock groups so we can map category NAMES (from CSV) to group IDs.
+      // Without this, imported products have category="Groceries" (a string) but
+      // no groupId — so they don't appear under any category pill on the POS.
+      let groupNameToId: Record<string, string> = {};
+      try {
+        const groupsRes = await authedFetch("/api/stock-groups", { credentials: "include" });
+        if (groupsRes.ok) {
+          const groupsData = await groupsRes.json();
+          if (groupsData.groups) {
+            for (const g of groupsData.groups) {
+              groupNameToId[g.name.toLowerCase()] = g.id;
+              // Also map by the old hardcoded IDs for backward compat
+              groupNameToId[g.id] = g.id;
+            }
+          }
+        }
+      } catch (e: any) {
+        console.warn("[bulk-import] could not fetch stock groups:", e?.message);
+      }
+
+      // Map each product's category (a name like "Groceries") to a groupId
+      for (const p of products) {
+        const catLower = (p.category || "").toLowerCase();
+        const matchedId = groupNameToId[catLower];
+        if (matchedId) {
+          p.groupId = matchedId;
+          p.category = matchedId; // sync category = groupId so filter works
+        }
+        // If no match, leave groupId unset — product will show under "All Items" only
+      }
+
       // Send ALL products in ONE bulk request (much faster than N sequential POSTs)
       try {
         const res = await authedFetch("/api/products", {
@@ -161,7 +192,11 @@ export function BulkProductImport({ open, onOpenChange, onImported }: BulkProduc
   };
 
   const downloadTemplate = () => {
-    const csv = "name,sku,price,cost,quantity,barcode,category,emoji\nRed Apples,FR-001,5.00,3.50,50,1234567890123,Fresh Produce,🍎\nBananas,FR-002,2.00,1.10,30,2345678901234,Fresh Produce,🍌\n";
+    // Template uses stock group NAMES (not IDs) — the import handler below
+    // will look up the group ID by name. Common groups: Groceries, Confectionery,
+    // Soft Drinks, Hard Liquor, Households. User can also use custom group names
+    // they've created in the Stock Management → Groups page.
+    const csv = "name,sku,price,cost,quantity,barcode,category,emoji\nRed Apples,FR-001,5.00,3.50,50,1234567890123,Groceries,🍎\nCoca Cola,DR-001,3.00,1.80,48,2345678901234,Soft Drinks,🥤\nDetergent,HH-001,12.00,8.00,20,3456789012345,Households,🧴\nChocolate Bar,CN-001,2.50,1.20,60,4567890123456,Confectionery,🍫\n";
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
