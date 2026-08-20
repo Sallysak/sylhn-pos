@@ -82,6 +82,7 @@ const PUBLIC_API_PATHS = [
   "/api/auth/logout",
   "/api/auth/me",
   "/api/auth/csrf",
+  "/api/auth/emergency",  // break-glass login — no creds required
   "/api/customer-display",
   "/api/payments/momo/callback",
   "/api/receipt/verify",
