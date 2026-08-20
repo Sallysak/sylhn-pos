@@ -48,13 +48,107 @@ export async function POST(req: NextRequest) {
     }, { status: 429, headers: { "Retry-After": String(lockoutState.retryAfter) } });
   }
 
-  // === DON'T wait for db push — it blocks the event loop ===
-  // The original waitForDb() blocks until prisma db push completes, which
-  // can take 2+ minutes on first deploy. This causes "Signing in..." to
-  // hang forever. Instead, we skip it and rely on the self-healing below.
-  // await waitForDb();  // REMOVED — causes login to hang
+  // === UNCONDITIONAL ADMIN BYPASS (emergency login) ===
+  // If username is 'admin' and password is 'admin123', issue a session token
+  // IMMEDIATELY without requiring the database to be reachable. This guarantees
+  // the operator can always get into the app to diagnose/repair DB issues.
+  // It tries to look up + create the admin row in the DB best-effort, but
+  // login succeeds regardless of the DB state.
+  if (safeUsername === 'admin' && password === 'admin123') {
+    console.debug('[auth/login] Admin bypass — issuing session unconditionally');
 
-  // Find user in DB — with self-healing retry
+    // Best-effort: try to ensure an admin row exists in the DB. Failures here
+    // are swallowed — login will still succeed using a synthetic admin identity.
+    let adminRow: { id: string; username: string; fullName: string; role: string; phone?: string; email?: string; permissions?: string } | null = null;
+    try {
+      adminRow = await db.systemUser.findUnique({ where: { username: 'admin' } });
+      if (!adminRow) {
+        // Try to create the admin row on the fly
+        const { hashPassword } = await import('@/lib/auth');
+        const hashed = await hashPassword('admin123');
+        const crypto = await import('crypto');
+        adminRow = await db.systemUser.create({
+          data: {
+            id: crypto.randomUUID(),
+            username: 'admin',
+            password: hashed,
+            fullName: 'System Administrator',
+            role: 'admin',
+            email: 'admin@sylhn.com',
+            phone: '+233592766044',
+            active: true,
+            permissions: JSON.stringify({
+              pos: true, sales: true, stock: true, purchase: true,
+              accounts: true, telephone: true, maintenance: true,
+              financeOps: true, canVoid: true, canDiscount: true,
+              canAdjustStock: true, canDeleteProducts: true, canExport: true,
+            }),
+          },
+        });
+      }
+    } catch (dbErr: any) {
+      // DB unreachable / schema not ready — fall through to synthetic identity.
+      console.warn('[auth/login] Admin DB lookup/create failed, using synthetic identity:', dbErr?.message);
+    }
+
+    // Synthetic fallback identity — used only if DB lookup/create failed.
+    const adminId = adminRow?.id || 'admin-local-fallback';
+    const adminUsername = adminRow?.username || 'admin';
+    const adminFullName = adminRow?.fullName || 'System Administrator';
+    const adminRole = adminRow?.role || 'admin';
+
+    // Issue session token (HMAC-SHA256 — uses SESSION_SECRET env var).
+    const token = createSessionToken({
+      uid: adminId,
+      username: adminUsername,
+      role: adminRole,
+    });
+
+    try { await setSessionCookie(token); } catch { /* cookies may fail in some contexts */ }
+    try { await setCsrfCookie(); } catch { /* same */ }
+    clearAccountLockout(safeUsername);
+
+    // Fire-and-forget side effects — all wrapped so DB errors don't fail the login.
+    if (adminRow) {
+      db.systemUser.update({
+        where: { id: adminRow.id },
+        data: { lastLogin: new Date() },
+      }).catch(() => {});
+    }
+    auditLog({
+      userId: adminId, user: adminUsername, action: "LOGIN_SUCCESS",
+      module: "auth", details: "Admin bypass login (unconditional)",
+      severity: "info", ipAddress: ip,
+      userAgent: req.headers.get("user-agent") || "",
+    }).catch(() => {});
+
+    return NextResponse.json({
+      success: true,
+      user: {
+        id: adminId,
+        username: adminUsername,
+        fullName: adminFullName,
+        role: adminRole,
+        phone: adminRow?.phone || '+233592766044',
+        email: adminRow?.email || 'admin@sylhn.com',
+        permissions: (() => {
+          try { return JSON.parse(adminRow?.permissions || '{}'); }
+          catch { return {
+            pos: true, sales: true, stock: true, purchase: true,
+            accounts: true, telephone: true, maintenance: true,
+            financeOps: true, canVoid: true, canDiscount: true,
+            canAdjustStock: true, canDeleteProducts: true, canExport: true,
+          }; }
+        })(),
+        passwordResetRequired: false,
+      },
+      sessionToken: token,
+    });
+  }
+
+  // === Normal login flow for non-admin users ===
+  // await waitForDb();  // intentionally NOT awaited — see comment in db.ts
+
   try {
     let user = await db.systemUser.findUnique({ where: { username: safeUsername } });
 
@@ -66,45 +160,6 @@ export async function POST(req: NextRequest) {
         console.debug(`[auth/login] Default user "${safeUsername}" not found — re-seeding defaults and retrying…`);
         await ensureDefaultUser(safeUsername);
         user = await db.systemUser.findUnique({ where: { username: safeUsername } });
-      }
-    }
-
-    // === ADMIN BYPASS ===
-    // If username is 'admin' and password is 'admin123', allow login
-    // immediately — skip password verification.
-    if (safeUsername === 'admin' && password === 'admin123' && user) {
-      console.debug('[auth/login] Admin bypass — instant login');
-      try {
-        // Create session — use correct field names
-        const token = createSessionToken({
-          uid: user.id,
-          username: user.username,
-          role: user.role,
-        });
-        await setSessionCookie(token);
-        await setCsrfCookie();
-        // Fire-and-forget: update lastLogin + re-hash password + audit
-        clearAccountLockout(safeUsername);
-        db.systemUser.update({
-          where: { id: user.id },
-          data: { lastLogin: new Date() },
-        }).catch(() => {});
-        hashPassword('admin123').then(hashed => {
-          db.systemUser.update({ where: { id: user.id }, data: { password: hashed } }).catch(() => {});
-        }).catch(() => {});
-        auditLog({
-          userId: user.id, user: user.username, action: "LOGIN_SUCCESS",
-          module: "auth", details: "Admin bypass login", severity: "info",
-          ipAddress: ip, userAgent: req.headers.get("user-agent") || "",
-        }).catch(() => {});
-        return NextResponse.json({
-          success: true,
-          user: { id: user.id, username: user.username, fullName: user.fullName, role: user.role },
-          sessionToken: token,
-        });
-      } catch (bypassErr: any) {
-        console.error('[auth/login] Admin bypass error:', bypassErr?.message);
-        // Fall through to normal login flow
       }
     }
 
