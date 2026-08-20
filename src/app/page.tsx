@@ -3348,7 +3348,7 @@ export default function POSPage() {
                     {/* Product image or emoji */}
                     <div className="h-20 w-20 sm:h-24 sm:w-24 rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center text-5xl mb-2 group-hover:scale-110 transition-transform duration-200 ring-1 ring-slate-100 overflow-hidden">
                       {product.imageUrl || product.image ? (
-                        <img loading="lazy"
+                        <img loading="lazy" decoding="async"
                           src={product.imageUrl || product.image}
                           alt={product.name}
                           className="h-full w-full object-cover rounded-2xl"
