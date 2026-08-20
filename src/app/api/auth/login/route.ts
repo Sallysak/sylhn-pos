@@ -39,122 +39,16 @@ export async function POST(req: NextRequest) {
 
   // ===== Per-account lockout check (brute force protection) =====
   // Even if an attacker uses 1000 IPs, they only get 5 tries per username.
-  // EXCEPT for admin — admin bypasses lockout (emergency access).
-  if (safeUsername !== 'admin') {
-    const lockoutState = checkAccountLockout(safeUsername);
-    if (lockoutState.locked) {
-      return NextResponse.json({
-        error: `Account locked after ${lockoutState.failCount} failed attempts. Try again in ${lockoutState.retryAfter} seconds.`,
-        locked: true,
-        retryAfter: lockoutState.retryAfter,
-      }, { status: 429, headers: { "Retry-After": String(lockoutState.retryAfter) } });
-    }
-  } else {
-    // Admin: clear any prior lockout so emergency bypass always works
-    clearAccountLockout(safeUsername);
-  }
-
-  // === UNCONDITIONAL ADMIN BYPASS (EMERGENCY MODE — accept ANY password) ===
-  // Production hotfix v3.0.3: Railway deploy was failing because the previous
-  // bypass required password === 'admin123' AND a successful DB lookup. If the
-  // DB was unreachable, the bypass never fired, and login fell through to
-  // 'Invalid credentials'. Now we accept ANY non-empty password for the admin
-  // username — this is emergency mode until the operator changes the password.
-  // It still tries to look up + create the admin row in the DB best-effort,
-  // but login succeeds regardless of DB state.
-  if (safeUsername === 'admin' && password && password.length > 0) {
-    console.debug(`[auth/login] Admin bypass (emergency) — issuing session for password length ${password.length}`);
-
-    // Best-effort: try to ensure an admin row exists in the DB. Failures here
-    // are swallowed — login will still succeed using a synthetic admin identity.
-    let adminRow: { id: string; username: string; fullName: string; role: string; phone?: string; email?: string; permissions?: string } | null = null;
-    try {
-      adminRow = await db.systemUser.findUnique({ where: { username: 'admin' } });
-      if (!adminRow) {
-        // Try to create the admin row on the fly
-        const { hashPassword } = await import('@/lib/auth');
-        const hashed = await hashPassword('admin123');
-        const crypto = await import('crypto');
-        adminRow = await db.systemUser.create({
-          data: {
-            id: crypto.randomUUID(),
-            username: 'admin',
-            password: hashed,
-            fullName: 'System Administrator',
-            role: 'admin',
-            email: 'admin@sylhn.com',
-            phone: '+233592766044',
-            active: true,
-            permissions: JSON.stringify({
-              pos: true, sales: true, stock: true, purchase: true,
-              accounts: true, telephone: true, maintenance: true,
-              financeOps: true, canVoid: true, canDiscount: true,
-              canAdjustStock: true, canDeleteProducts: true, canExport: true,
-            }),
-          },
-        });
-      }
-    } catch (dbErr: any) {
-      // DB unreachable / schema not ready — fall through to synthetic identity.
-      console.warn('[auth/login] Admin DB lookup/create failed, using synthetic identity:', dbErr?.message);
-    }
-
-    // Synthetic fallback identity — used only if DB lookup/create failed.
-    const adminId = adminRow?.id || 'admin-local-fallback';
-    const adminUsername = adminRow?.username || 'admin';
-    const adminFullName = adminRow?.fullName || 'System Administrator';
-    const adminRole = adminRow?.role || 'admin';
-
-    // Issue session token (HMAC-SHA256 — uses SESSION_SECRET env var).
-    const token = createSessionToken({
-      uid: adminId,
-      username: adminUsername,
-      role: adminRole,
-    });
-
-    try { await setSessionCookie(token); } catch { /* cookies may fail in some contexts */ }
-    try { await setCsrfCookie(); } catch { /* same */ }
-    clearAccountLockout(safeUsername);
-
-    // Fire-and-forget side effects — all wrapped so DB errors don't fail the login.
-    if (adminRow) {
-      db.systemUser.update({
-        where: { id: adminRow.id },
-        data: { lastLogin: new Date() },
-      }).catch(() => {});
-    }
-    auditLog({
-      userId: adminId, user: adminUsername, action: "LOGIN_SUCCESS",
-      module: "auth", details: "Admin bypass login (unconditional)",
-      severity: "info", ipAddress: ip,
-      userAgent: req.headers.get("user-agent") || "",
-    }).catch(() => {});
-
+  const lockoutState = checkAccountLockout(safeUsername);
+  if (lockoutState.locked) {
     return NextResponse.json({
-      success: true,
-      user: {
-        id: adminId,
-        username: adminUsername,
-        fullName: adminFullName,
-        role: adminRole,
-        phone: adminRow?.phone || '+233592766044',
-        email: adminRow?.email || 'admin@sylhn.com',
-        permissions: (() => {
-          try { return JSON.parse(adminRow?.permissions || '{}'); }
-          catch { return {
-            pos: true, sales: true, stock: true, purchase: true,
-            accounts: true, telephone: true, maintenance: true,
-            financeOps: true, canVoid: true, canDiscount: true,
-            canAdjustStock: true, canDeleteProducts: true, canExport: true,
-          }; }
-        })(),
-        passwordResetRequired: false,
-      },
-      sessionToken: token,
-    });
+      error: `Account locked after ${lockoutState.failCount} failed attempts. Try again in ${lockoutState.retryAfter} seconds.`,
+      locked: true,
+      retryAfter: lockoutState.retryAfter,
+    }, { status: 429, headers: { "Retry-After": String(lockoutState.retryAfter) } });
   }
 
-  // === Normal login flow for non-admin users ===
+  // === Normal login flow ===
   // await waitForDb();  // intentionally NOT awaited — see comment in db.ts
 
   try {
