@@ -183,3 +183,4 @@ export const CHANGELOG: { version: string; date: string; changes: string[] }[] =
     ],
   },
 ];
+// v2.4.7
