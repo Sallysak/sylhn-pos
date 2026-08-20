@@ -59,19 +59,18 @@ export function BulkProductImport({ open, onOpenChange, onImported }: BulkProduc
         return;
       }
 
-      let success = 0;
-      let failed = 0;
+      // Build products array from CSV
+      const products: any[] = [];
       const errors: string[] = [];
 
-      // Process each row
       for (let i = 1; i < lines.length; i++) {
         const cols = lines[i].split(",").map(c => c.trim().replace(/^"|"$/g, ""));
         const name = cols[nameIdx];
-        if (!name) { failed++; errors.push(`Row ${i + 1}: Missing name`); continue; }
+        if (!name) { errors.push(`Row ${i + 1}: Missing name`); continue; }
 
-        const productData: any = {
+        products.push({
           name,
-          sku: skuIdx >= 0 ? cols[skuIdx] : `SKU-${Date.now()}-${i}`,
+          sku: skuIdx >= 0 && cols[skuIdx] ? cols[skuIdx] : `SKU-${Date.now()}-${i}`,
           price: priceIdx >= 0 ? parseFloat(cols[priceIdx]) || 0 : 0,
           costPrice: costIdx >= 0 ? parseFloat(cols[costIdx]) || 0 : 0,
           quantity: qtyIdx >= 0 ? parseInt(cols[qtyIdx]) || 0 : 0,
@@ -82,26 +81,76 @@ export function BulkProductImport({ open, onOpenChange, onImported }: BulkProduc
           reorderLevel: 5,
           taxable: true,
           active: true,
-        };
-
-        try {
-          const res = await authedFetch("/api/products", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify(productData),
-          });
-          if (res.ok) success++;
-          else { failed++; const data = await res.json().catch(() => ({})); errors.push(`Row ${i + 1} (${name}): ${data.error || "Failed"}`); }
-        } catch {
-          failed++; errors.push(`Row ${i + 1} (${name}): Network error`);
-        }
+        });
       }
 
-      setResults({ success, failed, errors });
-      if (success > 0) {
-        toast({ title: `Imported ${success} products ✓`, description: failed > 0 ? `${failed} failed` : "All succeeded" });
-        onImported?.();
+      if (products.length === 0) {
+        toast({ title: "No valid products to import", variant: "destructive" });
+        setImporting(false);
+        return;
+      }
+
+      // Send ALL products in ONE bulk request (much faster than N sequential POSTs)
+      try {
+        const res = await authedFetch("/api/products", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ products }),
+        });
+
+        const data = await res.json().catch(() => ({} as any));
+
+        if (res.ok && data.success) {
+          const success = data.count || products.length;
+          setResults({ success, failed: 0, errors });
+          toast({
+            title: `Imported ${success} products ✓`,
+            description: "Product list refreshed",
+          });
+          onImported?.();
+        } else {
+          // Bulk endpoint failed — fall back to sequential creates
+          console.warn("[bulk-import] Bulk endpoint failed, falling back to sequential:", data.error);
+          let success = 0;
+          let failed = 0;
+          const seqErrors: string[] = [...errors];
+
+          for (let i = 0; i < products.length; i++) {
+            const p = products[i];
+            try {
+              const res = await authedFetch("/api/products", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+                body: JSON.stringify(p),
+              });
+              if (res.ok) success++;
+              else {
+                failed++;
+                const errData = await res.json().catch(() => ({} as any));
+                seqErrors.push(`Row ${i + 2} (${p.name}): ${errData.error || "Failed"}`);
+              }
+            } catch {
+              failed++;
+              seqErrors.push(`Row ${i + 2} (${p.name}): Network error`);
+            }
+          }
+
+          setResults({ success, failed, errors: seqErrors });
+          if (success > 0) {
+            toast({
+              title: `Imported ${success} products ✓`,
+              description: failed > 0 ? `${failed} failed` : "All succeeded",
+            });
+            onImported?.();
+          } else {
+            toast({ title: "Import failed", description: "All products failed to import", variant: "destructive" });
+          }
+        }
+      } catch (e: any) {
+        toast({ title: "Import failed", description: e?.message || "Network error", variant: "destructive" });
+        setResults({ success: 0, failed: products.length, errors: [...errors, `Network error: ${e?.message}`] });
       }
     } catch (e: any) {
       toast({ title: "Import failed", description: e?.message, variant: "destructive" });

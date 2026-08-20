@@ -1090,6 +1090,10 @@ export default function POSPage() {
   // ~0.2KB (304 Not Modified) or ~1KB (one or two changed products).
   const productSyncCursorRef = useRef<string | null>(null);
   const productEtagRef = useRef<string | null>(null);
+  // Expose fetchProducts so it can be called from outside the useEffect
+  // (e.g. after bulk import). Without this, imported products don't show
+  // up until the 5-minute polling interval fires.
+  const refreshProductsRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     if (!loggedInUser) return;
@@ -1140,6 +1144,8 @@ export default function POSPage() {
     };
 
     fetchProducts();
+    // Expose fetchProducts so it can be called from outside (e.g. after bulk import)
+    refreshProductsRef.current = fetchProducts;
     const interval = setInterval(fetchProducts, 300000); // 5 min polling (was 60s — too frequent)
     return () => clearInterval(interval);
   }, [loggedInUser]);
@@ -4252,7 +4258,14 @@ export default function POSPage() {
       <RecurringPOManager open={showRecurringPO} onOpenChange={setShowRecurringPO} suppliers={suppliers} products={products} />
 
       {/* ===== Bulk Product Import ===== */}
-      <BulkProductImport open={showBulkImport} onOpenChange={setShowBulkImport} onImported={() => { /* could refresh products here */ }} />
+      <BulkProductImport open={showBulkImport} onOpenChange={setShowBulkImport} onImported={() => {
+        // Reset the sync cursor + ETag so the next fetch does a FULL reload
+        // (not incremental — otherwise the new products might be missed)
+        productSyncCursorRef.current = null;
+        productEtagRef.current = null;
+        // Trigger an immediate product refresh
+        refreshProductsRef.current();
+      }} />
 
       {/* ===== Security: Forced Password Change Dialog ===== */}
       <Dialog open={showForcePasswordChange} onOpenChange={(v) => { /* don't allow closing without changing password */ }}>
