@@ -122,7 +122,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Unknown action" }, { status: 400 });
     }
 
-    await auditLog({
+    auditLog({
       userId: user.uid,
       user: user.username,
       action: "DATA_PROTECTION_ACTION",

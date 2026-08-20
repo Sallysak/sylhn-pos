@@ -92,7 +92,7 @@ export async function GET(req: NextRequest) {
       : `https://wa.me/?text=${encodeURIComponent(text)}`;
 
     // Audit the action
-    await auditLog({
+    auditLog({
       userId: user.uid,
       user: user.username,
       action: "RECEIPT_WHATSAPP",

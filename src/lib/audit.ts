@@ -18,11 +18,20 @@ export interface AuditParams {
   userAgent?: string;
 }
 
-// ===== Fire-and-forget audit log (does not block the request) =====
+// ===== Fire-and-forget audit log (does NOT block the request) =====
 // Use this for non-transactional audit logs (e.g. login, logout, exports).
-export async function auditLog(params: AuditParams): Promise<void> {
+//
+// PERFORMANCE: Previously this was `async` and every caller `await`ed it —
+// which blocked the response by 5-30ms per audit log DB write. On login,
+// there are 1-2 audit log writes, so login was 10-60ms slower than needed.
+//
+// Now: truly fire-and-forget. The DB write happens in the background.
+// Errors are logged via console.warn but never reject.
+export function auditLog(params: AuditParams): void {
+  // Fire-and-forget — do NOT await. The promise is intentionally unhandled
+  // (errors are caught inside .catch()).
   try {
-    await db.auditLog.create({
+    void db.auditLog.create({
       data: {
         userId: params.userId,
         user: params.user,
@@ -33,10 +42,13 @@ export async function auditLog(params: AuditParams): Promise<void> {
         ipAddress: params.ipAddress || "",
         userAgent: params.userAgent || "",
       },
+    }).catch((e: any) => {
+      // Audit log failure should NOT fail the user's request — just warn.
+      console.warn("Audit log failed:", e?.message || e);
     });
-  } catch (e) {
-    // Audit log failure should NOT fail the user's request — just warn.
-    console.warn("Audit log failed:", e);
+  } catch (e: any) {
+    // Synchronous error (e.g. db proxy getter failed) — log and move on
+    console.warn("Audit log setup failed:", e?.message || e);
   }
 }
 

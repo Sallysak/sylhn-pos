@@ -109,7 +109,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     openMailto(emailMessage);
   }
 
-  await auditLog({
+  auditLog({
     userId: user.uid,
     user: user.username,
     action: "EMAIL",

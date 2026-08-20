@@ -155,7 +155,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         where: { id },
         data: { status: "cancelled" },
       });
-      await auditLog({
+      auditLog({
         userId: user.uid,
         user: user.username,
         action: "CANCEL",

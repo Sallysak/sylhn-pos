@@ -56,7 +56,7 @@ export async function PUT(req: NextRequest) {
       clearLoyaltyConfigCache();
     }
 
-    await auditLog({
+    auditLog({
       userId: user.uid,
       user: user.username,
       action: "UPDATE",

@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
       create: { key: `shift-close-${new Date().toISOString().split('T')[0]}`, value: JSON.stringify(checklistRecord), updatedBy: user.uid },
     });
 
-    await auditLog({
+    auditLog({
       userId: user.uid,
       user: user.username,
       action: "SHIFT_CLOSE_CHECKLIST",

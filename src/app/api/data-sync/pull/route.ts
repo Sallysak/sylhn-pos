@@ -69,7 +69,7 @@ export async function GET(req: NextRequest) {
       receivedDate: p.receivedDate?.toISOString() || null,
     }));
 
-    await auditLog({
+    auditLog({
       userId: user.uid,
       user: user.username,
       action: "DATA_PULL",

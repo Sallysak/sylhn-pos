@@ -120,7 +120,7 @@ export async function GET(req: NextRequest) {
       byCategory[cat].count += 1;
     }
 
-    await auditLog({
+    auditLog({
       userId: "",
       user: "system",
       action: "REPORT",

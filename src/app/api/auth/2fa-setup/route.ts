@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
       // — TODO: use decryptField() once a stable encryption key is configured.
       const secret = base32Decode(freshUser.twoFactorSecret);
       if (!verifyTOTP(secret, String(body.code))) {
-        await auditLog({
+        auditLog({
           userId: user.uid,
           user: user.username,
           action: "2FA_VERIFY_FAILED",
@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      await auditLog({
+      auditLog({
         userId: user.uid,
         user: user.username,
         action: "2FA_ENABLED",
@@ -154,7 +154,7 @@ export async function DELETE(req: NextRequest) {
       },
     });
 
-    await auditLog({
+    auditLog({
       userId: user.uid,
       user: user.username,
       action: "2FA_DISABLED",

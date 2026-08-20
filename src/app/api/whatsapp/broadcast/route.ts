@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
       return { customer: { id: c.id, name: c.name, phone: c.mobile || c.phone, tier: c.tier, points: c.pointsBalance }, waLink };
     }).filter(l => l.customer.phone);
 
-    await auditLog({
+    auditLog({
       userId: user.uid,
       user: user.username,
       action: "WHATSAPP_BROADCAST",

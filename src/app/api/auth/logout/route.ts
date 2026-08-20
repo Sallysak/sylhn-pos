@@ -7,7 +7,7 @@ import { getClientIp } from "@/lib/rate-limit";
 export async function POST(req: NextRequest) {
   const session = await getSession();
   if (session) {
-    await auditLog({
+    auditLog({
       userId: session.uid,
       user: session.username,
       action: "LOGOUT",

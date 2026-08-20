@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
         ? "No users found. Visit /api/setup to create default users (admin/admin123)"
         : "Invalid credentials";
 
-      await auditLog({
+      auditLog({
         userId: "",
         user: safeUsername,
         action: "LOGIN_FAILED",
@@ -125,7 +125,7 @@ export async function POST(req: NextRequest) {
       }
     }
     if (!user.active) {
-      await auditLog({
+      auditLog({
         userId: user.id,
         user: user.username,
         action: "LOGIN_BLOCKED",
@@ -145,7 +145,7 @@ export async function POST(req: NextRequest) {
     // 2. The user must have registered biometrics after a successful password login
     // 3. The server still checks that the user exists and is active
     if (biometric) {
-      await auditLog({
+      auditLog({
         userId: user.id,
         user: user.username,
         action: "LOGIN_BIOMETRIC",
@@ -197,7 +197,7 @@ export async function POST(req: NextRequest) {
     if (!valid) {
       // Record failed attempt → may trigger lockout
       const failState = recordFailedLogin(safeUsername);
-      await auditLog({
+      auditLog({
         userId: user.id,
         user: user.username,
         action: "LOGIN_FAILED",
@@ -223,23 +223,25 @@ export async function POST(req: NextRequest) {
     // ===== Successful login — clear account lockout counter =====
     clearAccountLockout(safeUsername);
 
-    // Update lastLogin
-    await db.systemUser.update({
+    // Update lastLogin — fire-and-forget (don't block login response)
+    db.systemUser.update({
       where: { id: user.id },
       data: { lastLogin: new Date() },
-    });
+    }).catch(() => { /* ignore — best-effort */ });
 
-    // Create session token + cookies
+    // Create session token + cookies (parallel — saves 5-10ms)
     const token = createSessionToken({
       uid: user.id,
       username: user.username,
       role: user.role,
     });
-    await setSessionCookie(token);
-    await setCsrfCookie();
+    await Promise.all([
+      setSessionCookie(token),
+      setCsrfCookie(),
+    ]);
 
     // Audit successful login
-    await auditLog({
+    auditLog({
       userId: user.id,
       user: user.username,
       action: "LOGIN",

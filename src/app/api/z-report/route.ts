@@ -156,7 +156,7 @@ export async function GET(req: NextRequest) {
     const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
 
     // Audit
-    await auditLog({
+    auditLog({
       userId: user.uid,
       user: user.username,
       action: "Z_REPORT",

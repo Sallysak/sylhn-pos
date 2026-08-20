@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    await auditLog({ userId: user.uid, user: user.username, action: "CREATE", module: "purchase", details: `Recurring PO "${recurring.name}" created (${body.frequency}), next run: ${nextRun.toDateString()}`, severity: "info", ipAddress: ip });
+    auditLog({ userId: user.uid, user: user.username, action: "CREATE", module: "purchase", details: `Recurring PO "${recurring.name}" created (${body.frequency}), next run: ${nextRun.toDateString()}`, severity: "info", ipAddress: ip });
 
     return NextResponse.json({ success: true, recurringPO: recurring });
   } catch (e: any) {
@@ -112,7 +112,7 @@ export async function PUT(req: NextRequest) {
       });
 
       await db.recurringPO.update({ where: { id: recurring.id }, data: { lastRunAt: new Date(), runCount: { increment: 1 } } });
-      await auditLog({ userId: user.uid, user: user.username, action: "RECURRING_RUN", module: "purchase", details: `Recurring PO "${recurring.name}" executed — created ${purchase.refNo} (${poItems.length} items, GHS ${total.toFixed(2)})`, severity: "warning", ipAddress: ip });
+      auditLog({ userId: user.uid, user: user.username, action: "RECURRING_RUN", module: "purchase", details: `Recurring PO "${recurring.name}" executed — created ${purchase.refNo} (${poItems.length} items, GHS ${total.toFixed(2)})`, severity: "warning", ipAddress: ip });
 
       return NextResponse.json({ success: true, purchase });
     } catch (e: any) {

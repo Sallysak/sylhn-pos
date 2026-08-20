@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
         }
       }
       // Audit bulk upsert
-      await auditLog({
+      auditLog({
         userId: user.uid,
         user: user.username,
         action: "BULK_UPSERT",
@@ -152,7 +152,7 @@ export async function POST(req: NextRequest) {
       include: { products: true, purchases: true },
     });
 
-    await auditLog({
+    auditLog({
       userId: user.uid,
       user: user.username,
       action: "CREATE",

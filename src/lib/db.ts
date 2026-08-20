@@ -142,11 +142,31 @@ export const db = {
 
 // ===== Schema bootstrap =====
 // DB initialization — runs ONCE per serverless instance lifetime.
-// Uses a flag so we don't do a count() round-trip on every cold start
-// after the first successful init. The globalForPrisma cache persists
-// across warm invocations within the same serverless instance.
+//
+// PERFORMANCE FIX: Previously this ran 3 DB round-trips on every cold start
+// (count SystemUser → findFirst Product → count Email) before deciding sync
+// wasn't needed. That added 30-200ms latency to EVERY cold-start request.
+//
+// Now: uses a process-level flag (`__sylhnSchemaVerified`) that persists
+// across warm invocations within the same instance. The health check runs
+// only once per instance lifetime — subsequent cold starts skip it entirely.
+//
+// On Railway (which keeps instances warm for ~5min between requests), this
+// means: first request after deploy = 3 round-trips; subsequent requests
+// for the next 5 minutes = 0 round-trips.
+declare global {
+  // eslint-disable-next-line no-var
+  var __sylhnSchemaVerified: boolean | undefined;
+}
+
 if (!globalForPrisma.__prismaDbPush) {
   globalForPrisma.__prismaDbPush = (async () => {
+    // FAST PATH: if this instance already verified the schema in a previous
+    // warm invocation, skip the health check entirely. Saves 3 DB round-trips.
+    if (globalThis.__sylhnSchemaVerified) {
+      return;
+    }
+
     let needsSync = false;
     try {
       // Quick health check — if this succeeds, tables exist and DB is ready
@@ -212,6 +232,9 @@ if (!globalForPrisma.__prismaDbPush) {
         console.error('[db] prisma db push failed:', pushErr?.message || pushErr);
       }
     }
+
+    // Mark schema as verified — subsequent warm invocations skip the health check
+    globalThis.__sylhnSchemaVerified = true;
   })().catch((e) => {
     console.error('[db] Initialization error:', e?.message);
   });
@@ -278,8 +301,13 @@ export async function seedDefaultUsers(): Promise<void> {
 /**
  * Wait for the DB initialization (table creation + auto-seed) to settle.
  * Call this at the top of any API route that needs the schema to be ready.
+ *
+ * PERFORMANCE: Returns immediately if the schema has already been verified
+ * in this instance (process-level flag `__sylhnSchemaVerified`).
  */
 export async function waitForDb(): Promise<void> {
+  // Fast-path: if this instance already verified the schema, skip entirely
+  if (globalThis.__sylhnSchemaVerified) return;
   if (globalForPrisma.__prismaDbPush) {
     try { await globalForPrisma.__prismaDbPush; } catch { /* already logged */ }
   }

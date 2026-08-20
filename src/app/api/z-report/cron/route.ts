@@ -71,7 +71,7 @@ Expected Cash: GHS ${cashExpected.toFixed(2)}`;
       recipients = managers.map(m => m.email).filter(Boolean);
     }
 
-    await auditLog({
+    auditLog({
       userId: "",
       user: "cron",
       action: "Z_REPORT_CRON",

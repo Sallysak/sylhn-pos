@@ -124,7 +124,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Audit the report generation
-    await auditLog({
+    auditLog({
       userId: "",
       user: "system",
       action: "REPORT",

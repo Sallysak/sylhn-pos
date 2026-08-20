@@ -138,7 +138,7 @@ export async function GET(req: NextRequest) {
     };
 
     // Audit
-    await auditLog({
+    auditLog({
       userId: user.uid,
       user: user.username,
       action: "REPORT",

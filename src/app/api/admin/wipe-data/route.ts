@@ -160,7 +160,7 @@ export async function POST(req: NextRequest) {
 
     // Record this momentous event in the audit log (re-created after wipe)
     try {
-      await auditLog({
+      auditLog({
         userId: user.uid,
         user: user.username,
         action: "WIPE_ALL_DATA",

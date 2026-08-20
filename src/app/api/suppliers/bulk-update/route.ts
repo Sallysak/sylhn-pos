@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
 
     // Audit log
     const fieldSummary = fieldsToUpdate.map(f => `${f}=${f === "blacklist" ? updateData.blacklist : f === "rating" ? updateData.rating : "…"}`).join(", ");
-    await auditLog({
+    auditLog({
       userId: user.uid,
       user: user.username,
       action: "BULK_UPDATE",

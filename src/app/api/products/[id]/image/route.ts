@@ -32,7 +32,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       select: { id: true, name: true, imageUrl: true },
     });
 
-    await auditLog({
+    auditLog({
       userId: user.uid, user: user.username,
       action: "UPDATE", module: "stock",
       details: `Product image updated for ${product.name}`,

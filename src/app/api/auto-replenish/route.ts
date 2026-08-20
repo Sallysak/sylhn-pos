@@ -218,7 +218,7 @@ export async function POST(req: NextRequest) {
       include: { product: true, supplier: true },
     });
 
-    await auditLog({
+    auditLog({
       userId: user.uid,
       user: user.username,
       action: "CREATE",
@@ -269,7 +269,7 @@ export async function PUT(req: NextRequest) {
       include: { product: true, supplier: true },
     });
 
-    await auditLog({
+    auditLog({
       userId: user.uid,
       user: user.username,
       action: "UPDATE",
@@ -308,7 +308,7 @@ export async function DELETE(req: NextRequest) {
       include: { product: true },
     });
 
-    await auditLog({
+    auditLog({
       userId: user.uid,
       user: user.username,
       action: "DELETE",

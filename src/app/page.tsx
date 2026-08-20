@@ -240,6 +240,10 @@ export default function POSPage() {
   // Suppliers — fetch from API on mount, start empty
   const [suppliers, setSuppliers] = useState<any[]>([]);
   useEffect(() => {
+    // Don't fetch if user isn't logged in — avoids wasted 401 round-trips
+    // We use a lazy check via localStorage token presence (loggedInUser is declared later)
+    const token = typeof window !== 'undefined' ? localStorage.getItem('sylhn-session-token') : null;
+    if (!token) return;
     let cancelled = false;
     (async () => {
       try {
@@ -266,6 +270,9 @@ export default function POSPage() {
 
   // ===== Fetch stock groups from API on mount =====
   useEffect(() => {
+    // Don't fetch if user isn't logged in — avoids wasted 401 round-trips
+    const token = typeof window !== 'undefined' ? localStorage.getItem('sylhn-session-token') : null;
+    if (!token) return;
     let cancelled = false;
     (async () => {
       try {
@@ -1728,6 +1735,7 @@ export default function POSPage() {
         else if (showFindProduct) setShowFindProduct(false);
         else if (showStockList) setShowStockList(false);
         else if (showCartPreview) setShowCartPreview(false);
+        else if (showSidebar) setShowSidebar(false);
         else setSelectedCartIndex(null);
       }
     };
@@ -2057,7 +2065,7 @@ export default function POSPage() {
         <OperationsDashboard products={products} onBack={() => setView("pos")} dailyTotal={dailyTotal} transactionCount={transactionCount} />
         <MobileNav
           active={view}
-          onNavigate={(v) => { if (v === "cart") setMobileCartOpen(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
+          onNavigate={(v) => { if (v === "cart") setShowCartPreview(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
           cartCount={cart.reduce((s, i) => s + i.quantity, 0)}
           user={loggedInUser ? { fullName: loggedInUser.fullName, role: loggedInUser.role } : null}
           onLogout={() => handleLogout()}
@@ -2071,7 +2079,7 @@ export default function POSPage() {
         <ReceiptArchive onBack={() => setView("pos")} />
         <MobileNav
           active={view}
-          onNavigate={(v) => { if (v === "cart") setMobileCartOpen(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
+          onNavigate={(v) => { if (v === "cart") setShowCartPreview(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
           cartCount={cart.reduce((s, i) => s + i.quantity, 0)}
           user={loggedInUser ? { fullName: loggedInUser.fullName, role: loggedInUser.role } : null}
           onLogout={() => handleLogout()}
@@ -2085,7 +2093,7 @@ export default function POSPage() {
         <FeaturesMap onBack={() => setView("pos")} onNavigate={(v) => setView(v as ViewMode)} />
         <MobileNav
           active={view}
-          onNavigate={(v) => { if (v === "cart") setMobileCartOpen(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
+          onNavigate={(v) => { if (v === "cart") setShowCartPreview(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
           cartCount={cart.reduce((s, i) => s + i.quantity, 0)}
           user={loggedInUser ? { fullName: loggedInUser.fullName, role: loggedInUser.role } : null}
           onLogout={() => handleLogout()}
@@ -2099,7 +2107,7 @@ export default function POSPage() {
         <AdminHub onBack={() => setView("pos")} onNavigate={(v) => setView(v as ViewMode)} userRole={loggedInUser?.role || "cashier"} />
         <MobileNav
           active={view}
-          onNavigate={(v) => { if (v === "cart") setMobileCartOpen(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
+          onNavigate={(v) => { if (v === "cart") setShowCartPreview(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
           cartCount={cart.reduce((s, i) => s + i.quantity, 0)}
           user={loggedInUser ? { fullName: loggedInUser.fullName, role: loggedInUser.role } : null}
           onLogout={() => handleLogout()}
@@ -2113,7 +2121,7 @@ export default function POSPage() {
         <EmailSystem onBack={() => setView("pos")} />
         <MobileNav
           active={view}
-          onNavigate={(v) => { if (v === "cart") setMobileCartOpen(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
+          onNavigate={(v) => { if (v === "cart") setShowCartPreview(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
           cartCount={cart.reduce((s, i) => s + i.quantity, 0)}
           user={loggedInUser ? { fullName: loggedInUser.fullName, role: loggedInUser.role } : null}
           onLogout={() => handleLogout()}
@@ -2127,7 +2135,7 @@ export default function POSPage() {
         <StockManagement onBack={() => { setView("pos"); setOpenStockQtyReport(false); }} products={products} setProducts={setProducts} groups={groups} setGroups={setGroups} history={history} setHistory={setHistory} initialView={initialStockView} openQtyReport={openStockQtyReport} onNavigateToPurchase={() => setView("purchase-form")} />
         <MobileNav
           active={view}
-          onNavigate={(v) => { if (v === "cart") setMobileCartOpen(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
+          onNavigate={(v) => { if (v === "cart") setShowCartPreview(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
           cartCount={cart.reduce((s, i) => s + i.quantity, 0)}
           user={loggedInUser ? { fullName: loggedInUser.fullName, role: loggedInUser.role } : null}
           onLogout={() => handleLogout()}
@@ -2141,7 +2149,7 @@ export default function POSPage() {
         <StockHistoryView onBack={() => setView("pos")} />
         <MobileNav
           active={view}
-          onNavigate={(v) => { if (v === "cart") setMobileCartOpen(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
+          onNavigate={(v) => { if (v === "cart") setShowCartPreview(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
           cartCount={cart.reduce((s, i) => s + i.quantity, 0)}
           user={loggedInUser ? { fullName: loggedInUser.fullName, role: loggedInUser.role } : null}
           onLogout={() => handleLogout()}
@@ -2155,7 +2163,7 @@ export default function POSPage() {
         <Reports onBack={() => setView("pos")} products={products} groups={groups} history={history} />
         <MobileNav
           active={view}
-          onNavigate={(v) => { if (v === "cart") setMobileCartOpen(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
+          onNavigate={(v) => { if (v === "cart") setShowCartPreview(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
           cartCount={cart.reduce((s, i) => s + i.quantity, 0)}
           user={loggedInUser ? { fullName: loggedInUser.fullName, role: loggedInUser.role } : null}
           onLogout={() => handleLogout()}
@@ -2174,7 +2182,7 @@ export default function POSPage() {
         />
         <MobileNav
           active={view}
-          onNavigate={(v) => { if (v === "cart") setMobileCartOpen(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
+          onNavigate={(v) => { if (v === "cart") setShowCartPreview(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
           cartCount={cart.reduce((s, i) => s + i.quantity, 0)}
           user={loggedInUser ? { fullName: loggedInUser.fullName, role: loggedInUser.role } : null}
           onLogout={() => handleLogout()}
@@ -2192,7 +2200,7 @@ export default function POSPage() {
         />
         <MobileNav
           active={view}
-          onNavigate={(v) => { if (v === "cart") setMobileCartOpen(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
+          onNavigate={(v) => { if (v === "cart") setShowCartPreview(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
           cartCount={cart.reduce((s, i) => s + i.quantity, 0)}
           user={loggedInUser ? { fullName: loggedInUser.fullName, role: loggedInUser.role } : null}
           onLogout={() => handleLogout()}
@@ -2206,7 +2214,7 @@ export default function POSPage() {
         <ProfitMarginReport onBack={() => setView("reports-center")} />
         <MobileNav
           active={view}
-          onNavigate={(v) => { if (v === "cart") setMobileCartOpen(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
+          onNavigate={(v) => { if (v === "cart") setShowCartPreview(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
           cartCount={cart.reduce((s, i) => s + i.quantity, 0)}
           user={loggedInUser ? { fullName: loggedInUser.fullName, role: loggedInUser.role } : null}
           onLogout={() => handleLogout()}
@@ -2220,7 +2228,7 @@ export default function POSPage() {
         <CustomerStatements onBack={() => setView("credit-management")} />
         <MobileNav
           active={view}
-          onNavigate={(v) => { if (v === "cart") setMobileCartOpen(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
+          onNavigate={(v) => { if (v === "cart") setShowCartPreview(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
           cartCount={cart.reduce((s, i) => s + i.quantity, 0)}
           user={loggedInUser ? { fullName: loggedInUser.fullName, role: loggedInUser.role } : null}
           onLogout={() => handleLogout()}
@@ -2234,7 +2242,7 @@ export default function POSPage() {
         <FinancialReports onBack={() => setView("reports-center")} />
         <MobileNav
           active={view}
-          onNavigate={(v) => { if (v === "cart") setMobileCartOpen(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
+          onNavigate={(v) => { if (v === "cart") setShowCartPreview(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
           cartCount={cart.reduce((s, i) => s + i.quantity, 0)}
           user={loggedInUser ? { fullName: loggedInUser.fullName, role: loggedInUser.role } : null}
           onLogout={() => handleLogout()}
@@ -2248,7 +2256,7 @@ export default function POSPage() {
         <ZReport onBack={() => setView("sales-menu")} />
         <MobileNav
           active={view}
-          onNavigate={(v) => { if (v === "cart") setMobileCartOpen(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
+          onNavigate={(v) => { if (v === "cart") setShowCartPreview(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
           cartCount={cart.reduce((s, i) => s + i.quantity, 0)}
           user={loggedInUser ? { fullName: loggedInUser.fullName, role: loggedInUser.role } : null}
           onLogout={() => handleLogout()}
@@ -2275,7 +2283,7 @@ export default function POSPage() {
         <PurchaseForm onBack={handlePurchaseFormBack} products={products} groups={groups} suppliers={suppliers} />
         <MobileNav
           active={view}
-          onNavigate={(v) => { if (v === "cart") setMobileCartOpen(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
+          onNavigate={(v) => { if (v === "cart") setShowCartPreview(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
           cartCount={cart.reduce((s, i) => s + i.quantity, 0)}
           user={loggedInUser ? { fullName: loggedInUser.fullName, role: loggedInUser.role } : null}
           onLogout={() => handleLogout()}
@@ -2289,7 +2297,7 @@ export default function POSPage() {
         <TelephoneModule onBack={() => setView("pos")} products={products} />
         <MobileNav
           active={view}
-          onNavigate={(v) => { if (v === "cart") setMobileCartOpen(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
+          onNavigate={(v) => { if (v === "cart") setShowCartPreview(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
           cartCount={cart.reduce((s, i) => s + i.quantity, 0)}
           user={loggedInUser ? { fullName: loggedInUser.fullName, role: loggedInUser.role } : null}
           onLogout={() => handleLogout()}
@@ -2305,7 +2313,7 @@ export default function POSPage() {
         </div>
         <MobileNav
           active={view}
-          onNavigate={(v) => { if (v === "cart") setMobileCartOpen(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
+          onNavigate={(v) => { if (v === "cart") setShowCartPreview(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
           cartCount={cart.reduce((s, i) => s + i.quantity, 0)}
           user={loggedInUser ? { fullName: loggedInUser.fullName, role: loggedInUser.role } : null}
           onLogout={() => handleLogout()}
@@ -2319,7 +2327,7 @@ export default function POSPage() {
         <MaintenanceModule onBack={() => setView("pos")} cashier={cashier} dailyTotal={dailyTotal} transactionCount={transactionCount} />
         <MobileNav
           active={view}
-          onNavigate={(v) => { if (v === "cart") setMobileCartOpen(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
+          onNavigate={(v) => { if (v === "cart") setShowCartPreview(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
           cartCount={cart.reduce((s, i) => s + i.quantity, 0)}
           user={loggedInUser ? { fullName: loggedInUser.fullName, role: loggedInUser.role } : null}
           onLogout={() => handleLogout()}
@@ -2333,7 +2341,7 @@ export default function POSPage() {
         <SoldItemsReport onBack={() => setView("pos")} />
         <MobileNav
           active={view}
-          onNavigate={(v) => { if (v === "cart") setMobileCartOpen(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
+          onNavigate={(v) => { if (v === "cart") setShowCartPreview(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
           cartCount={cart.reduce((s, i) => s + i.quantity, 0)}
           user={loggedInUser ? { fullName: loggedInUser.fullName, role: loggedInUser.role } : null}
           onLogout={() => handleLogout()}
@@ -2347,7 +2355,7 @@ export default function POSPage() {
         <SalesMenu onBack={() => setView("pos")} />
         <MobileNav
           active={view}
-          onNavigate={(v) => { if (v === "cart") setMobileCartOpen(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
+          onNavigate={(v) => { if (v === "cart") setShowCartPreview(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
           cartCount={cart.reduce((s, i) => s + i.quantity, 0)}
           user={loggedInUser ? { fullName: loggedInUser.fullName, role: loggedInUser.role } : null}
           onLogout={() => handleLogout()}
@@ -2361,7 +2369,7 @@ export default function POSPage() {
         <DailySalesReport onBack={() => setView("pos")} dailyTotal={dailyTotal} transactionCount={transactionCount} />
         <MobileNav
           active={view}
-          onNavigate={(v) => { if (v === "cart") setMobileCartOpen(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
+          onNavigate={(v) => { if (v === "cart") setShowCartPreview(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
           cartCount={cart.reduce((s, i) => s + i.quantity, 0)}
           user={loggedInUser ? { fullName: loggedInUser.fullName, role: loggedInUser.role } : null}
           onLogout={() => handleLogout()}
@@ -2375,7 +2383,7 @@ export default function POSPage() {
         <SalesHistory onBack={() => setView("pos")} />
         <MobileNav
           active={view}
-          onNavigate={(v) => { if (v === "cart") setMobileCartOpen(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
+          onNavigate={(v) => { if (v === "cart") setShowCartPreview(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
           cartCount={cart.reduce((s, i) => s + i.quantity, 0)}
           user={loggedInUser ? { fullName: loggedInUser.fullName, role: loggedInUser.role } : null}
           onLogout={() => handleLogout()}
@@ -2402,7 +2410,7 @@ export default function POSPage() {
         <SupplierForm onBack={handleSupplierFormBack} products={products} />
         <MobileNav
           active={view}
-          onNavigate={(v) => { if (v === "cart") setMobileCartOpen(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
+          onNavigate={(v) => { if (v === "cart") setShowCartPreview(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
           cartCount={cart.reduce((s, i) => s + i.quantity, 0)}
           user={loggedInUser ? { fullName: loggedInUser.fullName, role: loggedInUser.role } : null}
           onLogout={() => handleLogout()}
@@ -2416,7 +2424,7 @@ export default function POSPage() {
         <AccountsReports onBack={() => setView("pos")} products={products} groups={groups} history={history} dailyTotal={dailyTotal} transactionCount={transactionCount} initialReport={accountsReport} />
         <MobileNav
           active={view}
-          onNavigate={(v) => { if (v === "cart") setMobileCartOpen(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
+          onNavigate={(v) => { if (v === "cart") setShowCartPreview(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
           cartCount={cart.reduce((s, i) => s + i.quantity, 0)}
           user={loggedInUser ? { fullName: loggedInUser.fullName, role: loggedInUser.role } : null}
           onLogout={() => handleLogout()}
@@ -2430,7 +2438,7 @@ export default function POSPage() {
         <CreditManagement />
         <MobileNav
           active={view}
-          onNavigate={(v) => { if (v === "cart") setMobileCartOpen(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
+          onNavigate={(v) => { if (v === "cart") setShowCartPreview(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
           cartCount={cart.reduce((s, i) => s + i.quantity, 0)}
           user={loggedInUser ? { fullName: loggedInUser.fullName, role: loggedInUser.role } : null}
           onLogout={() => handleLogout()}
@@ -2444,7 +2452,7 @@ export default function POSPage() {
         <AutoReplenishRules onBack={() => setView("pos")} />
         <MobileNav
           active={view}
-          onNavigate={(v) => { if (v === "cart") setMobileCartOpen(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
+          onNavigate={(v) => { if (v === "cart") setShowCartPreview(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
           cartCount={cart.reduce((s, i) => s + i.quantity, 0)}
           user={loggedInUser ? { fullName: loggedInUser.fullName, role: loggedInUser.role } : null}
           onLogout={() => handleLogout()}
@@ -2462,7 +2470,7 @@ export default function POSPage() {
         />
         <MobileNav
           active={view}
-          onNavigate={(v) => { if (v === "cart") setMobileCartOpen(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("reports-center"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
+          onNavigate={(v) => { if (v === "cart") setShowCartPreview(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("reports-center"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
           cartCount={cart.reduce((s, i) => s + i.quantity, 0)}
           user={loggedInUser ? { fullName: loggedInUser.fullName, role: loggedInUser.role } : null}
           onLogout={() => handleLogout()}
@@ -2476,7 +2484,7 @@ export default function POSPage() {
         <FinancialOperations onBack={() => setView("pos")} dailyTotal={dailyTotal} initialTab={financeTab} />
         <MobileNav
           active={view}
-          onNavigate={(v) => { if (v === "cart") setMobileCartOpen(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
+          onNavigate={(v) => { if (v === "cart") setShowCartPreview(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
           cartCount={cart.reduce((s, i) => s + i.quantity, 0)}
           user={loggedInUser ? { fullName: loggedInUser.fullName, role: loggedInUser.role } : null}
           onLogout={() => handleLogout()}
@@ -2514,7 +2522,7 @@ export default function POSPage() {
         <AdminPanel currentUser={adminUserForPanel} onBack={() => setView("pos")} />
         <MobileNav
           active={view}
-          onNavigate={(v) => { if (v === "cart") setMobileCartOpen(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
+          onNavigate={(v) => { if (v === "cart") setShowCartPreview(true); else if (v === "dashboard") setView("dashboard"); else if (v === "reports") setView("sales-menu"); else if (v === "pos") setView("pos"); else setView(v as ViewMode); }}
           cartCount={cart.reduce((s, i) => s + i.quantity, 0)}
           user={loggedInUser ? { fullName: loggedInUser.fullName, role: loggedInUser.role } : null}
           onLogout={() => handleLogout()}
@@ -3425,7 +3433,7 @@ export default function POSPage() {
                       </span>
                     )}
                   </div>
-                  <button title="Close cart" className="h-7 w-7 rounded-lg hover:bg-white/20 flex items-center justify-center transition">
+                  <button title="Close cart" onClick={() => setShowSidebar(false)} className="h-7 w-7 rounded-lg hover:bg-white/20 flex items-center justify-center transition">
                     <X className="h-3.5 w-3.5" />
                   </button>
                 </div>
@@ -3949,7 +3957,7 @@ export default function POSPage() {
         active={view === "pos" ? "pos" : view}
         onNavigate={(v) => {
           if (v === "cart") {
-            setMobileCartOpen(true);
+            setShowCartPreview(true);
           } else if (v === "dashboard") {
             setView("dashboard");
           } else if (v === "reports") {
@@ -5585,7 +5593,7 @@ function StockListPopup({ products, searchText, onSelect, onClose, onNew }: {
             <Printer className="h-3 w-3" /> Print (F3)
           </button>
           <div className="flex-1" />
-          <button title="Close dialog" className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1" style={{ backgroundColor: '#F44336' }}>
+          <button title="Close dialog" onClick={onClose} className="h-7 px-3 rounded text-white text-[10px] font-semibold flex items-center gap-1" style={{ backgroundColor: '#F44336' }}>
             <X className="h-3 w-3" /> Close (Esc)
           </button>
         </div>
@@ -6280,7 +6288,7 @@ function ReceiptModal({ payment, onClose }: { payment: PaymentResult; onClose: (
               </button>
             </div>
             {/* Row 3: New Sale */}
-            <button title="Close dialog" className="w-full h-10 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold text-xs flex items-center justify-center gap-1 hover:shadow-lg">
+            <button title="Close dialog" onClick={onClose} className="w-full h-10 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold text-xs flex items-center justify-center gap-1 hover:shadow-lg">
               <Check className="h-4 w-4" /> New Sale
             </button>
           </div>

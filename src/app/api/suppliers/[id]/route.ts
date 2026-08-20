@@ -98,7 +98,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       },
     });
 
-    await auditLog({
+    auditLog({
       userId: user.uid,
       user: user.username,
       action: "UPDATE",
@@ -135,7 +135,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
       data: { active: false },
     });
 
-    await auditLog({
+    auditLog({
       userId: user.uid,
       user: user.username,
       action: "DELETE",

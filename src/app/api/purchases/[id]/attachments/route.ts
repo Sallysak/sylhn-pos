@@ -122,7 +122,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const buffer = Buffer.from(await file.arrayBuffer());
   await writeFile(storagePath, buffer);
 
-  await auditLog({
+  auditLog({
     userId: user.uid,
     user: user.username,
     action: "ATTACHMENT_UPLOAD",
@@ -179,7 +179,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     return NextResponse.json({ error: "Failed to delete file" }, { status: 500 });
   }
 
-  await auditLog({
+  auditLog({
     userId: user.uid,
     user: user.username,
     action: "ATTACHMENT_DELETE",

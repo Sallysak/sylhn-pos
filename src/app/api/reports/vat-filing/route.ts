@@ -133,7 +133,7 @@ export async function GET(req: NextRequest) {
     const inputNHILComponent = inputTaxPaid * (nhilRate / standardRate);
 
     // Audit
-    await auditLog({
+    auditLog({
       userId: user.uid,
       user: user.username,
       action: "REPORT",

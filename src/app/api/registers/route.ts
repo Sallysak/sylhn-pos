@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
       include: { location: true },
     });
 
-    await auditLog({
+    auditLog({
       userId: user.uid,
       user: user.username,
       action: "CREATE",
@@ -113,7 +113,7 @@ export async function PUT(req: NextRequest) {
         data: { currentCashierId: user.uid, lastActivityAt: new Date() },
         include: { location: true, cashier: { select: { fullName: true, username: true } } },
       });
-      await auditLog({
+      auditLog({
         userId: user.uid,
         user: user.username,
         action: "REGISTER_CLAIM",
@@ -134,7 +134,7 @@ export async function PUT(req: NextRequest) {
         where: { id: register.id },
         data: { currentCashierId: null, currentShiftId: null, lastActivityAt: new Date() },
       });
-      await auditLog({
+      auditLog({
         userId: user.uid,
         user: user.username,
         action: "REGISTER_RELEASE",

@@ -118,7 +118,7 @@ Sent at: ${new Date().toISOString()}
       },
     }).catch(() => {});
 
-    await auditLog({
+    auditLog({
       userId: user.uid,
       user: user.username,
       action: "TEST_EMAIL",

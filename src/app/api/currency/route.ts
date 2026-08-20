@@ -60,7 +60,7 @@ export async function PUT(req: NextRequest) {
 
     clearRatesCache();
 
-    await auditLog({
+    auditLog({
       userId: user.uid,
       user: user.username,
       action: "UPDATE",

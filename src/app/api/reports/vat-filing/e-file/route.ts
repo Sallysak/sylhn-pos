@@ -72,7 +72,7 @@ export async function GET(req: NextRequest) {
     const netVatPayable = outputVat - inputVat;
 
     // Audit
-    await auditLog({
+    auditLog({
       userId: user.uid, user: user.username, action: "VAT_EFILE_EXPORT", module: "accounts",
       details: `Exported GRA e-VAT ${format.toUpperCase()} for ${year}-${String(month).padStart(2, "0")}`,
       severity: "warning", ipAddress: ip, userAgent: req.headers.get("user-agent") || "",

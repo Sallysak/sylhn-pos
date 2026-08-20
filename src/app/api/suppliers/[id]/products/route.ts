@@ -116,7 +116,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }).catch(() => {});
   }
 
-  await auditLog({
+  auditLog({
     userId: user.uid,
     user: user.username,
     action: existing ? "UPDATE" : "CREATE",
@@ -151,7 +151,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     where: { supplierId: id, productId },
   });
 
-  await auditLog({
+  auditLog({
     userId: user.uid,
     user: user.username,
     action: "DELETE",

@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
       data: { type: "manual", filename: backupFile, sizeBytes: stat.size, status: "completed", createdById: user.uid },
     });
 
-    await auditLog({ userId: user.uid, user: user.username, action: "BACKUP", module: "maintenance", details: `Manual backup created: ${backupFile} (${(stat.size / 1024).toFixed(1)} KB)`, severity: "warning", ipAddress: ip });
+    auditLog({ userId: user.uid, user: user.username, action: "BACKUP", module: "maintenance", details: `Manual backup created: ${backupFile} (${(stat.size / 1024).toFixed(1)} KB)`, severity: "warning", ipAddress: ip });
 
     return NextResponse.json({ success: true, backup: record });
   } catch (e: any) {
@@ -97,7 +97,7 @@ export async function DELETE(req: NextRequest) {
 
   try {
     await fs.unlink(backupPath).catch(() => {});
-    await auditLog({ userId: user.uid, user: user.username, action: "DELETE", module: "maintenance", details: `Backup deleted: ${safeFilename}`, severity: "warning", ipAddress: getClientIp(req) });
+    auditLog({ userId: user.uid, user: user.username, action: "DELETE", module: "maintenance", details: `Backup deleted: ${safeFilename}`, severity: "warning", ipAddress: getClientIp(req) });
     return NextResponse.json({ success: true });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message }, { status: 500 });

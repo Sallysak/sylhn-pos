@@ -177,7 +177,7 @@ export async function GET(req: NextRequest) {
           }),
         });
         const sent = sendRes.ok;
-        await auditLog({
+        auditLog({
           userId: user.uid,
           user: user.username,
           action: "LOW_STOCK_DIGEST_EMAIL",

@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
   // Find the manager/admin user
   const manager = await db.systemUser.findUnique({ where: { username: String(managerUsername) } });
   if (!manager) {
-    await auditLog({
+    auditLog({
       userId: requestingUser.uid,
       user: requestingUser.username,
       action: "APPROVE_DENIED",
@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (!manager.active) {
-    await auditLog({
+    auditLog({
       userId: requestingUser.uid,
       user: requestingUser.username,
       action: "APPROVE_DENIED",
@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (!valid) {
-    await auditLog({
+    auditLog({
       userId: requestingUser.uid,
       user: requestingUser.username,
       action: "APPROVE_DENIED",
@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
 
   // Check role — must be manager or admin
   if (manager.role !== "manager" && manager.role !== "admin") {
-    await auditLog({
+    auditLog({
       userId: requestingUser.uid,
       user: requestingUser.username,
       action: "APPROVE_DENIED",
@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Approved
-  await auditLog({
+  auditLog({
     userId: requestingUser.uid,
     user: requestingUser.username,
     action: "APPROVE_GRANTED",

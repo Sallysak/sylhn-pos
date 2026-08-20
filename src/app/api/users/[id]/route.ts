@@ -69,7 +69,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     if (data.password) changes.push("password reset");
     if (data.permissions) changes.push("permissions updated");
 
-    await auditLog({
+    auditLog({
       userId: adminUser.uid,
       user: adminUser.username,
       action: "UPDATE",
@@ -122,7 +122,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
       await db.systemUser.update({ where: { id }, data: { active: false } });
     }
 
-    await auditLog({
+    auditLog({
       userId: adminUser.uid,
       user: adminUser.username,
       action: "DELETE",

@@ -181,7 +181,7 @@ Expected Cash: GHS ${cashExpected.toFixed(2)}`;
 
     if (!transporter) {
       // No SMTP configured — log a warning and return the report content
-      await auditLog({
+      auditLog({
         userId: user.uid,
         user: user.username,
         action: "Z_REPORT_EMAIL_FAILED",
@@ -208,7 +208,7 @@ Expected Cash: GHS ${cashExpected.toFixed(2)}`;
       html,
     });
 
-    await auditLog({
+    auditLog({
       userId: user.uid,
       user: user.username,
       action: "Z_REPORT_EMAILED",

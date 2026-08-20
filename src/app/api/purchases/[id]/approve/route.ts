@@ -93,7 +93,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return null;
   });
 
-  await auditLog({
+  auditLog({
     userId: user.uid,
     user: user.username,
     action: "APPROVE",

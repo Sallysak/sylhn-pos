@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
       include: { user: { select: { fullName: true, username: true } } },
     });
 
-    await auditLog({
+    auditLog({
       userId: user.uid,
       user: user.username,
       action: "CREATE",

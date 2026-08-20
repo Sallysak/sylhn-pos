@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    await auditLog({
+    auditLog({
       userId: user.uid,
       user: user.username,
       action: "CREATE",

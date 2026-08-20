@@ -241,7 +241,7 @@ ${JSON.stringify(businessContext, null, 2)}`;
     }
 
     // Audit (don't log the full response — just that the user asked)
-    await auditLog({
+    auditLog({
       userId: user.uid,
       user: user.username,
       action: "AI_QUERY",

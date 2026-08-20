@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
       valid = user.password === currentPassword;
     }
     if (!valid) {
-      await auditLog({
+      auditLog({
         userId: user.id,
         user: user.username,
         action: "PASSWORD_CHANGE_FAILED",
@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    await auditLog({
+    auditLog({
       userId: user.id,
       user: user.username,
       action: "PASSWORD_CHANGE",

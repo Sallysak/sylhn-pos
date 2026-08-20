@@ -450,7 +450,7 @@ ${JSON.stringify(trendingDown.map(f => ({ name: f.name, trendPct: f.trendPct, ve
       ].join("\n");
     }
 
-    await auditLog({
+    auditLog({
       userId: "",
       user: "system",
       action: "AI_FORECAST",

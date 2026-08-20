@@ -107,7 +107,7 @@ export async function GET(req: NextRequest) {
       data: dump,
     };
 
-    await auditLog({
+    auditLog({
       userId: user.uid,
       user: user.username,
       action: "BACKUP_DOWNLOAD",
@@ -189,7 +189,7 @@ export async function POST(req: NextRequest) {
 
     const totalRestored = Object.values(restored).reduce((s, n) => s + n, 0);
 
-    await auditLog({
+    auditLog({
       userId: user.uid,
       user: user.username,
       action: "BACKUP_RESTORE",

@@ -9,6 +9,7 @@
 
 import { cookies, headers } from "next/headers";
 import crypto from "crypto";
+import { promisify } from "util";
 import { db } from "./db";
 
 // ===== Configuration =====
@@ -17,6 +18,10 @@ const SESSION_MAX_AGE_SECONDS = 8 * 60 * 60; // 8 hours
 const PBKDF2_ITERATIONS = 100_000;
 const SALT_BYTES = 16;
 const KEY_BYTES = 32;
+
+// Async PBKDF2 — non-blocking (frees event loop during the ~200ms hash).
+// Previously used crypto.pbkdf2Sync which blocked all other requests during login.
+const pbkdf2Async = promisify(crypto.pbkdf2);
 
 // Secret key — in production, SESSION_SECRET MUST be set via env var.
 // In dev, we fall back to an insecure default with a console warning.
@@ -39,15 +44,20 @@ function getSessionSecret(): string {
 /**
  * Hash a password using PBKDF2 + SHA-256.
  * Returns: `pbkdf2$<iterations>$<salt_hex>$<hash_hex>`
+ *
+ * PERFORMANCE: Uses async crypto.pbkdf2 (non-blocking). Previously used
+ * crypto.pbkdf2Sync which blocked the event loop for ~200ms per hash.
  */
 export async function hashPassword(password: string): Promise<string> {
   const salt = crypto.randomBytes(SALT_BYTES);
-  const hash = crypto.pbkdf2Sync(password, salt, PBKDF2_ITERATIONS, KEY_BYTES, "sha256");
+  const hash = await pbkdf2Async(password, salt, PBKDF2_ITERATIONS, KEY_BYTES, "sha256");
   return `pbkdf2$${PBKDF2_ITERATIONS}$${salt.toString("hex")}$${hash.toString("hex")}`;
 }
 
 /**
  * Verify a password against a stored hash.
+ *
+ * PERFORMANCE: Uses async crypto.pbkdf2 (non-blocking).
  */
 export async function verifyPassword(password: string, stored: string): Promise<boolean> {
   try {
@@ -56,7 +66,7 @@ export async function verifyPassword(password: string, stored: string): Promise<
     const iterations = parseInt(parts[1], 10);
     const salt = Buffer.from(parts[2], "hex");
     const expectedHash = Buffer.from(parts[3], "hex");
-    const hash = crypto.pbkdf2Sync(password, salt, iterations, KEY_BYTES, "sha256");
+    const hash = await pbkdf2Async(password, salt, iterations, KEY_BYTES, "sha256");
     // Constant-time comparison
     return crypto.timingSafeEqual(hash, expectedHash);
   } catch {

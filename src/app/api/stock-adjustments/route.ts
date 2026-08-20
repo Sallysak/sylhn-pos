@@ -139,7 +139,7 @@ export async function POST(req: NextRequest) {
       }
 
       // Audit the approval
-      await auditLog({
+      auditLog({
         userId: user.uid,
         user: user.username,
         action: "APPROVE_GRANTED",

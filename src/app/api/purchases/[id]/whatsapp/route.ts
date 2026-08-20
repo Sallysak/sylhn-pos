@@ -95,7 +95,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       : `https://wa.me/?text=${encodeURIComponent(text)}`;
 
     // Audit the action
-    await auditLog({
+    auditLog({
       userId: user.uid,
       user: user.username,
       action: "PURCHASE_WHATSAPP",

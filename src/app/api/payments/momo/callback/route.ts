@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    await auditLog({
+    auditLog({
       userId: payment.sale?.cashierId || "",
       user: payment.sale?.cashierName || "system",
       action: newStatus === "completed" ? "MOMO_PAID" : "MOMO_FAILED",

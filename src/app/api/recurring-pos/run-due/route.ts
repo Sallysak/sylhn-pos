@@ -143,7 +143,7 @@ export async function POST(req: NextRequest) {
           },
         });
 
-        await auditLog({
+        auditLog({
           userId: user.uid,
           user: user.username,
           action: "RECURRING_PO_GENERATED",

@@ -149,7 +149,7 @@ export async function POST(req: NextRequest) {
           include: { supplier: { select: { name: true } } },
         });
 
-    await auditLog({
+    auditLog({
       userId: user.uid, user: user.username,
       action: "CREATE", module: "accounts",
       details: `Procurement budget set — ${body.month}: ${budget.supplier?.name || body.category || "All"} = ₵${Number(body.budgetAmount).toFixed(2)}`,
