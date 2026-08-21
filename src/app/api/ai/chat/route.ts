@@ -118,19 +118,33 @@ async function getAiReply(messages: Array<{ role: string; content: string }>): P
         });
         if (modelsRes.ok) {
           const modelsData = await modelsRes.json();
-          const availableModels = (modelsData.data || []).map((m: any) => m.id);
-          console.log('[ai/chat] Available Groq models:', availableModels);
-          // Pick the first model that looks like a chat model (not whisper/tts)
-          const chatModels = availableModels.filter((id: string) =>
-            id.includes('llama') || id.includes('gemma') || id.includes('mixtral') || id.includes('qwen')
+          const allModels = (modelsData.data || []).map((m: any) => m.id);
+          console.log('[ai/chat] All available Groq models:', allModels);
+
+          // Filter to chat/instruct models ONLY — exclude guard/whisper/tts/embedding
+          const chatModels = allModels.filter((id: string) => {
+            const lower = id.toLowerCase();
+            // Exclude non-chat models
+            if (lower.includes('guard') || lower.includes('whisper') ||
+                lower.includes('tts') || lower.includes('embed') ||
+                lower.includes('moderation')) return false;
+            // Include known chat model families
+            return lower.includes('llama') || lower.includes('gemma') ||
+                   lower.includes('mixtral') || lower.includes('qwen') ||
+                   lower.includes('deepseek');
+          });
+          console.log('[ai/chat] Chat models only:', chatModels);
+
+          // Prefer models with 'instant' or 'versatile' in the name (faster/cheaper)
+          const preferred = chatModels.find((id: string) =>
+            id.includes('instant') || id.includes('versatile')
           );
-          if (chatModels.length > 0) {
+          if (preferred) {
+            modelToUse = preferred;
+          } else if (chatModels.length > 0) {
             modelToUse = chatModels[0];
-            console.log('[ai/chat] Using first available chat model:', modelToUse);
-          } else if (availableModels.length > 0) {
-            modelToUse = availableModels[0];
-            console.log('[ai/chat] Using first available model:', modelToUse);
           }
+          console.log('[ai/chat] Selected model:', modelToUse);
         } else {
           console.warn('[ai/chat] /models endpoint returned:', modelsRes.status);
         }
@@ -158,7 +172,7 @@ async function getAiReply(messages: Array<{ role: string; content: string }>): P
           model: modelToUse,
           messages,
           temperature: 0.7,
-          max_tokens: 1024,
+          max_tokens: 512,
           stream: false,
         }),
       });
