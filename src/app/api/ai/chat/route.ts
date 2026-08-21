@@ -104,11 +104,50 @@ async function getAiReply(messages: Array<{ role: string; content: string }>): P
   // ===== PRIMARY PATH: External API (Groq/OpenAI) =====
   const baseUrl = process.env.AI_BASE_URL;
   const apiKey = process.env.AI_API_KEY;
-  const model = process.env.AI_MODEL || 'llama-3.1-8b-instant';
   if (baseUrl && apiKey) {
     try {
+      // ===== STEP 1: Discover available models =====
+      // ALWAYS discover available models via the /models endpoint — ignore
+      // AI_MODEL env var because Groq frequently deprecates/renames models.
+      // This way the code always uses a model that actually exists.
+      let modelToUse = '';
+      try {
+        const modelsRes = await fetch(`${baseUrl.replace(/\/$/, '')}/models`, {
+          method: 'GET',
+          headers: { 'Authorization': `Bearer ${apiKey}` },
+        });
+        if (modelsRes.ok) {
+          const modelsData = await modelsRes.json();
+          const availableModels = (modelsData.data || []).map((m: any) => m.id);
+          console.log('[ai/chat] Available Groq models:', availableModels);
+          // Pick the first model that looks like a chat model (not whisper/tts)
+          const chatModels = availableModels.filter((id: string) =>
+            id.includes('llama') || id.includes('gemma') || id.includes('mixtral') || id.includes('qwen')
+          );
+          if (chatModels.length > 0) {
+            modelToUse = chatModels[0];
+            console.log('[ai/chat] Using first available chat model:', modelToUse);
+          } else if (availableModels.length > 0) {
+            modelToUse = availableModels[0];
+            console.log('[ai/chat] Using first available model:', modelToUse);
+          }
+        } else {
+          console.warn('[ai/chat] /models endpoint returned:', modelsRes.status);
+        }
+      } catch (e: any) {
+        console.warn('[ai/chat] Could not fetch models list:', e?.message);
+      }
+
+      if (!modelToUse) {
+        return {
+          reply: "I'm currently unable to connect to the AI service. Please try again in a moment, or check the dashboard for current business data. If this persists, contact your administrator to verify AI_API_KEY is set in the environment.",
+          debug: { path: 'groq', error: 'No working model found after trying all fallbacks' },
+        };
+      }
+
+      // ===== STEP 2: Call the chat completion with the discovered model =====
       const url = `${baseUrl.replace(/\/$/, '')}/chat/completions`;
-      console.log('[ai/chat] Calling Groq/OpenAI:', url, 'model:', model);
+      console.log('[ai/chat] Calling Groq:', url, 'model:', modelToUse);
       const response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -116,7 +155,7 @@ async function getAiReply(messages: Array<{ role: string; content: string }>): P
           'Authorization': `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model,
+          model: modelToUse,
           messages,
           temperature: 0.7,
           max_tokens: 1024,
@@ -129,13 +168,12 @@ async function getAiReply(messages: Array<{ role: string; content: string }>): P
       if (!response.ok) {
         const errText = await response.text();
         console.error('[ai/chat] Groq API error body:', errText);
-        // Return the error in debug info so we can see what's wrong
         return {
           reply: "I'm currently unable to connect to the AI service. Please try again in a moment, or check the dashboard for current business data. If this persists, contact your administrator to verify AI_API_KEY is set in the environment.",
           debug: {
             path: 'groq',
             url,
-            model,
+            model: modelToUse,
             status: response.status,
             statusText: response.statusText,
             errorBody: errText.slice(0, 500),
@@ -151,14 +189,12 @@ async function getAiReply(messages: Array<{ role: string; content: string }>): P
       if (reply && reply.trim()) {
         return { reply: reply.trim() };
       }
-      // Response was OK but no content — unusual
       return {
         reply: "I received an empty response from the AI service. Please try again.",
         debug: { path: 'groq', ok: true, responseKeys: Object.keys(data), data: JSON.stringify(data).slice(0, 500) },
       };
     } catch (e: any) {
       console.error('[ai/chat] External API exception:', e?.message);
-      // Network error, DNS failure, etc.
       return {
         reply: "I'm currently unable to connect to the AI service. Please try again in a moment, or check the dashboard for current business data. If this persists, contact your administrator to verify AI_API_KEY is set in the environment.",
         debug: {
