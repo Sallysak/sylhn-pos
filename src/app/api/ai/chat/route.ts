@@ -65,19 +65,20 @@ export async function POST(req: NextRequest) {
       ...messages,
     ]
 
-    const reply = await getAiReply(fullMessages)
+    const result = await getAiReply(fullMessages)
 
     return NextResponse.json({
       success: true,
-      reply,
+      reply: result.reply,
+      // Include debug info ONLY when there's a problem (not on successful replies)
+      // so the client can see exactly what went wrong.
+      ...(result.debug && { debug: result.debug }),
     })
   } catch (e: any) {
     console.error('AI chat error:', e)
     return NextResponse.json(
       {
         error: e.message || 'Failed to get AI response',
-        // Include the AI config status in the error response so the client
-        // can show a helpful diagnostic message.
         aiStatus: {
           groqConfigured: !!(process.env.AI_BASE_URL && process.env.AI_API_KEY),
           zaiConfigured: await isZaiConfigured().catch(() => false),
@@ -99,20 +100,23 @@ export async function POST(req: NextRequest) {
  *
  * LAST RESORT: rule-based message — never leave the user with an error.
  */
-async function getAiReply(messages: Array<{ role: string; content: string }>): Promise<string> {
+async function getAiReply(messages: Array<{ role: string; content: string }>): Promise<{ reply: string; debug?: any }> {
   // ===== PRIMARY PATH: External API (Groq/OpenAI) =====
   const baseUrl = process.env.AI_BASE_URL;
   const apiKey = process.env.AI_API_KEY;
+  const model = process.env.AI_MODEL || 'llama-3.3-70b-versatile';
   if (baseUrl && apiKey) {
     try {
-      const response = await fetch(`${baseUrl.replace(/\/$/, '')}/chat/completions`, {
+      const url = `${baseUrl.replace(/\/$/, '')}/chat/completions`;
+      console.log('[ai/chat] Calling Groq/OpenAI:', url, 'model:', model);
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: process.env.AI_MODEL || 'llama-3.3-70b-versatile',
+          model,
           messages,
           temperature: 0.7,
           max_tokens: 1024,
@@ -120,18 +124,50 @@ async function getAiReply(messages: Array<{ role: string; content: string }>): P
         }),
       });
 
+      console.log('[ai/chat] Groq response status:', response.status, response.statusText);
+
       if (!response.ok) {
         const errText = await response.text();
-        console.error('[ai/chat] External AI API error:', response.status, errText);
-        throw new Error(`AI service error: ${response.status} — ${errText.slice(0, 200)}`);
+        console.error('[ai/chat] Groq API error body:', errText);
+        // Return the error in debug info so we can see what's wrong
+        return {
+          reply: "I'm currently unable to connect to the AI service. Please try again in a moment, or check the dashboard for current business data. If this persists, contact your administrator to verify AI_API_KEY is set in the environment.",
+          debug: {
+            path: 'groq',
+            url,
+            model,
+            status: response.status,
+            statusText: response.statusText,
+            errorBody: errText.slice(0, 500),
+            apiKeyPrefix: apiKey.slice(0, 6),
+            apiKeySuffix: apiKey.slice(-4),
+          },
+        };
       }
 
       const data = await response.json();
+      console.log('[ai/chat] Groq response keys:', Object.keys(data));
       const reply = data.choices?.[0]?.message?.content;
-      if (reply && reply.trim()) return reply.trim();
+      if (reply && reply.trim()) {
+        return { reply: reply.trim() };
+      }
+      // Response was OK but no content — unusual
+      return {
+        reply: "I received an empty response from the AI service. Please try again.",
+        debug: { path: 'groq', ok: true, responseKeys: Object.keys(data), data: JSON.stringify(data).slice(0, 500) },
+      };
     } catch (e: any) {
-      console.warn('[ai/chat] External API failed, trying Z.AI SDK fallback:', e?.message);
-      // Fall through to Z.AI SDK
+      console.error('[ai/chat] External API exception:', e?.message);
+      // Network error, DNS failure, etc.
+      return {
+        reply: "I'm currently unable to connect to the AI service. Please try again in a moment, or check the dashboard for current business data. If this persists, contact your administrator to verify AI_API_KEY is set in the environment.",
+        debug: {
+          path: 'groq',
+          exception: e?.message,
+          code: e?.code,
+          cause: e?.cause?.message,
+        },
+      };
     }
   }
 
@@ -145,16 +181,20 @@ async function getAiReply(messages: Array<{ role: string; content: string }>): P
         temperature: 0.7,
         maxTokens: 1024,
       });
-      if (text && text.trim()) return text.trim();
+      if (text && text.trim()) return { reply: text.trim() };
     }
   } catch (e: any) {
     console.warn('[ai/chat] Z.AI SDK failed:', e?.message);
   }
 
-  // ===== LAST RESORT: rule-based response =====
-  return "I'm currently unable to connect to the AI service. " +
-    "Please try again in a moment, or check the dashboard for current business data. " +
-    "If this persists, contact your administrator to verify AI_API_KEY is set in the environment.";
+  // ===== LAST RESORT =====
+  return {
+    reply: "I'm currently unable to connect to the AI service. Please try again in a moment, or check the dashboard for current business data. If this persists, contact your administrator to verify AI_API_KEY is set in the environment.",
+    debug: {
+      path: 'none',
+      reason: 'No AI provider configured (neither Groq nor Z.AI)',
+    },
+  };
 }
 
 async function gatherBusinessContext(options: any): Promise<string> {
