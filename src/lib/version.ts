@@ -19,10 +19,10 @@
  * Helps identify exact deploy when debugging
  */
 
-export const APP_VERSION = "3.1.0";
-export const BUILD_ID = "build-2026-08-21-v310-dynamic-category-pills";
+export const APP_VERSION = "3.2.0";
+export const BUILD_ID = "build-2026-08-21-v320-purchase-supplier-audit-fixes";
 export const RELEASE_DATE = "August 21, 2026";
-export const RELEASE_NAME = "Dynamic Category Pills + Group Fix";
+export const RELEASE_NAME = "Purchase + Supplier Audit Fixes + AI Auto-Discovery";
 
 // Full version string for display
 export const FULL_VERSION = `v${APP_VERSION} (${BUILD_ID})`;
