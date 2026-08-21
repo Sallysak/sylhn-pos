@@ -113,7 +113,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     await db.product.update({
       where: { id: String(body.productId) },
       data: { costPrice: Number(body.supplierCost) },
-    }).catch(() => {});
+    });
   }
 
   auditLog({
@@ -125,7 +125,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     severity: "info",
     ipAddress: ip,
     userAgent: req.headers.get("user-agent") || "",
-  }).catch(() => {});
+  });
 
   return NextResponse.json({ success: true, catalogEntry }, { status: existing ? 200 : 201 });
 }
@@ -160,7 +160,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     severity: "info",
     ipAddress: ip,
     userAgent: req.headers.get("user-agent") || "",
-  }).catch(() => {});
+  });
 
   return NextResponse.json({ success: true });
 }

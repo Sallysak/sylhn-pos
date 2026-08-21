@@ -99,32 +99,35 @@ export async function POST(req: NextRequest) {
       // Only update supplier balance + purchase amountPaid if NOT scheduled
       // (scheduled payments don't actually move money yet)
       if (!isScheduled) {
-        // Decrement supplier balance by (amount - whtAmount) — WHT is withheld,
-        // not paid to the supplier. The withheld portion goes to GRA separately.
-        const supplier = await tx.supplier.findUnique({ where: { id: body.supplierId }, select: { balance: true } });
-        if (supplier) {
-          const effectivePayment = amount - whtAmount;
-          const newBalance = Math.max(0, supplier.balance - effectivePayment);
-          await tx.supplier.update({
-            where: { id: body.supplierId },
-            data: { balance: newBalance },
-          });
-        }
+        // ===== ATOMIC UPDATE (race-condition-safe) =====
+        // Previously: read supplier.balance, compute newBalance, write fixed value.
+        // Two concurrent payments would both read the same balance, both compute
+        // the same newBalance, and one payment would be silently lost.
+        //
+        // Now: use Prisma's atomic `decrement` which translates to SQL:
+        //   UPDATE Supplier SET balance = balance - $1 WHERE id = $2
+        // Postgres handles concurrent decrements correctly at the row level.
+        const effectivePayment = amount - whtAmount;
+        await tx.supplier.update({
+          where: { id: body.supplierId },
+          data: { balance: { decrement: effectivePayment } },
+        });
 
-        // If linked to a purchase, increment its amountPaid
+        // If linked to a purchase, atomically increment its amountPaid
+        // (same race-condition fix as above)
         if (body.purchaseId) {
-          const purchase = await tx.purchase.findUnique({ where: { id: body.purchaseId }, select: { amountPaid: true, total: true, status: true } });
-          if (purchase) {
-            const newAmountPaid = purchase.amountPaid + amount;
-            await tx.purchase.update({
-              where: { id: body.purchaseId },
-              data: {
-                amountPaid: newAmountPaid,
-                // Auto-mark purchase as fully paid if amountPaid >= total
-                ...(newAmountPaid >= purchase.total && purchase.status !== "received" && { status: "received" }),
-              },
-            });
-          }
+          // ===== FIX: Don't auto-flip purchase status to "received" on payment =====
+          // Payment ≠ delivery. Marking a purchase as "received" without actually
+          // receiving stock creates a zombie state where:
+          //   - status = "received" (so the receive dialog refuses to operate)
+          //   - stock was never incremented (no GRN was done)
+          // The purchase status should only change via the explicit "receive" action.
+          await tx.purchase.update({
+            where: { id: body.purchaseId },
+            data: {
+              amountPaid: { increment: amount },
+            },
+          });
         }
       }
 

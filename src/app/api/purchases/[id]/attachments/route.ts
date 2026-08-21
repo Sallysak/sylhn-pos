@@ -3,17 +3,20 @@ import { db } from "@/lib/db";
 import { requireAuth, requirePermission } from "@/lib/auth";
 import { rateLimitApiRead, rateLimitApiWrite, rateLimitResponse, getClientIp } from "@/lib/rate-limit";
 import { auditLog } from "@/lib/audit";
-import { writeFile, mkdir, readdir, stat, unlink } from "fs/promises";
+import { writeFile, readFile, mkdir, readdir, stat, unlink } from "fs/promises";
 import { join } from "path";
 import { randomUUID } from "crypto";
 
 // ============================================================================
-// GET /api/purchases/[id]/attachments — list attachments for a purchase
+// GET /api/purchases/[id]/attachments — list attachments OR download a file
 // ============================================================================
 // Files are stored on disk under uploads/purchase-attachments/{purchaseId}/.
 // Metadata is reconstructed from the filesystem (filename pattern:
-// `{uuid}__{originalName}__{category}.{ext}`). No DB table needed — keeps
-// this Phase-1 change schema-free.
+// `{uuid}__{originalName}__{category}.{ext}`). No DB table needed.
+//
+// Query params:
+//   ?file=<filename>  — stream the file bytes (with Content-Type + Content-Disposition)
+//   (no params)       — list attachments as JSON (default)
 // ============================================================================
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try { await requireAuth(); } catch (e: any) { return e as Response; }
@@ -22,6 +25,43 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   if (!rl.allowed) return rateLimitResponse(rl);
 
   const { id } = await params;
+  const { searchParams } = new URL(req.url);
+  const fileParam = searchParams.get("file");
+
+  // ===== DOWNLOAD MODE: stream the file bytes =====
+  if (fileParam) {
+    const dir = join(process.cwd(), "uploads", "purchase-attachments", id);
+    const filePath = join(dir, fileParam);
+    // Prevent path traversal — only allow filenames in this purchase's directory
+    if (!filePath.startsWith(dir)) {
+      return NextResponse.json({ error: "Invalid file path" }, { status: 400 });
+    }
+    try {
+      const buffer = await readFile(filePath);
+      const stats = await stat(filePath);
+      // Parse filename for original name + extension
+      const match = fileParam.match(/^(.+?)__(.+?)__(.+?)\.([^.]+)$/);
+      const originalName = match ? match[2] : fileParam;
+      const ext = match ? match[4] : "";
+      const mimeType = getMimeType(ext);
+      return new NextResponse(buffer, {
+        status: 200,
+        headers: {
+          "Content-Type": mimeType,
+          "Content-Disposition": `inline; filename="${originalName}"`,
+          "Content-Length": String(stats.size),
+          "Cache-Control": "private, max-age=3600",
+        },
+      });
+    } catch (e: any) {
+      if (e?.code === "ENOENT") {
+        return NextResponse.json({ error: "File not found" }, { status: 404 });
+      }
+      return NextResponse.json({ error: "Failed to read file" }, { status: 500 });
+    }
+  }
+
+  // ===== LIST MODE: return JSON array of attachments =====
   const dir = join(process.cwd(), "uploads", "purchase-attachments", id);
 
   try {
@@ -131,7 +171,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     severity: "info",
     ipAddress: ip,
     userAgent: req.headers.get("user-agent") || "",
-  }).catch(() => {});
+  });
 
   return NextResponse.json({
     success: true,
@@ -188,7 +228,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     severity: "info",
     ipAddress: ip,
     userAgent: req.headers.get("user-agent") || "",
-  }).catch(() => {});
+  });
 
   return NextResponse.json({ success: true });
 }

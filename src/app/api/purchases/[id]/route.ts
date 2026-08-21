@@ -70,33 +70,80 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         if (purchase.status === "received") throw new Error("Purchase already received");
         if (purchase.status === "cancelled") throw new Error("Cannot receive a cancelled purchase");
 
+        // ===== PARTIAL DELIVERY SUPPORT =====
+        // The frontend sends `receivedItems: [{id, receivedQty, rejectedQty, rejectionReason}]`
+        // for each line item. We use these per-line quantities instead of blindly
+        // incrementing by the full ordered quantity.
+        const receivedMap = new Map<string, { qty: number; rejected?: number; reason?: string }>();
+        if (Array.isArray(body.receivedItems)) {
+          for (const r of body.receivedItems) {
+            if (r.id) {
+              receivedMap.set(r.id, {
+                qty: Number(r.receivedQty) || 0,
+                rejected: Number(r.rejectedQty) || 0,
+                reason: r.rejectionReason || "",
+              });
+            }
+          }
+        }
+
+        let totalReceived = 0;
+        let allFullyReceived = true;
+
         // Increment stock + create stock history for each item
         for (const item of purchase.items) {
           if (!item.productId) continue;
+
+          // Determine how many units are being received NOW for this line
+          const alreadyReceived = (item as any).receivedQty ?? 0;
+          const incoming = receivedMap.has(item.id)
+            ? Math.min(receivedMap.get(item.id)!.qty, item.quantity - alreadyReceived)
+            : item.quantity; // fallback: full receipt (legacy behavior)
+
+          if (incoming <= 0) {
+            allFullyReceived = false;
+            continue;
+          }
+
+          totalReceived += incoming;
+
+          // Increment product stock
           await tx.product.update({
             where: { id: item.productId },
             data: {
-              quantity: { increment: item.quantity },
+              quantity: { increment: incoming },
               ...(item.cost > 0 && { costPrice: item.cost }),
               receivedDate: new Date(),
               ...(item.expiryDate && { expiryDate: item.expiryDate }),
             },
           });
+
+          // Update PurchaseItem.receivedQty (track partial receipt)
+          await (tx as any).purchaseItem.update({
+            where: { id: item.id },
+            data: { receivedQty: { increment: incoming } },
+          });
+
           await tx.stockHistory.create({
             data: {
               productId: item.productId,
               action: "received",
-              quantity: item.quantity,
-              reason: `Purchase ${purchase.refNo} received`,
+              quantity: incoming,
+              reason: `Purchase ${purchase.refNo} received (${incoming}/${item.quantity})`,
               reference: purchase.refNo,
               purchaseId: purchase.id,
               userId: user.uid,
             },
           });
+
+          // Check if this line is fully received
+          if (alreadyReceived + incoming < item.quantity) {
+            allFullyReceived = false;
+          }
         }
 
-        // Update supplier balance if amountPaid < total
-        if (purchase.supplierId && purchase.total > purchase.amountPaid) {
+        // Update supplier balance if amountPaid < total (only on first receive)
+        if (purchase.supplierId && purchase.total > purchase.amountPaid && purchase.status === "ordered") {
           const outstanding = purchase.total - purchase.amountPaid;
           await tx.supplier.update({
             where: { id: purchase.supplierId },
@@ -104,12 +151,14 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
           });
         }
 
+        // Only flip status to "received" when ALL items are fully received.
+        // Otherwise, mark as "partial" (still ordered, can receive more later).
+        const newStatus = allFullyReceived ? "received" : "ordered";
         const updatedPurchase = await tx.purchase.update({
           where: { id },
           data: {
-            status: "received",
-            receivedAt: new Date(),
-            receivedById: user.uid,
+            status: newStatus,
+            ...(allFullyReceived && { receivedAt: new Date(), receivedById: user.uid }),
           },
           include: { items: true, supplier: true },
         });
@@ -119,7 +168,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
           user: user.username,
           action: "UPDATE",
           module: "purchase",
-          details: `Purchase ${purchase.refNo} marked as received — ${purchase.items.length} items, stock incremented`,
+          details: `Purchase ${purchase.refNo} ${allFullyReceived ? "fully received" : "partially received"} — ${totalReceived} units across ${purchase.items.length} items`,
           severity: "info",
           ipAddress: ip,
           userAgent: req.headers.get("user-agent") || "",

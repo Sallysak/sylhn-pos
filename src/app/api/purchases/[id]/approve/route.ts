@@ -102,7 +102,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     severity: "warning",
     ipAddress: ip,
     userAgent: req.headers.get("user-agent") || "",
-  }).catch(() => {});
+  });
 
   return NextResponse.json({
     success: true,

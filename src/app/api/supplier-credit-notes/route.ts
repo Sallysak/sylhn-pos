@@ -69,17 +69,24 @@ export async function POST(req: NextRequest) {
 
   try {
     const creditNote = await db.$transaction(async (tx) => {
-      // Decrement supplier balance (the supplier owes us less now)
+      // ===== ATOMIC UPDATE (race-condition-safe) =====
+      // Previously: read supplier.balance, compute Math.max(0, balance - amount),
+      // write fixed value. Two concurrent credit notes would both read the same
+      // balance, both compute the same newBalance, and one would be silently lost.
+      // The Math.max(0, ...) clamp also silently lost data — if balance went
+      // negative (supplier owes the business a credit), it was set to 0 instead.
+      //
+      // Now: use Prisma's atomic `decrement`. Negative balance is semantically
+      // correct (means the supplier owes the business a credit).
       const supplier = await tx.supplier.findUnique({
         where: { id: body.supplierId },
-        select: { id: true, name: true, code: true, balance: true },
+        select: { id: true, name: true, code: true },
       });
       if (!supplier) throw new Error("Supplier not found");
 
-      const newBalance = Math.max(0, supplier.balance - amount);
       await tx.supplier.update({
         where: { id: body.supplierId },
-        data: { balance: newBalance },
+        data: { balance: { decrement: amount } },
       });
 
       const newNote = await tx.supplierCreditNote.create({
