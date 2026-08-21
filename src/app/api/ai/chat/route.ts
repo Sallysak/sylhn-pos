@@ -74,7 +74,15 @@ export async function POST(req: NextRequest) {
   } catch (e: any) {
     console.error('AI chat error:', e)
     return NextResponse.json(
-      { error: e.message || 'Failed to get AI response' },
+      {
+        error: e.message || 'Failed to get AI response',
+        // Include the AI config status in the error response so the client
+        // can show a helpful diagnostic message.
+        aiStatus: {
+          groqConfigured: !!(process.env.AI_BASE_URL && process.env.AI_API_KEY),
+          zaiConfigured: await isZaiConfigured().catch(() => false),
+        },
+      },
       { status: 500 }
     )
   }
