@@ -89,7 +89,7 @@ async function getBusinessAiReply(messages: Array<{ role: string; content: strin
           'Authorization': `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: process.env.AI_MODEL || 'llama-3.3-70b-versatile',
+          model: process.env.AI_MODEL || 'llama-3.1-8b-instant',
           messages,
           temperature: 0.4,
           max_tokens: 1500,

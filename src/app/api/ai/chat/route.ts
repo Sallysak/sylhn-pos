@@ -104,7 +104,7 @@ async function getAiReply(messages: Array<{ role: string; content: string }>): P
   // ===== PRIMARY PATH: External API (Groq/OpenAI) =====
   const baseUrl = process.env.AI_BASE_URL;
   const apiKey = process.env.AI_API_KEY;
-  const model = process.env.AI_MODEL || 'llama-3.3-70b-versatile';
+  const model = process.env.AI_MODEL || 'llama-3.1-8b-instant';
   if (baseUrl && apiKey) {
     try {
       const url = `${baseUrl.replace(/\/$/, '')}/chat/completions`;
