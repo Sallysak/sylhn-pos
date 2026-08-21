@@ -101,203 +101,259 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const purchase = await db.$transaction(async (tx) => {
-      const refNo = p.refNo || generatePurchaseRefNo();
-      const status = p.status || "received";
-      const total = Number(p.total) || 0;
-      const amountPaid = Number(p.amountPaid) || 0;
+    // FIX: Always let the server own refNo generation. Trusting a client-supplied
+    // refNo caused P2002 ("Unique constraint failed on the fields: (RefNo)")
+    // whenever two users submitted at the same second, because the client only
+    // uses the last 6 digits of Date.now() (purchase-form.tsx line 122).
+    //
+    // We retry up to 5 times on P2002 (unique constraint on refNo). The server-
+    // side generator uses ms + per-process counter, which is safe on a single
+    // instance; the retry loop adds safety across instances / serverless workers.
+    const MAX_REFNO_RETRIES = 5;
+    let lastRefNoError: any = null;
+    let newPurchase: any = null;
 
-      // Phase 2: pull new optional fields from the body (all defaulted so
-      // missing values don't break older clients)
-      const body = p as any;
-      const currency = String(body.currency || "GHS");
-      const exchangeRate = Number(body.exchangeRate) || 1;
-      const freightCost = Number(body.freightCost) || 0;
-      const insuranceCost = Number(body.insuranceCost) || 0;
-      const customsDuty = Number(body.customsDuty) || 0;
-      const otherLandedCosts = Number(body.otherLandedCosts) || 0;
-      // Tier 1.2 — landed-cost allocation method
-      const landedCostAllocationMethod = String(body.landedCostAllocationMethod || "none");
-      const totalLandedCosts = freightCost + insuranceCost + customsDuty + otherLandedCosts;
+    for (let attempt = 0; attempt < MAX_REFNO_RETRIES; attempt++) {
+      try {
+        newPurchase = await db.$transaction(async (tx) => {
+          // Always generate a fresh refNo server-side. Ignore any client value
+          // to prevent both collisions and IDOR (a client could otherwise
+          // overwrite another user's purchase by passing its refNo).
+          const refNo = generatePurchaseRefNo();
+          const status = p.status || "received";
+          const total = Number(p.total) || 0;
+          const amountPaid = Number(p.amountPaid) || 0;
 
-      // Tier 1.2 — compute per-line landed cost allocation
-      // Method: by_value (default) — proportional to line net total
-      //         by_qty           — proportional to quantity
-      //         manual           — caller supplies landedCostPerUnit per line
-      //         none             — no allocation (legacy behaviour)
-      const lineItemsData = p.items.map((item: any) => {
-        const lineGross = (Number(item.quantity) || 0) * (Number(item.cost) || 0);
-        let discountAmount = 0;
-        if (item.discountType === "amount") {
-          discountAmount = Math.min(Number(item.discountValue) || 0, lineGross);
-        } else if (item.discountType === "percent") {
-          discountAmount = (lineGross * Math.min(Number(item.discountValue) || 0, 100)) / 100;
-        }
-        const lineNet = lineGross - discountAmount;
-        const taxRate = Number(item.taxRate) || 0;
-        const taxAmount = lineNet * taxRate;
-        const lineTotalWithTax = lineNet + taxAmount;
+          // Phase 2: pull new optional fields from the body (all defaulted so
+          // missing values don't break older clients)
+          const body = p as any;
+          const currency = String(body.currency || "GHS");
+          const exchangeRate = Number(body.exchangeRate) || 1;
+          const freightCost = Number(body.freightCost) || 0;
+          const insuranceCost = Number(body.insuranceCost) || 0;
+          const customsDuty = Number(body.customsDuty) || 0;
+          const otherLandedCosts = Number(body.otherLandedCosts) || 0;
+          // Tier 1.2 — landed-cost allocation method
+          const landedCostAllocationMethod = String(body.landedCostAllocationMethod || "none");
+          const totalLandedCosts = freightCost + insuranceCost + customsDuty + otherLandedCosts;
 
-        return {
-          productId: item.productId || null,
-          partNo: item.partNo,
-          details: item.details,
-          emoji: item.emoji || "📦",
-          quantity: Number(item.quantity) || 1,
-          cost: Number(item.cost) || 0,
-          tax: item.tax !== false,
-          total: Number(item.total) || lineTotalWithTax,
-          expiryDate: item.expiryDate ? new Date(item.expiryDate as string) : null,
-          // Phase 2 fields
-          discountType: item.discountType || null,
-          discountValue: Number(item.discountValue) || 0,
-          discountAmount,
-          taxRate,
-          taxAmount,
-          batchNumber: item.batchNumber || null,
-          freeQuantity: Number(item.freeQuantity) || 0,
-          retailPrice: Number(item.retailPrice) || 0,
-          tradePrice: Number(item.tradePrice) || 0,
-          wholesalePrice: Number(item.wholesalePrice) || 0,
-          // Tier 1.2 — per-line landed cost (filled below after allocation)
-          landedCostPerUnit: 0,
-          totalLandedCost: 0,
-          // Stash for allocation
-          _lineNet: lineNet,
-        };
-      });
+          // Tier 1.2 — compute per-line landed cost allocation
+          // Method: by_value (default) — proportional to line net total
+          //         by_qty           — proportional to quantity
+          //         manual           — caller supplies landedCostPerUnit per line
+          //         none             — no allocation (legacy behaviour)
+          const lineItemsData = p.items.map((item: any) => {
+            const lineGross = (Number(item.quantity) || 0) * (Number(item.cost) || 0);
+            let discountAmount = 0;
+            if (item.discountType === "amount") {
+              discountAmount = Math.min(Number(item.discountValue) || 0, lineGross);
+            } else if (item.discountType === "percent") {
+              discountAmount = (lineGross * Math.min(Number(item.discountValue) || 0, 100)) / 100;
+            }
+            const lineNet = lineGross - discountAmount;
+            const taxRate = Number(item.taxRate) || 0;
+            const taxAmount = lineNet * taxRate;
+            const lineTotalWithTax = lineNet + taxAmount;
 
-      // Allocate landed costs to lines if method != "none" and there are landed costs
-      if (landedCostAllocationMethod !== "none" && totalLandedCosts > 0 && lineItemsData.length > 0) {
-        if (landedCostAllocationMethod === "by_value") {
-          const totalLineNet = lineItemsData.reduce((s, l) => s + l._lineNet, 0);
-          if (totalLineNet > 0) {
-            for (const l of lineItemsData) {
-              const share = l._lineNet / totalLineNet;
-              const lineLanded = totalLandedCosts * share;
-              l.totalLandedCost = Math.round(lineLanded * 100) / 100;
-              l.landedCostPerUnit = l.quantity > 0 ? Math.round((lineLanded / l.quantity) * 10000) / 10000 : 0;
+            return {
+              productId: item.productId || null,
+              partNo: item.partNo,
+              details: item.details,
+              emoji: item.emoji || "📦",
+              quantity: Number(item.quantity) || 1,
+              cost: Number(item.cost) || 0,
+              tax: item.tax !== false,
+              total: Number(item.total) || lineTotalWithTax,
+              expiryDate: item.expiryDate ? new Date(item.expiryDate as string) : null,
+              // Phase 2 fields
+              discountType: item.discountType || null,
+              discountValue: Number(item.discountValue) || 0,
+              discountAmount,
+              taxRate,
+              taxAmount,
+              batchNumber: item.batchNumber || null,
+              freeQuantity: Number(item.freeQuantity) || 0,
+              retailPrice: Number(item.retailPrice) || 0,
+              tradePrice: Number(item.tradePrice) || 0,
+              wholesalePrice: Number(item.wholesalePrice) || 0,
+              // Tier 1.2 — per-line landed cost (filled below after allocation)
+              landedCostPerUnit: 0,
+              totalLandedCost: 0,
+              // Stash for allocation
+              _lineNet: lineNet,
+            };
+          });
+
+          // Allocate landed costs to lines if method != "none" and there are landed costs
+          if (landedCostAllocationMethod !== "none" && totalLandedCosts > 0 && lineItemsData.length > 0) {
+            if (landedCostAllocationMethod === "by_value") {
+              const totalLineNet = lineItemsData.reduce((s, l) => s + l._lineNet, 0);
+              if (totalLineNet > 0) {
+                for (const l of lineItemsData) {
+                  const share = l._lineNet / totalLineNet;
+                  const lineLanded = totalLandedCosts * share;
+                  l.totalLandedCost = Math.round(lineLanded * 100) / 100;
+                  l.landedCostPerUnit = l.quantity > 0 ? Math.round((lineLanded / l.quantity) * 10000) / 10000 : 0;
+                }
+              }
+            } else if (landedCostAllocationMethod === "by_qty") {
+              const totalQty = lineItemsData.reduce((s, l) => s + l.quantity, 0);
+              if (totalQty > 0) {
+                for (const l of lineItemsData) {
+                  const share = l.quantity / totalQty;
+                  const lineLanded = totalLandedCosts * share;
+                  l.totalLandedCost = Math.round(lineLanded * 100) / 100;
+                  l.landedCostPerUnit = l.quantity > 0 ? Math.round((lineLanded / l.quantity) * 10000) / 10000 : 0;
+                }
+              }
+            } else if (landedCostAllocationMethod === "manual") {
+              // Caller supplies landedCostPerUnit per line — trust their values
+              for (const l of lineItemsData) {
+                // No transformation needed — landedCostPerUnit already set by caller
+                // (default 0 if not provided)
+              }
             }
           }
-        } else if (landedCostAllocationMethod === "by_qty") {
-          const totalQty = lineItemsData.reduce((s, l) => s + l.quantity, 0);
-          if (totalQty > 0) {
-            for (const l of lineItemsData) {
-              const share = l.quantity / totalQty;
-              const lineLanded = totalLandedCosts * share;
-              l.totalLandedCost = Math.round(lineLanded * 100) / 100;
-              l.landedCostPerUnit = l.quantity > 0 ? Math.round((lineLanded / l.quantity) * 10000) / 10000 : 0;
+
+          // Strip the _lineNet helper field before create
+          const cleanLineItems = lineItemsData.map(({ _lineNet, ...rest }: any) => rest);
+
+          // Create purchase + items
+          const created = await tx.purchase.create({
+            data: {
+              refNo,
+              type: p.type || "purchase",
+              supplierId: p.supplierId || null,
+              supplierName: p.supplierName || "",
+              status,
+              subtotal: Number(p.subtotal) || 0,
+              discount: Number(p.discount) || 0,
+              taxAmount: Number(p.taxAmount) || 0,
+              total,
+              amountPaid,
+              notes: p.notes || "",
+              createdById: user.uid,
+              receivedById: status === "received" ? user.uid : null,
+              receivedAt: p.receivedAt ? new Date(p.receivedAt as string) : (status === "received" ? new Date() : null),
+              expectedAt,
+              // Phase 2 fields
+              currency,
+              exchangeRate,
+              freightCost,
+              insuranceCost,
+              customsDuty,
+              otherLandedCosts,
+              // Tier 1.2 — landed cost allocation method
+              landedCostAllocationMethod,
+              items: { create: cleanLineItems },
+            },
+            include: { items: true, supplier: true },
+          });
+
+          // If received, increment stock + create linked StockHistory entries atomically
+          // Phase 2: also increment by freeQuantity (buy 10 get 1 free → stock gets 11)
+          // Tier 1.2: update product costPrice to use LANDED cost (raw cost + landedCostPerUnit)
+          //          so margin reports reflect the true cost of goods sold.
+          if (created.status === "received") {
+            for (const item of created.items) {
+              if (item.productId) {
+                const totalReceived = item.quantity + (item.freeQuantity || 0);
+                // Tier 1.2 — landed cost per unit (0 if not allocated)
+                const landedUnitCost = item.cost + (item.landedCostPerUnit || 0);
+                // Update product: increment qty, update costPrice (with landed cost) + receivedDate + expiryDate
+                await tx.product.update({
+                  where: { id: item.productId },
+                  data: {
+                    quantity: { increment: totalReceived },
+                    ...(item.cost > 0 && { costPrice: landedUnitCost }),
+                    receivedDate: new Date(),
+                    ...(item.expiryDate && { expiryDate: item.expiryDate }),
+                    // Phase 2: update retail/trade/wholesale prices if provided
+                    ...(item.retailPrice > 0 && { retailPrice: item.retailPrice }),
+                    ...(item.tradePrice > 0 && { tradePrice: item.tradePrice }),
+                    ...(item.wholesalePrice > 0 && { wholesalePrice: item.wholesalePrice }),
+                  },
+                });
+                await tx.stockHistory.create({
+                  data: {
+                    productId: item.productId,
+                    action: "received",
+                    quantity: totalReceived,
+                    reason: `Purchase ${refNo}${item.batchNumber ? ` · batch ${item.batchNumber}` : ""}${item.landedCostPerUnit > 0 ? ` · landed ₵${item.landedCostPerUnit.toFixed(2)}/unit` : ""}`,
+                    reference: refNo,
+                    purchaseId: created.id,
+                    userId: user.uid,
+                  },
+                });
+              }
             }
           }
-        } else if (landedCostAllocationMethod === "manual") {
-          // Caller supplies landedCostPerUnit per line — trust their values
-          for (const l of lineItemsData) {
-            // No transformation needed — landedCostPerUnit already set by caller
-            // (default 0 if not provided)
-          }
-        }
-      }
 
-      // Strip the _lineNet helper field before create
-      const cleanLineItems = lineItemsData.map(({ _lineNet, ...rest }: any) => rest);
-
-      // Create purchase + items
-      const newPurchase = await tx.purchase.create({
-        data: {
-          refNo,
-          type: p.type || "purchase",
-          supplierId: p.supplierId || null,
-          supplierName: p.supplierName || "",
-          status,
-          subtotal: Number(p.subtotal) || 0,
-          discount: Number(p.discount) || 0,
-          taxAmount: Number(p.taxAmount) || 0,
-          total,
-          amountPaid,
-          notes: p.notes || "",
-          createdById: user.uid,
-          receivedById: status === "received" ? user.uid : null,
-          receivedAt: p.receivedAt ? new Date(p.receivedAt as string) : (status === "received" ? new Date() : null),
-          expectedAt,
-          // Phase 2 fields
-          currency,
-          exchangeRate,
-          freightCost,
-          insuranceCost,
-          customsDuty,
-          otherLandedCosts,
-          // Tier 1.2 — landed cost allocation method
-          landedCostAllocationMethod,
-          items: { create: cleanLineItems },
-        },
-        include: { items: true, supplier: true },
-      });
-
-      // If received, increment stock + create linked StockHistory entries atomically
-      // Phase 2: also increment by freeQuantity (buy 10 get 1 free → stock gets 11)
-      // Tier 1.2: update product costPrice to use LANDED cost (raw cost + landedCostPerUnit)
-      //          so margin reports reflect the true cost of goods sold.
-      if (newPurchase.status === "received") {
-        for (const item of newPurchase.items) {
-          if (item.productId) {
-            const totalReceived = item.quantity + (item.freeQuantity || 0);
-            // Tier 1.2 — landed cost per unit (0 if not allocated)
-            const landedUnitCost = item.cost + (item.landedCostPerUnit || 0);
-            // Update product: increment qty, update costPrice (with landed cost) + receivedDate + expiryDate
-            await tx.product.update({
-              where: { id: item.productId },
-              data: {
-                quantity: { increment: totalReceived },
-                ...(item.cost > 0 && { costPrice: landedUnitCost }),
-                receivedDate: new Date(),
-                ...(item.expiryDate && { expiryDate: item.expiryDate }),
-                // Phase 2: update retail/trade/wholesale prices if provided
-                ...(item.retailPrice > 0 && { retailPrice: item.retailPrice }),
-                ...(item.tradePrice > 0 && { tradePrice: item.tradePrice }),
-                ...(item.wholesalePrice > 0 && { wholesalePrice: item.wholesalePrice }),
-              },
-            });
-            await tx.stockHistory.create({
-              data: {
-                productId: item.productId,
-                action: "received",
-                quantity: totalReceived,
-                reason: `Purchase ${refNo}${item.batchNumber ? ` · batch ${item.batchNumber}` : ""}${item.landedCostPerUnit > 0 ? ` · landed ₵${item.landedCostPerUnit.toFixed(2)}/unit` : ""}`,
-                reference: refNo,
-                purchaseId: newPurchase.id,
-                userId: user.uid,
-              },
+          // Update supplier balance: if received but not fully paid, the outstanding
+          // amount (total - amountPaid) is now owed to the supplier.
+          if (created.supplierId && status === "received" && total > amountPaid) {
+            const outstanding = total - amountPaid;
+            await tx.supplier.update({
+              where: { id: created.supplierId },
+              data: { balance: { increment: outstanding } },
             });
           }
-        }
-      }
 
-      // Update supplier balance: if received but not fully paid, the outstanding
-      // amount (total - amountPaid) is now owed to the supplier.
-      if (newPurchase.supplierId && status === "received" && total > amountPaid) {
-        const outstanding = total - amountPaid;
-        await tx.supplier.update({
-          where: { id: newPurchase.supplierId },
-          data: { balance: { increment: outstanding } },
+          // Audit log inside the transaction
+          await auditLogTx(tx, {
+            userId: user.uid,
+            user: user.username,
+            action: "CREATE",
+            module: "purchase",
+            details: `Purchase ${refNo} created — ${created.items.length} items, total ${total.toFixed(2)}, status: ${status}${created.supplier ? `, supplier: ${created.supplier.name}` : ""}`,
+            severity: "info",
+            ipAddress: ip,
+            userAgent: req.headers.get("user-agent") || "",
+          });
+
+          // Stash refNo on the result so the outer scope can return it.
+          (created as any)._refNo = refNo;
+          return created;
         });
+        // Success — break out of the retry loop.
+        lastRefNoError = null;
+        break;
+      } catch (e: any) {
+        // P2002 = unique constraint violation. If it's the refNo column, retry
+        // with a fresh refNo (generated above each loop iteration). Any other
+        // P2002 (e.g. duplicate partNo on a related table) should bubble up.
+        const isRefNoConflict =
+          e?.code === "P2002" &&
+          Array.isArray(e?.meta?.target) &&
+          (e.meta.target as string[]).includes("refNo");
+        if (isRefNoConflict && attempt < MAX_REFNO_RETRIES - 1) {
+          lastRefNoError = e;
+          // Loop again — generatePurchaseRefNo() will mint a new value.
+          continue;
+        }
+        // Not a refNo conflict, or we've exhausted retries — rethrow.
+        throw e;
       }
+    }
 
-      // Audit log inside the transaction
-      await auditLogTx(tx, {
-        userId: user.uid,
-        user: user.username,
-        action: "CREATE",
-        module: "purchase",
-        details: `Purchase ${refNo} created — ${newPurchase.items.length} items, total ${total.toFixed(2)}, status: ${status}${newPurchase.supplier ? `, supplier: ${newPurchase.supplier.name}` : ""}`,
-        severity: "info",
-        ipAddress: ip,
-        userAgent: req.headers.get("user-agent") || "",
-      });
+    if (lastRefNoError || !newPurchase) {
+      // Exhausted retries — return a friendly error instead of leaking Prisma.
+      console.error("POST /api/purchases refNo collision exhausted:", lastRefNoError);
+      return NextResponse.json(
+        {
+          error: "Could not generate a unique reference number",
+          detail: "The system tried 5 times to mint a unique purchase reference but the database kept rejecting it. Please try again in a moment.",
+          code: "REFNO_COLLISION",
+        },
+        { status: 503 }
+      );
+    }
 
-      return newPurchase;
-    });
+    const purchase = newPurchase;
+    const refNo = (purchase as any)._refNo;
+    delete (purchase as any)._refNo;
 
-    return NextResponse.json({ success: true, purchase });
+    return NextResponse.json({ success: true, purchase, refNo });
   } catch (e: any) {
     console.error("POST /api/purchases error:", e);
     // Surface FK violations as friendly 400s — defense in depth in case the
@@ -315,6 +371,22 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-    return NextResponse.json({ error: e?.message || "Failed to create purchase" }, { status: 500 });
+    // FIX: Never leak raw Prisma messages to the client. Previously the line
+    //      `error: e?.message` exposed "Unique constraint failed on the fields:
+    //      (RefNo)" verbatim. Now we only return a friendly summary.
+    if (e?.code === "P2002") {
+      return NextResponse.json(
+        {
+          error: "Duplicate reference number",
+          detail: "This purchase could not be saved because the reference number is already in use. Please try saving again — the system will generate a new reference.",
+          code: "DUPLICATE_REFNO",
+        },
+        { status: 409 }
+      );
+    }
+    return NextResponse.json(
+      { error: "Failed to save purchase", detail: "An unexpected error occurred while saving. The error has been logged — please try again.", code: "INTERNAL" },
+      { status: 500 }
+    );
   }
 }

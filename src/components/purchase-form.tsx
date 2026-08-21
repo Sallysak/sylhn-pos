@@ -141,6 +141,11 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
   const [paidAmount, setPaidAmount] = useState(0);
   const [saved, setSaved] = useState(false);
   const [showDraftBanner, setShowDraftBanner] = useState(false);
+  // FIX: dedicated "saving" flag so the Save button can be disabled during
+  // the request — previously nothing stopped the user pressing F2 / clicking
+  // Save twice in quick succession, which is one of the triggers for the
+  // P2002 refNo collision (the other is two users saving in the same second).
+  const [isSaving, setIsSaving] = useState(false);
   // Track the saved purchase ID + refNo so Email/Payment/Delete buttons can call the right endpoints
   const [savedPurchaseId, setSavedPurchaseId] = useState<string | null>(null);
   const [savedRefNo, setSavedRefNo] = useState<string>("");
@@ -583,6 +588,7 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
 
   // ===== Working Action Handlers =====
   const handleSave = async () => {
+    if (isSaving) return; // FIX: guard against double-submit
     if (lines.length === 0) { toast({ title: "No items to save", variant: "destructive" }); return; }
     if (!supplier) { toast({ title: "Select a supplier first", variant: "destructive" }); return; }
     // Validate line items — prevent saving with invalid quantities or prices
@@ -591,13 +597,46 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
       toast({ title: "Invalid line items", description: `${invalidLines.length} item(s) have missing part number, zero quantity, or negative cost.`, variant: "destructive" });
       return;
     }
+    // FIX: validate taxRate (must be 0..1 — 0.15 = 15%) and discountValue (>= 0).
+    //      Previously a user could type "50" for tax rate meaning 50% but it was
+    //      silently stored as 5000%, and a negative discount could inflate totals.
+    const badTax = lines.find(l => typeof l.taxRate === "number" && (l.taxRate < 0 || l.taxRate > 1));
+    if (badTax) {
+      toast({
+        title: "Invalid tax rate",
+        description: `Tax rate on "${badTax.partNo}" must be between 0 and 1 (e.g. 0.15 for 15%). Got ${badTax.taxRate}.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    const badDisc = lines.find(l => (l.discountValue ?? 0) < 0);
+    if (badDisc) {
+      toast({
+        title: "Invalid discount",
+        description: `Discount on "${badDisc.partNo}" cannot be negative.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    if (paidAmount < 0) {
+      toast({ title: "Invalid paid amount", description: "Paid amount cannot be negative.", variant: "destructive" });
+      return;
+    }
+    if (freightCost < 0 || insuranceCost < 0 || customsDuty < 0 || otherLandedCosts < 0) {
+      toast({ title: "Invalid landed cost", description: "Freight, insurance, customs, and other costs cannot be negative.", variant: "destructive" });
+      return;
+    }
 
     // Premium fix: actually POST the purchase to the server so it's persisted.
     // Previously this was a stub that only showed a toast — the purchase was
     // lost on refresh.
     const supplierObj = suppliers.find(s => s.name === supplier || `${s.code}-${s.name}` === supplier);
     const payload = {
-      refNo: invoiceNo,
+      // FIX: do NOT send refNo from the client. The server always generates a
+      // unique one (with P2002 retry). Previously we sent `refNo: invoiceNo`,
+      // which collided because invoiceNo is `PUR-${Date.now().slice(-6)}` —
+      // only 6 digits of millis, so two saves within the same second collided.
+      refNo: undefined,
       type: 'purchase' as const,
       supplierId: supplierObj?.id || null,
       supplierName: supplier || '',
@@ -639,6 +678,7 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
       })),
     };
 
+    setIsSaving(true);
     try {
       const res = await authedFetch('/api/purchases', {
         method: 'POST',
@@ -650,35 +690,52 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
       if (!res.ok || !data.success) {
         // Surface FK errors with a friendly message — this is the fix for
         // "foreign key constraint violated on purchase_supplierid_fkey"
-        const errMsg = data.code === "SUPPLIER_NOT_FOUND" || data.code === "FK_SUPPLIER"
-          ? "Supplier not found. Please re-select the supplier from the dropdown."
-          : data.code === "SUPPLIER_NOT_UUID"
-          ? "The supplier value looks wrong. Please re-select the supplier from the dropdown."
-          : data.code === "SUPPLIER_DEACTIVATED"
-          ? "This supplier is deactivated. Reactivate them in the supplier master file first."
-          : data.error || `HTTP ${res.status}`;
+        let errMsg: string;
+        switch (data.code) {
+          case "SUPPLIER_NOT_FOUND":
+          case "FK_SUPPLIER":
+            errMsg = "Supplier not found. Please re-select the supplier from the dropdown.";
+            break;
+          case "SUPPLIER_NOT_UUID":
+            errMsg = "The supplier value looks wrong. Please re-select the supplier from the dropdown.";
+            break;
+          case "SUPPLIER_DEACTIVATED":
+            errMsg = "This supplier is deactivated. Reactivate them in the supplier master file first.";
+            break;
+          // FIX: handle the new refNo-collision codes from the server.
+          case "DUPLICATE_REFNO":
+          case "REFNO_COLLISION":
+            errMsg = "The reference number was already used. Please try saving again — a new reference will be generated automatically.";
+            break;
+          default:
+            errMsg = data.error || `Failed to save (HTTP ${res.status})`;
+        }
         throw new Error(errMsg);
       }
       setSaved(true);
       // Track the saved purchase ID + refNo so Email/Payment buttons work
       if (data.purchase?.id) setSavedPurchaseId(data.purchase.id);
-      if (data.purchase?.refNo) {
-        setSavedRefNo(data.purchase.refNo);
-        setInvoiceNo(data.purchase.refNo);
+      // FIX: server now returns the refNo it generated. Use that everywhere.
+      const finalRefNo = data.refNo || data.purchase?.refNo;
+      if (finalRefNo) {
+        setSavedRefNo(finalRefNo);
+        setInvoiceNo(finalRefNo);
       }
       if (data.purchase?.status) setPurchaseStatus(data.purchase.status);
       // Clear draft since the purchase is now saved
       try { window.localStorage.removeItem(draftKey); } catch {}
       toast({
         title: "Purchase saved to server",
-        description: `${data.purchase.refNo} · ${lines.length} items · ${formatGHS(totals.grandTotal)} · stock updated`,
+        description: `${finalRefNo || 'Saved'} · ${lines.length} items · ${formatGHS(totals.grandTotal)} · stock updated`,
       });
     } catch (e: any) {
       toast({
         title: "Failed to save purchase",
-        description: e?.message || "Network error",
+        description: e?.message || "Network error — please check your connection and try again.",
         variant: "destructive",
       });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -1057,8 +1114,22 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
 
           {/* Data Grid */}
           <div className="flex-1 overflow-hidden flex flex-col min-h-0">
-            <div className="flex-shrink-0 grid grid-cols-[40px_90px_1fr_45px_60px_55px_50px_45px_70px] gap-1 px-2 py-1 text-[9px] font-bold text-slate-700 border-b border-slate-400" style={{ backgroundColor: '#E0E0E0' }}>
-              <div className="text-center">#</div><div>Part Number</div><div>Details</div><div className="text-right">Qty</div><div className="text-right">Cost</div><div className="text-right">Disc</div><div className="text-right">Tax%</div><div className="text-center">Expiry</div><div className="text-right">Total</div>
+            {/* FIX: grid template widened so the Disc cell (select+input) and the
+                 Expiry cell (native date input, intrinsic min ~100px) no longer
+                 overflow into their neighbours. min-w-0 on each cell is required
+                 so truncate/overflow-hidden actually clip instead of expanding
+                 the grid track. Header now lives inside the same horizontal
+                 ScrollArea wrapper as the rows so they share one scroll context. */}
+            <div className="flex-shrink-0 grid grid-cols-[52px_90px_minmax(120px,1fr)_50px_64px_84px_54px_110px_72px] gap-1 px-2 py-1 text-[9px] font-bold text-slate-700 border-b border-slate-400" style={{ backgroundColor: '#E0E0E0' }}>
+              <div className="text-center min-w-0">#</div>
+              <div className="min-w-0">Part Number</div>
+              <div className="min-w-0">Details</div>
+              <div className="text-right min-w-0">Qty</div>
+              <div className="text-right min-w-0">Cost</div>
+              <div className="text-right min-w-0">Disc</div>
+              <div className="text-right min-w-0">Tax%</div>
+              <div className="text-center min-w-0">Expiry</div>
+              <div className="text-right min-w-0">Total</div>
             </div>
             <ScrollArea className="flex-1 min-h-0">
               <div>
@@ -1085,17 +1156,17 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
                       <div key={line.id}>
                         <div
                           onClick={() => setSelectedLine(idx)}
-                          className="grid grid-cols-[40px_90px_1fr_45px_60px_55px_50px_45px_70px] gap-1 px-2 py-0.5 text-[9px] cursor-pointer border-b border-slate-100"
+                          className="grid grid-cols-[52px_90px_minmax(120px,1fr)_50px_64px_84px_54px_110px_72px] gap-1 px-2 py-0.5 text-[9px] cursor-pointer border-b border-slate-100"
                           style={{ backgroundColor: isSelected ? '#E6F0FF' : (idx % 2 === 1 ? '#F8F8F8' : '#FFFFFF') }}
                         >
                           {/* # + reorder + expand */}
-                          <div className="flex items-center justify-center gap-0.5 text-slate-500" onClick={(e) => e.stopPropagation()}>
-                            <span className="text-[8px]">{idx + 1}</span>
+                          <div className="flex items-center justify-center gap-0.5 text-slate-500 min-w-0 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                            <span className="text-[8px] shrink-0">{idx + 1}</span>
                             <button
                               onClick={() => moveLine(idx, 'up')}
                               disabled={idx === 0}
                               title="Move up"
-                              className={cn("h-3 w-3 rounded hover:bg-slate-200 flex items-center justify-center", idx === 0 && "opacity-30 cursor-not-allowed")}
+                              className={cn("h-3 w-3 rounded hover:bg-slate-200 flex items-center justify-center shrink-0", idx === 0 && "opacity-30 cursor-not-allowed")}
                             >
                               <ChevronUp className="h-2 w-2" />
                             </button>
@@ -1103,40 +1174,40 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
                               onClick={() => moveLine(idx, 'down')}
                               disabled={idx === lines.length - 1}
                               title="Move down"
-                              className={cn("h-3 w-3 rounded hover:bg-slate-200 flex items-center justify-center", idx === lines.length - 1 && "opacity-30 cursor-not-allowed")}
+                              className={cn("h-3 w-3 rounded hover:bg-slate-200 flex items-center justify-center shrink-0", idx === lines.length - 1 && "opacity-30 cursor-not-allowed")}
                             >
                               <ChevronDown className="h-2 w-2" />
                             </button>
                             <button
                               onClick={() => setExpandedLine(isExpanded ? null : line.id)}
                               title={isExpanded ? "Hide details (batch, free qty, prices)" : "Show details (batch, free qty, prices)"}
-                              className="h-3 w-3 rounded hover:bg-slate-200 flex items-center justify-center"
+                              className="h-3 w-3 rounded hover:bg-slate-200 flex items-center justify-center shrink-0"
                             >
                               <Hash className="h-2 w-2" />
                             </button>
                           </div>
-                          <div className="font-mono truncate">{line.partNo}</div>
-                          <div className="truncate">{line.details}</div>
+                          <div className="font-mono truncate min-w-0">{line.partNo}</div>
+                          <div className="truncate min-w-0">{line.details}</div>
                           {/* Qty */}
-                          <div className="text-right">
+                          <div className="text-right min-w-0">
                             <input type="number" value={line.quantity}
                               onClick={(e) => e.stopPropagation()}
                               onChange={(e) => updateLine(idx, 'quantity', parseFloat(e.target.value) || 0)}
                               className="w-full text-right font-mono bg-transparent border-b border-transparent hover:border-slate-300 focus:border-green-400 outline-none" />
                           </div>
                           {/* Cost */}
-                          <div className="text-right">
+                          <div className="text-right min-w-0">
                             <input type="number" step="0.01" value={line.cost}
                               onClick={(e) => e.stopPropagation()}
                               onChange={(e) => updateLine(idx, 'cost', parseFloat(e.target.value) || 0)}
                               className="w-full text-right font-mono bg-transparent border-b border-transparent hover:border-slate-300 focus:border-green-400 outline-none" />
                           </div>
                           {/* Phase 2: Discount (type + value) */}
-                          <div className="text-right flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+                          <div className="text-right flex items-center justify-end gap-0.5 min-w-0 overflow-hidden" onClick={(e) => e.stopPropagation()}>
                             <select
                               value={line.discountType || ""}
                               onChange={(e) => updateLine(idx, 'discountType', (e.target.value || null) as any)}
-                              className="text-[8px] px-0.5 h-4 rounded border border-slate-200 bg-white"
+                              className="text-[8px] px-0.5 h-4 rounded border border-slate-200 bg-white shrink-0 w-9"
                               title="Discount type"
                             >
                               <option value="">—</option>
@@ -1147,11 +1218,11 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
                               type="number" step="0.01" value={line.discountValue || 0}
                               onChange={(e) => updateLine(idx, 'discountValue', parseFloat(e.target.value) || 0)}
                               disabled={!line.discountType}
-                              className="w-10 text-right font-mono bg-transparent border-b border-transparent hover:border-slate-300 focus:border-green-400 outline-none disabled:opacity-40"
+                              className="w-12 text-right font-mono bg-transparent border-b border-transparent hover:border-slate-300 focus:border-green-400 outline-none disabled:opacity-40"
                             />
                           </div>
                           {/* Phase 2: Tax rate (replaces simple checkbox) */}
-                          <div className="text-right" onClick={(e) => e.stopPropagation()} title="Tax rate (0.15 = 15%)">
+                          <div className="text-right min-w-0" onClick={(e) => e.stopPropagation()} title="Tax rate (0.15 = 15%)">
                             <input
                               type="number" step="0.005" min="0" max="1" value={effectiveTaxRate}
                               onChange={(e) => updateLine(idx, 'taxRate', parseFloat(e.target.value) || 0)}
@@ -1159,7 +1230,7 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
                             />
                           </div>
                           {/* Expiry */}
-                          <div className="text-center text-slate-600">
+                          <div className="text-center text-slate-600 min-w-0">
                             <input
                               type="date"
                               value={line.expiry}
@@ -1169,7 +1240,7 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
                             />
                           </div>
                           {/* Total */}
-                          <div className="text-right font-mono font-semibold">
+                          <div className="text-right font-mono font-semibold min-w-0">
                             {lineTotal.toFixed(2)}
                             {lineDiscount > 0 && (
                               <div className="text-[7px] text-emerald-600">−{lineDiscount.toFixed(2)}</div>
@@ -1330,7 +1401,7 @@ export function PurchaseForm({ onBack, products, groups, suppliers }: PurchaseFo
 
           {/* Action Buttons */}
           <div className="flex-shrink-0 px-3 py-1.5 flex items-center gap-1.5 border-t border-slate-300 flex-wrap" style={{ backgroundColor: '#F0F0F0' }}>
-            <button onClick={handleSave} className="h-7 px-3 rounded text-white text-[9px] font-semibold flex items-center gap-1 transition shadow-sm" style={{ backgroundColor: GREEN }}> <Save className="h-3 w-3" /> Save <kbd className="text-[7px] bg-white/20 px-0.5 rounded">F2</kbd></button>
+            <button onClick={handleSave} disabled={isSaving} className={cn("h-7 px-3 rounded text-white text-[9px] font-semibold flex items-center gap-1 transition shadow-sm", isSaving && "opacity-60 cursor-wait")} style={{ backgroundColor: GREEN }}> <Save className="h-3 w-3" /> {isSaving ? 'Saving…' : 'Save'} <kbd className="text-[7px] bg-white/20 px-0.5 rounded">F2</kbd></button>
             <button onClick={handlePrint} className="h-7 px-3 rounded text-white text-[9px] font-semibold flex items-center gap-1 transition shadow-sm" style={{ backgroundColor: GREEN }}> <Printer className="h-3 w-3" /> Print <kbd className="text-[7px] bg-white/20 px-0.5 rounded">F3</kbd></button>
             <button onClick={handleEmail} disabled={!savedPurchaseId} title={!savedPurchaseId ? "Save the purchase first to enable email" : "Email this purchase order to the supplier"} className={cn("h-7 px-3 rounded text-white text-[9px] font-semibold flex items-center gap-1 transition shadow-sm", !savedPurchaseId && "opacity-40 cursor-not-allowed")} style={{ backgroundColor: GREEN }}> <Mail className="h-3 w-3" /> Email</button>
             <button onClick={handleDelete} className="h-7 px-3 rounded text-white text-[9px] font-semibold flex items-center gap-1 transition shadow-sm" style={{ backgroundColor: GREEN }}> <Trash2 className="h-3 w-3" /> Delete <kbd className="text-[7px] bg-white/20 px-0.5 rounded">F4</kbd></button>
