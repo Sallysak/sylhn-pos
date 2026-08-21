@@ -77,7 +77,41 @@ export async function POST(req: NextRequest) {
  *   3. Rule-based fallback message
  */
 async function getBusinessAiReply(messages: Array<{ role: string; content: string }>): Promise<string> {
-  // PRIMARY PATH: Z.AI SDK
+  // ===== PRIMARY PATH: External API (Groq/OpenAI) =====
+  const baseUrl = process.env.AI_BASE_URL;
+  const apiKey = process.env.AI_API_KEY;
+  if (baseUrl && apiKey) {
+    try {
+      const response = await fetch(`${baseUrl.replace(/\/$/, '')}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: process.env.AI_MODEL || 'llama-3.3-70b-versatile',
+          messages,
+          temperature: 0.4,
+          max_tokens: 1500,
+          stream: false,
+        }),
+      })
+
+      if (!response.ok) {
+        const errText = await response.text()
+        console.error('[business-chat] External AI API error:', response.status, errText)
+        throw new Error(`AI service error: ${response.status}`)
+      }
+
+      const data = await response.json()
+      const reply = data.choices?.[0]?.message?.content
+      if (reply && reply.trim()) return reply.trim()
+    } catch (e: any) {
+      console.warn('[business-chat] External API failed, trying Z.AI SDK:', e?.message)
+    }
+  }
+
+  // ===== FALLBACK: Z.AI SDK =====
   try {
     const { chat: zaiChat, isZaiConfigured } = await import('@/lib/zai');
     const configured = await isZaiConfigured();
@@ -85,46 +119,16 @@ async function getBusinessAiReply(messages: Array<{ role: string; content: strin
       const text = await zaiChat({
         messages: messages as any,
         thinking: { type: 'disabled' },
-        temperature: 0.4,  // Lower temp for analytical responses
+        temperature: 0.4,
         maxTokens: 1500,
       });
       if (text && text.trim()) return text.trim();
     }
   } catch (e: any) {
-    console.warn('[business-chat] Z.AI SDK failed, trying external API:', e?.message);
+    console.warn('[business-chat] Z.AI SDK failed:', e?.message);
   }
 
-  // FALLBACK: External API
-  const baseUrl = process.env.AI_BASE_URL;
-  const apiKey = process.env.AI_API_KEY;
-  if (baseUrl && apiKey) {
-    const response = await fetch(`${baseUrl.replace(/\/$/, '')}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: process.env.AI_MODEL || 'llama-3.3-70b-versatile',
-        messages,
-        temperature: 0.4,
-        max_tokens: 1500,
-        stream: false,
-      }),
-    })
-
-    if (!response.ok) {
-      const errText = await response.text()
-      console.error('External AI API error:', errText)
-      throw new Error(`AI service error: ${response.status}`)
-    }
-
-    const data = await response.json()
-    const reply = data.choices?.[0]?.message?.content
-    if (reply && reply.trim()) return reply.trim()
-  }
-
-  // LAST RESORT
+  // ===== LAST RESORT =====
   return "I'm currently unable to connect to the AI service. " +
     "Please review the dashboard data directly or try again in a moment.";
 }

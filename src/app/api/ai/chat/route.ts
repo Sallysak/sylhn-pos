@@ -81,15 +81,53 @@ export async function POST(req: NextRequest) {
 }
 
 /**
- * Get an AI reply. Primary path: Z.AI SDK (works out-of-the-box, no env vars
- * required on Railway). Fallback: external OpenAI-compatible API if
- * AI_BASE_URL + AI_API_KEY are set (Groq, OpenAI, OpenRouter, etc.).
+ * Get an AI reply.
  *
- * Previously this only used the external API path, which failed with 404 when
- * AI_BASE_URL was unset (fetch went to `undefined/chat/completions`).
+ * PRIMARY PATH: External OpenAI-compatible API (Groq/OpenAI/OpenRouter) if
+ *   AI_BASE_URL + AI_API_KEY are set. This is the recommended production path.
+ *
+ * FALLBACK: Z.AI SDK (works in dev sandbox via /etc/.z-ai-config, or on
+ *   Railway if ZAI_API_KEY env var is set).
+ *
+ * LAST RESORT: rule-based message — never leave the user with an error.
  */
 async function getAiReply(messages: Array<{ role: string; content: string }>): Promise<string> {
-  // PRIMARY PATH: Z.AI SDK — works on Railway with zero configuration
+  // ===== PRIMARY PATH: External API (Groq/OpenAI) =====
+  const baseUrl = process.env.AI_BASE_URL;
+  const apiKey = process.env.AI_API_KEY;
+  if (baseUrl && apiKey) {
+    try {
+      const response = await fetch(`${baseUrl.replace(/\/$/, '')}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: process.env.AI_MODEL || 'llama-3.3-70b-versatile',
+          messages,
+          temperature: 0.7,
+          max_tokens: 1024,
+          stream: false,
+        }),
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        console.error('[ai/chat] External AI API error:', response.status, errText);
+        throw new Error(`AI service error: ${response.status} — ${errText.slice(0, 200)}`);
+      }
+
+      const data = await response.json();
+      const reply = data.choices?.[0]?.message?.content;
+      if (reply && reply.trim()) return reply.trim();
+    } catch (e: any) {
+      console.warn('[ai/chat] External API failed, trying Z.AI SDK fallback:', e?.message);
+      // Fall through to Z.AI SDK
+    }
+  }
+
+  // ===== FALLBACK: Z.AI SDK (dev sandbox or Railway with ZAI_API_KEY) =====
   try {
     const configured = await isZaiConfigured();
     if (configured) {
@@ -102,40 +140,10 @@ async function getAiReply(messages: Array<{ role: string; content: string }>): P
       if (text && text.trim()) return text.trim();
     }
   } catch (e: any) {
-    console.warn('[ai/chat] Z.AI SDK failed, trying external API fallback:', e?.message);
+    console.warn('[ai/chat] Z.AI SDK failed:', e?.message);
   }
 
-  // FALLBACK: External OpenAI-compatible API (if AI_BASE_URL + AI_API_KEY are set)
-  const baseUrl = process.env.AI_BASE_URL;
-  const apiKey = process.env.AI_API_KEY;
-  if (baseUrl && apiKey) {
-    const response = await fetch(`${baseUrl.replace(/\/$/, '')}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: process.env.AI_MODEL || 'llama-3.3-70b-versatile',
-        messages,
-        temperature: 0.7,
-        max_tokens: 1024,
-        stream: false,
-      }),
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error('External AI API error:', errText);
-      throw new Error(`AI service error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const reply = data.choices?.[0]?.message?.content;
-    if (reply && reply.trim()) return reply.trim();
-  }
-
-  // LAST RESORT: rule-based response — never leave the user with an error
+  // ===== LAST RESORT: rule-based response =====
   return "I'm currently unable to connect to the AI service. " +
     "Please try again in a moment, or check the dashboard for current business data. " +
     "If this persists, contact your administrator to verify AI_API_KEY is set in the environment.";
