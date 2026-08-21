@@ -37,13 +37,36 @@ export async function POST(req: NextRequest) {
   } catch (e: any) { return e as Response; }
 
   try {
-    // 1. Fetch all products + all stock groups in parallel
+    // ===== STEP 0: Ensure default stock groups exist =====
+    // After a DB wipe, stock groups are gone. We need to recreate them before
+    // we can match products to groups.
+    const defaultGroups = [
+      { name: "Groceries", description: "Food items, fresh produce, dairy, meat, bakery, pantry, frozen", color: "emerald", icon: "🛒" },
+      { name: "Confectionery", description: "Snacks, candy, chocolates, sweets", color: "purple", icon: "🍫" },
+      { name: "Soft Drinks", description: "Non-alcoholic beverages, juices, water", color: "cyan", icon: "🥤" },
+      { name: "Hard Liquor", description: "Wine, spirits, and alcoholic beverages", color: "red", icon: "🍷" },
+      { name: "Households", description: "Household items, cleaning supplies, paper goods", color: "teal", icon: "🧴" },
+    ];
+    let groupsCreated = 0;
+    for (const g of defaultGroups) {
+      const existing = await db.stockGroup.findFirst({ where: { name: g.name } });
+      if (!existing) {
+        try {
+          await db.stockGroup.create({ data: g });
+          groupsCreated++;
+        } catch (e: any) {
+          console.warn(`[fix-product-groups] could not create group "${g.name}":`, e?.message);
+        }
+      }
+    }
+
+    // ===== STEP 1: Fetch all products + all stock groups in parallel =====
     const [products, groups] = await Promise.all([
       db.product.findMany({ select: { id: true, name: true, sku: true, category: true, groupId: true } }),
       db.stockGroup.findMany({ select: { id: true, name: true, icon: true } }),
     ]);
 
-    // 2. Build a lookup map: name (lowercase) → group ID, and also map id → id
+    // ===== STEP 2: Build a lookup map: name (lowercase) → group ID =====
     const nameToGroupId: Record<string, string> = {};
     for (const g of groups) {
       nameToGroupId[g.name.toLowerCase()] = g.id;
@@ -119,8 +142,9 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: `Fixed ${updated} of ${toFix.length} products. ${unmatched.length} products had no matching group.`,
+      message: `Created ${groupsCreated} default groups. Fixed ${updated} of ${toFix.length} products. ${unmatched.length} products had no matching group.`,
       summary: {
+        groupsCreated,
         totalProducts: products.length,
         totalGroups: groups.length,
         productsAlreadyHadGroup: products.length - toFix.length - unmatched.length,
